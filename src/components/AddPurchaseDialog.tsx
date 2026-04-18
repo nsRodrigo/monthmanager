@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useFinance } from "@/store/finance";
+import { useCards, useAddPurchase } from "@/store/finance";
 
 export function AddPurchaseDialog({
   open,
@@ -13,7 +13,8 @@ export function AddPurchaseDialog({
   defaultYear: number;
   defaultMonth: number;
 }) {
-  const { cards, addPurchase } = useFinance();
+  const { data: cards = [] } = useCards();
+  const addPurchase = useAddPurchase();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
@@ -33,9 +34,9 @@ export function AddPurchaseDialog({
     }
   }, [open, defaultYear, defaultMonth, cards]);
 
-  const submit = () => {
+  const submit = async () => {
     if (!description.trim() || !amount || !cardId) return;
-    addPurchase({
+    await addPurchase.mutateAsync({
       cardId,
       description: description.trim(),
       totalAmount: parseFloat(amount),
@@ -93,7 +94,7 @@ export function AddPurchaseDialog({
             />
             {total > 0 && n > 1 && (
               <p className="mt-2 text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> — distribuídas automaticamente nos próximos meses.
+                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> — última parcela ajusta os centavos. Cada parcela poderá ser editada individualmente.
               </p>
             )}
           </Field>
@@ -103,8 +104,12 @@ export function AddPurchaseDialog({
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
             Cancelar
           </button>
-          <button onClick={submit} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
-            Adicionar
+          <button
+            onClick={submit}
+            disabled={addPurchase.isPending}
+            className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {addPurchase.isPending ? "Salvando…" : "Adicionar"}
           </button>
         </div>
       </div>

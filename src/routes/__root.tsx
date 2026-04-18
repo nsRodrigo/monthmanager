@@ -1,7 +1,14 @@
-import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation } from "@tanstack/react-router";
-import { Wallet, LayoutDashboard, CalendarDays } from "lucide-react";
+import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Wallet, LayoutDashboard, CalendarDays, LogOut, Upload } from "lucide-react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
+import { AuthProvider, useAuth } from "@/store/auth";
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
+});
 
 function NotFoundComponent() {
   return (
@@ -9,14 +16,9 @@ function NotFoundComponent() {
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Página não encontrada</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          A página que você procura não existe.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">A página que você procura não existe.</p>
         <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
+          <Link to="/" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             Voltar ao início
           </Link>
         </div>
@@ -65,13 +67,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function BottomNav() {
   const loc = useLocation();
   const items = [
-    { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+    { to: "/", label: "Início", icon: LayoutDashboard, exact: true },
     { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
     { to: "/carteira", label: "Carteira", icon: Wallet, exact: false },
+    { to: "/importar", label: "Importar", icon: Upload, exact: false },
   ] as const;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-lg md:hidden">
-      <div className="mx-auto flex max-w-2xl items-center justify-around px-4 py-2">
+      <div className="mx-auto flex max-w-2xl items-center justify-around px-2 py-2">
         {items.map((it) => {
           const active = it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to);
           const Icon = it.icon;
@@ -79,7 +82,7 @@ function BottomNav() {
             <Link
               key={it.to}
               to={it.to}
-              className={`flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+              className={`flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-medium transition-colors ${
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -95,20 +98,22 @@ function BottomNav() {
 
 function SideNav() {
   const loc = useLocation();
+  const { signOut, user } = useAuth();
   const items = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
     { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
     { to: "/carteira", label: "Carteira", icon: Wallet, exact: false },
+    { to: "/importar", label: "Importar CSV", icon: Upload, exact: false },
   ] as const;
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border bg-card/40 p-6 md:block">
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/40 p-6 md:flex">
       <div className="mb-10 flex items-center gap-2">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
           <Wallet className="h-5 w-5 text-primary-foreground" />
         </div>
         <span className="text-lg font-bold tracking-tight">Finanças</span>
       </div>
-      <nav className="space-y-1">
+      <nav className="flex-1 space-y-1">
         {items.map((it) => {
           const active = it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to);
           const Icon = it.icon;
@@ -128,18 +133,65 @@ function SideNav() {
           );
         })}
       </nav>
+      <div className="mt-6 border-t border-border pt-4">
+        <p className="mb-2 truncate text-xs text-muted-foreground">{user?.email}</p>
+        <button
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+        >
+          <LogOut className="h-4 w-4" /> Sair
+        </button>
+      </div>
     </aside>
+  );
+}
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useRouterState({ select: (s) => s.location });
+  const [redirected, setRedirected] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    const path = location.pathname;
+    if (!user && path !== "/auth" && !redirected) {
+      setRedirected(true);
+      navigate({ to: "/auth" });
+    }
+  }, [user, loading, location.pathname, navigate, redirected]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!user && location.pathname !== "/auth") return null;
+
+  if (location.pathname === "/auth") {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <SideNav />
+      <main className="flex-1 pb-24 md:pb-0">{children}</main>
+      <BottomNav />
+    </div>
   );
 }
 
 function RootComponent() {
   return (
-    <div className="flex min-h-screen bg-background">
-      <SideNav />
-      <main className="flex-1 pb-24 md:pb-0">
-        <Outlet />
-      </main>
-      <BottomNav />
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AuthGate>
+          <Outlet />
+        </AuthGate>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

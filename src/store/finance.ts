@@ -403,7 +403,13 @@ export function useUpdateInstallment() {
       dueDate?: string;
       paid?: boolean;
     }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: {
+        amount?: number;
+        due_date?: string;
+        year?: number;
+        month?: number;
+        paid?: boolean;
+      } = {};
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.dueDate !== undefined) {
         patch.due_date = args.dueDate;

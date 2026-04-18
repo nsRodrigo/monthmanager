@@ -1,5 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useFinance } from "@/store/finance";
+import {
+  useCards,
+  useInstallments,
+  usePurchases,
+  useDebits,
+  useIncomes,
+  useWallet,
+  getMonthInstallments,
+  getMonthDebits,
+  getMonthIncomes,
+} from "@/store/finance";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { ArrowDownRight, ArrowUpRight, CreditCard, TrendingUp, Wallet, ChevronRight } from "lucide-react";
 
@@ -18,17 +28,22 @@ function Dashboard() {
   const year = now.getFullYear();
   const month = now.getMonth();
 
-  const { cards, walletAmount, getMonthInstallments, getMonthDebits, getMonthIncomes } = useFinance();
+  const { data: cards = [] } = useCards();
+  const { data: purchases = [] } = usePurchases();
+  const { data: installments = [] } = useInstallments();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
+  const { data: walletAmount = 0 } = useWallet();
 
-  const inst = getMonthInstallments(year, month);
-  const debits = getMonthDebits(year, month);
-  const incomes = getMonthIncomes(year, month);
+  const inst = getMonthInstallments(installments, year, month);
+  const monthDebits = getMonthDebits(debits, year, month);
+  const monthIncomes = getMonthIncomes(incomes, year, month);
 
   const totalCredit = inst.reduce((s, i) => s + i.amount, 0);
-  const totalDebits = debits.reduce((s, d) => s + d.amount, 0);
-  const totalIncome = incomes.reduce((s, i) => s + i.amount, 0);
+  const totalDebits = monthDebits.reduce((s, d) => s + d.amount, 0);
+  const totalIncome = monthIncomes.reduce((s, i) => s + i.amount, 0);
   const pendingCredit = inst.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
-  const pendingDebits = debits.filter((d) => !d.paid).reduce((s, d) => s + d.amount, 0);
+  const pendingDebits = monthDebits.filter((d) => !d.paid).reduce((s, d) => s + d.amount, 0);
 
   const balance = totalIncome - totalCredit - totalDebits;
 
@@ -40,7 +55,6 @@ function Dashboard() {
         <p className="mt-2 text-muted-foreground">Aqui está o resumo do seu mês.</p>
       </header>
 
-      {/* Hero balance */}
       <div className="bg-gradient-hero relative overflow-hidden rounded-3xl border border-border p-8 shadow-elevated">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
         <p className="text-sm font-medium text-muted-foreground">Saldo do mês</p>
@@ -54,29 +68,12 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Cards row */}
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <StatCard
-          title="Recebimentos"
-          value={formatCurrency(totalIncome)}
-          icon={<ArrowUpRight className="h-5 w-5" />}
-          gradient="bg-gradient-income"
-        />
-        <StatCard
-          title="Cartões de crédito"
-          value={formatCurrency(totalCredit)}
-          icon={<CreditCard className="h-5 w-5" />}
-          gradient="bg-gradient-credit"
-        />
-        <StatCard
-          title="Débitos"
-          value={formatCurrency(totalDebits)}
-          icon={<ArrowDownRight className="h-5 w-5" />}
-          gradient="bg-gradient-debit"
-        />
+        <StatCard title="Recebimentos" value={formatCurrency(totalIncome)} icon={<ArrowUpRight className="h-5 w-5" />} gradient="bg-gradient-income" />
+        <StatCard title="Cartões de crédito" value={formatCurrency(totalCredit)} icon={<CreditCard className="h-5 w-5" />} gradient="bg-gradient-credit" />
+        <StatCard title="Débitos" value={formatCurrency(totalDebits)} icon={<ArrowDownRight className="h-5 w-5" />} gradient="bg-gradient-debit" />
       </div>
 
-      {/* Cards do mês */}
       <section className="mt-10">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Cartões — {MONTHS[month]}</h2>
@@ -88,10 +85,15 @@ function Dashboard() {
             Ver mês completo <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
+        {cards.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+            Cadastre seu primeiro cartão na aba <Link to="/carteira" className="text-primary hover:underline">Carteira</Link>.
+          </div>
+        )}
         <div className="grid gap-3 md:grid-cols-2">
           {cards.map((c) => {
             const cardInst = inst.filter((i) => {
-              const pur = useFinance.getState().purchases.find((p) => p.id === i.purchaseId);
+              const pur = purchases.find((p) => p.id === i.purchaseId);
               return pur?.cardId === c.id;
             });
             const total = cardInst.reduce((s, i) => s + i.amount, 0);

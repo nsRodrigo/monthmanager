@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MesesIndexRouteImport } from './routes/meses.index'
 import { Route as MesesYearMonthRouteImport } from './routes/meses.$year.$month'
 
+const ImportarRoute = ImportarRouteImport.update({
+  id: '/importar',
+  path: '/importar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CarteiraRoute = CarteiraRouteImport.update({
   id: '/carteira',
   path: '/carteira',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
+  '/importar': typeof ImportarRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
+  '/importar': typeof ImportarRoute
   '/meses': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
 }
@@ -60,19 +68,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
+  '/importar': typeof ImportarRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/carteira' | '/meses/' | '/meses/$year/$month'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/carteira'
+    | '/importar'
+    | '/meses/'
+    | '/meses/$year/$month'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/carteira' | '/meses' | '/meses/$year/$month'
+  to:
+    | '/'
+    | '/auth'
+    | '/carteira'
+    | '/importar'
+    | '/meses'
+    | '/meses/$year/$month'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/carteira'
+    | '/importar'
     | '/meses/'
     | '/meses/$year/$month'
   fileRoutesById: FileRoutesById
@@ -81,12 +103,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   CarteiraRoute: typeof CarteiraRoute
+  ImportarRoute: typeof ImportarRoute
   MesesIndexRoute: typeof MesesIndexRoute
   MesesYearMonthRoute: typeof MesesYearMonthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/importar': {
+      id: '/importar'
+      path: '/importar'
+      fullPath: '/importar'
+      preLoaderRoute: typeof ImportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/carteira': {
       id: '/carteira'
       path: '/carteira'
@@ -129,9 +159,19 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CarteiraRoute: CarteiraRoute,
+  ImportarRoute: ImportarRoute,
   MesesIndexRoute: MesesIndexRoute,
   MesesYearMonthRoute: MesesYearMonthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

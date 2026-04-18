@@ -1,20 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useFinance } from "@/store/finance";
+import { useInstallments, useDebits, useIncomes } from "@/store/finance";
 import { formatCurrency, MONTHS, MONTHS_SHORT } from "@/lib/format";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/meses/")({
-  head: () => ({
-    meta: [{ title: "Meses — Finanças" }],
-  }),
+  head: () => ({ meta: [{ title: "Meses — Finanças" }] }),
   component: MonthsList,
 });
 
 function MonthsList() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
-  const { installments, debits, incomes, purchases } = useFinance();
+  const { data: installments = [] } = useInstallments();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
 
   const monthSummary = (m: number) => {
     const cInst = installments.filter((i) => i.year === year && i.month === m);
@@ -30,9 +30,6 @@ function MonthsList() {
     const inc = is.reduce((s, i) => s + i.amount, 0);
     return { out, inc, count: cInst.length + ds.length + is.length };
   };
-
-  // Just to avoid unused-var lint when purchases changes
-  void purchases;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">

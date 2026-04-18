@@ -1,11 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useFinance } from "@/store/finance";
+import {
+  useCards,
+  usePurchases,
+  useInstallments,
+  useDebits,
+  useIncomes,
+  useCardPayments,
+  useToggleInstallmentPaid,
+  useSetCardPaid,
+  useRemovePurchase,
+  useToggleDebitPaid,
+  useRemoveDebit,
+  useToggleIncomeReceived,
+  useRemoveIncome,
+  getMonthInstallments,
+  getMonthDebits,
+  getMonthIncomes,
+  isCardFullyPaid,
+  type Installment,
+  type Purchase,
+} from "@/store/finance";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
-import { ArrowLeft, Plus, CreditCard, ArrowDownRight, ArrowUpRight, Trash2, Check, Circle } from "lucide-react";
+import { ArrowLeft, Plus, CreditCard, ArrowDownRight, ArrowUpRight, Trash2, Check, Pencil } from "lucide-react";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
+import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
 
 export const Route = createFileRoute("/meses/$year/$month")({
   head: ({ params }) => ({
@@ -24,30 +45,30 @@ function MonthView() {
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
+  const [editing, setEditing] = useState<{ inst: Installment; pur: Purchase } | null>(null);
 
-  const {
-    cards,
-    purchases,
-    getMonthInstallments,
-    getMonthDebits,
-    getMonthIncomes,
-    toggleInstallmentPaid,
-    setCardPaid,
-    isCardFullyPaid,
-    removePurchase,
-    toggleDebitPaid,
-    removeDebit,
-    toggleIncomeReceived,
-    removeIncome,
-  } = useFinance();
+  const { data: cards = [] } = useCards();
+  const { data: purchases = [] } = usePurchases();
+  const { data: installments = [] } = useInstallments();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
+  const { data: cardPayments = {} } = useCardPayments();
 
-  const inst = getMonthInstallments(year, month);
-  const debits = getMonthDebits(year, month);
-  const incomes = getMonthIncomes(year, month);
+  const toggleInst = useToggleInstallmentPaid();
+  const setCardPaid = useSetCardPaid();
+  const removePurchase = useRemovePurchase();
+  const toggleDebit = useToggleDebitPaid();
+  const removeDebit = useRemoveDebit();
+  const toggleIncome = useToggleIncomeReceived();
+  const removeIncome = useRemoveIncome();
+
+  const inst = getMonthInstallments(installments, year, month);
+  const monthDebits = getMonthDebits(debits, year, month);
+  const monthIncomes = getMonthIncomes(incomes, year, month);
 
   const totalCredit = inst.reduce((s, i) => s + i.amount, 0);
-  const totalDebits = debits.reduce((s, d) => s + d.amount, 0);
-  const totalIncome = incomes.reduce((s, i) => s + i.amount, 0);
+  const totalDebits = monthDebits.reduce((s, d) => s + d.amount, 0);
+  const totalIncome = monthIncomes.reduce((s, i) => s + i.amount, 0);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
@@ -90,7 +111,7 @@ function MonthView() {
                 return pur?.cardId === c.id;
               });
               const total = cardInst.reduce((s, i) => s + i.amount, 0);
-              const paid = isCardFullyPaid(c.id, year, month);
+              const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
               return (
                 <div key={c.id} className="overflow-hidden rounded-2xl border border-border bg-gradient-card">
                   <div className="flex items-center justify-between gap-3 border-b border-border p-5">
@@ -98,11 +119,13 @@ function MonthView() {
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color }} />
                       <div>
                         <p className="font-semibold">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{cardInst.length} {cardInst.length === 1 ? "parcela" : "parcelas"} · {formatCurrency(total)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {cardInst.length} {cardInst.length === 1 ? "parcela" : "parcelas"} · {formatCurrency(total)}
+                        </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => setCardPaid(c.id, year, month, !paid)}
+                      onClick={() => setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })}
                       className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
                         paid ? "bg-success/15 text-success hover:bg-success/25" : "bg-warning/15 text-warning hover:bg-warning/25"
                       }`}
@@ -121,29 +144,31 @@ function MonthView() {
                       return (
                         <div key={i.id} className="flex items-center gap-3 px-5 py-3">
                           <button
-                            onClick={() => toggleInstallmentPaid(i.id)}
+                            onClick={() => toggleInst(i.id, !i.paid)}
                             className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
                               i.paid ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
                             }`}
                           >
-                            {i.paid ? <Check className="h-3.5 w-3.5" /> : <Circle className="h-3 w-3 opacity-0" />}
+                            {i.paid && <Check className="h-3.5 w-3.5" />}
                           </button>
-                          <div className="flex-1 min-w-0">
+                          <button
+                            onClick={() => setEditing({ inst: i, pur })}
+                            className="flex-1 min-w-0 text-left"
+                          >
                             <p className={`truncate text-sm font-medium ${i.paid ? "text-muted-foreground line-through" : ""}`}>
                               {pur.description}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {i.total > 1 ? `Parcela ${i.number}/${i.total}` : "À vista"} · {formatDate(pur.date)}
+                              {i.total > 1 ? `Parcela ${i.number}/${i.total}` : "À vista"} · venc. {formatDate(i.dueDate)}
                             </p>
-                          </div>
+                          </button>
                           <p className="text-sm font-semibold">{formatCurrency(i.amount)}</p>
                           <button
-                            onClick={() => {
-                              if (confirm("Excluir compra e todas as parcelas?")) removePurchase(pur.id);
-                            }}
-                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setEditing({ inst: i, pur })}
+                            className="text-muted-foreground hover:text-primary"
+                            title="Editar parcela"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </button>
                         </div>
                       );
@@ -163,11 +188,11 @@ function MonthView() {
 
         {tab === "debitos" && (
           <div className="space-y-3">
-            {debits.length === 0 && <Empty text="Nenhum débito neste mês." />}
-            {debits.map((d) => (
+            {monthDebits.length === 0 && <Empty text="Nenhum débito neste mês." />}
+            {monthDebits.map((d) => (
               <div key={d.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
                 <button
-                  onClick={() => toggleDebitPaid(d.id)}
+                  onClick={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
                   className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
                     d.paid ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
                   }`}
@@ -186,7 +211,7 @@ function MonthView() {
                   <p className="text-xs text-muted-foreground">{formatDate(d.date)}</p>
                 </div>
                 <p className="font-semibold text-debit">{formatCurrency(d.amount)}</p>
-                <button onClick={() => removeDebit(d.id)} className="text-muted-foreground hover:text-destructive">
+                <button onClick={() => removeDebit.mutate(d.id)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -202,11 +227,11 @@ function MonthView() {
 
         {tab === "recebimentos" && (
           <div className="space-y-3">
-            {incomes.length === 0 && <Empty text="Nenhum recebimento neste mês." />}
-            {incomes.map((i) => (
+            {monthIncomes.length === 0 && <Empty text="Nenhum recebimento neste mês." />}
+            {monthIncomes.map((i) => (
               <div key={i.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
                 <button
-                  onClick={() => toggleIncomeReceived(i.id)}
+                  onClick={() => toggleIncome.mutate({ id: i.id, received: !i.received })}
                   className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
                     i.received ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
                   }`}
@@ -218,7 +243,7 @@ function MonthView() {
                   <p className="text-xs text-muted-foreground">{formatDate(i.date)}</p>
                 </div>
                 <p className="font-semibold text-success">{formatCurrency(i.amount)}</p>
-                <button onClick={() => removeIncome(i.id)} className="text-muted-foreground hover:text-destructive">
+                <button onClick={() => removeIncome.mutate(i.id)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -233,7 +258,6 @@ function MonthView() {
         )}
       </div>
 
-      {/* FAB mobile */}
       <button
         onClick={() => {
           if (tab === "cartoes") setOpenPurchase(true);
@@ -248,6 +272,13 @@ function MonthView() {
       <AddPurchaseDialog open={openPurchase} onClose={() => setOpenPurchase(false)} defaultYear={year} defaultMonth={month} />
       <AddDebitDialog open={openDebit} onClose={() => setOpenDebit(false)} defaultYear={year} defaultMonth={month} />
       <AddIncomeDialog open={openIncome} onClose={() => setOpenIncome(false)} defaultYear={year} defaultMonth={month} />
+      <EditInstallmentDialog
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        installment={editing?.inst ?? null}
+        purchase={editing?.pur ?? null}
+        onDeletePurchase={editing ? () => removePurchase.mutate(editing.pur.id) : undefined}
+      />
     </div>
   );
 }

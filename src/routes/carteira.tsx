@@ -1,8 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useFinance } from "@/store/finance";
+import { useState, useEffect } from "react";
+import {
+  useCards,
+  useAddCard,
+  useRemoveCard,
+  useInvestments,
+  useAddInvestment,
+  useRemoveInvestment,
+  useWallet,
+  useSetWallet,
+} from "@/store/finance";
+import { useAuth } from "@/store/auth";
 import { formatCurrency } from "@/lib/format";
-import { Wallet, Plus, Trash2, TrendingUp, CreditCard } from "lucide-react";
+import { Wallet, Plus, Trash2, TrendingUp, CreditCard, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/carteira")({
   head: () => ({ meta: [{ title: "Carteira — Finanças" }] }),
@@ -10,22 +20,43 @@ export const Route = createFileRoute("/carteira")({
 });
 
 function WalletPage() {
-  const { walletAmount, setWallet, cards, addCard, removeCard, investments, addInvestment, removeInvestment } = useFinance();
-  const [walletInput, setWalletInput] = useState(String(walletAmount));
+  const { data: cards = [] } = useCards();
+  const { data: investments = [] } = useInvestments();
+  const { data: walletAmount = 0 } = useWallet();
+  const { user, signOut } = useAuth();
+
+  const addCard = useAddCard();
+  const removeCard = useRemoveCard();
+  const addInvestment = useAddInvestment();
+  const removeInvestment = useRemoveInvestment();
+  const setWallet = useSetWallet();
+
+  const [walletInput, setWalletInput] = useState("");
   const [cardName, setCardName] = useState("");
   const [cardColor, setCardColor] = useState("#8b5cf6");
   const [invType, setInvType] = useState("");
   const [invAmount, setInvAmount] = useState("");
   const [invPct, setInvPct] = useState("");
 
+  useEffect(() => {
+    setWalletInput(String(walletAmount));
+  }, [walletAmount]);
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-8 md:py-12">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Carteira & Cadastros</h1>
-        <p className="mt-2 text-muted-foreground">Gerencie dinheiro físico, cartões e investimentos.</p>
+      <header className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Carteira & Cadastros</h1>
+          <p className="mt-2 text-muted-foreground">Gerencie dinheiro físico, cartões e investimentos.</p>
+        </div>
+        <div className="flex flex-col items-end gap-2 md:hidden">
+          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          <button onClick={() => signOut()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <LogOut className="h-3.5 w-3.5" /> Sair
+          </button>
+        </div>
       </header>
 
-      {/* Wallet */}
       <section className="rounded-2xl border border-border bg-gradient-card p-6 shadow-elegant">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -44,15 +75,15 @@ function WalletPage() {
             placeholder="0,00"
           />
           <button
-            onClick={() => setWallet(parseFloat(walletInput) || 0)}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            onClick={() => setWallet.mutate(parseFloat(walletInput) || 0)}
+            disabled={setWallet.isPending}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             Atualizar
           </button>
         </div>
       </section>
 
-      {/* Cards */}
       <section className="mt-6 rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-credit/15 text-credit">
@@ -61,13 +92,19 @@ function WalletPage() {
           <h2 className="text-lg font-semibold">Cartões de crédito</h2>
         </div>
         <div className="mt-4 space-y-2">
+          {cards.length === 0 && (
+            <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+              Cadastre seu primeiro cartão abaixo.
+            </p>
+          )}
           {cards.map((c) => (
             <div key={c.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
               <div className="h-4 w-4 rounded-full" style={{ backgroundColor: c.color }} />
               <span className="flex-1 font-medium">{c.name}</span>
               <button
                 onClick={() => {
-                  if (confirm(`Excluir ${c.name}? Todas as compras e parcelas vinculadas serão removidas.`)) removeCard(c.id);
+                  if (confirm(`Excluir ${c.name}? Todas as compras e parcelas vinculadas serão removidas.`))
+                    removeCard.mutate(c.id);
                 }}
                 className="text-muted-foreground hover:text-destructive"
               >
@@ -93,8 +130,10 @@ function WalletPage() {
           <button
             onClick={() => {
               if (!cardName.trim()) return;
-              addCard({ name: cardName.trim(), color: cardColor, closingDay: 25, dueDay: 5 });
-              setCardName("");
+              addCard.mutate(
+                { name: cardName.trim(), color: cardColor, closingDay: 25, dueDay: 5 },
+                { onSuccess: () => setCardName("") },
+              );
             }}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
@@ -103,7 +142,6 @@ function WalletPage() {
         </div>
       </section>
 
-      {/* Investments */}
       <section className="mt-6 rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/15 text-success">
@@ -124,7 +162,7 @@ function WalletPage() {
                 <p className="text-xs text-muted-foreground">{i.percentage}% a.a.</p>
               </div>
               <p className="font-semibold text-success">{formatCurrency(i.amount)}</p>
-              <button onClick={() => removeInvestment(i.id)} className="text-muted-foreground hover:text-destructive">
+              <button onClick={() => removeInvestment.mutate(i.id)} className="text-muted-foreground hover:text-destructive">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
@@ -157,14 +195,20 @@ function WalletPage() {
           <button
             onClick={() => {
               if (!invType.trim() || !invAmount) return;
-              addInvestment({
-                type: invType.trim(),
-                amount: parseFloat(invAmount),
-                percentage: parseFloat(invPct) || 0,
-              });
-              setInvType("");
-              setInvAmount("");
-              setInvPct("");
+              addInvestment.mutate(
+                {
+                  type: invType.trim(),
+                  amount: parseFloat(invAmount),
+                  percentage: parseFloat(invPct) || 0,
+                },
+                {
+                  onSuccess: () => {
+                    setInvType("");
+                    setInvAmount("");
+                    setInvPct("");
+                  },
+                },
+              );
             }}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 md:col-span-4"
           >

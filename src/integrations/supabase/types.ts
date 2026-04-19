@@ -82,30 +82,42 @@ export type Database = {
       debits: {
         Row: {
           amount: number
+          auto_debit: boolean
+          auto_debit_day: number | null
           created_at: string
           date: string
           description: string
           id: string
+          installments_count: number
+          is_parent: boolean
           paid: boolean
           required: boolean
           user_id: string
         }
         Insert: {
           amount: number
+          auto_debit?: boolean
+          auto_debit_day?: number | null
           created_at?: string
           date: string
           description: string
           id?: string
+          installments_count?: number
+          is_parent?: boolean
           paid?: boolean
           required?: boolean
           user_id: string
         }
         Update: {
           amount?: number
+          auto_debit?: boolean
+          auto_debit_day?: number | null
           created_at?: string
           date?: string
           description?: string
           id?: string
+          installments_count?: number
+          is_parent?: boolean
           paid?: boolean
           required?: boolean
           user_id?: string
@@ -119,6 +131,8 @@ export type Database = {
           date: string
           description: string
           id: string
+          installments_count: number
+          is_parent: boolean
           received: boolean
           user_id: string
         }
@@ -128,6 +142,8 @@ export type Database = {
           date: string
           description: string
           id?: string
+          installments_count?: number
+          is_parent?: boolean
           received?: boolean
           user_id: string
         }
@@ -137,6 +153,8 @@ export type Database = {
           date?: string
           description?: string
           id?: string
+          installments_count?: number
+          is_parent?: boolean
           received?: boolean
           user_id?: string
         }
@@ -151,7 +169,9 @@ export type Database = {
           month: number
           number: number
           paid: boolean
-          purchase_id: string
+          parent_id: string | null
+          parent_type: string
+          purchase_id: string | null
           total: number
           user_id: string
           year: number
@@ -164,7 +184,9 @@ export type Database = {
           month: number
           number: number
           paid?: boolean
-          purchase_id: string
+          parent_id?: string | null
+          parent_type?: string
+          purchase_id?: string | null
           total: number
           user_id: string
           year: number
@@ -177,7 +199,9 @@ export type Database = {
           month?: number
           number?: number
           paid?: boolean
-          purchase_id?: string
+          parent_id?: string | null
+          parent_type?: string
+          purchase_id?: string | null
           total?: number
           user_id?: string
           year?: number

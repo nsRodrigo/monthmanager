@@ -7,23 +7,32 @@ import {
   useDebits,
   useIncomes,
   useCardPayments,
-  useToggleInstallmentPaid,
-  useSetCardPaid,
-  useRemovePurchase,
   useToggleDebitPaid,
   useRemoveDebit,
   useToggleIncomeReceived,
   useRemoveIncome,
+  useToggleInstallmentPaid,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
   isCardFullyPaid,
   type Installment,
-  type Purchase,
+  type Debit,
+  type Income,
 } from "@/store/finance";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
-import { ArrowLeft, Plus, CreditCard, ArrowDownRight, ArrowUpRight, Trash2, Check, Pencil } from "lucide-react";
-import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
+import {
+  ArrowLeft,
+  Plus,
+  CreditCard,
+  ArrowDownRight,
+  ArrowUpRight,
+  Trash2,
+  Check,
+  Pencil,
+  ChevronRight,
+  Zap,
+} from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
 import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
@@ -42,10 +51,14 @@ function MonthView() {
   const year = Number(y);
   const month = Number(m);
   const [tab, setTab] = useState<Tab>("cartoes");
-  const [openPurchase, setOpenPurchase] = useState(false);
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
-  const [editing, setEditing] = useState<{ inst: Installment; pur: Purchase } | null>(null);
+  const [editing, setEditing] = useState<{
+    inst: Installment;
+    label: string;
+    subtitle?: string;
+    onDeleteParent?: () => void;
+  } | null>(null);
 
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -55,20 +68,24 @@ function MonthView() {
   const { data: cardPayments = {} } = useCardPayments();
 
   const toggleInst = useToggleInstallmentPaid();
-  const setCardPaid = useSetCardPaid();
-  const removePurchase = useRemovePurchase();
   const toggleDebit = useToggleDebitPaid();
   const removeDebit = useRemoveDebit();
   const toggleIncome = useToggleIncomeReceived();
   const removeIncome = useRemoveIncome();
 
   const inst = getMonthInstallments(installments, year, month);
-  const monthDebits = getMonthDebits(debits, year, month);
-  const monthIncomes = getMonthIncomes(incomes, year, month);
+  const monthDebits = getMonthDebits(debits, installments, year, month);
+  const monthIncomes = getMonthIncomes(incomes, installments, year, month);
 
-  const totalCredit = inst.reduce((s, i) => s + i.amount, 0);
-  const totalDebits = monthDebits.reduce((s, d) => s + d.amount, 0);
-  const totalIncome = monthIncomes.reduce((s, i) => s + i.amount, 0);
+  const totalCredit = inst
+    .filter((i) => i.parentType === "purchase")
+    .reduce((s, i) => s + i.amount, 0);
+  const totalDebits =
+    monthDebits.single.reduce((s, d) => s + d.amount, 0) +
+    monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+  const totalIncome =
+    monthIncomes.single.reduce((s, i) => s + i.amount, 0) +
+    monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
@@ -103,118 +120,79 @@ function MonthView() {
 
       <div className="mt-6">
         {tab === "cartoes" && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {cards.length === 0 && <Empty text="Nenhum cartão cadastrado." />}
             {cards.map((c) => {
               const cardInst = inst.filter((i) => {
-                const pur = purchases.find((p) => p.id === i.purchaseId);
+                if (i.parentType !== "purchase") return false;
+                const pur = purchases.find((p) => p.id === i.parentId);
                 return pur?.cardId === c.id;
               });
               const total = cardInst.reduce((s, i) => s + i.amount, 0);
               const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
               return (
-                <div key={c.id} className="overflow-hidden rounded-2xl border border-border bg-gradient-card">
-                  <div className="flex items-center justify-between gap-3 border-b border-border p-5">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color }} />
-                      <div>
-                        <p className="font-semibold">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {cardInst.length} {cardInst.length === 1 ? "parcela" : "parcelas"} · {formatCurrency(total)}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })}
-                      className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
-                        paid ? "bg-success/15 text-success hover:bg-success/25" : "bg-warning/15 text-warning hover:bg-warning/25"
+                <Link
+                  key={c.id}
+                  to="/meses/$year/$month/cartao/$cardId"
+                  params={{ year: y, month: m, cardId: c.id }}
+                  className="group flex items-center gap-4 rounded-2xl border border-border bg-gradient-card p-5 transition-all hover:border-primary/40 hover:shadow-glow"
+                >
+                  <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{c.name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {cardInst.length} {cardInst.length === 1 ? "lançamento" : "lançamentos"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-base font-bold">{formatCurrency(total)}</p>
+                    <span
+                      className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
                       }`}
                     >
-                      {paid ? "✓ Pago" : "Marcar pago"}
-                    </button>
+                      {paid ? "Pago" : "Em aberto"}
+                    </span>
                   </div>
-                  <div className="divide-y divide-border">
-                    {cardInst.length === 0 && (
-                      <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-                        Nenhuma compra neste mês.
-                      </div>
-                    )}
-                    {cardInst.map((i) => {
-                      const pur = purchases.find((p) => p.id === i.purchaseId)!;
-                      return (
-                        <div key={i.id} className="flex items-center gap-3 px-5 py-3">
-                          <button
-                            onClick={() => toggleInst(i.id, !i.paid)}
-                            className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
-                              i.paid ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
-                            }`}
-                          >
-                            {i.paid && <Check className="h-3.5 w-3.5" />}
-                          </button>
-                          <button
-                            onClick={() => setEditing({ inst: i, pur })}
-                            className="flex-1 min-w-0 text-left"
-                          >
-                            <p className={`truncate text-sm font-medium ${i.paid ? "text-muted-foreground line-through" : ""}`}>
-                              {pur.description}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {i.total > 1 ? `Parcela ${i.number}/${i.total}` : "À vista"} · venc. {formatDate(i.dueDate)}
-                            </p>
-                          </button>
-                          <p className="text-sm font-semibold">{formatCurrency(i.amount)}</p>
-                          <button
-                            onClick={() => setEditing({ inst: i, pur })}
-                            className="text-muted-foreground hover:text-primary"
-                            title="Editar parcela"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                </Link>
               );
             })}
-            <button
-              onClick={() => setOpenPurchase(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-            >
-              <Plus className="h-4 w-4" /> Nova compra
-            </button>
+            <p className="px-1 text-center text-xs text-muted-foreground">
+              Toque em um cartão para ver compras, parcelas e adicionar itens.
+            </p>
           </div>
         )}
 
         {tab === "debitos" && (
           <div className="space-y-3">
-            {monthDebits.length === 0 && <Empty text="Nenhum débito neste mês." />}
-            {monthDebits.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-                <button
-                  onClick={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
-                    d.paid ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
-                  }`}
-                >
-                  {d.paid && <Check className="h-3.5 w-3.5" />}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className={`truncate font-medium ${d.paid ? "text-muted-foreground line-through" : ""}`}>{d.description}</p>
-                    {d.required && (
-                      <span className="rounded-full bg-debit/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-debit">
-                        Obrigatório
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{formatDate(d.date)}</p>
-                </div>
-                <p className="font-semibold text-debit">{formatCurrency(d.amount)}</p>
-                <button onClick={() => removeDebit.mutate(d.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+            {monthDebits.single.length === 0 && monthDebits.parcelled.length === 0 && (
+              <Empty text="Nenhum débito neste mês." />
+            )}
+            {monthDebits.single.map((d) => (
+              <DebitRow
+                key={d.id}
+                debit={d}
+                onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+                onRemove={() => removeDebit.mutate(d.id)}
+              />
+            ))}
+            {monthDebits.parcelled.map((p) => (
+              <ParcelledRow
+                key={p.installment.id}
+                kind="debit"
+                installment={p.installment}
+                parent={p.debit!}
+                onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+                onEdit={() =>
+                  setEditing({
+                    inst: p.installment,
+                    label: p.debit!.description,
+                    subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
+                    onDeleteParent: () => removeDebit.mutate(p.debit!.id),
+                  })
+                }
+              />
             ))}
             <button
               onClick={() => setOpenDebit(true)}
@@ -227,26 +205,33 @@ function MonthView() {
 
         {tab === "recebimentos" && (
           <div className="space-y-3">
-            {monthIncomes.length === 0 && <Empty text="Nenhum recebimento neste mês." />}
-            {monthIncomes.map((i) => (
-              <div key={i.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-                <button
-                  onClick={() => toggleIncome.mutate({ id: i.id, received: !i.received })}
-                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
-                    i.received ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
-                  }`}
-                >
-                  {i.received && <Check className="h-3.5 w-3.5" />}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`truncate font-medium ${i.received ? "text-muted-foreground" : ""}`}>{i.description}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(i.date)}</p>
-                </div>
-                <p className="font-semibold text-success">{formatCurrency(i.amount)}</p>
-                <button onClick={() => removeIncome.mutate(i.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+            {monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0 && (
+              <Empty text="Nenhum recebimento neste mês." />
+            )}
+            {monthIncomes.single.map((i) => (
+              <IncomeRow
+                key={i.id}
+                income={i}
+                onToggle={() => toggleIncome.mutate({ id: i.id, received: !i.received })}
+                onRemove={() => removeIncome.mutate(i.id)}
+              />
+            ))}
+            {monthIncomes.parcelled.map((p) => (
+              <ParcelledRow
+                key={p.installment.id}
+                kind="income"
+                installment={p.installment}
+                parent={p.income!}
+                onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+                onEdit={() =>
+                  setEditing({
+                    inst: p.installment,
+                    label: p.income!.description,
+                    subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
+                    onDeleteParent: () => removeIncome.mutate(p.income!.id),
+                  })
+                }
+              />
             ))}
             <button
               onClick={() => setOpenIncome(true)}
@@ -258,27 +243,132 @@ function MonthView() {
         )}
       </div>
 
-      <button
-        onClick={() => {
-          if (tab === "cartoes") setOpenPurchase(true);
-          else if (tab === "debitos") setOpenDebit(true);
-          else setOpenIncome(true);
-        }}
-        className="fixed bottom-20 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform hover:scale-110 md:hidden"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      {tab !== "cartoes" && (
+        <button
+          onClick={() => (tab === "debitos" ? setOpenDebit(true) : setOpenIncome(true))}
+          className="fixed bottom-20 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform hover:scale-110 md:hidden"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
-      <AddPurchaseDialog open={openPurchase} onClose={() => setOpenPurchase(false)} defaultYear={year} defaultMonth={month} />
       <AddDebitDialog open={openDebit} onClose={() => setOpenDebit(false)} defaultYear={year} defaultMonth={month} />
       <AddIncomeDialog open={openIncome} onClose={() => setOpenIncome(false)} defaultYear={year} defaultMonth={month} />
       <EditInstallmentDialog
         open={!!editing}
         onClose={() => setEditing(null)}
         installment={editing?.inst ?? null}
-        purchase={editing?.pur ?? null}
-        onDeletePurchase={editing ? () => removePurchase.mutate(editing.pur.id) : undefined}
+        parentLabel={editing?.label}
+        parentSubtitle={editing?.subtitle}
+        onDeleteParent={editing?.onDeleteParent}
       />
+    </div>
+  );
+}
+
+function DebitRow({ debit, onToggle, onRemove }: { debit: Debit; onToggle: () => void; onRemove: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+      <button
+        onClick={onToggle}
+        className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
+          debit.paid ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
+        }`}
+      >
+        {debit.paid && <Check className="h-3.5 w-3.5" />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className={`truncate font-medium ${debit.paid ? "text-muted-foreground line-through" : ""}`}>{debit.description}</p>
+          {debit.required && (
+            <span className="rounded-full bg-debit/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-debit">
+              Obrigatório
+            </span>
+          )}
+          {debit.autoDebit && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+              <Zap className="h-3 w-3" />Auto{debit.autoDebitDay ? ` dia ${debit.autoDebitDay}` : ""}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{formatDate(debit.date)}</p>
+      </div>
+      <p className="font-semibold text-debit">{formatCurrency(debit.amount)}</p>
+      <button onClick={onRemove} className="text-muted-foreground hover:text-destructive">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function IncomeRow({ income, onToggle, onRemove }: { income: Income; onToggle: () => void; onRemove: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+      <button
+        onClick={onToggle}
+        className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
+          income.received ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
+        }`}
+      >
+        {income.received && <Check className="h-3.5 w-3.5" />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={`truncate font-medium ${income.received ? "text-muted-foreground" : ""}`}>{income.description}</p>
+        <p className="text-xs text-muted-foreground">{formatDate(income.date)}</p>
+      </div>
+      <p className="font-semibold text-success">{formatCurrency(income.amount)}</p>
+      <button onClick={onRemove} className="text-muted-foreground hover:text-destructive">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function ParcelledRow({
+  kind,
+  installment,
+  parent,
+  onToggle,
+  onEdit,
+}: {
+  kind: "debit" | "income";
+  installment: Installment;
+  parent: Debit | Income;
+  onToggle: () => void;
+  onEdit: () => void;
+}) {
+  const tone = kind === "debit" ? "text-debit" : "text-success";
+  const auto = kind === "debit" && (parent as Debit).autoDebit;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+      <button
+        onClick={onToggle}
+        className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors ${
+          installment.paid ? "border-success bg-success text-success-foreground" : "border-border hover:border-primary"
+        }`}
+      >
+        {installment.paid && <Check className="h-3.5 w-3.5" />}
+      </button>
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className={`truncate font-medium ${installment.paid ? "text-muted-foreground line-through" : ""}`}>
+            {parent.description}
+          </p>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+            {installment.number}/{installment.total}
+          </span>
+          {auto && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+              <Zap className="h-3 w-3" />Auto
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">venc. {formatDate(installment.dueDate)}</p>
+      </button>
+      <p className={`font-semibold ${tone}`}>{formatCurrency(installment.amount)}</p>
+      <button onClick={onEdit} className="text-muted-foreground hover:text-primary" title="Editar parcela">
+        <Pencil className="h-4 w-4" />
+      </button>
     </div>
   );
 }

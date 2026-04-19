@@ -36,14 +36,21 @@ function Dashboard() {
   const { data: walletAmount = 0 } = useWallet();
 
   const inst = getMonthInstallments(installments, year, month);
-  const monthDebits = getMonthDebits(debits, year, month);
-  const monthIncomes = getMonthIncomes(incomes, year, month);
+  const monthDebits = getMonthDebits(debits, installments, year, month);
+  const monthIncomes = getMonthIncomes(incomes, installments, year, month);
 
-  const totalCredit = inst.reduce((s, i) => s + i.amount, 0);
-  const totalDebits = monthDebits.reduce((s, d) => s + d.amount, 0);
-  const totalIncome = monthIncomes.reduce((s, i) => s + i.amount, 0);
-  const pendingCredit = inst.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
-  const pendingDebits = monthDebits.filter((d) => !d.paid).reduce((s, d) => s + d.amount, 0);
+  const credInst = inst.filter((i) => i.parentType === "purchase");
+  const totalCredit = credInst.reduce((s, i) => s + i.amount, 0);
+  const totalDebits =
+    monthDebits.single.reduce((s, d) => s + d.amount, 0) +
+    monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+  const totalIncome =
+    monthIncomes.single.reduce((s, i) => s + i.amount, 0) +
+    monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+  const pendingCredit = credInst.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
+  const pendingDebits =
+    monthDebits.single.filter((d) => !d.paid).reduce((s, d) => s + d.amount, 0) +
+    monthDebits.parcelled.filter((p) => !p.installment.paid).reduce((s, p) => s + p.installment.amount, 0);
 
   const balance = totalIncome - totalCredit - totalDebits;
 
@@ -92,8 +99,8 @@ function Dashboard() {
         )}
         <div className="grid gap-3 md:grid-cols-2">
           {cards.map((c) => {
-            const cardInst = inst.filter((i) => {
-              const pur = purchases.find((p) => p.id === i.purchaseId);
+            const cardInst = credInst.filter((i) => {
+              const pur = purchases.find((p) => p.id === i.parentId);
               return pur?.cardId === c.id;
             });
             const total = cardInst.reduce((s, i) => s + i.amount, 0);
@@ -101,8 +108,8 @@ function Dashboard() {
             return (
               <Link
                 key={c.id}
-                to="/meses/$year/$month"
-                params={{ year: String(year), month: String(month) }}
+                to="/meses/$year/$month/cartao/$cardId"
+                params={{ year: String(year), month: String(month), cardId: c.id }}
                 className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-card p-5 transition-all hover:border-primary/40 hover:shadow-glow"
               >
                 <div className="flex items-start justify-between">

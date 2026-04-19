@@ -509,19 +509,17 @@ export function useShiftInstallmentDate() {
     }) => {
       const newD = new Date(args.newDate);
       // Always update the current one
-      const updates: Array<Promise<unknown>> = [
-        supabase
-          .from("installments")
-          .update({
-            due_date: args.newDate,
-            year: newD.getFullYear(),
-            month: newD.getMonth(),
-          })
-          .eq("id", args.installment.id),
-      ];
+      const { error: eCur } = await supabase
+        .from("installments")
+        .update({
+          due_date: args.newDate,
+          year: newD.getFullYear(),
+          month: newD.getMonth(),
+        })
+        .eq("id", args.installment.id);
+      if (eCur) throw eCur;
 
       if (args.applyToFuture) {
-        // Get all future installments of the same parent
         const { data: rows, error } = await supabase
           .from("installments")
           .select("id,number")
@@ -535,22 +533,16 @@ export function useShiftInstallmentDate() {
           const target = new Date(newD.getFullYear(), newD.getMonth() + offset, 1);
           const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
           const d = new Date(target.getFullYear(), target.getMonth(), Math.min(day, lastDay));
-          updates.push(
-            supabase
-              .from("installments")
-              .update({
-                due_date: d.toISOString().slice(0, 10),
-                year: d.getFullYear(),
-                month: d.getMonth(),
-              })
-              .eq("id", r.id),
-          );
+          const { error: eUpd } = await supabase
+            .from("installments")
+            .update({
+              due_date: d.toISOString().slice(0, 10),
+              year: d.getFullYear(),
+              month: d.getMonth(),
+            })
+            .eq("id", r.id);
+          if (eUpd) throw eUpd;
         }
-      }
-      const results = await Promise.all(updates);
-      for (const r of results) {
-        const e = (r as { error?: { message: string } }).error;
-        if (e) throw new Error(e.message);
       }
     },
     onSuccess: () => inv(["installments", "card_payments"]),

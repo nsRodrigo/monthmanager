@@ -7,11 +7,14 @@ export function AddPurchaseDialog({
   onClose,
   defaultYear,
   defaultMonth,
+  fixedCardId,
 }: {
   open: boolean;
   onClose: () => void;
   defaultYear: number;
   defaultMonth: number;
+  /** When provided, the card selector is hidden and this card is used. */
+  fixedCardId?: string;
 }) {
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
@@ -26,13 +29,13 @@ export function AddPurchaseDialog({
     if (open) {
       const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
       setDate(d.toISOString().slice(0, 10));
-      setCardId(cards[0]?.id ?? "");
+      setCardId(fixedCardId ?? cards[0]?.id ?? "");
       setDescription("");
       setAmount("");
       setInstallments("1");
       setIsInstallment(false);
     }
-  }, [open, defaultYear, defaultMonth, cards]);
+  }, [open, defaultYear, defaultMonth, cards, fixedCardId]);
 
   const submit = async () => {
     if (!description.trim() || !amount || !cardId) return;
@@ -51,7 +54,7 @@ export function AddPurchaseDialog({
   const perInstallment = n > 0 ? total / n : 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Nova compra no cartão">
+    <Modal open={open} onClose={onClose} title={fixedCardId ? "Adicionar à fatura" : "Nova compra no cartão"}>
       <div className="space-y-4">
         <Field label="Descrição">
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Tênis novo" />
@@ -60,17 +63,19 @@ export function AddPurchaseDialog({
           <Field label="Valor total">
             <input type="number" step="0.01" className={inputClass} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
           </Field>
-          <Field label="Data">
+          <Field label="Data da compra">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
-        <Field label="Cartão">
-          <select className={inputClass} value={cardId} onChange={(e) => setCardId(e.target.value)}>
-            {cards.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </Field>
+        {!fixedCardId && (
+          <Field label="Cartão">
+            <select className={inputClass} value={cardId} onChange={(e) => setCardId(e.target.value)}>
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input
@@ -94,7 +99,7 @@ export function AddPurchaseDialog({
             />
             {total > 0 && n > 1 && (
               <p className="mt-2 text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> — última parcela ajusta os centavos. Cada parcela poderá ser editada individualmente.
+                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> — última parcela ajusta os centavos. Mesma data ({new Date(date).getDate()}) em todos os meses.
               </p>
             )}
           </Field>

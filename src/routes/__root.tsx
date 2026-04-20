@@ -242,8 +242,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <SideNav />
       <div className="flex-1 pb-24 md:pb-0">
-        <div className="border-b border-border bg-card/40 px-5 py-3 md:hidden">
-          <AccountSwitcher compact />
+        <div className="flex items-center gap-3 border-b border-border bg-card/40 px-5 py-3 md:hidden">
+          <div className="flex-1 min-w-0">
+            <AccountSwitcher compact />
+          </div>
+          <SettingsMenu />
+        </div>
+        <div className="hidden md:flex justify-end px-6 pt-4">
+          <SettingsMenu />
         </div>
         <main>{children}</main>
       </div>

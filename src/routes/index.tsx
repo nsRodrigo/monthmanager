@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Building2,
   TrendingUp,
+  CalendarDays,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -132,7 +133,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* 4 cards grandes por categoria */}
+          {/* Cards grandes por categoria */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <CategoryCard
               to="/credito"
@@ -162,16 +163,12 @@ function Dashboard() {
               gradient="bg-gradient-income"
             />
             <CategoryCard
-              to="/dinheiro"
-              title="Carteira"
-              subtitle="Dinheiro físico"
-              value={formatCurrency(
-                accounts
-                  .filter((a) => a.type === "carteira")
-                  .reduce((s, a) => s + computeAccountBalance(a, allCards, purchases, installments, allDebits, allIncomes), 0),
-              )}
-              count="contas em espécie"
-              icon={<Wallet className="h-5 w-5" />}
+              to="/meses"
+              title="Visão mensal"
+              subtitle="Todos os meses"
+              value={formatCurrency(totalCredit + totalDebits)}
+              count="ver outros meses"
+              icon={<CalendarDays className="h-5 w-5" />}
               gradient="bg-gradient-card"
               dark
             />
@@ -227,7 +224,7 @@ function CategoryCard({
   gradient,
   dark,
 }: {
-  to: "/credito" | "/debito" | "/recebimentos" | "/dinheiro";
+  to: "/credito" | "/debito" | "/recebimentos" | "/meses";
   title: string;
   subtitle: string;
   value: string;

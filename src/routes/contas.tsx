@@ -204,7 +204,7 @@ function AccountsPage() {
       </section>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Depois de criar contas, vá para <Link to="/carteira" className="text-primary hover:underline">Carteira</Link> para cadastrar cartões e investimentos vinculados.
+        Depois de criar contas, vá para <Link to="/credito" className="text-primary hover:underline">Crédito</Link> para cadastrar cartões vinculados.
       </p>
     </div>
   );

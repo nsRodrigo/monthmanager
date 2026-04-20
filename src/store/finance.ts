@@ -87,6 +87,39 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Compute the invoice (fatura) month/year for a credit-card purchase.
+ *
+ * Rule: a purchase made before or on `closingDay` belongs to the invoice
+ * that closes in the *current* month and is due in the *next* month.
+ * A purchase made after `closingDay` rolls over to the *next* invoice
+ * (closes next month, due in two months).
+ *
+ * Returns the year + month (0-indexed) of the invoice's DUE date — that
+ * is the month the user actually pays, and the month we want all UI to
+ * group the installment under.
+ */
+export function getInvoiceMonth(
+  purchaseDate: string | Date,
+  closingDay: number,
+  dueDay: number,
+): { year: number; month: number; dueDate: string } {
+  const d = typeof purchaseDate === "string" ? new Date(purchaseDate) : purchaseDate;
+  const purchaseDay = d.getDate();
+  // If purchase happens AFTER the closing day, the invoice closes next month
+  // and is due the month after. Otherwise it closes this month and is due next.
+  const monthsAhead = purchaseDay > closingDay ? 2 : 1;
+  const target = new Date(d.getFullYear(), d.getMonth() + monthsAhead, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  const day = Math.min(dueDay, lastDay);
+  const due = new Date(target.getFullYear(), target.getMonth(), day);
+  return {
+    year: due.getFullYear(),
+    month: due.getMonth(),
+    dueDate: due.toISOString().slice(0, 10),
+  };
+}
+
 export function buildInstallments(
   parentId: string,
   parentType: ParentType,
@@ -138,14 +171,61 @@ export function buildInstallments(
   return items;
 }
 
+/**
+ * Build installments for a credit-card purchase using the INVOICE-MONTH rule.
+ *
+ * The first installment goes into the month that the next invoice is due
+ * (based on closingDay/dueDay), and subsequent installments fall on the same
+ * dueDay each following month. The purchase date itself is informational only.
+ */
 export function buildInstallmentsForPurchase(
   purchaseId: string,
   userId: string,
   totalAmount: number,
   installmentsCount: number,
-  startDate: string,
+  purchaseDate: string,
+  closingDay: number,
+  dueDay: number,
 ) {
-  return buildInstallments(purchaseId, "purchase", userId, totalAmount, installmentsCount, startDate);
+  const count = Math.max(1, installmentsCount);
+  const base = round2(totalAmount / count);
+  const first = getInvoiceMonth(purchaseDate, closingDay, dueDay);
+  let accum = 0;
+  const items: Array<{
+    user_id: string;
+    parent_id: string;
+    parent_type: ParentType;
+    purchase_id: string | null;
+    number: number;
+    total: number;
+    amount: number;
+    due_date: string;
+    year: number;
+    month: number;
+    paid: boolean;
+  }> = [];
+  for (let i = 0; i < count; i++) {
+    const target = new Date(first.year, first.month + i, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const day = Math.min(dueDay, lastDay);
+    const d = new Date(target.getFullYear(), target.getMonth(), day);
+    const amount = i === count - 1 ? round2(totalAmount - accum) : base;
+    accum += amount;
+    items.push({
+      user_id: userId,
+      parent_id: purchaseId,
+      parent_type: "purchase",
+      purchase_id: purchaseId,
+      number: i + 1,
+      total: count,
+      amount,
+      due_date: d.toISOString().slice(0, 10),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      paid: false,
+    });
+  }
+  return items;
 }
 
 const num = (v: number | string) => (typeof v === "number" ? v : parseFloat(v));

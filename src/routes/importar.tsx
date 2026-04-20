@@ -91,7 +91,12 @@ function ImportPage() {
     Papa.parse<ParsedRow>(file, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "", // auto-detect (",", ";", "\t", "|")
+      delimitersToGuess: [",", ";", "\t", "|"],
       complete: (res) => {
+        if (res.meta?.delimiter) {
+          console.log("[CSV] Delimitador detectado:", JSON.stringify(res.meta.delimiter));
+        }
         const data = res.data;
         if (!data.length) {
           setError("CSV vazio.");

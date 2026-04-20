@@ -408,7 +408,12 @@ export function useUpdateAccount() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (a: Partial<Account> & { id: string }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: {
+        name?: string;
+        type?: string;
+        color?: string;
+        initial_balance?: number;
+      } = {};
       if (a.name !== undefined) patch.name = a.name;
       if (a.type !== undefined) patch.type = a.type;
       if (a.color !== undefined) patch.color = a.color;
@@ -511,7 +516,7 @@ export function useUpdateInstallment() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { id: string; amount?: number; dueDate?: string; paid?: boolean }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { amount?: number; due_date?: string; year?: number; month?: number; paid?: boolean } = {};
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.dueDate !== undefined) {
         patch.due_date = args.dueDate;

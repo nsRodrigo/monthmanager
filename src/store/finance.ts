@@ -549,6 +549,13 @@ export function useAddPurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (p: Omit<Purchase, "id">) => {
+      // Need card's closing/due day to calculate the invoice month.
+      const { data: card, error: eCard } = await supabase
+        .from("cards")
+        .select("closing_day,due_day")
+        .eq("id", p.cardId)
+        .single();
+      if (eCard) throw eCard;
       const { data, error } = await supabase
         .from("purchases")
         .insert({
@@ -562,13 +569,14 @@ export function useAddPurchase() {
         .select("id")
         .single();
       if (error) throw error;
-      const inst = buildInstallments(
+      const inst = buildInstallmentsForPurchase(
         (data as { id: string }).id,
-        "purchase",
         user!.id,
         p.totalAmount,
         p.installmentsCount,
         p.date,
+        (card as { closing_day: number; due_day: number }).closing_day,
+        (card as { closing_day: number; due_day: number }).due_day,
       );
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;

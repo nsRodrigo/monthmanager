@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Wallet, LayoutDashboard, CalendarDays, LogOut, Upload, Building2 } from "lucide-react";
+import { Wallet, LayoutDashboard, CreditCard, ArrowDownRight, ArrowUpRight, LogOut, Building2, Upload, CalendarDays } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -39,6 +39,9 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", href: "/icon-512.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/icon-512.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -70,14 +73,14 @@ function BottomNav() {
   const loc = useLocation();
   const items = [
     { to: "/", label: "Início", icon: LayoutDashboard, exact: true },
-    { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
-    { to: "/contas", label: "Contas", icon: Building2, exact: false },
-    { to: "/carteira", label: "Carteira", icon: Wallet, exact: false },
-    { to: "/importar", label: "Importar", icon: Upload, exact: false },
+    { to: "/credito", label: "Crédito", icon: CreditCard, exact: false },
+    { to: "/debito", label: "Débito", icon: ArrowDownRight, exact: false },
+    { to: "/recebimentos", label: "Receber", icon: ArrowUpRight, exact: false },
+    { to: "/dinheiro", label: "Carteira", icon: Wallet, exact: false },
   ] as const;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-lg md:hidden">
-      <div className="mx-auto flex max-w-2xl items-center justify-around px-2 py-2">
+      <div className="mx-auto flex max-w-2xl items-center justify-around px-1 py-2">
         {items.map((it) => {
           const active = it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to);
           const Icon = it.icon;
@@ -85,7 +88,7 @@ function BottomNav() {
             <Link
               key={it.to}
               to={it.to}
-              className={`flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-medium transition-colors ${
+              className={`flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors ${
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -104,9 +107,13 @@ function SideNav() {
   const { signOut, user } = useAuth();
   const items = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
+    { to: "/credito", label: "Crédito", icon: CreditCard, exact: false },
+    { to: "/debito", label: "Débito + Investimentos", icon: ArrowDownRight, exact: false },
+    { to: "/recebimentos", label: "Recebimentos", icon: ArrowUpRight, exact: false },
+    { to: "/dinheiro", label: "Carteira física", icon: Wallet, exact: false },
+    { to: "/meses", label: "Visão mensal", icon: CalendarDays, exact: false },
     { to: "/contas", label: "Contas", icon: Building2, exact: false },
-    { to: "/carteira", label: "Carteira", icon: Wallet, exact: false },
+    { to: "/carteira", label: "Cartões + invest.", icon: CreditCard, exact: true },
     { to: "/importar", label: "Importar CSV", icon: Upload, exact: false },
   ] as const;
   return (

@@ -9,7 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RecebimentosRouteImport } from './routes/recebimentos'
 import { Route as ImportarRouteImport } from './routes/importar'
+import { Route as DinheiroRouteImport } from './routes/dinheiro'
+import { Route as DebitoRouteImport } from './routes/debito'
+import { Route as CreditoRouteImport } from './routes/credito'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -18,9 +22,29 @@ import { Route as MesesIndexRouteImport } from './routes/meses.index'
 import { Route as MesesYearMonthRouteImport } from './routes/meses.$year.$month'
 import { Route as MesesYearMonthCartaoCardIdRouteImport } from './routes/meses.$year.$month_.cartao.$cardId'
 
+const RecebimentosRoute = RecebimentosRouteImport.update({
+  id: '/recebimentos',
+  path: '/recebimentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ImportarRoute = ImportarRouteImport.update({
   id: '/importar',
   path: '/importar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DinheiroRoute = DinheiroRouteImport.update({
+  id: '/dinheiro',
+  path: '/dinheiro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DebitoRoute = DebitoRouteImport.update({
+  id: '/debito',
+  path: '/debito',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreditoRoute = CreditoRouteImport.update({
+  id: '/credito',
+  path: '/credito',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContasRoute = ContasRouteImport.update({
@@ -65,7 +89,11 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
   '/contas': typeof ContasRoute
+  '/credito': typeof CreditoRoute
+  '/debito': typeof DebitoRoute
+  '/dinheiro': typeof DinheiroRoute
   '/importar': typeof ImportarRoute
+  '/recebimentos': typeof RecebimentosRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
@@ -75,7 +103,11 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
   '/contas': typeof ContasRoute
+  '/credito': typeof CreditoRoute
+  '/debito': typeof DebitoRoute
+  '/dinheiro': typeof DinheiroRoute
   '/importar': typeof ImportarRoute
+  '/recebimentos': typeof RecebimentosRoute
   '/meses': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
@@ -86,7 +118,11 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
   '/contas': typeof ContasRoute
+  '/credito': typeof CreditoRoute
+  '/debito': typeof DebitoRoute
+  '/dinheiro': typeof DinheiroRoute
   '/importar': typeof ImportarRoute
+  '/recebimentos': typeof RecebimentosRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month_/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
@@ -98,7 +134,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/carteira'
     | '/contas'
+    | '/credito'
+    | '/debito'
+    | '/dinheiro'
     | '/importar'
+    | '/recebimentos'
     | '/meses/'
     | '/meses/$year/$month'
     | '/meses/$year/$month/cartao/$cardId'
@@ -108,7 +148,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/carteira'
     | '/contas'
+    | '/credito'
+    | '/debito'
+    | '/dinheiro'
     | '/importar'
+    | '/recebimentos'
     | '/meses'
     | '/meses/$year/$month'
     | '/meses/$year/$month/cartao/$cardId'
@@ -118,7 +162,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/carteira'
     | '/contas'
+    | '/credito'
+    | '/debito'
+    | '/dinheiro'
     | '/importar'
+    | '/recebimentos'
     | '/meses/'
     | '/meses/$year/$month'
     | '/meses/$year/$month_/cartao/$cardId'
@@ -129,7 +177,11 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CarteiraRoute: typeof CarteiraRoute
   ContasRoute: typeof ContasRoute
+  CreditoRoute: typeof CreditoRoute
+  DebitoRoute: typeof DebitoRoute
+  DinheiroRoute: typeof DinheiroRoute
   ImportarRoute: typeof ImportarRoute
+  RecebimentosRoute: typeof RecebimentosRoute
   MesesIndexRoute: typeof MesesIndexRoute
   MesesYearMonthRoute: typeof MesesYearMonthRoute
   MesesYearMonthCartaoCardIdRoute: typeof MesesYearMonthCartaoCardIdRoute
@@ -137,11 +189,39 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/recebimentos': {
+      id: '/recebimentos'
+      path: '/recebimentos'
+      fullPath: '/recebimentos'
+      preLoaderRoute: typeof RecebimentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/importar': {
       id: '/importar'
       path: '/importar'
       fullPath: '/importar'
       preLoaderRoute: typeof ImportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dinheiro': {
+      id: '/dinheiro'
+      path: '/dinheiro'
+      fullPath: '/dinheiro'
+      preLoaderRoute: typeof DinheiroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/debito': {
+      id: '/debito'
+      path: '/debito'
+      fullPath: '/debito'
+      preLoaderRoute: typeof DebitoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/credito': {
+      id: '/credito'
+      path: '/credito'
+      fullPath: '/credito'
+      preLoaderRoute: typeof CreditoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contas': {
@@ -201,7 +281,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CarteiraRoute: CarteiraRoute,
   ContasRoute: ContasRoute,
+  CreditoRoute: CreditoRoute,
+  DebitoRoute: DebitoRoute,
+  DinheiroRoute: DinheiroRoute,
   ImportarRoute: ImportarRoute,
+  RecebimentosRoute: RecebimentosRoute,
   MesesIndexRoute: MesesIndexRoute,
   MesesYearMonthRoute: MesesYearMonthRoute,
   MesesYearMonthCartaoCardIdRoute: MesesYearMonthCartaoCardIdRoute,

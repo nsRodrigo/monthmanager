@@ -6,23 +6,33 @@ import {
   usePurchases,
   useDebits,
   useIncomes,
+  useInvestments,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
   filterCardsByAccount,
   filterDebitsByAccount,
   filterIncomesByAccount,
+  filterInvestmentsByAccount,
   computeAccountBalance,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
-import { ArrowDownRight, ArrowUpRight, CreditCard, TrendingUp, Wallet, ChevronRight, Building2 } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CreditCard,
+  Wallet,
+  ChevronRight,
+  Building2,
+  TrendingUp,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Dashboard — Finanças" },
-      { name: "description", content: "Visão geral das suas finanças mensais." },
+      { name: "description", content: "Visão geral do mês com saldo previsto." },
     ],
   }),
   component: Dashboard,
@@ -40,12 +50,13 @@ function Dashboard() {
   const { data: installments = [] } = useInstallments();
   const { data: allDebits = [] } = useDebits();
   const { data: allIncomes = [] } = useIncomes();
+  const { data: allInvestments = [] } = useInvestments();
 
   const cards = filterCardsByAccount(allCards, accountId);
   const debits = filterDebitsByAccount(allDebits, accountId);
   const incomes = filterIncomesByAccount(allIncomes, accountId);
+  const investments = filterInvestmentsByAccount(allInvestments, accountId);
 
-  // Restrict purchase-installments to cards belonging to selected account
   const visibleCardIds = new Set(cards.map((c) => c.id));
   const visiblePurchaseIds = new Set(
     purchases.filter((p) => visibleCardIds.has(p.cardId)).map((p) => p.id),
@@ -65,21 +76,19 @@ function Dashboard() {
   const totalIncome =
     monthIncomes.single.reduce((s, i) => s + i.amount, 0) +
     monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-  const pendingCredit = credInst.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
-  const pendingDebits =
-    monthDebits.single.filter((d) => !d.paid).reduce((s, d) => s + d.amount, 0) +
-    monthDebits.parcelled.filter((p) => !p.installment.paid).reduce((s, p) => s + p.installment.amount, 0);
+  const totalInvestments = investments.reduce((s, i) => s + i.amount, 0);
 
-  const balance = totalIncome - totalCredit - totalDebits;
+  const expectedBalance = totalIncome - totalCredit - totalDebits;
 
-  // Per-account running balance (current state of money — independent from month)
   const visibleAccounts = accountId ? accounts.filter((a) => a.id === accountId) : accounts;
   const totalAccountBalance = visibleAccounts.reduce(
     (sum, a) => sum + computeAccountBalance(a, allCards, purchases, installments, allDebits, allIncomes),
     0,
   );
 
-  const filterLabel = accountId ? accounts.find((a) => a.id === accountId)?.name ?? "Conta" : "Todas as contas";
+  const filterLabel = accountId
+    ? accounts.find((a) => a.id === accountId)?.name ?? "Conta"
+    : "Todas as contas";
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">
@@ -91,14 +100,12 @@ function Dashboard() {
             <Building2 className="h-3 w-3" /> {filterLabel}
           </span>
         </div>
-        <p className="mt-2 text-muted-foreground">Aqui está o resumo do seu mês.</p>
+        <p className="mt-2 text-muted-foreground">Resumo do mês com base no vencimento das faturas.</p>
       </header>
 
       {accounts.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Você ainda não tem nenhuma conta cadastrada.
-          </p>
+          <p className="text-sm text-muted-foreground">Você ainda não tem nenhuma conta cadastrada.</p>
           <Link
             to="/contas"
             className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-105"
@@ -110,25 +117,67 @@ function Dashboard() {
 
       {accounts.length > 0 && (
         <>
-          <div className="bg-gradient-hero relative overflow-hidden rounded-3xl border border-border p-8 shadow-elevated">
+          {/* Saldo previsto destacado */}
+          <div className="bg-gradient-hero relative mb-6 overflow-hidden rounded-3xl border border-border p-8 shadow-elevated">
             <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
-            <p className="text-sm font-medium text-muted-foreground">Saldo do mês</p>
-            <p className={`mt-2 text-4xl font-bold tracking-tight md:text-5xl ${balance >= 0 ? "text-success" : "text-destructive"}`}>
-              {formatCurrency(balance)}
+            <p className="text-sm font-medium text-muted-foreground">Saldo previsto · {MONTHS[month]}</p>
+            <p className={`mt-2 text-4xl font-bold tracking-tight md:text-5xl ${expectedBalance >= 0 ? "text-success" : "text-destructive"}`}>
+              {formatCurrency(expectedBalance)}
             </p>
+            <p className="mt-2 text-xs text-muted-foreground">Recebimentos − faturas − débitos</p>
             <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
               <MiniStat label="Saldo das contas" value={formatCurrency(totalAccountBalance)} icon={<Wallet className="h-4 w-4" />} />
-              <MiniStat label="A pagar (cartões)" value={formatCurrency(pendingCredit)} icon={<CreditCard className="h-4 w-4" />} tone="credit" />
-              <MiniStat label="Débitos pendentes" value={formatCurrency(pendingDebits)} icon={<ArrowDownRight className="h-4 w-4" />} tone="debit" />
+              <MiniStat label="Investido" value={formatCurrency(totalInvestments)} icon={<TrendingUp className="h-4 w-4" />} />
+              <MiniStat label="A receber" value={formatCurrency(totalIncome)} icon={<ArrowUpRight className="h-4 w-4" />} />
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <StatCard title="Recebimentos" value={formatCurrency(totalIncome)} icon={<ArrowUpRight className="h-5 w-5" />} gradient="bg-gradient-income" />
-            <StatCard title="Cartões de crédito" value={formatCurrency(totalCredit)} icon={<CreditCard className="h-5 w-5" />} gradient="bg-gradient-credit" />
-            <StatCard title="Débitos" value={formatCurrency(totalDebits)} icon={<ArrowDownRight className="h-5 w-5" />} gradient="bg-gradient-debit" />
+          {/* 4 cards grandes por categoria */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <CategoryCard
+              to="/credito"
+              title="Crédito"
+              subtitle="Faturas do mês"
+              value={formatCurrency(totalCredit)}
+              count={`${credInst.length} parcelas`}
+              icon={<CreditCard className="h-5 w-5" />}
+              gradient="bg-gradient-credit"
+            />
+            <CategoryCard
+              to="/debito"
+              title="Débito"
+              subtitle="Conta corrente"
+              value={formatCurrency(totalDebits)}
+              count={`${monthDebits.single.length + monthDebits.parcelled.length} lançamentos`}
+              icon={<ArrowDownRight className="h-5 w-5" />}
+              gradient="bg-gradient-debit"
+            />
+            <CategoryCard
+              to="/recebimentos"
+              title="Recebimentos"
+              subtitle="Entradas do mês"
+              value={formatCurrency(totalIncome)}
+              count={`${monthIncomes.single.length + monthIncomes.parcelled.length} a receber`}
+              icon={<ArrowUpRight className="h-5 w-5" />}
+              gradient="bg-gradient-income"
+            />
+            <CategoryCard
+              to="/dinheiro"
+              title="Carteira"
+              subtitle="Dinheiro físico"
+              value={formatCurrency(
+                accounts
+                  .filter((a) => a.type === "carteira")
+                  .reduce((s, a) => s + computeAccountBalance(a, allCards, purchases, installments, allDebits, allIncomes), 0),
+              )}
+              count="contas em espécie"
+              icon={<Wallet className="h-5 w-5" />}
+              gradient="bg-gradient-card"
+              dark
+            />
           </div>
 
+          {/* Contas detalhadas (apenas no consolidado) */}
           {!accountId && visibleAccounts.length > 0 && (
             <section className="mt-10">
               <h2 className="mb-4 text-xl font-semibold">Suas contas</h2>
@@ -136,10 +185,7 @@ function Dashboard() {
                 {visibleAccounts.map((a) => {
                   const bal = computeAccountBalance(a, allCards, purchases, installments, allDebits, allIncomes);
                   return (
-                    <div
-                      key={a.id}
-                      className="rounded-2xl border border-border bg-gradient-card p-5"
-                    >
+                    <div key={a.id} className="rounded-2xl border border-border bg-gradient-card p-5">
                       <div className="flex items-center gap-2">
                         <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: a.color }} />
                         <p className="font-semibold">{a.name}</p>
@@ -154,95 +200,59 @@ function Dashboard() {
               </div>
             </section>
           )}
-
-          <section className="mt-10">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Cartões — {MONTHS[month]}</h2>
-              <Link
-                to="/meses/$year/$month"
-                params={{ year: String(year), month: String(month) }}
-                className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-              >
-                Ver mês completo <ChevronRight className="h-4 w-4" />
-              </Link>
-            </div>
-            {cards.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-                Nenhum cartão {accountId ? "nesta conta" : "cadastrado"}. Cadastre na aba{" "}
-                <Link to="/carteira" className="text-primary hover:underline">Carteira</Link>.
-              </div>
-            )}
-            <div className="grid gap-3 md:grid-cols-2">
-              {cards.map((c) => {
-                const cardInst = credInst.filter((i) => {
-                  const pur = purchases.find((p) => p.id === i.parentId);
-                  return pur?.cardId === c.id;
-                });
-                const total = cardInst.reduce((s, i) => s + i.amount, 0);
-                const allPaid = cardInst.length > 0 && cardInst.every((i) => i.paid);
-                return (
-                  <Link
-                    key={c.id}
-                    to="/meses/$year/$month/cartao/$cardId"
-                    params={{ year: String(year), month: String(month), cardId: c.id }}
-                    className="group relative overflow-hidden rounded-2xl border border-border bg-gradient-card p-5 transition-all hover:border-primary/40 hover:shadow-glow"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />
-                          <p className="font-semibold">{c.name}</p>
-                        </div>
-                        <p className="mt-3 text-2xl font-bold">{formatCurrency(total)}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{cardInst.length} {cardInst.length === 1 ? "lançamento" : "lançamentos"}</p>
-                      </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        allPaid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
-                      }`}>
-                        {allPaid ? "Pago" : "Em aberto"}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-
-          <div className="mt-8 flex items-center justify-center">
-            <Link
-              to="/meses"
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-105"
-            >
-              <TrendingUp className="h-4 w-4" /> Ver todos os meses
-            </Link>
-          </div>
         </>
       )}
     </div>
   );
 }
 
-function MiniStat({ label, value, icon, tone }: { label: string; value: string; icon: React.ReactNode; tone?: "credit" | "debit" }) {
-  const toneClass =
-    tone === "credit" ? "text-credit" : tone === "debit" ? "text-debit" : "text-foreground";
+function MiniStat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
     <div className="rounded-xl bg-card/60 p-4 backdrop-blur-sm">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {icon} {label}
       </div>
-      <p className={`mt-2 text-lg font-semibold ${toneClass}`}>{value}</p>
+      <p className="mt-2 text-lg font-semibold">{value}</p>
     </div>
   );
 }
 
-function StatCard({ title, value, icon, gradient }: { title: string; value: string; icon: React.ReactNode; gradient: string }) {
+function CategoryCard({
+  to,
+  title,
+  subtitle,
+  value,
+  count,
+  icon,
+  gradient,
+  dark,
+}: {
+  to: "/credito" | "/debito" | "/recebimentos" | "/dinheiro";
+  title: string;
+  subtitle: string;
+  value: string;
+  count: string;
+  icon: React.ReactNode;
+  gradient: string;
+  dark?: boolean;
+}) {
+  const text = dark ? "text-foreground" : "text-white";
+  const muted = dark ? "text-muted-foreground" : "text-white/85";
   return (
-    <div className={`relative overflow-hidden rounded-2xl ${gradient} p-5 shadow-elegant`}>
+    <Link
+      to={to}
+      className={`group relative overflow-hidden rounded-2xl ${gradient} p-5 shadow-elegant transition-transform hover:scale-[1.02]`}
+    >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-white/85">{title}</p>
-        <div className="rounded-lg bg-white/15 p-2 text-white">{icon}</div>
+        <p className={`text-xs font-semibold uppercase tracking-wide ${muted}`}>{subtitle}</p>
+        <div className={`rounded-lg ${dark ? "bg-secondary" : "bg-white/15"} p-2 ${text}`}>{icon}</div>
       </div>
-      <p className="mt-4 text-2xl font-bold text-white">{value}</p>
-    </div>
+      <p className={`mt-3 text-base font-bold ${text}`}>{title}</p>
+      <p className={`mt-2 text-2xl font-bold ${text}`}>{value}</p>
+      <div className={`mt-2 flex items-center justify-between text-xs ${muted}`}>
+        <span>{count}</span>
+        <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+      </div>
+    </Link>
   );
 }

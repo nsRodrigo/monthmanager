@@ -16,10 +16,14 @@ import {
   getMonthDebits,
   getMonthIncomes,
   isCardFullyPaid,
+  filterCardsByAccount,
+  filterDebitsByAccount,
+  filterIncomesByAccount,
   type Installment,
   type Debit,
   type Income,
 } from "@/store/finance";
+import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ArrowLeft,
@@ -60,12 +64,17 @@ function MonthView() {
     onDeleteParent?: () => void;
   } | null>(null);
 
-  const { data: cards = [] } = useCards();
+  const { accountId } = useAccountFilter();
+  const { data: allCards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
   const { data: installments = [] } = useInstallments();
-  const { data: debits = [] } = useDebits();
-  const { data: incomes = [] } = useIncomes();
+  const { data: allDebits = [] } = useDebits();
+  const { data: allIncomes = [] } = useIncomes();
   const { data: cardPayments = {} } = useCardPayments();
+
+  const cards = filterCardsByAccount(allCards, accountId);
+  const debits = filterDebitsByAccount(allDebits, accountId);
+  const incomes = filterIncomesByAccount(allIncomes, accountId);
 
   const toggleInst = useToggleInstallmentPaid();
   const toggleDebit = useToggleDebitPaid();
@@ -73,7 +82,15 @@ function MonthView() {
   const toggleIncome = useToggleIncomeReceived();
   const removeIncome = useRemoveIncome();
 
-  const inst = getMonthInstallments(installments, year, month);
+  const allMonthInst = getMonthInstallments(installments, year, month);
+  // restrict purchase installments to cards in current account
+  const visibleCardIds = new Set(cards.map((c) => c.id));
+  const visiblePurchaseIds = new Set(
+    purchases.filter((p) => visibleCardIds.has(p.cardId)).map((p) => p.id),
+  );
+  const inst = allMonthInst.filter((i) =>
+    i.parentType === "purchase" ? (accountId ? visiblePurchaseIds.has(i.parentId) : true) : true,
+  );
   const monthDebits = getMonthDebits(debits, installments, year, month);
   const monthIncomes = getMonthIncomes(incomes, installments, year, month);
 

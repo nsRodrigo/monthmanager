@@ -1,10 +1,12 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Wallet, LayoutDashboard, CalendarDays, LogOut, Upload } from "lucide-react";
+import { Wallet, LayoutDashboard, CalendarDays, LogOut, Upload, Building2 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
+import { AccountFilterProvider } from "@/store/account-filter";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -69,6 +71,7 @@ function BottomNav() {
   const items = [
     { to: "/", label: "Início", icon: LayoutDashboard, exact: true },
     { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
+    { to: "/contas", label: "Contas", icon: Building2, exact: false },
     { to: "/carteira", label: "Carteira", icon: Wallet, exact: false },
     { to: "/importar", label: "Importar", icon: Upload, exact: false },
   ] as const;
@@ -102,16 +105,21 @@ function SideNav() {
   const items = [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
     { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
+    { to: "/contas", label: "Contas", icon: Building2, exact: false },
     { to: "/carteira", label: "Carteira", icon: Wallet, exact: false },
     { to: "/importar", label: "Importar CSV", icon: Upload, exact: false },
   ] as const;
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/40 p-6 md:flex">
-      <div className="mb-10 flex items-center gap-2">
+      <div className="mb-8 flex items-center gap-2">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
           <Wallet className="h-5 w-5 text-primary-foreground" />
         </div>
         <span className="text-lg font-bold tracking-tight">Finanças</span>
+      </div>
+      <div className="mb-6">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Conta ativa</p>
+        <AccountSwitcher />
       </div>
       <nav className="flex-1 space-y-1">
         {items.map((it) => {
@@ -178,7 +186,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <SideNav />
-      <main className="flex-1 pb-24 md:pb-0">{children}</main>
+      <div className="flex-1 pb-24 md:pb-0">
+        <div className="border-b border-border bg-card/40 px-5 py-3 md:hidden">
+          <AccountSwitcher compact />
+        </div>
+        <main>{children}</main>
+      </div>
       <BottomNav />
     </div>
   );
@@ -188,9 +201,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AuthGate>
-          <Outlet />
-        </AuthGate>
+        <AccountFilterProvider>
+          <AuthGate>
+            <Outlet />
+          </AuthGate>
+        </AccountFilterProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

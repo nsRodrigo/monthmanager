@@ -948,13 +948,21 @@ export function useImportPurchases() {
           const { error: e2 } = await supabase.from("installments").insert(insertRows);
           if (e2) throw e2;
         } else {
-          const inst = buildInstallments(
+          const { data: cardRow } = await supabase
+            .from("cards")
+            .select("closing_day,due_day")
+            .eq("id", head.cardId)
+            .single();
+          const closingDay = (cardRow as { closing_day?: number } | null)?.closing_day ?? 25;
+          const dueDay = (cardRow as { due_day?: number } | null)?.due_day ?? 5;
+          const inst = buildInstallmentsForPurchase(
             purchaseId,
-            "purchase",
             user!.id,
             head.totalAmount,
             head.installmentsCount,
             head.purchaseDate,
+            closingDay,
+            dueDay,
           );
           if (head.paid) inst.forEach((i) => (i.paid = true));
           const { error: e2 } = await supabase.from("installments").insert(inst);

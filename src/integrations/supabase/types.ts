@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          initial_balance: number
+          name: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          initial_balance?: number
+          name: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          initial_balance?: number
+          name?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       card_payments: {
         Row: {
           card_id: string
@@ -51,6 +81,7 @@ export type Database = {
       }
       cards: {
         Row: {
+          account_id: string
           closing_day: number
           color: string
           created_at: string
@@ -60,6 +91,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           closing_day?: number
           color?: string
           created_at?: string
@@ -69,6 +101,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           closing_day?: number
           color?: string
           created_at?: string
@@ -77,10 +110,19 @@ export type Database = {
           name?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cards_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       debits: {
         Row: {
+          account_id: string
           amount: number
           auto_debit: boolean
           auto_debit_day: number | null
@@ -95,6 +137,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           amount: number
           auto_debit?: boolean
           auto_debit_day?: number | null
@@ -109,6 +152,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           amount?: number
           auto_debit?: boolean
           auto_debit_day?: number | null
@@ -122,10 +166,19 @@ export type Database = {
           required?: boolean
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "debits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       incomes: {
         Row: {
+          account_id: string
           amount: number
           created_at: string
           date: string
@@ -137,6 +190,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           amount: number
           created_at?: string
           date: string
@@ -148,6 +202,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           amount?: number
           created_at?: string
           date?: string
@@ -158,7 +213,15 @@ export type Database = {
           received?: boolean
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "incomes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       installments: {
         Row: {
@@ -218,6 +281,7 @@ export type Database = {
       }
       investments: {
         Row: {
+          account_id: string
           amount: number
           created_at: string
           id: string
@@ -226,6 +290,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           amount: number
           created_at?: string
           id?: string
@@ -234,6 +299,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           amount?: number
           created_at?: string
           id?: string
@@ -241,7 +307,15 @@ export type Database = {
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "investments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchases: {
         Row: {
@@ -283,24 +357,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      wallet: {
-        Row: {
-          amount: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          amount?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
       }
     }
     Views: {

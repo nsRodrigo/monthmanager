@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useAddIncome } from "@/store/finance";
+import { useAddIncome, useAccounts } from "@/store/finance";
+import { useAccountFilter } from "@/store/account-filter";
+import { AccountSelect } from "./AccountSelect";
 
 export function AddIncomeDialog({
   open,
@@ -14,6 +16,9 @@ export function AddIncomeDialog({
   defaultMonth: number;
 }) {
   const addIncome = useAddIncome();
+  const { data: accounts = [] } = useAccounts();
+  const { accountId: filterAccountId } = useAccountFilter();
+  const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
@@ -25,20 +30,22 @@ export function AddIncomeDialog({
     if (open) {
       const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
       setDate(d.toISOString().slice(0, 10));
+      setAccountId(filterAccountId ?? accounts[0]?.id ?? "");
       setDescription("");
       setAmount("");
       setIsInstallment(false);
       setInstallments("2");
       setMode("total");
     }
-  }, [open, defaultYear, defaultMonth]);
+  }, [open, defaultYear, defaultMonth, accounts, filterAccountId]);
 
   const submit = async () => {
-    if (!description.trim() || !amount) return;
+    if (!description.trim() || !amount || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const value = parseFloat(amount);
     const totalAmount = mode === "perInstallment" && n > 1 ? value * n : value;
     await addIncome.mutateAsync({
+      accountId,
       description: description.trim(),
       amount: totalAmount,
       date,
@@ -55,6 +62,7 @@ export function AddIncomeDialog({
   return (
     <Modal open={open} onClose={onClose} title="Novo recebimento">
       <div className="space-y-4">
+        <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
         <Field label="Descrição">
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Salário, freelance" />
         </Field>
@@ -75,18 +83,10 @@ export function AddIncomeDialog({
         {isInstallment && (
           <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
             <div className="flex gap-1 rounded-full bg-secondary p-1">
-              <button
-                type="button"
-                onClick={() => setMode("total")}
-                className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
+              <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
                 Valor total
               </button>
-              <button
-                type="button"
-                onClick={() => setMode("perInstallment")}
-                className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
+              <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
                 Valor por parcela
               </button>
             </div>
@@ -104,7 +104,7 @@ export function AddIncomeDialog({
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>
-          <button onClick={submit} disabled={addIncome.isPending} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+          <button onClick={submit} disabled={addIncome.isPending || !accountId} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             {addIncome.isPending ? "Salvando…" : "Adicionar"}
           </button>
         </div>

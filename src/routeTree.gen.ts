@@ -10,16 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ImportarRouteImport } from './routes/importar'
+import { Route as ContasRouteImport } from './routes/contas'
 import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MesesIndexRouteImport } from './routes/meses.index'
 import { Route as MesesYearMonthRouteImport } from './routes/meses.$year.$month'
-import { Route as MesesYearMonthCartaoCardIdRouteImport } from './routes/meses.$year.$month.cartao.$cardId'
+import { Route as MesesYearMonthCartaoCardIdRouteImport } from './routes/meses.$year.$month_.cartao.$cardId'
 
 const ImportarRoute = ImportarRouteImport.update({
   id: '/importar',
   path: '/importar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContasRoute = ContasRouteImport.update({
+  id: '/contas',
+  path: '/contas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CarteiraRoute = CarteiraRouteImport.update({
@@ -49,27 +55,29 @@ const MesesYearMonthRoute = MesesYearMonthRouteImport.update({
 } as any)
 const MesesYearMonthCartaoCardIdRoute =
   MesesYearMonthCartaoCardIdRouteImport.update({
-    id: '/cartao/$cardId',
-    path: '/cartao/$cardId',
-    getParentRoute: () => MesesYearMonthRoute,
+    id: '/meses/$year/$month_/cartao/$cardId',
+    path: '/meses/$year/$month/cartao/$cardId',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
+  '/contas': typeof ContasRoute
   '/importar': typeof ImportarRoute
   '/meses/': typeof MesesIndexRoute
-  '/meses/$year/$month': typeof MesesYearMonthRouteWithChildren
+  '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
+  '/contas': typeof ContasRoute
   '/importar': typeof ImportarRoute
   '/meses': typeof MesesIndexRoute
-  '/meses/$year/$month': typeof MesesYearMonthRouteWithChildren
+  '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
 }
 export interface FileRoutesById {
@@ -77,10 +85,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/carteira': typeof CarteiraRoute
+  '/contas': typeof ContasRoute
   '/importar': typeof ImportarRoute
   '/meses/': typeof MesesIndexRoute
-  '/meses/$year/$month': typeof MesesYearMonthRouteWithChildren
-  '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
+  '/meses/$year/$month': typeof MesesYearMonthRoute
+  '/meses/$year/$month_/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/carteira'
+    | '/contas'
     | '/importar'
     | '/meses/'
     | '/meses/$year/$month'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/carteira'
+    | '/contas'
     | '/importar'
     | '/meses'
     | '/meses/$year/$month'
@@ -106,19 +117,22 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/carteira'
+    | '/contas'
     | '/importar'
     | '/meses/'
     | '/meses/$year/$month'
-    | '/meses/$year/$month/cartao/$cardId'
+    | '/meses/$year/$month_/cartao/$cardId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   CarteiraRoute: typeof CarteiraRoute
+  ContasRoute: typeof ContasRoute
   ImportarRoute: typeof ImportarRoute
   MesesIndexRoute: typeof MesesIndexRoute
-  MesesYearMonthRoute: typeof MesesYearMonthRouteWithChildren
+  MesesYearMonthRoute: typeof MesesYearMonthRoute
+  MesesYearMonthCartaoCardIdRoute: typeof MesesYearMonthCartaoCardIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -128,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/importar'
       fullPath: '/importar'
       preLoaderRoute: typeof ImportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contas': {
+      id: '/contas'
+      path: '/contas'
+      fullPath: '/contas'
+      preLoaderRoute: typeof ContasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/carteira': {
@@ -165,45 +186,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MesesYearMonthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/meses/$year/$month/cartao/$cardId': {
-      id: '/meses/$year/$month/cartao/$cardId'
-      path: '/cartao/$cardId'
+    '/meses/$year/$month_/cartao/$cardId': {
+      id: '/meses/$year/$month_/cartao/$cardId'
+      path: '/meses/$year/$month/cartao/$cardId'
       fullPath: '/meses/$year/$month/cartao/$cardId'
       preLoaderRoute: typeof MesesYearMonthCartaoCardIdRouteImport
-      parentRoute: typeof MesesYearMonthRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface MesesYearMonthRouteChildren {
-  MesesYearMonthCartaoCardIdRoute: typeof MesesYearMonthCartaoCardIdRoute
-}
-
-const MesesYearMonthRouteChildren: MesesYearMonthRouteChildren = {
-  MesesYearMonthCartaoCardIdRoute: MesesYearMonthCartaoCardIdRoute,
-}
-
-const MesesYearMonthRouteWithChildren = MesesYearMonthRoute._addFileChildren(
-  MesesYearMonthRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CarteiraRoute: CarteiraRoute,
+  ContasRoute: ContasRoute,
   ImportarRoute: ImportarRoute,
   MesesIndexRoute: MesesIndexRoute,
-  MesesYearMonthRoute: MesesYearMonthRouteWithChildren,
+  MesesYearMonthRoute: MesesYearMonthRoute,
+  MesesYearMonthCartaoCardIdRoute: MesesYearMonthCartaoCardIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

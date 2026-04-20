@@ -5,8 +5,19 @@ import { useAuth } from "./auth";
 // =======================
 // Types (camelCase domain)
 // =======================
+export type AccountType = "corrente" | "digital" | "carteira" | "investimento";
+
+export type Account = {
+  id: string;
+  name: string;
+  type: AccountType;
+  color: string;
+  initialBalance: number;
+};
+
 export type Card = {
   id: string;
+  accountId: string;
   name: string;
   color: string;
   closingDay: number;
@@ -18,7 +29,7 @@ export type Purchase = {
   cardId: string;
   description: string;
   totalAmount: number;
-  date: string; // ISO yyyy-mm-dd
+  date: string;
   installmentsCount: number;
 };
 
@@ -28,18 +39,19 @@ export type Installment = {
   id: string;
   parentType: ParentType;
   parentId: string;
-  purchaseId: string | null; // legacy mirror for purchase installments
+  purchaseId: string | null;
   number: number;
   total: number;
   amount: number;
-  dueDate: string; // ISO
+  dueDate: string;
   year: number;
-  month: number; // 0-11
+  month: number;
   paid: boolean;
 };
 
 export type Debit = {
   id: string;
+  accountId: string;
   description: string;
   amount: number;
   date: string;
@@ -53,6 +65,7 @@ export type Debit = {
 
 export type Income = {
   id: string;
+  accountId: string;
   description: string;
   amount: number;
   date: string;
@@ -63,6 +76,7 @@ export type Income = {
 
 export type Investment = {
   id: string;
+  accountId: string;
   type: string;
   amount: number;
   percentage: number;
@@ -73,11 +87,6 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/**
- * Generate installments evenly, last one absorbs rounding.
- * The day-of-month is preserved for every parcel (ex: 25/04, 25/05, 25/06).
- * Example: 100 / 3 => 33.33, 33.33, 33.34
- */
 export function buildInstallments(
   parentId: string,
   parentType: ParentType,
@@ -106,7 +115,6 @@ export function buildInstallments(
     paid: boolean;
   }> = [];
   for (let i = 0; i < count; i++) {
-    // Same day-of-month, advance month — clamp if month is shorter (e.g. 31 -> 28/feb).
     const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
     const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
     const day = Math.min(dayOfMonth, lastDay);
@@ -130,7 +138,6 @@ export function buildInstallments(
   return items;
 }
 
-// Backwards-compatible wrapper used by importer.
 export function buildInstallmentsForPurchase(
   purchaseId: string,
   userId: string,
@@ -141,59 +148,33 @@ export function buildInstallmentsForPurchase(
   return buildInstallments(purchaseId, "purchase", userId, totalAmount, installmentsCount, startDate);
 }
 
-// =======================
-// Row mappers
-// =======================
-type CardRow = { id: string; name: string; color: string; closing_day: number; due_day: number };
-type PurchaseRow = {
-  id: string;
-  card_id: string;
-  description: string;
-  total_amount: number | string;
-  purchase_date: string;
-  installments_count: number;
-};
-type InstallmentRow = {
-  id: string;
-  parent_type: ParentType;
-  parent_id: string;
-  purchase_id: string | null;
-  number: number;
-  total: number;
-  amount: number | string;
-  due_date: string;
-  year: number;
-  month: number;
-  paid: boolean;
-};
-type DebitRow = {
-  id: string;
-  description: string;
-  amount: number | string;
-  date: string;
-  required: boolean;
-  paid: boolean;
-  auto_debit: boolean;
-  auto_debit_day: number | null;
-  installments_count: number;
-  is_parent: boolean;
-};
-type IncomeRow = {
-  id: string;
-  description: string;
-  amount: number | string;
-  date: string;
-  received: boolean;
-  installments_count: number;
-  is_parent: boolean;
-};
-type InvRow = { id: string; type: string; amount: number | string; percentage: number | string };
-
 const num = (v: number | string) => (typeof v === "number" ? v : parseFloat(v));
 
 // =======================
-// Hooks
+// Queries
 // =======================
+export function useAccounts() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["accounts", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<Account[]> => {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("id,name,type,color,initial_balance")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: a.type as AccountType,
+        color: a.color,
+        initialBalance: num(a.initial_balance as number | string),
+      }));
+    },
+  });
+}
+
 export function useCards() {
   const { user } = useAuth();
   return useQuery({
@@ -202,11 +183,12 @@ export function useCards() {
     queryFn: async (): Promise<Card[]> => {
       const { data, error } = await supabase
         .from("cards")
-        .select("id,name,color,closing_day,due_day")
+        .select("id,account_id,name,color,closing_day,due_day")
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data as CardRow[]).map((c) => ({
+      return (data ?? []).map((c) => ({
         id: c.id,
+        accountId: c.account_id,
         name: c.name,
         color: c.color,
         closingDay: c.closing_day,
@@ -226,11 +208,11 @@ export function usePurchases() {
         .from("purchases")
         .select("id,card_id,description,total_amount,purchase_date,installments_count");
       if (error) throw error;
-      return (data as PurchaseRow[]).map((p) => ({
+      return (data ?? []).map((p) => ({
         id: p.id,
         cardId: p.card_id,
         description: p.description,
-        totalAmount: num(p.total_amount),
+        totalAmount: num(p.total_amount as number | string),
         date: p.purchase_date,
         installmentsCount: p.installments_count,
       }));
@@ -251,14 +233,14 @@ export function useInstallments() {
         .order("month", { ascending: true })
         .order("number", { ascending: true });
       if (error) throw error;
-      return (data as InstallmentRow[]).map((i) => ({
+      return (data ?? []).map((i) => ({
         id: i.id,
-        parentType: i.parent_type,
-        parentId: i.parent_id,
+        parentType: i.parent_type as ParentType,
+        parentId: i.parent_id ?? "",
         purchaseId: i.purchase_id,
         number: i.number,
         total: i.total,
-        amount: num(i.amount),
+        amount: num(i.amount as number | string),
         dueDate: i.due_date,
         year: i.year,
         month: i.month,
@@ -276,13 +258,14 @@ export function useDebits() {
     queryFn: async (): Promise<Debit[]> => {
       const { data, error } = await supabase
         .from("debits")
-        .select("id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
+        .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
         .order("date", { ascending: true });
       if (error) throw error;
-      return (data as DebitRow[]).map((d) => ({
+      return (data ?? []).map((d) => ({
         id: d.id,
+        accountId: d.account_id,
         description: d.description,
-        amount: num(d.amount),
+        amount: num(d.amount as number | string),
         date: d.date,
         required: d.required,
         paid: d.paid,
@@ -303,13 +286,14 @@ export function useIncomes() {
     queryFn: async (): Promise<Income[]> => {
       const { data, error } = await supabase
         .from("incomes")
-        .select("id,description,amount,date,received,installments_count,is_parent")
+        .select("id,account_id,description,amount,date,received,installments_count,is_parent")
         .order("date", { ascending: true });
       if (error) throw error;
-      return (data as IncomeRow[]).map((d) => ({
+      return (data ?? []).map((d) => ({
         id: d.id,
+        accountId: d.account_id,
         description: d.description,
-        amount: num(d.amount),
+        amount: num(d.amount as number | string),
         date: d.date,
         received: d.received,
         installmentsCount: d.installments_count,
@@ -327,30 +311,15 @@ export function useInvestments() {
     queryFn: async (): Promise<Investment[]> => {
       const { data, error } = await supabase
         .from("investments")
-        .select("id,type,amount,percentage");
+        .select("id,account_id,type,amount,percentage");
       if (error) throw error;
-      return (data as InvRow[]).map((i) => ({
+      return (data ?? []).map((i) => ({
         id: i.id,
+        accountId: i.account_id,
         type: i.type,
-        amount: num(i.amount),
-        percentage: num(i.percentage),
+        amount: num(i.amount as number | string),
+        percentage: num(i.percentage as number | string),
       }));
-    },
-  });
-}
-
-export function useWallet() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["wallet", user?.id],
-    enabled: !!user,
-    queryFn: async (): Promise<number> => {
-      const { data, error } = await supabase
-        .from("wallet")
-        .select("amount")
-        .maybeSingle();
-      if (error) throw error;
-      return data ? num((data as { amount: number | string }).amount) : 0;
     },
   });
 }
@@ -366,7 +335,7 @@ export function useCardPayments() {
         .select("card_id,year,month,paid");
       if (error) throw error;
       const map: Record<string, boolean> = {};
-      for (const r of data as Array<{ card_id: string; year: number; month: number; paid: boolean }>) {
+      for (const r of (data ?? []) as Array<{ card_id: string; year: number; month: number; paid: boolean }>) {
         map[`${r.card_id}-${r.year}-${r.month}`] = r.paid;
       }
       return map;
@@ -375,13 +344,90 @@ export function useCardPayments() {
 }
 
 // =======================
-// Mutations
+// Mutations — Accounts
 // =======================
 function useInvalidate() {
   const qc = useQueryClient();
   return (keys: string[]) => keys.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
 }
 
+export function useAddAccount() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (a: Omit<Account, "id">) => {
+      const { error } = await supabase.from("accounts").insert({
+        user_id: user!.id,
+        name: a.name,
+        type: a.type,
+        color: a.color,
+        initial_balance: a.initialBalance,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => inv(["accounts"]),
+  });
+}
+
+export function useRemoveAccount() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Cascading FKs handle cards/debits/incomes/investments removal.
+      // Installments are linked to purchases (via parent_id) — wipe them
+      // explicitly before purchases vanish through cards cascade.
+      const { data: cardRows } = await supabase.from("cards").select("id").eq("account_id", id);
+      const cardIds = (cardRows ?? []).map((c) => c.id);
+      if (cardIds.length > 0) {
+        const { data: purs } = await supabase.from("purchases").select("id").in("card_id", cardIds);
+        const purIds = (purs ?? []).map((p) => p.id);
+        if (purIds.length > 0) {
+          await supabase.from("installments").delete().in("parent_id", purIds).eq("parent_type", "purchase");
+        }
+      }
+      // Debits + Incomes also have child installments
+      const { data: debs } = await supabase.from("debits").select("id").eq("account_id", id);
+      const debIds = (debs ?? []).map((d) => d.id);
+      if (debIds.length > 0) {
+        await supabase.from("installments").delete().in("parent_id", debIds).eq("parent_type", "debit");
+      }
+      const { data: incs } = await supabase.from("incomes").select("id").eq("account_id", id);
+      const incIds = (incs ?? []).map((i) => i.id);
+      if (incIds.length > 0) {
+        await supabase.from("installments").delete().in("parent_id", incIds).eq("parent_type", "income");
+      }
+      const { error } = await supabase.from("accounts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () =>
+      inv(["accounts", "cards", "purchases", "installments", "debits", "incomes", "investments", "card_payments"]),
+  });
+}
+
+export function useUpdateAccount() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (a: Partial<Account> & { id: string }) => {
+      const patch: {
+        name?: string;
+        type?: string;
+        color?: string;
+        initial_balance?: number;
+      } = {};
+      if (a.name !== undefined) patch.name = a.name;
+      if (a.type !== undefined) patch.type = a.type;
+      if (a.color !== undefined) patch.color = a.color;
+      if (a.initialBalance !== undefined) patch.initial_balance = a.initialBalance;
+      const { error } = await supabase.from("accounts").update(patch).eq("id", a.id);
+      if (error) throw error;
+    },
+    onSuccess: () => inv(["accounts"]),
+  });
+}
+
+// =======================
+// Mutations — Cards / Purchases
+// =======================
 export function useAddCard() {
   const { user } = useAuth();
   const inv = useInvalidate();
@@ -389,6 +435,7 @@ export function useAddCard() {
     mutationFn: async (c: Omit<Card, "id">) => {
       const { error } = await supabase.from("cards").insert({
         user_id: user!.id,
+        account_id: c.accountId,
         name: c.name,
         color: c.color,
         closing_day: c.closingDay,
@@ -399,13 +446,13 @@ export function useAddCard() {
     onSuccess: () => inv(["cards"]),
   });
 }
+
 export function useRemoveCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      // also remove installments tied to purchases of this card
       const { data: purs } = await supabase.from("purchases").select("id").eq("card_id", id);
-      const ids = (purs as Array<{ id: string }> | null)?.map((p) => p.id) ?? [];
+      const ids = (purs ?? []).map((p) => p.id);
       if (ids.length > 0) {
         await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
         await supabase.from("purchases").delete().in("id", ids);
@@ -454,7 +501,6 @@ export function useRemovePurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      // remove installments first (foreign key not declared but consistent)
       await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "purchase");
       const { error } = await supabase.from("purchases").delete().eq("id", id);
       if (error) throw error;
@@ -463,22 +509,14 @@ export function useRemovePurchase() {
   });
 }
 
+// =======================
+// Installments
+// =======================
 export function useUpdateInstallment() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: {
-      id: string;
-      amount?: number;
-      dueDate?: string;
-      paid?: boolean;
-    }) => {
-      const patch: {
-        amount?: number;
-        due_date?: string;
-        year?: number;
-        month?: number;
-        paid?: boolean;
-      } = {};
+    mutationFn: async (args: { id: string; amount?: number; dueDate?: string; paid?: boolean }) => {
+      const patch: { amount?: number; due_date?: string; year?: number; month?: number; paid?: boolean } = {};
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.dueDate !== undefined) {
         patch.due_date = args.dueDate;
@@ -494,28 +532,14 @@ export function useUpdateInstallment() {
   });
 }
 
-/**
- * Smart date update: shifts THIS installment to a new date and, optionally,
- * shifts every installment AFTER it to keep the same day-of-month.
- * Past installments are NEVER affected.
- */
 export function useShiftInstallmentDate() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: {
-      installment: Installment;
-      newDate: string;
-      applyToFuture: boolean;
-    }) => {
+    mutationFn: async (args: { installment: Installment; newDate: string; applyToFuture: boolean }) => {
       const newD = new Date(args.newDate);
-      // Always update the current one
       const { error: eCur } = await supabase
         .from("installments")
-        .update({
-          due_date: args.newDate,
-          year: newD.getFullYear(),
-          month: newD.getMonth(),
-        })
+        .update({ due_date: args.newDate, year: newD.getFullYear(), month: newD.getMonth() })
         .eq("id", args.installment.id);
       if (eCur) throw eCur;
 
@@ -528,18 +552,14 @@ export function useShiftInstallmentDate() {
           .gt("number", args.installment.number);
         if (error) throw error;
         const day = newD.getDate();
-        for (const r of (rows as Array<{ id: string; number: number }>) ?? []) {
+        for (const r of (rows ?? []) as Array<{ id: string; number: number }>) {
           const offset = r.number - args.installment.number;
           const target = new Date(newD.getFullYear(), newD.getMonth() + offset, 1);
           const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
           const d = new Date(target.getFullYear(), target.getMonth(), Math.min(day, lastDay));
           const { error: eUpd } = await supabase
             .from("installments")
-            .update({
-              due_date: d.toISOString().slice(0, 10),
-              year: d.getFullYear(),
-              month: d.getMonth(),
-            })
+            .update({ due_date: d.toISOString().slice(0, 10), year: d.getFullYear(), month: d.getMonth() })
             .eq("id", r.id);
           if (eUpd) throw eUpd;
         }
@@ -564,7 +584,7 @@ export function useSetCardPaid() {
         .select("id")
         .eq("card_id", args.cardId);
       if (e1) throw e1;
-      const purIds = (pursRaw as Array<{ id: string }>).map((p) => p.id);
+      const purIds = (pursRaw ?? []).map((p) => p.id);
       if (purIds.length > 0) {
         const { error: e2 } = await supabase
           .from("installments")
@@ -593,12 +613,15 @@ export function useSetCardPaid() {
   });
 }
 
-// ----- Debits -----
+// =======================
+// Debits
+// =======================
 export function useAddDebit() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (d: {
+      accountId: string;
       description: string;
       amount: number;
       date: string;
@@ -612,6 +635,7 @@ export function useAddDebit() {
         .from("debits")
         .insert({
           user_id: user!.id,
+          account_id: d.accountId,
           description: d.description,
           amount: d.amount,
           date: d.date,
@@ -641,6 +665,7 @@ export function useAddDebit() {
     onSuccess: () => inv(["debits", "installments"]),
   });
 }
+
 export function useToggleDebitPaid() {
   const inv = useInvalidate();
   return useMutation({
@@ -651,6 +676,7 @@ export function useToggleDebitPaid() {
     onSuccess: () => inv(["debits"]),
   });
 }
+
 export function useRemoveDebit() {
   const inv = useInvalidate();
   return useMutation({
@@ -663,12 +689,15 @@ export function useRemoveDebit() {
   });
 }
 
-// ----- Incomes -----
+// =======================
+// Incomes
+// =======================
 export function useAddIncome() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (i: {
+      accountId: string;
       description: string;
       amount: number;
       date: string;
@@ -679,6 +708,7 @@ export function useAddIncome() {
         .from("incomes")
         .insert({
           user_id: user!.id,
+          account_id: i.accountId,
           description: i.description,
           amount: i.amount,
           date: i.date,
@@ -705,6 +735,7 @@ export function useAddIncome() {
     onSuccess: () => inv(["incomes", "installments"]),
   });
 }
+
 export function useToggleIncomeReceived() {
   const inv = useInvalidate();
   return useMutation({
@@ -718,6 +749,7 @@ export function useToggleIncomeReceived() {
     onSuccess: () => inv(["incomes"]),
   });
 }
+
 export function useRemoveIncome() {
   const inv = useInvalidate();
   return useMutation({
@@ -730,23 +762,9 @@ export function useRemoveIncome() {
   });
 }
 
-export function useSetWallet() {
-  const { user } = useAuth();
-  const inv = useInvalidate();
-  return useMutation({
-    mutationFn: async (amount: number) => {
-      const { error } = await supabase
-        .from("wallet")
-        .upsert(
-          { user_id: user!.id, amount, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" },
-        );
-      if (error) throw error;
-    },
-    onSuccess: () => inv(["wallet"]),
-  });
-}
-
+// =======================
+// Investments
+// =======================
 export function useAddInvestment() {
   const { user } = useAuth();
   const inv = useInvalidate();
@@ -754,6 +772,7 @@ export function useAddInvestment() {
     mutationFn: async (i: Omit<Investment, "id">) => {
       const { error } = await supabase.from("investments").insert({
         user_id: user!.id,
+        account_id: i.accountId,
         type: i.type,
         amount: i.amount,
         percentage: i.percentage,
@@ -763,6 +782,7 @@ export function useAddInvestment() {
     onSuccess: () => inv(["investments"]),
   });
 }
+
 export function useRemoveInvestment() {
   const inv = useInvalidate();
   return useMutation({
@@ -774,11 +794,9 @@ export function useRemoveInvestment() {
   });
 }
 
-/**
- * Bulk insert imported data: handles both
- *  - "compra com parcelas detalhadas" (respeita valores informados)
- *  - "compra única + n parcelas" (gera parcelas iguais)
- */
+// =======================
+// Importer (cards live inside an account, so card already carries account)
+// =======================
 export type ImportedRow = {
   description: string;
   purchaseDate: string;
@@ -802,7 +820,6 @@ export function useImportPurchases() {
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(r);
       }
-
       for (const [, items] of groups) {
         const head = items[0];
         const { data: pIns, error: e1 } = await supabase
@@ -819,7 +836,6 @@ export function useImportPurchases() {
           .single();
         if (e1) throw e1;
         const purchaseId = (pIns as { id: string }).id;
-
         const detailed = items.filter(
           (r) => r.installmentNumber !== undefined && r.installmentAmount !== undefined,
         );
@@ -863,17 +879,12 @@ export function useImportPurchases() {
 }
 
 // =======================
-// Selectors (pure utilities)
+// Selectors
 // =======================
 export function getMonthInstallments(installments: Installment[], year: number, month: number) {
   return installments.filter((i) => i.year === year && i.month === month);
 }
 
-/**
- * Returns the items that should appear in a month's "debits" tab.
- * - One-shot debits (installments_count == 1): show by date
- * - Parcelled debits (is_parent): show ONLY their installments (one per month)
- */
 export function getMonthDebits(
   debits: Debit[],
   installments: Installment[],
@@ -892,7 +903,7 @@ export function getMonthDebits(
       const parent = debits.find((d) => d.id === i.parentId);
       return { installment: i, debit: parent };
     })
-    .filter((x) => !!x.debit);
+    .filter((x): x is { installment: Installment; debit: Debit } => !!x.debit);
   return { single, parcelled };
 }
 
@@ -914,7 +925,7 @@ export function getMonthIncomes(
       const parent = incomes.find((d) => d.id === i.parentId);
       return { installment: i, income: parent };
     })
-    .filter((x) => !!x.income);
+    .filter((x): x is { installment: Installment; income: Income } => !!x.income);
   return { single, parcelled };
 }
 
@@ -934,4 +945,62 @@ export function isCardFullyPaid(
   const key = `${cardId}-${year}-${month}`;
   if (monthInst.length === 0) return cardPayments[key] ?? false;
   return monthInst.every((i) => i.paid);
+}
+
+// =======================
+// Account-aware filters
+// =======================
+/**
+ * Filter helpers used across pages — when accountId is null, returns the input unchanged.
+ */
+export function filterCardsByAccount(cards: Card[], accountId: string | null) {
+  return accountId ? cards.filter((c) => c.accountId === accountId) : cards;
+}
+export function filterDebitsByAccount(debits: Debit[], accountId: string | null) {
+  return accountId ? debits.filter((d) => d.accountId === accountId) : debits;
+}
+export function filterIncomesByAccount(incomes: Income[], accountId: string | null) {
+  return accountId ? incomes.filter((i) => i.accountId === accountId) : incomes;
+}
+export function filterInvestmentsByAccount(invs: Investment[], accountId: string | null) {
+  return accountId ? invs.filter((i) => i.accountId === accountId) : invs;
+}
+
+/**
+ * Compute the running balance of an account across all paid transactions.
+ * Balance = initialBalance + (paid incomes/installments) - (paid debits/installments) - (paid card installments)
+ */
+export function computeAccountBalance(
+  account: Account,
+  cards: Card[],
+  purchases: Purchase[],
+  installments: Installment[],
+  debits: Debit[],
+  incomes: Income[],
+): number {
+  let bal = account.initialBalance;
+  // Incomes received
+  for (const inc of incomes.filter((i) => i.accountId === account.id && !i.isParent && i.received)) {
+    bal += inc.amount;
+  }
+  // Income installments paid (paid==true used as "received" for parcelled)
+  for (const i of installments.filter((x) => x.parentType === "income" && x.paid)) {
+    const parent = incomes.find((p) => p.id === i.parentId);
+    if (parent?.accountId === account.id) bal += i.amount;
+  }
+  // Debits paid
+  for (const d of debits.filter((d) => d.accountId === account.id && !d.isParent && d.paid)) {
+    bal -= d.amount;
+  }
+  for (const i of installments.filter((x) => x.parentType === "debit" && x.paid)) {
+    const parent = debits.find((p) => p.id === i.parentId);
+    if (parent?.accountId === account.id) bal -= i.amount;
+  }
+  // Card installments paid (purchases attached to cards in this account)
+  const accountCardIds = new Set(cards.filter((c) => c.accountId === account.id).map((c) => c.id));
+  for (const i of installments.filter((x) => x.parentType === "purchase" && x.paid)) {
+    const pur = purchases.find((p) => p.id === i.parentId);
+    if (pur && accountCardIds.has(pur.cardId)) bal -= i.amount;
+  }
+  return bal;
 }

@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Wallet, LayoutDashboard, CreditCard, ArrowDownRight, ArrowUpRight, LogOut, Building2, Upload, CalendarDays } from "lucide-react";
+import { LayoutDashboard, CreditCard, ArrowDownRight, ArrowUpRight, LogOut, Building2, Upload, CalendarDays, Settings, Wallet } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -76,7 +76,7 @@ function BottomNav() {
     { to: "/credito", label: "Crédito", icon: CreditCard, exact: false },
     { to: "/debito", label: "Débito", icon: ArrowDownRight, exact: false },
     { to: "/recebimentos", label: "Receber", icon: ArrowUpRight, exact: false },
-    { to: "/dinheiro", label: "Carteira", icon: Wallet, exact: false },
+    { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
   ] as const;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-lg md:hidden">
@@ -110,11 +110,8 @@ function SideNav() {
     { to: "/credito", label: "Crédito", icon: CreditCard, exact: false },
     { to: "/debito", label: "Débito + Investimentos", icon: ArrowDownRight, exact: false },
     { to: "/recebimentos", label: "Recebimentos", icon: ArrowUpRight, exact: false },
-    { to: "/dinheiro", label: "Carteira física", icon: Wallet, exact: false },
     { to: "/meses", label: "Visão mensal", icon: CalendarDays, exact: false },
     { to: "/contas", label: "Contas", icon: Building2, exact: false },
-    { to: "/carteira", label: "Cartões + invest.", icon: CreditCard, exact: true },
-    { to: "/importar", label: "Importar CSV", icon: Upload, exact: false },
   ] as const;
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/40 p-6 md:flex">
@@ -147,6 +144,18 @@ function SideNav() {
             </Link>
           );
         })}
+        <div className="my-2 border-t border-border" />
+        <Link
+          to="/importar"
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+            loc.pathname.startsWith("/importar")
+              ? "bg-secondary text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <Upload className="h-4 w-4" />
+          Importar CSV
+        </Link>
       </nav>
       <div className="mt-6 border-t border-border pt-4">
         <p className="mb-2 truncate text-xs text-muted-foreground">{user?.email}</p>
@@ -158,6 +167,45 @@ function SideNav() {
         </button>
       </div>
     </aside>
+  );
+}
+
+function SettingsMenu() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground"
+        aria-label="Configurações"
+      >
+        <Settings className="h-4 w-4" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
+            <p className="border-b border-border px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Configurações
+            </p>
+            <Link
+              to="/importar"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"
+            >
+              <Upload className="h-4 w-4" /> Importar CSV
+            </Link>
+            <Link
+              to="/contas"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"
+            >
+              <Building2 className="h-4 w-4" /> Gerenciar contas
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -194,8 +242,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <SideNav />
       <div className="flex-1 pb-24 md:pb-0">
-        <div className="border-b border-border bg-card/40 px-5 py-3 md:hidden">
-          <AccountSwitcher compact />
+        <div className="flex items-center gap-3 border-b border-border bg-card/40 px-5 py-3 md:hidden">
+          <div className="flex-1 min-w-0">
+            <AccountSwitcher compact />
+          </div>
+          <SettingsMenu />
+        </div>
+        <div className="hidden md:flex justify-end px-6 pt-4">
+          <SettingsMenu />
         </div>
         <main>{children}</main>
       </div>

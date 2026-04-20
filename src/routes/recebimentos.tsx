@@ -107,7 +107,7 @@ function RecebimentosPage() {
               <input
                 type="checkbox"
                 checked={installment.paid}
-                onChange={() => toggleInst.mutate({ id: installment.id, paid: !installment.paid })}
+                onChange={() => toggleInst(installment.id, !installment.paid)}
                 className="h-4 w-4 accent-success"
               />
               <div className="min-w-0 flex-1">

@@ -428,10 +428,10 @@ function parseSlot(
     })();
 
     // Detectar sub-seção (apenas no formato moderno).
-    // IMPORTANTE: cabeçalhos como "RECEBIDOS", "CARTEIRA", "ITAU UNICLASS BLACK - CRÉDITO"
-    // vêm na MESMA linha que a palavra TOTAL (em outra coluna do slot).
-    // Precisamos classificá-los ANTES de descartar a linha como total.
-    if (isModern && isSectionHeader(upDesc)) {
+    // IMPORTANTE: cabeçalhos de sub-seção sempre têm "TOTAL" na mesma linha
+    // (ex: "RECEBIDOS ... TOTAL 7495.11"). Exigir essa coexistência reduz
+    // falsos positivos com descrições reais.
+    if (isModern && isTotalRow && isSectionHeader(upDesc)) {
       currentSection = classifySection(upDesc);
       continue;
     }

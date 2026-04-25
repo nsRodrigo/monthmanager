@@ -156,13 +156,24 @@ function SideNav() {
         <Link
           to="/importar"
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            loc.pathname.startsWith("/importar")
+            loc.pathname === "/importar"
               ? "bg-secondary text-foreground shadow-sm"
               : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           }`}
         >
           <Upload className="h-4 w-4" />
           Importar CSV
+        </Link>
+        <Link
+          to="/importar-historico"
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+            loc.pathname === "/importar-historico"
+              ? "bg-secondary text-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Planilha histórica
         </Link>
       </nav>
       <div className="mt-6 border-t border-border pt-4">

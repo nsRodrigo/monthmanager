@@ -300,15 +300,24 @@ Mercado;2024-04-02;320,50;1;;;;nao;Cartão Principal`;
       <div className="mt-6 rounded-2xl border border-border bg-card p-6">
         <h2 className="text-sm font-semibold">Formato esperado</h2>
         <ul className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-          <li>• <code className="text-foreground">descricao</code>, <code className="text-foreground">data_compra</code>, <code className="text-foreground">valor_total</code>, <code className="text-foreground">parcelas</code></li>
-          <li>• Opcionais para parcelas detalhadas: <code className="text-foreground">numero_parcela</code>, <code className="text-foreground">valor_parcela</code>, <code className="text-foreground">data_vencimento</code></li>
-          <li>• <code className="text-foreground">status</code>: <code>pago</code> / <code>nao</code></li>
-          <li>• <code className="text-foreground">cartao</code>: nome exato do cartão (fallback aplicado)</li>
+          <li>• Obrigatórios: <code className="text-foreground">descricao</code>, <code className="text-foreground">data_compra</code>, <code className="text-foreground">valor_total</code>, <code className="text-foreground">parcelas</code>, <code className="text-foreground">cartao</code></li>
+          <li>• Opcionais: <code className="text-foreground">numero_parcela</code>, <code className="text-foreground">data_vencimento</code>, <code className="text-foreground">status</code> (<code>pago</code> / <code>nao</code>)</li>
+          <li>• Delimitador <code>,</code> ou <code>;</code> (detectado automaticamente)</li>
         </ul>
-        <p className="mt-3 text-xs text-muted-foreground">
-          <strong className="text-foreground">Caso 1:</strong> sem <code>numero_parcela</code> → o sistema gera as parcelas dividindo o total.<br />
-          <strong className="text-foreground">Caso 2:</strong> uma linha por parcela com <code>numero_parcela</code> + <code>valor_parcela</code> → respeitamos seus valores reais (centavos preservados).
-        </p>
+        <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+          <p>
+            <strong className="text-foreground">Cada linha = 1 compra completa.</strong> O sistema gera todas as N parcelas automaticamente, divididas igualmente (último ajuste de centavos na parcela final).
+          </p>
+          <p>
+            <strong className="text-foreground">Modo linha-âncora</strong> (com <code>numero_parcela</code>): a parcela informada cai no mês de <code>data_vencimento</code> (ou <code>data_compra</code> se ausente). Parcelas anteriores caem nos meses passados e ficam <strong className="text-foreground">marcadas como pagas</strong>. As seguintes vão para os meses futuros.
+          </p>
+          <p>
+            <strong className="text-foreground">Modo data de compra</strong> (sem <code>numero_parcela</code>): usa a regra de fechamento/vencimento do cartão para distribuir as parcelas a partir da próxima fatura.
+          </p>
+          <p>
+            Você pode ajustar o status (pago / não pago) de qualquer parcela manualmente depois.
+          </p>
+        </div>
       </div>
     </div>
   );

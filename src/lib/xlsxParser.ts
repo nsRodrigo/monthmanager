@@ -254,6 +254,7 @@ function parseYearBlock(
   // cada slot está associado a um mês (descoberto por linhas TOTAL ou
   // por contagem trimestral).
   let monthCursor = 0; // 0..11 — avança quando encontramos novo trimestre
+  let lastQuarterMonths: number[] | null = null; // meses do último frame PAGAMENTO/DESCRIÇÃO
 
   for (let r = start; r < end; r++) {
     const row = grid[r] || [];
@@ -263,28 +264,39 @@ function parseYearBlock(
 
     const isModern = headerSlots[0].kind === "MODERN";
     const slotWidth = isModern ? 6 : 4;
+    const isValeFrame = !isModern && headerSlots.every((s) => s.label === "VALE");
 
     // Para cada slot, descobrir o mês olhando na linha TOTAL (mais confiável)
     // ou usando o cursor trimestral.
     const slotMonths: number[] = [];
-    // Procura "TOTAL" linha algumas linhas abaixo
-    const totalRow = findTotalRow(grid, r, end, headerSlots, slotWidth);
-    if (totalRow >= 0) {
+
+    if (isValeFrame && lastQuarterMonths && lastQuarterMonths.length === headerSlots.length) {
+      // Frame VALE: reusa os mesmos meses do PAGAMENTO anterior do mesmo trimestre.
+      // (Layout legacy 2015: cada trimestre tem 2 frames empilhados — PAGAMENTO + VALE,
+      // ambos referentes aos MESMOS 3 meses.)
       for (let i = 0; i < headerSlots.length; i++) {
-        const startCol = headerSlots[i].col;
-        // O nome do mês geralmente está na coluna anterior à "Total" (dentro do mesmo slot)
-        const m = findMonthInRange(grid[totalRow], startCol, startCol + slotWidth);
-        slotMonths.push(m >= 0 ? m : monthCursor + i);
+        slotMonths.push(lastQuarterMonths[i]);
       }
     } else {
-      for (let i = 0; i < headerSlots.length; i++) {
-        slotMonths.push(monthCursor + i);
+      // Procura "TOTAL" linha algumas linhas abaixo
+      const totalRow = findTotalRow(grid, r, end, headerSlots, slotWidth);
+      if (totalRow >= 0) {
+        for (let i = 0; i < headerSlots.length; i++) {
+          const startCol = headerSlots[i].col;
+          // O nome do mês geralmente está na coluna anterior à "Total" (dentro do mesmo slot)
+          const m = findMonthInRange(grid[totalRow], startCol, startCol + slotWidth);
+          slotMonths.push(m >= 0 ? m : monthCursor + i);
+        }
+      } else {
+        for (let i = 0; i < headerSlots.length; i++) {
+          slotMonths.push(monthCursor + i);
+        }
       }
+      // Avança cursor de trimestre apenas para frames "principais" (PAGAMENTO/DESCRIÇÃO)
+      monthCursor = Math.max(...slotMonths) + 1;
+      if (monthCursor > 12) monthCursor = 0;
+      lastQuarterMonths = slotMonths.slice();
     }
-
-    // Avança cursor de trimestre
-    monthCursor = Math.max(...slotMonths) + 1;
-    if (monthCursor > 12) monthCursor = 0;
 
     // Detecta o fim do frame (próximo cabeçalho ou próximo trimestre)
     let frameEnd = end;
@@ -327,7 +339,11 @@ function parseYearBlock(
   }
 }
 
-type HeaderSlot = { col: number; kind: "MODERN" | "LEGACY" };
+type HeaderSlot = {
+  col: number;
+  kind: "MODERN" | "LEGACY";
+  label: "PAGAMENTO" | "VALE" | "DESCRIÇÃO";
+};
 
 /**
  * Detecta cabeçalhos PAGAMENTO/DESCRIÇÃO numa linha.
@@ -342,13 +358,13 @@ function findHeaderSlots(row: Cell[]): HeaderSlot[] {
       const next = upper(row[c + 1]);
       const next2 = upper(row[c + 2]);
       if ((next === "PARC" || next === "PARC.") && (next2 === "VALOR" || next2 === "VALOR ")) {
-        slots.push({ col: c, kind: "LEGACY" });
+        slots.push({ col: c, kind: "LEGACY", label: s as "PAGAMENTO" | "VALE" });
       }
     } else if (s === "DESCRIÇÃO" || s === "DESCRICAO") {
       // modern: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | STATUS
       const next = upper(row[c + 1]);
       if (next === "DATA") {
-        slots.push({ col: c, kind: "MODERN" });
+        slots.push({ col: c, kind: "MODERN", label: "DESCRIÇÃO" });
       }
     }
   }

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RecebimentosRouteImport } from './routes/recebimentos'
+import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as DebitoRouteImport } from './routes/debito'
 import { Route as CreditoRouteImport } from './routes/credito'
@@ -23,6 +24,11 @@ import { Route as MesesYearMonthCartaoCardIdRouteImport } from './routes/meses.$
 const RecebimentosRoute = RecebimentosRouteImport.update({
   id: '/recebimentos',
   path: '/recebimentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportarHistoricoRoute = ImportarHistoricoRouteImport.update({
+  id: '/importar-historico',
+  path: '/importar-historico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportarRoute = ImportarRouteImport.update({
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/credito': typeof CreditoRoute
   '/debito': typeof DebitoRoute
   '/importar': typeof ImportarRoute
+  '/importar-historico': typeof ImportarHistoricoRoute
   '/recebimentos': typeof RecebimentosRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/credito': typeof CreditoRoute
   '/debito': typeof DebitoRoute
   '/importar': typeof ImportarRoute
+  '/importar-historico': typeof ImportarHistoricoRoute
   '/recebimentos': typeof RecebimentosRoute
   '/meses': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/credito': typeof CreditoRoute
   '/debito': typeof DebitoRoute
   '/importar': typeof ImportarRoute
+  '/importar-historico': typeof ImportarHistoricoRoute
   '/recebimentos': typeof RecebimentosRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/credito'
     | '/debito'
     | '/importar'
+    | '/importar-historico'
     | '/recebimentos'
     | '/meses/'
     | '/meses/$year/$month'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/credito'
     | '/debito'
     | '/importar'
+    | '/importar-historico'
     | '/recebimentos'
     | '/meses'
     | '/meses/$year/$month'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/credito'
     | '/debito'
     | '/importar'
+    | '/importar-historico'
     | '/recebimentos'
     | '/meses/'
     | '/meses/$year/$month'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   CreditoRoute: typeof CreditoRoute
   DebitoRoute: typeof DebitoRoute
   ImportarRoute: typeof ImportarRoute
+  ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   RecebimentosRoute: typeof RecebimentosRoute
   MesesIndexRoute: typeof MesesIndexRoute
   MesesYearMonthRoute: typeof MesesYearMonthRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/recebimentos'
       fullPath: '/recebimentos'
       preLoaderRoute: typeof RecebimentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importar-historico': {
+      id: '/importar-historico'
+      path: '/importar-historico'
+      fullPath: '/importar-historico'
+      preLoaderRoute: typeof ImportarHistoricoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/importar': {
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   CreditoRoute: CreditoRoute,
   DebitoRoute: DebitoRoute,
   ImportarRoute: ImportarRoute,
+  ImportarHistoricoRoute: ImportarHistoricoRoute,
   RecebimentosRoute: RecebimentosRoute,
   MesesIndexRoute: MesesIndexRoute,
   MesesYearMonthRoute: MesesYearMonthRoute,
@@ -251,3 +272,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

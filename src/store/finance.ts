@@ -248,10 +248,11 @@ export function buildInstallmentsAnchored(
   const count = Math.max(1, installmentsCount);
   const anchor = Math.min(Math.max(1, anchorNumber), count);
   const base = round2(totalAmount / count);
-  const anchorD = new Date(anchorDate);
-  const anchorYear = anchorD.getFullYear();
-  const anchorMonth = anchorD.getMonth();
-  const anchorDay = anchorD.getDate();
+  // Parse anchorDate como data LOCAL (evita shift de fuso com new Date("YYYY-MM-DD") que assume UTC)
+  const [ay, am, ad] = anchorDate.slice(0, 10).split("-").map((n) => parseInt(n, 10));
+  const anchorYear = ay;
+  const anchorMonth = (am || 1) - 1;
+  const anchorDay = ad || 1;
   let accum = 0;
   const items: Array<{
     user_id: string;

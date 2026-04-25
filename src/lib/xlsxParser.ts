@@ -419,20 +419,24 @@ function parseSlot(
       return;
     }
 
-    // detectar linha "TOTAL"
+    // detectar linha "TOTAL" (de mês ou de sub-seção)
     const isTotalRow = (() => {
       for (let c = col; c < Math.min(col + width, row.length); c++) {
         if (upper(row[c]) === "TOTAL") return true;
       }
       return false;
     })();
-    if (isTotalRow) continue;
 
-    // Detectar sub-seção (apenas no formato moderno)
+    // Detectar sub-seção (apenas no formato moderno).
+    // IMPORTANTE: cabeçalhos como "RECEBIDOS", "CARTEIRA", "ITAU UNICLASS BLACK - CRÉDITO"
+    // vêm na MESMA linha que a palavra TOTAL (em outra coluna do slot).
+    // Precisamos classificá-los ANTES de descartar a linha como total.
     if (isModern && isSectionHeader(upDesc)) {
       currentSection = classifySection(upDesc);
       continue;
     }
+
+    if (isTotalRow) continue;
 
     // Pular se a linha é só um nome de mês (rótulo de total trimestral)
     const cleaned = upDesc.replace(/\s+/g, "");

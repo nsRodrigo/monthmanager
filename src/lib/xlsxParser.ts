@@ -254,6 +254,7 @@ function parseYearBlock(
   // cada slot está associado a um mês (descoberto por linhas TOTAL ou
   // por contagem trimestral).
   let monthCursor = 0; // 0..11 — avança quando encontramos novo trimestre
+  let lastQuarterMonths: number[] | null = null; // meses do último frame PAGAMENTO/DESCRIÇÃO
 
   for (let r = start; r < end; r++) {
     const row = grid[r] || [];
@@ -263,28 +264,39 @@ function parseYearBlock(
 
     const isModern = headerSlots[0].kind === "MODERN";
     const slotWidth = isModern ? 6 : 4;
+    const isValeFrame = !isModern && headerSlots.every((s) => s.label === "VALE");
 
     // Para cada slot, descobrir o mês olhando na linha TOTAL (mais confiável)
     // ou usando o cursor trimestral.
     const slotMonths: number[] = [];
-    // Procura "TOTAL" linha algumas linhas abaixo
-    const totalRow = findTotalRow(grid, r, end, headerSlots, slotWidth);
-    if (totalRow >= 0) {
+
+    if (isValeFrame && lastQuarterMonths && lastQuarterMonths.length === headerSlots.length) {
+      // Frame VALE: reusa os mesmos meses do PAGAMENTO anterior do mesmo trimestre.
+      // (Layout legacy 2015: cada trimestre tem 2 frames empilhados — PAGAMENTO + VALE,
+      // ambos referentes aos MESMOS 3 meses.)
       for (let i = 0; i < headerSlots.length; i++) {
-        const startCol = headerSlots[i].col;
-        // O nome do mês geralmente está na coluna anterior à "Total" (dentro do mesmo slot)
-        const m = findMonthInRange(grid[totalRow], startCol, startCol + slotWidth);
-        slotMonths.push(m >= 0 ? m : monthCursor + i);
+        slotMonths.push(lastQuarterMonths[i]);
       }
     } else {
-      for (let i = 0; i < headerSlots.length; i++) {
-        slotMonths.push(monthCursor + i);
+      // Procura "TOTAL" linha algumas linhas abaixo
+      const totalRow = findTotalRow(grid, r, end, headerSlots, slotWidth);
+      if (totalRow >= 0) {
+        for (let i = 0; i < headerSlots.length; i++) {
+          const startCol = headerSlots[i].col;
+          // O nome do mês geralmente está na coluna anterior à "Total" (dentro do mesmo slot)
+          const m = findMonthInRange(grid[totalRow], startCol, startCol + slotWidth);
+          slotMonths.push(m >= 0 ? m : monthCursor + i);
+        }
+      } else {
+        for (let i = 0; i < headerSlots.length; i++) {
+          slotMonths.push(monthCursor + i);
+        }
       }
+      // Avança cursor de trimestre apenas para frames "principais" (PAGAMENTO/DESCRIÇÃO)
+      monthCursor = Math.max(...slotMonths) + 1;
+      if (monthCursor > 12) monthCursor = 0;
+      lastQuarterMonths = slotMonths.slice();
     }
-
-    // Avança cursor de trimestre
-    monthCursor = Math.max(...slotMonths) + 1;
-    if (monthCursor > 12) monthCursor = 0;
 
     // Detecta o fim do frame (próximo cabeçalho ou próximo trimestre)
     let frameEnd = end;

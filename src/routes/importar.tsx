@@ -167,12 +167,10 @@ function ImportPage() {
   };
 
   const downloadSample = () => {
-    const sample = `descricao,data_compra,valor_total,parcelas,numero_parcela,valor_parcela,data_vencimento,status,cartao
-Notebook Dell,2024-03-15,4500.00,10,1,450.00,2024-04-15,pago,Cartão Principal
-Notebook Dell,2024-03-15,4500.00,10,2,450.00,2024-05-15,pago,Cartão Principal
-Notebook Dell,2024-03-15,4500.00,10,3,450.00,2024-06-15,nao,Cartão Principal
-Mercado,2024-04-02,320.50,1,,,,nao,Cartão Principal
-Geladeira,2024-05-10,3000.00,12,,,,nao,Cartão Principal`;
+    const sample = `descricao;data_compra;valor_total;parcelas;numero_parcela;valor_parcela;data_vencimento;status;cartao
+Notebook Dell;2024-03-15;4500,00;10;3;450,00;2024-06-15;nao;Cartão Principal
+Geladeira;2024-05-10;3000,00;12;1;250,00;2024-06-10;nao;Cartão Principal
+Mercado;2024-04-02;320,50;1;;;;nao;Cartão Principal`;
     const blob = new Blob([sample], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

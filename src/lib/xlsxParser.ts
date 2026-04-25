@@ -327,7 +327,11 @@ function parseYearBlock(
   }
 }
 
-type HeaderSlot = { col: number; kind: "MODERN" | "LEGACY" };
+type HeaderSlot = {
+  col: number;
+  kind: "MODERN" | "LEGACY";
+  label: "PAGAMENTO" | "VALE" | "DESCRIÇÃO";
+};
 
 /**
  * Detecta cabeçalhos PAGAMENTO/DESCRIÇÃO numa linha.
@@ -342,13 +346,13 @@ function findHeaderSlots(row: Cell[]): HeaderSlot[] {
       const next = upper(row[c + 1]);
       const next2 = upper(row[c + 2]);
       if ((next === "PARC" || next === "PARC.") && (next2 === "VALOR" || next2 === "VALOR ")) {
-        slots.push({ col: c, kind: "LEGACY" });
+        slots.push({ col: c, kind: "LEGACY", label: s as "PAGAMENTO" | "VALE" });
       }
     } else if (s === "DESCRIÇÃO" || s === "DESCRICAO") {
       // modern: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | STATUS
       const next = upper(row[c + 1]);
       if (next === "DATA") {
-        slots.push({ col: c, kind: "MODERN" });
+        slots.push({ col: c, kind: "MODERN", label: "DESCRIÇÃO" });
       }
     }
   }

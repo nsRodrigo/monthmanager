@@ -228,6 +228,69 @@ export function buildInstallmentsForPurchase(
   return items;
 }
 
+/**
+ * Build installments anchored at a known position.
+ * Used by CSV import where one line represents an existing installment plan
+ * already in progress (e.g. "parcela 5 de 12, vence em 2026-05-01").
+ *
+ * - The anchor installment lands on `anchorDate` month/day.
+ * - Earlier installments roll back month-by-month and are marked PAID.
+ * - Later installments roll forward month-by-month, not paid.
+ */
+export function buildInstallmentsAnchored(
+  purchaseId: string,
+  userId: string,
+  totalAmount: number,
+  installmentsCount: number,
+  anchorNumber: number,
+  anchorDate: string,
+) {
+  const count = Math.max(1, installmentsCount);
+  const anchor = Math.min(Math.max(1, anchorNumber), count);
+  const base = round2(totalAmount / count);
+  const anchorD = new Date(anchorDate);
+  const anchorYear = anchorD.getFullYear();
+  const anchorMonth = anchorD.getMonth();
+  const anchorDay = anchorD.getDate();
+  let accum = 0;
+  const items: Array<{
+    user_id: string;
+    parent_id: string;
+    parent_type: ParentType;
+    purchase_id: string | null;
+    number: number;
+    total: number;
+    amount: number;
+    due_date: string;
+    year: number;
+    month: number;
+    paid: boolean;
+  }> = [];
+  for (let i = 1; i <= count; i++) {
+    const monthOffset = i - anchor;
+    const target = new Date(anchorYear, anchorMonth + monthOffset, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const day = Math.min(anchorDay, lastDay);
+    const d = new Date(target.getFullYear(), target.getMonth(), day);
+    const amount = i === count ? round2(totalAmount - accum) : base;
+    accum += amount;
+    items.push({
+      user_id: userId,
+      parent_id: purchaseId,
+      parent_type: "purchase",
+      purchase_id: purchaseId,
+      number: i,
+      total: count,
+      amount,
+      due_date: d.toISOString().slice(0, 10),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      paid: i < anchor,
+    });
+  }
+  return items;
+}
+
 const num = (v: number | string) => (typeof v === "number" ? v : parseFloat(v));
 
 // =======================
@@ -902,69 +965,71 @@ export function useImportPurchases() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (rows: ImportedRow[]) => {
-      const groups = new Map<string, ImportedRow[]>();
+      // Cache de cartões para evitar fetch repetido
+      const cardCache = new Map<string, { closing_day: number; due_day: number }>();
+      const getCard = async (cardId: string) => {
+        if (cardCache.has(cardId)) return cardCache.get(cardId)!;
+        const { data } = await supabase
+          .from("cards")
+          .select("closing_day,due_day")
+          .eq("id", cardId)
+          .single();
+        const c = {
+          closing_day: (data as { closing_day?: number } | null)?.closing_day ?? 25,
+          due_day: (data as { due_day?: number } | null)?.due_day ?? 5,
+        };
+        cardCache.set(cardId, c);
+        return c;
+      };
+
+      // Cada linha = 1 compra completa (modo linha-âncora)
       for (const r of rows) {
-        const key = `${r.cardId}|${r.description}|${r.purchaseDate}|${r.totalAmount}|${r.installmentsCount}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(r);
-      }
-      for (const [, items] of groups) {
-        const head = items[0];
         const { data: pIns, error: e1 } = await supabase
           .from("purchases")
           .insert({
             user_id: user!.id,
-            card_id: head.cardId,
-            description: head.description,
-            total_amount: head.totalAmount,
-            purchase_date: head.purchaseDate,
-            installments_count: head.installmentsCount,
+            card_id: r.cardId,
+            description: r.description,
+            total_amount: r.totalAmount,
+            purchase_date: r.purchaseDate,
+            installments_count: r.installmentsCount,
           })
           .select("id")
           .single();
         if (e1) throw e1;
         const purchaseId = (pIns as { id: string }).id;
-        const detailed = items.filter(
-          (r) => r.installmentNumber !== undefined && r.installmentAmount !== undefined,
-        );
-        if (detailed.length > 0) {
-          const insertRows = detailed.map((r) => {
-            const due = r.installmentDueDate ?? head.purchaseDate;
-            const d = new Date(due);
-            return {
-              user_id: user!.id,
-              parent_id: purchaseId,
-              parent_type: "purchase" as const,
-              purchase_id: purchaseId,
-              number: r.installmentNumber!,
-              total: head.installmentsCount,
-              amount: r.installmentAmount!,
-              due_date: due,
-              year: d.getFullYear(),
-              month: d.getMonth(),
-              paid: !!r.paid,
-            };
-          });
-          const { error: e2 } = await supabase.from("installments").insert(insertRows);
+
+        if (r.installmentNumber && r.installmentsCount > 1) {
+          // Modo âncora: usa data_vencimento (preferida) ou data_compra
+          const anchorDate = r.installmentDueDate ?? r.purchaseDate;
+          const inst = buildInstallmentsAnchored(
+            purchaseId,
+            user!.id,
+            r.totalAmount,
+            r.installmentsCount,
+            r.installmentNumber,
+            anchorDate,
+          );
+          // Se o status do CSV indica "pago", aplica à parcela âncora
+          if (r.paid) {
+            const a = inst.find((x) => x.number === r.installmentNumber);
+            if (a) a.paid = true;
+          }
+          const { error: e2 } = await supabase.from("installments").insert(inst);
           if (e2) throw e2;
         } else {
-          const { data: cardRow } = await supabase
-            .from("cards")
-            .select("closing_day,due_day")
-            .eq("id", head.cardId)
-            .single();
-          const closingDay = (cardRow as { closing_day?: number } | null)?.closing_day ?? 25;
-          const dueDay = (cardRow as { due_day?: number } | null)?.due_day ?? 5;
+          // Sem numero_parcela ou compra à vista: usa cálculo clássico do cartão
+          const { closing_day, due_day } = await getCard(r.cardId);
           const inst = buildInstallmentsForPurchase(
             purchaseId,
             user!.id,
-            head.totalAmount,
-            head.installmentsCount,
-            head.purchaseDate,
-            closingDay,
-            dueDay,
+            r.totalAmount,
+            r.installmentsCount,
+            r.purchaseDate,
+            closing_day,
+            due_day,
           );
-          if (head.paid) inst.forEach((i) => (i.paid = true));
+          if (r.paid) inst.forEach((i) => (i.paid = true));
           const { error: e2 } = await supabase.from("installments").insert(inst);
           if (e2) throw e2;
         }

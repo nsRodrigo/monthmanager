@@ -283,7 +283,7 @@ export function buildInstallmentsAnchored(
       number: i,
       total: count,
       amount,
-      due_date: d.toISOString().slice(0, 10),
+      due_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       year: d.getFullYear(),
       month: d.getMonth(),
       paid: i < anchor,

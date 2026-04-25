@@ -204,6 +204,13 @@ function SettingsMenu() {
               <Upload className="h-4 w-4" /> Importar CSV
             </Link>
             <Link
+              to="/importar-historico"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Importar planilha histórica
+            </Link>
+            <Link
               to="/contas"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"

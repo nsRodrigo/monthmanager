@@ -93,10 +93,13 @@ const upper = (v: unknown): string => norm(v).toUpperCase();
 const parseAmount = (v: unknown): number => {
   if (v === null || v === undefined || v === "") return 0;
   if (typeof v === "number") return v;
-  const s = String(v)
-    .replace(/[^\d.,-]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
+  let s = String(v).trim().replace(/[^\d.,-]/g, "");
+  if (!s) return 0;
+  // Detecta formato pt-BR: "1.234,56" → tem vírgula como separador decimal
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  }
+  // Senão, é formato US/já-numérico: "1234.56" → mantém ponto
   const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 };

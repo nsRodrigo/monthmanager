@@ -256,7 +256,7 @@ Mercado;2024-04-02;320,50;1;;;;nao;Cartão Principal`;
                 <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                   detected ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
                 }`}>
-                  {detected ? "Modo: parcelas detalhadas" : "Modo: gerar parcelas automaticamente"}
+                  {detected ? "Modo: linha-âncora (gera N parcelas por linha)" : "Modo: gerar parcelas pela data de compra"}
                 </span>
               </div>
               <button

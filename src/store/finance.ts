@@ -1041,6 +1041,363 @@ export function useImportPurchases() {
 }
 
 // =======================
+// Purge — apaga TODAS as movimentações (mantém contas e cartões)
+// =======================
+export function usePurgeAllMovements() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Não autenticado.");
+      // Ordem importa: filhos antes de pais
+      await supabase.from("installments").delete().eq("user_id", user.id);
+      await supabase.from("card_payments").delete().eq("user_id", user.id);
+      await supabase.from("purchases").delete().eq("user_id", user.id);
+      await supabase.from("debits").delete().eq("user_id", user.id);
+      await supabase.from("incomes").delete().eq("user_id", user.id);
+      await supabase.from("investments").delete().eq("user_id", user.id);
+    },
+    onSuccess: () =>
+      inv(["purchases", "installments", "debits", "incomes", "investments", "card_payments"]),
+  });
+}
+
+// =======================
+// Importação histórica do XLSX (parser em src/lib/xlsxParser.ts)
+// =======================
+export type HistoricalImportPlan = {
+  // Contas a criar (nome → tipo)
+  accountsToCreate: Array<{ name: string; type: AccountType; color: string }>;
+  // Cartões a criar (nome → conta)
+  cardsToCreate: Array<{ name: string; accountName: string; color: string }>;
+  // Entries já mapeadas (descritas em coordenadas de domínio)
+  entries: HistoricalImportEntry[];
+};
+
+export type HistoricalImportEntry = {
+  kind: "purchase" | "debit" | "income" | "investment";
+  description: string;
+  amount: number;
+  date: string; // YYYY-MM-DD (aproximada para legacy)
+  paid: boolean;
+  // Para purchase
+  cardName?: string;
+  installmentNumber?: number;
+  installmentTotal?: number;
+  // Para debit/income
+  accountName?: string;
+};
+
+export function useImportHistorical() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (
+      plan: HistoricalImportPlan,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ) => {
+      if (!user) throw new Error("Não autenticado.");
+
+      // 1) Criar contas que ainda não existem
+      const { data: existingAccs } = await supabase
+        .from("accounts")
+        .select("id,name")
+        .eq("user_id", user.id);
+      const accByName = new Map<string, string>();
+      for (const a of (existingAccs ?? []) as Array<{ id: string; name: string }>) {
+        accByName.set(a.name.toLowerCase(), a.id);
+      }
+      for (const a of plan.accountsToCreate) {
+        if (accByName.has(a.name.toLowerCase())) continue;
+        const { data, error } = await supabase
+          .from("accounts")
+          .insert({
+            user_id: user.id,
+            name: a.name,
+            type: a.type,
+            color: a.color,
+            initial_balance: 0,
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        accByName.set(a.name.toLowerCase(), (data as { id: string }).id);
+      }
+
+      // 2) Criar cartões que ainda não existem
+      const { data: existingCards } = await supabase
+        .from("cards")
+        .select("id,name,account_id,closing_day,due_day")
+        .eq("user_id", user.id);
+      const cardByName = new Map<
+        string,
+        { id: string; closing_day: number; due_day: number }
+      >();
+      for (const c of (existingCards ?? []) as Array<{
+        id: string;
+        name: string;
+        closing_day: number;
+        due_day: number;
+      }>) {
+        cardByName.set(c.name.toLowerCase(), {
+          id: c.id,
+          closing_day: c.closing_day,
+          due_day: c.due_day,
+        });
+      }
+      for (const c of plan.cardsToCreate) {
+        if (cardByName.has(c.name.toLowerCase())) continue;
+        const accId = accByName.get(c.accountName.toLowerCase());
+        if (!accId) continue;
+        const { data, error } = await supabase
+          .from("cards")
+          .insert({
+            user_id: user.id,
+            account_id: accId,
+            name: c.name,
+            color: c.color,
+            closing_day: 25,
+            due_day: 5,
+          })
+          .select("id,closing_day,due_day")
+          .single();
+        if (error) throw error;
+        const row = data as { id: string; closing_day: number; due_day: number };
+        cardByName.set(c.name.toLowerCase(), {
+          id: row.id,
+          closing_day: row.closing_day,
+          due_day: row.due_day,
+        });
+      }
+
+      // 3) Inserir entries em lote por tipo
+      // 3a) Purchases (acumular para batch)
+      const purchaseRows: Array<{
+        user_id: string;
+        card_id: string;
+        description: string;
+        total_amount: number;
+        purchase_date: string;
+        installments_count: number;
+        _entry: HistoricalImportEntry;
+      }> = [];
+      const debitRows: Array<{
+        user_id: string;
+        account_id: string;
+        description: string;
+        amount: number;
+        date: string;
+        required: boolean;
+        paid: boolean;
+        auto_debit: boolean;
+        auto_debit_day: number | null;
+        installments_count: number;
+        is_parent: boolean;
+      }> = [];
+      const incomeRows: Array<{
+        user_id: string;
+        account_id: string;
+        description: string;
+        amount: number;
+        date: string;
+        received: boolean;
+        installments_count: number;
+        is_parent: boolean;
+      }> = [];
+      const investmentRows: Array<{
+        user_id: string;
+        account_id: string;
+        type: string;
+        amount: number;
+        percentage: number;
+      }> = [];
+
+      // Conta padrão para entries sem accountName
+      let defaultAccountId = accByName.values().next().value;
+      if (!defaultAccountId) {
+        // criar uma conta "Importado"
+        const { data, error } = await supabase
+          .from("accounts")
+          .insert({
+            user_id: user.id,
+            name: "Importado",
+            type: "corrente",
+            color: "#8b5cf6",
+            initial_balance: 0,
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        defaultAccountId = (data as { id: string }).id;
+      }
+
+      for (const e of plan.entries) {
+        if (e.kind === "purchase") {
+          const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
+          if (!card) continue; // pula se não há cartão associado
+          const totalParcelas = e.installmentTotal ?? 1;
+          const totalAmount =
+            totalParcelas > 1 ? round2(e.amount * totalParcelas) : e.amount;
+          purchaseRows.push({
+            user_id: user.id,
+            card_id: card.id,
+            description: e.description,
+            total_amount: totalAmount,
+            purchase_date: e.date,
+            installments_count: totalParcelas,
+            _entry: e,
+          });
+        } else if (e.kind === "debit") {
+          const accId = e.accountName
+            ? accByName.get(e.accountName.toLowerCase())
+            : defaultAccountId;
+          if (!accId) continue;
+          debitRows.push({
+            user_id: user.id,
+            account_id: accId,
+            description: e.description,
+            amount: e.amount,
+            date: e.date,
+            required: false,
+            paid: e.paid,
+            auto_debit: false,
+            auto_debit_day: null,
+            installments_count: 1,
+            is_parent: false,
+          });
+        } else if (e.kind === "income") {
+          const accId = e.accountName
+            ? accByName.get(e.accountName.toLowerCase())
+            : defaultAccountId;
+          if (!accId) continue;
+          incomeRows.push({
+            user_id: user.id,
+            account_id: accId,
+            description: e.description,
+            amount: e.amount,
+            date: e.date,
+            received: e.paid,
+            installments_count: 1,
+            is_parent: false,
+          });
+        } else if (e.kind === "investment") {
+          const accId = e.accountName
+            ? accByName.get(e.accountName.toLowerCase())
+            : defaultAccountId;
+          if (!accId) continue;
+          investmentRows.push({
+            user_id: user.id,
+            account_id: accId,
+            type: e.description,
+            amount: e.amount,
+            percentage: 0,
+          });
+        }
+      }
+
+      // 4) Inserir purchases em chunks e gerar installments (anchored)
+      const CHUNK = 100;
+      for (let i = 0; i < purchaseRows.length; i += CHUNK) {
+        const slice = purchaseRows.slice(i, i + CHUNK);
+        const insertPayload = slice.map((p) => ({
+          user_id: p.user_id,
+          card_id: p.card_id,
+          description: p.description,
+          total_amount: p.total_amount,
+          purchase_date: p.purchase_date,
+          installments_count: p.installments_count,
+        }));
+        const { data: ins, error } = await supabase
+          .from("purchases")
+          .insert(insertPayload)
+          .select("id");
+        if (error) throw error;
+        const inserted = (ins ?? []) as Array<{ id: string }>;
+        const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
+        for (let j = 0; j < inserted.length; j++) {
+          const p = slice[j];
+          const purchaseId = inserted[j].id;
+          const e = p._entry;
+          const card = cardByName.get(e.cardName!.toLowerCase())!;
+          if (e.installmentNumber && e.installmentTotal && e.installmentTotal > 1) {
+            const items = buildInstallmentsAnchored(
+              purchaseId,
+              user.id,
+              p.total_amount,
+              e.installmentTotal,
+              e.installmentNumber,
+              e.date,
+            );
+            // Se a entry estava paga, marca a parcela âncora como paga
+            if (e.paid) {
+              const a = items.find((x) => x.number === e.installmentNumber);
+              if (a) a.paid = true;
+            }
+            allInstallments.push(...items);
+          } else {
+            const items = buildInstallmentsForPurchase(
+              purchaseId,
+              user.id,
+              p.total_amount,
+              p.installments_count,
+              p.purchase_date,
+              card.closing_day,
+              card.due_day,
+            );
+            if (e.paid) items.forEach((x) => (x.paid = true));
+            allInstallments.push(...items);
+          }
+        }
+        if (allInstallments.length > 0) {
+          // insert em sub-chunks para não estourar limite
+          for (let k = 0; k < allInstallments.length; k += 500) {
+            const sub = allInstallments.slice(k, k + 500);
+            const { error: e2 } = await supabase.from("installments").insert(sub);
+            if (e2) throw e2;
+          }
+        }
+      }
+
+      // 5) Insert debits / incomes / investments em lote
+      for (let i = 0; i < debitRows.length; i += CHUNK) {
+        const { error } = await supabase.from("debits").insert(debitRows.slice(i, i + CHUNK));
+        if (error) throw error;
+      }
+      for (let i = 0; i < incomeRows.length; i += CHUNK) {
+        const { error } = await supabase.from("incomes").insert(incomeRows.slice(i, i + CHUNK));
+        if (error) throw error;
+      }
+      for (let i = 0; i < investmentRows.length; i += CHUNK) {
+        const { error } = await supabase
+          .from("investments")
+          .insert(investmentRows.slice(i, i + CHUNK));
+        if (error) throw error;
+      }
+
+      return {
+        accounts: plan.accountsToCreate.length,
+        cards: plan.cardsToCreate.length,
+        purchases: purchaseRows.length,
+        debits: debitRows.length,
+        incomes: incomeRows.length,
+        investments: investmentRows.length,
+      };
+    },
+    onSuccess: () =>
+      inv([
+        "accounts",
+        "cards",
+        "purchases",
+        "installments",
+        "debits",
+        "incomes",
+        "investments",
+        "card_payments",
+      ]),
+  });
+}
+
+// =======================
 // Selectors
 // =======================
 export function getMonthInstallments(installments: Installment[], year: number, month: number) {

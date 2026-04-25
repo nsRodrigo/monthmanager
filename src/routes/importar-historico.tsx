@@ -1,0 +1,405 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useMemo } from "react";
+import {
+  parseHistoricalWorkbook,
+  summarizeSections,
+  type ParsedEntry,
+  type ParseResult,
+} from "@/lib/xlsxParser";
+import { buildImportPlan } from "@/lib/xlsxImportPlan";
+import { useImportHistorical, usePurgeAllMovements } from "@/store/finance";
+import { formatCurrency } from "@/lib/format";
+import {
+  Upload,
+  FileSpreadsheet,
+  Check,
+  AlertCircle,
+  ChevronRight,
+  ChevronDown,
+  Trash2,
+  Database,
+} from "lucide-react";
+
+export const Route = createFileRoute("/importar-historico")({
+  head: () => ({ meta: [{ title: "Importar Planilha Histórica — Finanças" }] }),
+  component: HistoricalImportPage,
+});
+
+const MONTH_NAMES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+function HistoricalImportPage() {
+  const [results, setResults] = useState<ParseResult[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+  const [confirmingPurge, setConfirmingPurge] = useState(false);
+
+  const importMut = useImportHistorical();
+  const purgeMut = usePurgeAllMovements();
+
+  const allEntries = useMemo<ParsedEntry[]>(
+    () => results.flatMap((r) => r.entries),
+    [results],
+  );
+
+  const stats = useMemo(() => {
+    const byKind = { purchase: 0, debit: 0, income: 0, investment: 0 };
+    let total = 0;
+    for (const e of allEntries) {
+      byKind[e.kind]++;
+      total += e.amount;
+    }
+    return { byKind, total, count: allEntries.length };
+  }, [allEntries]);
+
+  const plan = useMemo(
+    () => (allEntries.length > 0 ? buildImportPlan(allEntries) : null),
+    [allEntries],
+  );
+
+  const byYear = useMemo(() => {
+    const m = new Map<number, ParsedEntry[]>();
+    for (const e of allEntries) {
+      if (!m.has(e.year)) m.set(e.year, []);
+      m.get(e.year)!.push(e);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[0] - b[0]);
+  }, [allEntries]);
+
+  const onFile = async (file: File) => {
+    setError(null);
+    setSuccess(null);
+    setParsing(true);
+    setFileName(file.name);
+    try {
+      const buf = await file.arrayBuffer();
+      const parsed = parseHistoricalWorkbook(buf);
+      setResults(parsed);
+      // Expande o primeiro ano por padrão
+      const firstYear = parsed
+        .flatMap((r) => r.entries)
+        .map((e) => e.year)
+        .sort()[0];
+      if (firstYear) setExpandedYears(new Set([firstYear]));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao ler planilha.");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const toggleYear = (y: number) => {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(y)) next.delete(y);
+      else next.add(y);
+      return next;
+    });
+  };
+
+  const submit = async () => {
+    if (!plan) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      const r = await importMut.mutateAsync(plan);
+      setSuccess(
+        `✅ Importado: ${r.purchases} compras, ${r.debits} débitos, ${r.incomes} recebimentos, ${r.investments} investimentos. ${r.accounts} contas e ${r.cards} cartões criados/encontrados.`,
+      );
+      setResults([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gravar dados.");
+    }
+  };
+
+  const purge = async () => {
+    setError(null);
+    setSuccess(null);
+    try {
+      await purgeMut.mutateAsync();
+      setSuccess("✅ Todas as movimentações foram apagadas.");
+      setConfirmingPurge(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao apagar.");
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
+      <header className="mb-8">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link to="/importar" className="hover:text-foreground">
+            Importar CSV
+          </Link>
+          <ChevronRight className="h-3 w-3" />
+          <span>Planilha histórica</span>
+        </div>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
+          Importar planilha histórica
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Carregue sua planilha XLSX completa (todos os anos). O sistema detecta
+          automaticamente contas, cartões, parcelas e seções, e mostra um preview
+          antes de gravar.
+        </p>
+      </header>
+
+      {/* Zona perigosa */}
+      <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+        <div className="flex items-start gap-3">
+          <Database className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div className="flex-1">
+            <h2 className="font-semibold text-destructive">Antes de importar: limpe o banco</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Apaga TODAS as compras, parcelas, débitos, recebimentos e investimentos.
+              Mantém suas contas e cartões cadastrados. Use isso se você importou dados
+              de teste e quer começar do zero.
+            </p>
+            <div className="mt-3 flex gap-2">
+              {!confirmingPurge ? (
+                <button
+                  onClick={() => setConfirmingPurge(true)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/20"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Apagar todas as movimentações
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={purge}
+                    disabled={purgeMut.isPending}
+                    className="inline-flex items-center gap-2 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground hover:opacity-90 disabled:opacity-50"
+                  >
+                    {purgeMut.isPending ? "Apagando…" : "Confirmar (irreversível)"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingPurge(false)}
+                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-secondary"
+                  >
+                    Cancelar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Upload */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-background/50 p-10 text-center transition-colors hover:border-primary">
+          <Upload className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">
+            {parsing
+              ? "Lendo planilha…"
+              : fileName
+                ? fileName
+                : "Clique ou arraste sua planilha .xlsx"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Suporta o formato "ACOMPANHAMENTO DE GASTOS E COMPRAS" (2014-atual)
+          </p>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            disabled={parsing}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+            }}
+          />
+        </label>
+
+        {error && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+        {success && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg bg-success/10 p-3 text-sm text-success">
+            <Check className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{success}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Stats globais */}
+      {results.length > 0 && (
+        <>
+          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+            <StatCard label="Total de linhas" value={String(stats.count)} />
+            <StatCard label="Compras (cartão)" value={String(stats.byKind.purchase)} />
+            <StatCard label="Débitos" value={String(stats.byKind.debit)} />
+            <StatCard label="Recebimentos" value={String(stats.byKind.income)} />
+            <StatCard label="Investimentos" value={String(stats.byKind.investment)} />
+          </div>
+
+          {/* Plano de criação */}
+          {plan && (
+            <div className="mt-6 rounded-2xl border border-border bg-card p-6">
+              <h2 className="text-lg font-semibold">O que será criado</h2>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Contas ({plan.accountsToCreate.length})
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {plan.accountsToCreate.map((a) => (
+                      <span
+                        key={a.name}
+                        className="rounded-full px-2.5 py-1 text-xs font-medium"
+                        style={{ backgroundColor: a.color + "25", color: a.color }}
+                      >
+                        {a.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Cartões ({plan.cardsToCreate.length})
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {plan.cardsToCreate.map((c) => (
+                      <span
+                        key={c.name}
+                        className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
+                        title={`Conta: ${c.accountName}`}
+                      >
+                        {c.name}{" "}
+                        <span className="text-muted-foreground">· {c.accountName}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={submit}
+                disabled={importMut.isPending}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 md:w-auto"
+              >
+                {importMut.isPending
+                  ? "Gravando no banco…"
+                  : `Confirmar e gravar ${stats.count} lançamentos`}
+              </button>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Esta operação cria contas/cartões automaticamente e insere todas as
+                linhas. Pode levar alguns segundos.
+              </p>
+            </div>
+          )}
+
+          {/* Árvore por ano > mês > seção */}
+          <div className="mt-6 rounded-2xl border border-border bg-card p-2">
+            {byYear.map(([year, ents]) => {
+              const open = expandedYears.has(year);
+              const yearTotal = ents.reduce((s, e) => s + e.amount, 0);
+              return (
+                <div key={year} className="border-b border-border last:border-0">
+                  <button
+                    onClick={() => toggleYear(year)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-secondary/40"
+                  >
+                    {open ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <FileSpreadsheet className="h-4 w-4 text-primary" />
+                    <span className="font-semibold">{year}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {ents.length} lançamentos · {formatCurrency(yearTotal)}
+                    </span>
+                  </button>
+                  {open && <YearBreakdown entries={ents} />}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function YearBreakdown({ entries }: { entries: ParsedEntry[] }) {
+  const byMonth = useMemo(() => {
+    const m = new Map<number, ParsedEntry[]>();
+    for (const e of entries) {
+      if (!m.has(e.month)) m.set(e.month, []);
+      m.get(e.month)!.push(e);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[0] - b[0]);
+  }, [entries]);
+
+  return (
+    <div className="bg-background/40 px-4 py-3">
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        {byMonth.map(([month, ents]) => {
+          const sections = summarizeSections(ents);
+          const total = ents.reduce((s, e) => s + e.amount, 0);
+          return (
+            <div
+              key={month}
+              className="rounded-lg border border-border bg-card p-3"
+            >
+              <div className="mb-2 flex items-baseline justify-between">
+                <p className="text-sm font-semibold">{MONTH_NAMES[month]}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {ents.length} · {formatCurrency(total)}
+                </p>
+              </div>
+              <ul className="space-y-1">
+                {sections.slice(0, 6).map((s) => (
+                  <li
+                    key={s.key}
+                    className="flex items-center justify-between gap-2 text-[11px]"
+                  >
+                    <span className="truncate text-muted-foreground" title={s.label}>
+                      {s.label}
+                    </span>
+                    <span className="shrink-0 font-mono text-foreground">
+                      {formatCurrency(s.total)}
+                    </span>
+                  </li>
+                ))}
+                {sections.length > 6 && (
+                  <li className="text-[10px] text-muted-foreground">
+                    + {sections.length - 6} seções
+                  </li>
+                )}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

@@ -228,6 +228,69 @@ export function buildInstallmentsForPurchase(
   return items;
 }
 
+/**
+ * Build installments anchored at a known position.
+ * Used by CSV import where one line represents an existing installment plan
+ * already in progress (e.g. "parcela 5 de 12, vence em 2026-05-01").
+ *
+ * - The anchor installment lands on `anchorDate` month/day.
+ * - Earlier installments roll back month-by-month and are marked PAID.
+ * - Later installments roll forward month-by-month, not paid.
+ */
+export function buildInstallmentsAnchored(
+  purchaseId: string,
+  userId: string,
+  totalAmount: number,
+  installmentsCount: number,
+  anchorNumber: number,
+  anchorDate: string,
+) {
+  const count = Math.max(1, installmentsCount);
+  const anchor = Math.min(Math.max(1, anchorNumber), count);
+  const base = round2(totalAmount / count);
+  const anchorD = new Date(anchorDate);
+  const anchorYear = anchorD.getFullYear();
+  const anchorMonth = anchorD.getMonth();
+  const anchorDay = anchorD.getDate();
+  let accum = 0;
+  const items: Array<{
+    user_id: string;
+    parent_id: string;
+    parent_type: ParentType;
+    purchase_id: string | null;
+    number: number;
+    total: number;
+    amount: number;
+    due_date: string;
+    year: number;
+    month: number;
+    paid: boolean;
+  }> = [];
+  for (let i = 1; i <= count; i++) {
+    const monthOffset = i - anchor;
+    const target = new Date(anchorYear, anchorMonth + monthOffset, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const day = Math.min(anchorDay, lastDay);
+    const d = new Date(target.getFullYear(), target.getMonth(), day);
+    const amount = i === count ? round2(totalAmount - accum) : base;
+    accum += amount;
+    items.push({
+      user_id: userId,
+      parent_id: purchaseId,
+      parent_type: "purchase",
+      purchase_id: purchaseId,
+      number: i,
+      total: count,
+      amount,
+      due_date: d.toISOString().slice(0, 10),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      paid: i < anchor,
+    });
+  }
+  return items;
+}
+
 const num = (v: number | string) => (typeof v === "number" ? v : parseFloat(v));
 
 // =======================

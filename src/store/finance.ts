@@ -1240,7 +1240,8 @@ export function useImportHistorical() {
         total_amount: number;
         purchase_date: string;
         installments_count: number;
-        _entry: HistoricalImportEntry;
+        _entries: HistoricalImportEntry[];
+        _useListedInstallments: boolean;
       }> = [];
       const debitRows: Array<{
         user_id: string;
@@ -1292,48 +1293,99 @@ export function useImportHistorical() {
         defaultAccountId = (data as { id: string }).id;
       }
 
-      // Dedup de compras parceladas: a mesma compra aparece em N linhas
-      // (uma por mês), cada linha sendo uma parcela. Agrupamos por
-      // (cartão + descrição + total de parcelas + valor da parcela)
-      // e ficamos apenas com a entry de MENOR installmentNumber, que vira a
-      // âncora real da compra. As demais são descartadas para evitar duplicação.
-      const purchaseDedup = new Map<string, HistoricalImportEntry>();
-      const purchaseEntries: HistoricalImportEntry[] = [];
+      // Na planilha histórica, cada linha parcelada já representa UMA parcela
+      // no mês da coluna (ex.: 05/21 = 5ª parcela de 21). Portanto não podemos
+      // gerar 21 parcelas para cada linha. Agrupamos as linhas da mesma compra
+      // e gravamos exatamente as parcelas listadas na planilha.
+      const parcelGroups = new Map<string, HistoricalImportEntry[]>();
+      const singlePurchaseEntries: HistoricalImportEntry[] = [];
+
       for (const e of plan.entries) {
         if (e.kind !== "purchase") continue;
-        if (e.installmentTotal && e.installmentTotal > 1 && e.installmentNumber) {
+        const totalParcelas = Math.max(1, e.installmentTotal || 1);
+        const numeroParcela = Math.max(0, e.installmentNumber || 0);
+        if (totalParcelas > 1 && numeroParcela >= 1) {
           const key = [
             (e.cardName || "").toLowerCase(),
             e.description.trim().toLowerCase(),
-            e.installmentTotal,
-            Math.round(e.amount * 100),
+            totalParcelas,
           ].join("|");
-          const existing = purchaseDedup.get(key);
-          if (!existing || (e.installmentNumber ?? 999) < (existing.installmentNumber ?? 999)) {
-            purchaseDedup.set(key, e);
-          }
+          const group = parcelGroups.get(key) ?? [];
+          group.push(e);
+          parcelGroups.set(key, group);
         } else {
-          // Compra à vista ou sem info de parcelas: passa direto
-          purchaseEntries.push(e);
+          singlePurchaseEntries.push(e);
         }
       }
-      purchaseEntries.push(...purchaseDedup.values());
 
-      for (const e of purchaseEntries) {
+      for (const e of singlePurchaseEntries) {
         const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
-        if (!card) continue; // pula se não há cartão associado
-        const totalParcelas = e.installmentTotal ?? 1;
-        const totalAmount =
-          totalParcelas > 1 ? round2(e.amount * totalParcelas) : e.amount;
+        if (!card) continue;
         purchaseRows.push({
           user_id: user.id,
           card_id: card.id,
           description: e.description,
-          total_amount: totalAmount,
+          total_amount: e.amount,
           purchase_date: e.date,
-          installments_count: totalParcelas,
-          _entry: e,
+          installments_count: 1,
+          _entries: [e],
+          _useListedInstallments: true,
         });
+      }
+
+      for (const entries of parcelGroups.values()) {
+        const sorted = [...entries].sort(
+          (a, b) =>
+            a.date.localeCompare(b.date) ||
+            (a.installmentNumber || 0) - (b.installmentNumber || 0),
+        );
+
+        // Se o mesmo número de parcela aparecer de novo mais tarde, é outra
+        // compra/ciclo com a mesma descrição. Separa para não misturar ciclos.
+        const cycles: HistoricalImportEntry[][] = [];
+        let current: HistoricalImportEntry[] = [];
+        let seen = new Set<number>();
+        for (const e of sorted) {
+          const n = Math.max(1, e.installmentNumber || 1);
+          if (seen.has(n) && current.length > 0) {
+            cycles.push(current);
+            current = [];
+            seen = new Set<number>();
+          }
+          current.push(e);
+          seen.add(n);
+        }
+        if (current.length > 0) cycles.push(current);
+
+        for (const cycle of cycles) {
+          const byNumber = new Map<number, HistoricalImportEntry>();
+          for (const e of cycle) {
+            const n = Math.max(1, e.installmentNumber || 1);
+            if (!byNumber.has(n)) byNumber.set(n, e);
+          }
+          const listed = Array.from(byNumber.values()).sort(
+            (a, b) => (a.installmentNumber || 0) - (b.installmentNumber || 0),
+          );
+          const first = listed[0];
+          const card = first.cardName ? cardByName.get(first.cardName.toLowerCase()) : undefined;
+          if (!card) continue;
+          const totalParcelas = Math.max(1, first.installmentTotal || 1);
+          const knownTotal = round2(listed.reduce((sum, e) => sum + e.amount, 0));
+          const projectedTotal = round2((knownTotal / listed.length) * totalParcelas);
+          const totalAmount = listed.length >= totalParcelas ? knownTotal : projectedTotal;
+          const purchaseDate = listed.find((e) => e.installmentNumber === 1)?.date ?? listed[0].date;
+
+          purchaseRows.push({
+            user_id: user.id,
+            card_id: card.id,
+            description: first.description,
+            total_amount: totalAmount,
+            purchase_date: purchaseDate,
+            installments_count: totalParcelas,
+            _entries: listed,
+            _useListedInstallments: true,
+          });
+        }
       }
 
       for (const e of plan.entries) {
@@ -1386,7 +1438,8 @@ export function useImportHistorical() {
         }
       }
 
-      // 4) Inserir purchases em chunks e gerar installments (anchored)
+      // 4) Inserir purchases em chunks e gravar as parcelas exatamente nos
+      // meses listados pela planilha histórica.
       const CHUNK = 100;
       for (let i = 0; i < purchaseRows.length; i += CHUNK) {
         const slice = purchaseRows.slice(i, i + CHUNK);
@@ -1405,42 +1458,31 @@ export function useImportHistorical() {
         if (error) throw error;
         const inserted = (ins ?? []) as Array<{ id: string }>;
         const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
+
         for (let j = 0; j < inserted.length; j++) {
           const p = slice[j];
           const purchaseId = inserted[j].id;
-          const e = p._entry;
-          const card = cardByName.get(e.cardName!.toLowerCase())!;
-          if (e.installmentNumber && e.installmentTotal && e.installmentTotal > 1) {
-            const items = buildInstallmentsAnchored(
-              purchaseId,
-              user.id,
-              p.total_amount,
-              e.installmentTotal,
-              e.installmentNumber,
-              e.date,
-            );
-            // Se a entry estava paga, marca a parcela âncora como paga
-            if (e.paid) {
-              const a = items.find((x) => x.number === e.installmentNumber);
-              if (a) a.paid = true;
-            }
-            allInstallments.push(...items);
-          } else {
-            const items = buildInstallmentsForPurchase(
-              purchaseId,
-              user.id,
-              p.total_amount,
-              p.installments_count,
-              p.purchase_date,
-              card.closing_day,
-              card.due_day,
-            );
-            if (e.paid) items.forEach((x) => (x.paid = true));
-            allInstallments.push(...items);
+          for (const e of p._entries) {
+            const [year, month, day] = e.date.split("-").map((n) => parseInt(n, 10));
+            const total = Math.max(1, e.installmentTotal || p.installments_count || 1);
+            const number = Math.min(Math.max(1, e.installmentNumber || 1), total);
+            allInstallments.push({
+              user_id: user.id,
+              parent_id: purchaseId,
+              parent_type: "purchase",
+              purchase_id: purchaseId,
+              number,
+              total,
+              amount: e.amount,
+              due_date: `${year}-${String(month).padStart(2, "0")}-${String(day || 1).padStart(2, "0")}`,
+              year,
+              month: month - 1,
+              paid: e.paid,
+            });
           }
         }
+
         if (allInstallments.length > 0) {
-          // insert em sub-chunks para não estourar limite
           for (let k = 0; k < allInstallments.length; k += 500) {
             const sub = allInstallments.slice(k, k + 500);
             const { error: e2 } = await supabase.from("installments").insert(sub);

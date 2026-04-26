@@ -1139,7 +1139,18 @@ export type HistoricalImportEntry = {
   kind: "purchase" | "debit" | "income" | "investment";
   description: string;
   amount: number;
-  date: string; // YYYY-MM-DD (aproximada para legacy)
+  /**
+   * Data de competência da linha na planilha (YYYY-MM-DD).
+   * Para parceladas: representa o mês/ano em que ESTA parcela específica
+   * cai (derivado da coluna do mês onde a linha apareceu).
+   */
+  date: string;
+  /**
+   * Data ORIGINAL da compra (célula DATA da planilha), quando disponível.
+   * Para parceladas, todas as linhas da mesma compra trazem a mesma
+   * purchaseDate — usada como purchase_date no banco.
+   */
+  purchaseDate?: string;
   paid: boolean;
   // Para purchase
   cardName?: string;

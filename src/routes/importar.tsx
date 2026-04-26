@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Papa from "papaparse";
-import { useCards, useImportPurchases, type ImportedRow } from "@/store/finance";
+import { useAccounts, useCards, useImportPurchases, type ImportedRow } from "@/store/finance";
 import { Upload, FileText, Check, AlertCircle, Download } from "lucide-react";
 
 export const Route = createFileRoute("/importar")({

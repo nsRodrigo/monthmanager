@@ -7,7 +7,7 @@ import {
   type ParseResult,
 } from "@/lib/xlsxParser";
 import { buildImportPlan } from "@/lib/xlsxImportPlan";
-import { useImportHistorical, usePurgeAllMovements } from "@/store/finance";
+import { useAccounts, useImportHistorical, usePurgeAllMovements } from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
 import {
   Upload,

@@ -1351,28 +1351,42 @@ export function useImportHistorical() {
             (a.installmentNumber || 0) - (b.installmentNumber || 0),
         );
 
-        // Se o mesmo número de parcela aparecer de novo mais tarde, é outra
-        // compra/ciclo com a mesma descrição. Separa para não misturar ciclos.
+        // Detecta ciclos: a mesma parcela N só "fecha" um ciclo quando aparece
+        // novamente com valor POSITIVO (compra real repetida). Linhas negativas
+        // com o mesmo número são ajustes/estornos parciais e devem somar
+        // dentro do mesmo ciclo.
         const cycles: HistoricalImportEntry[][] = [];
         let current: HistoricalImportEntry[] = [];
-        let seen = new Set<number>();
+        let seenPositive = new Set<number>();
         for (const e of sorted) {
           const n = Math.max(1, e.installmentNumber || 1);
-          if (seen.has(n) && current.length > 0) {
+          if (e.amount > 0 && seenPositive.has(n) && current.length > 0) {
             cycles.push(current);
             current = [];
-            seen = new Set<number>();
+            seenPositive = new Set<number>();
           }
           current.push(e);
-          seen.add(n);
+          if (e.amount > 0) seenPositive.add(n);
         }
         if (current.length > 0) cycles.push(current);
 
         for (const cycle of cycles) {
+          // Soma todas as linhas com o mesmo número de parcela (parcela base +
+          // estornos/reembolsos parciais = valor LÍQUIDO daquele mês).
           const byNumber = new Map<number, HistoricalImportEntry>();
           for (const e of cycle) {
             const n = Math.max(1, e.installmentNumber || 1);
-            if (!byNumber.has(n)) byNumber.set(n, e);
+            const existing = byNumber.get(n);
+            if (existing) {
+              byNumber.set(n, {
+                ...existing,
+                amount: round2(existing.amount + e.amount),
+                // Se qualquer ajuste vier marcado como pago, mantém pago.
+                paid: existing.paid || e.paid,
+              });
+            } else {
+              byNumber.set(n, e);
+            }
           }
           const listed = Array.from(byNumber.values()).sort(
             (a, b) => (a.installmentNumber || 0) - (b.installmentNumber || 0),

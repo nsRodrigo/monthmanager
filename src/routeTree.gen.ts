@@ -18,6 +18,7 @@ import { Route as ContasRouteImport } from './routes/contas'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MesesIndexRouteImport } from './routes/meses.index'
+import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
 import { Route as MesesYearMonthRouteImport } from './routes/meses.$year.$month'
 import { Route as MesesYearMonthCartaoCardIdRouteImport } from './routes/meses.$year.$month_.cartao.$cardId'
 
@@ -66,6 +67,11 @@ const MesesIndexRoute = MesesIndexRouteImport.update({
   path: '/meses/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContasContaIdRoute = ContasContaIdRouteImport.update({
+  id: '/$contaId',
+  path: '/$contaId',
+  getParentRoute: () => ContasRoute,
+} as any)
 const MesesYearMonthRoute = MesesYearMonthRouteImport.update({
   id: '/meses/$year/$month',
   path: '/meses/$year/$month',
@@ -81,12 +87,13 @@ const MesesYearMonthCartaoCardIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/contas': typeof ContasRoute
+  '/contas': typeof ContasRouteWithChildren
   '/credito': typeof CreditoRoute
   '/debito': typeof DebitoRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/recebimentos': typeof RecebimentosRoute
+  '/contas/$contaId': typeof ContasContaIdRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
@@ -94,12 +101,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/contas': typeof ContasRoute
+  '/contas': typeof ContasRouteWithChildren
   '/credito': typeof CreditoRoute
   '/debito': typeof DebitoRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/recebimentos': typeof RecebimentosRoute
+  '/contas/$contaId': typeof ContasContaIdRoute
   '/meses': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
@@ -108,12 +116,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/contas': typeof ContasRoute
+  '/contas': typeof ContasRouteWithChildren
   '/credito': typeof CreditoRoute
   '/debito': typeof DebitoRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/recebimentos': typeof RecebimentosRoute
+  '/contas/$contaId': typeof ContasContaIdRoute
   '/meses/': typeof MesesIndexRoute
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/meses/$year/$month_/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/importar-historico'
     | '/recebimentos'
+    | '/contas/$contaId'
     | '/meses/'
     | '/meses/$year/$month'
     | '/meses/$year/$month/cartao/$cardId'
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/importar-historico'
     | '/recebimentos'
+    | '/contas/$contaId'
     | '/meses'
     | '/meses/$year/$month'
     | '/meses/$year/$month/cartao/$cardId'
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/importar-historico'
     | '/recebimentos'
+    | '/contas/$contaId'
     | '/meses/'
     | '/meses/$year/$month'
     | '/meses/$year/$month_/cartao/$cardId'
@@ -163,7 +175,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
-  ContasRoute: typeof ContasRoute
+  ContasRoute: typeof ContasRouteWithChildren
   CreditoRoute: typeof CreditoRoute
   DebitoRoute: typeof DebitoRoute
   ImportarRoute: typeof ImportarRoute
@@ -239,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MesesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contas/$contaId': {
+      id: '/contas/$contaId'
+      path: '/$contaId'
+      fullPath: '/contas/$contaId'
+      preLoaderRoute: typeof ContasContaIdRouteImport
+      parentRoute: typeof ContasRoute
+    }
     '/meses/$year/$month': {
       id: '/meses/$year/$month'
       path: '/meses/$year/$month'
@@ -256,10 +275,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ContasRouteChildren {
+  ContasContaIdRoute: typeof ContasContaIdRoute
+}
+
+const ContasRouteChildren: ContasRouteChildren = {
+  ContasContaIdRoute: ContasContaIdRoute,
+}
+
+const ContasRouteWithChildren =
+  ContasRoute._addFileChildren(ContasRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
-  ContasRoute: ContasRoute,
+  ContasRoute: ContasRouteWithChildren,
   CreditoRoute: CreditoRoute,
   DebitoRoute: DebitoRoute,
   ImportarRoute: ImportarRoute,

@@ -433,12 +433,25 @@ export function useDebits() {
     queryKey: ["debits", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Debit[]> => {
-      const { data, error } = await supabase
-        .from("debits")
-        .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
-        .order("date", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((d) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        account_id: string;
+        description: string;
+        amount: number | string;
+        date: string;
+        required: boolean;
+        paid: boolean;
+        auto_debit: boolean;
+        auto_debit_day: number | null;
+        installments_count: number;
+        is_parent: boolean;
+      }>(() =>
+        supabase
+          .from("debits")
+          .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
+          .order("date", { ascending: true }),
+      );
+      return data.map((d) => ({
         id: d.id,
         accountId: d.account_id,
         description: d.description,
@@ -461,12 +474,22 @@ export function useIncomes() {
     queryKey: ["incomes", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Income[]> => {
-      const { data, error } = await supabase
-        .from("incomes")
-        .select("id,account_id,description,amount,date,received,installments_count,is_parent")
-        .order("date", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((d) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        account_id: string;
+        description: string;
+        amount: number | string;
+        date: string;
+        received: boolean;
+        installments_count: number;
+        is_parent: boolean;
+      }>(() =>
+        supabase
+          .from("incomes")
+          .select("id,account_id,description,amount,date,received,installments_count,is_parent")
+          .order("date", { ascending: true }),
+      );
+      return data.map((d) => ({
         id: d.id,
         accountId: d.account_id,
         description: d.description,

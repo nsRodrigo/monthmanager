@@ -509,11 +509,14 @@ export function useInvestments() {
     queryKey: ["investments", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Investment[]> => {
-      const { data, error } = await supabase
-        .from("investments")
-        .select("id,account_id,type,amount,percentage");
-      if (error) throw error;
-      return (data ?? []).map((i) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        account_id: string;
+        type: string;
+        amount: number | string;
+        percentage: number | string;
+      }>(() => supabase.from("investments").select("id,account_id,type,amount,percentage"));
+      return data.map((i) => ({
         id: i.id,
         accountId: i.account_id,
         type: i.type,
@@ -530,12 +533,14 @@ export function useCardPayments() {
     queryKey: ["card_payments", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("card_payments")
-        .select("card_id,year,month,paid");
-      if (error) throw error;
+      const data = await fetchAllRows<{
+        card_id: string;
+        year: number;
+        month: number;
+        paid: boolean;
+      }>(() => supabase.from("card_payments").select("card_id,year,month,paid"));
       const map: Record<string, boolean> = {};
-      for (const r of (data ?? []) as Array<{ card_id: string; year: number; month: number; paid: boolean }>) {
+      for (const r of data) {
         map[`${r.card_id}-${r.year}-${r.month}`] = r.paid;
       }
       return map;

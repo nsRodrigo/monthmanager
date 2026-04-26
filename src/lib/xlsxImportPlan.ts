@@ -2,11 +2,14 @@
  * Converte ParsedEntry[] (saída do xlsxParser) em HistoricalImportPlan
  * (formato consumido por useImportHistorical).
  *
- * Estratégia de mapeamento:
- *  - Cada SECTION do tipo CONTA / CARTEIRA  → uma conta (ex: "CONTA NUBANK", "CARTEIRA")
- *  - Cada SECTION do tipo CREDITO          → um cartão (a conta é inferida pelo prefixo, ou cai numa conta default "Itaú")
- *  - RECEBIDOS                             → income, na conta default
- *  - INVESTIMENTO                          → investment, na conta default
+ * REGRA SIMPLIFICADA (2026-04+):
+ *  - TODA conta-padrão informada pelo usuário é usada para débitos,
+ *    recebimentos, investimentos e como conta-mãe dos cartões.
+ *  - Cartões são deduplicados por nome (limpo). Um cartão = uma seção
+ *    no formato moderno (ex: "ITAU UNICLASS BLACK CRÉDITO - MASTERCARD").
+ *  - NENHUMA conta secundária é criada automaticamente. Se o usuário quer
+ *    uma conta separada para Inter, Santander, Carteira etc., ele cadastra
+ *    manualmente em Contas e re-importa selecionando-a como destino.
  */
 import type { ParsedEntry } from "./xlsxParser";
 import type {
@@ -14,40 +17,6 @@ import type {
   HistoricalImportEntry,
   HistoricalImportPlan,
 } from "@/store/finance";
-
-const BANK_KEYWORDS = [
-  { re: /ITA[ÚU]/i, account: "Itaú", color: "#EC7000" },
-  { re: /NUBANK|NU\s*BANK/i, account: "Nubank", color: "#8A05BE" },
-  { re: /CAIXA/i, account: "Caixa", color: "#005CA9" },
-  { re: /BRADESCO/i, account: "Bradesco", color: "#CC092F" },
-  { re: /SANTANDER/i, account: "Santander", color: "#EC0000" },
-  { re: /MERCADO\s*PAGO|MP\b/i, account: "Mercado Pago", color: "#00B1EA" },
-  { re: /INTER/i, account: "Inter", color: "#FF7A00" },
-  { re: /C6/i, account: "C6", color: "#000000" },
-];
-
-const CARD_KEYWORDS = [
-  /UNICLASS/i,
-  /BLACK/i,
-  /PLATINUM/i,
-  /SIGNATURE/i,
-  /SAMSUNG/i,
-  /VISA/i,
-  /MASTERCARD/i,
-  /MULTIPL/i,
-  /GOLD/i,
-];
-
-function inferBank(label: string): { account: string; color: string } | null {
-  for (const k of BANK_KEYWORDS) {
-    if (k.re.test(label)) return { account: k.account, color: k.color };
-  }
-  return null;
-}
-
-function isCardLabel(label: string): boolean {
-  return CARD_KEYWORDS.some((re) => re.test(label));
-}
 
 function cleanCardLabel(label: string): string {
   // Remove sufixos genéricos como " - CRÉDITO", "FATURA ", etc.
@@ -57,28 +26,12 @@ function cleanCardLabel(label: string): string {
     .trim();
 }
 
-function pickColor(idx: number): string {
-  const palette = [
-    "#8b5cf6",
-    "#06b6d4",
-    "#f59e0b",
-    "#ef4444",
-    "#10b981",
-    "#ec4899",
-    "#6366f1",
-    "#84cc16",
-  ];
-  return palette[idx % palette.length];
-}
-
 export type BuildPlanOptions = {
   approxDayForLegacy?: number; // dia usado quando entry não tem data exata (default 15)
   /**
-   * Nome da conta padrão usada para débitos/recebidos/investimentos quando
-   * a planilha não permite inferir o banco (ex: "CARTEIRA", "RECEBIDOS",
-   * "INVESTIMENTO"). Default: "Geral".
-   * Se o nome corresponder a uma conta já existente, ela será reutilizada
-   * (sem criar duplicada).
+   * Nome da conta destino. TODOS os lançamentos (débitos, recebimentos,
+   * investimentos) e TODOS os cartões serão associados a esta conta.
+   * Se a conta não existir, será criada automaticamente como corrente.
    */
   defaultAccountName?: string;
   defaultAccountColor?: string;
@@ -94,17 +47,30 @@ export function buildImportPlan(
   const DEFAULT_ACCOUNT_COLOR = opts.defaultAccountColor || "#8b5cf6";
   const DEFAULT_ACCOUNT_TYPE: AccountType = opts.defaultAccountType || "corrente";
 
-  const accountsMap = new Map<string, { name: string; type: AccountType; color: string }>();
   const cardsMap = new Map<string, { name: string; accountName: string; color: string }>();
   const entries: HistoricalImportEntry[] = [];
 
-  accountsMap.set(DEFAULT_ACCOUNT.toLowerCase(), {
-    name: DEFAULT_ACCOUNT,
-    type: DEFAULT_ACCOUNT_TYPE,
-    color: DEFAULT_ACCOUNT_COLOR,
-  });
+  // Única conta criada/usada — a escolhida pelo usuário
+  const accountsToCreate = [
+    {
+      name: DEFAULT_ACCOUNT,
+      type: DEFAULT_ACCOUNT_TYPE,
+      color: DEFAULT_ACCOUNT_COLOR,
+    },
+  ];
 
-  let colorIdx = 0;
+  // Paleta para cores dos cartões (as contas usam a cor única do default)
+  const cardPalette = [
+    "#8b5cf6",
+    "#06b6d4",
+    "#f59e0b",
+    "#ef4444",
+    "#10b981",
+    "#ec4899",
+    "#6366f1",
+    "#84cc16",
+  ];
+  let cardColorIdx = 0;
 
   for (const e of parsed) {
     // Determina data
@@ -115,28 +81,15 @@ export function buildImportPlan(
     }
 
     if (e.kind === "purchase") {
-      // Section vira cartão
+      // Cartão de crédito: cria 1 cartão por sectionLabel limpo, todos sob a conta default
       const cardName = cleanCardLabel(e.sectionLabel);
-      // Banco a partir da label
-      const bank = inferBank(e.sectionLabel);
-      const accountName = bank?.account ?? DEFAULT_ACCOUNT;
-      const accountColor = bank?.color ?? pickColor(colorIdx++);
-
-      if (!accountsMap.has(accountName.toLowerCase())) {
-        accountsMap.set(accountName.toLowerCase(), {
-          name: accountName,
-          type: "corrente",
-          color: accountColor,
-        });
-      }
       if (!cardsMap.has(cardName.toLowerCase())) {
         cardsMap.set(cardName.toLowerCase(), {
           name: cardName,
-          accountName,
-          color: accountColor,
+          accountName: DEFAULT_ACCOUNT,
+          color: cardPalette[cardColorIdx++ % cardPalette.length],
         });
       }
-
       entries.push({
         kind: "purchase",
         description: e.description,
@@ -148,71 +101,39 @@ export function buildImportPlan(
         installmentTotal: e.installmentTotal ?? undefined,
       });
     } else if (e.kind === "debit") {
-      // Section vira conta (ou banco)
-      const bank = inferBank(e.sectionLabel);
-      let accountName = bank?.account;
-      if (!accountName) {
-        // Se a label parece ser um banco/conta (CONTA xxx, CARTEIRA), usa
-        if (/^CONTA\s+/i.test(e.sectionLabel)) {
-          accountName = e.sectionLabel.replace(/^CONTA\s+/i, "").trim();
-        } else if (/CARTEIRA/i.test(e.sectionLabel)) {
-          accountName = "Carteira";
-        } else {
-          accountName = DEFAULT_ACCOUNT;
-        }
-      }
-      if (!accountsMap.has(accountName.toLowerCase())) {
-        accountsMap.set(accountName.toLowerCase(), {
-          name: accountName,
-          type: /CARTEIRA/i.test(accountName) ? "carteira" : "corrente",
-          color: bank?.color ?? pickColor(colorIdx++),
-        });
-      }
+      // Débito automático / despesa de conta corrente — vai para a conta default
       entries.push({
         kind: "debit",
         description: e.description,
         amount: e.amount,
         date: dateStr,
         paid: e.paid,
-        accountName,
+        accountName: DEFAULT_ACCOUNT,
       });
     } else if (e.kind === "income") {
-      const accountName = DEFAULT_ACCOUNT;
       entries.push({
         kind: "income",
         description: e.description,
         amount: e.amount,
         date: dateStr,
         paid: e.paid,
-        accountName,
+        accountName: DEFAULT_ACCOUNT,
       });
     } else if (e.kind === "investment") {
-      const accountName = "Investimentos";
-      if (!accountsMap.has(accountName.toLowerCase())) {
-        accountsMap.set(accountName.toLowerCase(), {
-          name: accountName,
-          type: "investimento",
-          color: "#10b981",
-        });
-      }
       entries.push({
         kind: "investment",
         description: e.description,
         amount: e.amount,
         date: dateStr,
         paid: e.paid,
-        accountName,
+        accountName: DEFAULT_ACCOUNT,
       });
     }
-
-    // Marca para descartar warning não usado
-    void isCardLabel;
   }
 
   return {
-    accountsToCreate: Array.from(accountsMap.values()),
+    accountsToCreate,
     cardsToCreate: Array.from(cardsMap.values()),
     entries,
   };
 }
-

@@ -237,8 +237,9 @@ function HistoricalImportPage() {
               ))}
             </select>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Usada para CARTEIRA, RECEBIDOS e itens sem banco identificável na planilha.
-              Bancos detectados (Itaú, Nubank, Caixa, etc.) sempre vão para suas próprias contas.
+              TODOS os lançamentos da planilha (débitos, recebimentos, investimentos)
+              e TODOS os cartões serão associados a esta conta. Para separar por banco,
+              cadastre as contas manualmente em <strong>Contas</strong> e re-importe.
             </p>
           </div>
           {defaultAccountChoice === "__new__" && (

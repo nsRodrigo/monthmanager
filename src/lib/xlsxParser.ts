@@ -263,7 +263,9 @@ function parseYearBlock(
     if (headerSlots.length === 0) continue;
 
     const isModern = headerSlots[0].kind === "MODERN";
-    const slotWidth = isModern ? 6 : 4;
+    // MODERN: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | (blank) | STATUS | (blank) → 8 cols.
+    // LEGACY: PAGAMENTO | PARC | VALOR | STATUS → 4 cols.
+    const slotWidth = isModern ? 8 : 4;
     const isValeFrame = !isModern && headerSlots.every((s) => s.label === "VALE");
 
     // Para cada slot, descobrir o mês olhando na linha TOTAL (mais confiável)
@@ -471,13 +473,15 @@ const SECTION_PATTERNS: Array<{ re: RegExp; kind: SectionKind; cleanup?: (s: str
   { re: /^RECEBIDO/i, kind: "RECEBIDOS" },
   { re: /^CARTEIRA/i, kind: "CARTEIRA" },
   { re: /^INVESTIMENTO/i, kind: "INVESTIMENTO" },
-  // Sufixo "- DÉBITO" tem prioridade ABSOLUTA: identifica despesas pagas em
-  // débito automático da conta (não é cartão de crédito), mesmo quando o
-  // rótulo contém o nome de um cartão (ex: "ITAU UNICLASS ... - DÉBITO").
-  { re: /-\s*D[ÉE]BITO\s*$/i, kind: "CONTA" },
+  // PRIORIDADE ABSOLUTA: a palavra "DÉBITO" (em qualquer posição do label)
+  // marca a seção como conta de débito automático — NÃO cartão de crédito.
+  // Cobre variações como:
+  //   "ITAU UNICLASS MULTIPLO SIGNATURE DÉBITO - VISA"
+  //   "ITAU UNICLASS MULTIPLO SIGNATURE DÉBITO" (sem sufixo)
+  //   "XPTO - DÉBITO"
+  { re: /\bD[ÉE]BITO\b/i, kind: "CONTA" },
   // Demais cartões de crédito
-  { re: /-\s*CR[ÉE]DITO\s*$/i, kind: "CREDITO" },
-  { re: /CRÉDITO|CREDITO/i, kind: "CREDITO" },
+  { re: /\bCR[ÉE]DITO\b/i, kind: "CREDITO" },
   { re: /^FATURA\s+/i, kind: "CREDITO" },
   { re: /^CONTA\s+/i, kind: "CONTA" },
   { re: /UNICLASS|BLACK|PLATINUM|SIGNATURE|SAMSUNG|VISA|MASTERCARD/i, kind: "CREDITO" },
@@ -521,14 +525,18 @@ function parseModernRow(
   section: { label: string; kind: SectionKind },
   sourceRow: number,
 ): ParsedEntry | null {
-  // Layout: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | STATUS
+  // Layout: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | (blank) | STATUS | (blank)
   const description = norm(row[col]);
   const date = parseDateCell(row[col + 1]);
   const transaction = norm(row[col + 2]) || null;
   const parc = parseParc(row[col + 3]);
   const amount = parseAmount(row[col + 4]);
-  const paid = parsePaid(row[col + 5]);
-  const rawStatus = norm(row[col + 5]);
+  // STATUS fica no col+6 (col+5 é uma coluna em branco usada como separador
+  // visual na planilha original). Aceitamos também col+5 como fallback caso
+  // a planilha venha sem o separador.
+  const statusCell = row[col + 6] ?? row[col + 5];
+  const paid = parsePaid(statusCell);
+  const rawStatus = norm(statusCell);
 
   if (!description || amount === 0) return null;
   // Ignorar linhas que são apenas continuação textual (sem valor)

@@ -25,8 +25,11 @@ export const MONTHS_SHORT = [
 ] as const;
 
 export const formatDate = (iso: string) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString("pt-BR");
+  // Trata "YYYY-MM-DD" literalmente para evitar deslocamento de fuso horário
+  // (new Date("2025-07-07") = UTC midnight → em UTC-3 vira 06/07).
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return new Date(iso).toLocaleDateString("pt-BR");
 };
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);

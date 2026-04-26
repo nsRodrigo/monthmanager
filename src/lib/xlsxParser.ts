@@ -525,14 +525,18 @@ function parseModernRow(
   section: { label: string; kind: SectionKind },
   sourceRow: number,
 ): ParsedEntry | null {
-  // Layout: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | STATUS
+  // Layout: DESCRIÇÃO | DATA | TRANSAÇÃO | PARC | VALOR | (blank) | STATUS | (blank)
   const description = norm(row[col]);
   const date = parseDateCell(row[col + 1]);
   const transaction = norm(row[col + 2]) || null;
   const parc = parseParc(row[col + 3]);
   const amount = parseAmount(row[col + 4]);
-  const paid = parsePaid(row[col + 5]);
-  const rawStatus = norm(row[col + 5]);
+  // STATUS fica no col+6 (col+5 é uma coluna em branco usada como separador
+  // visual na planilha original). Aceitamos também col+5 como fallback caso
+  // a planilha venha sem o separador.
+  const statusCell = row[col + 6] ?? row[col + 5];
+  const paid = parsePaid(statusCell);
+  const rawStatus = norm(statusCell);
 
   if (!description || amount === 0) return null;
   // Ignorar linhas que são apenas continuação textual (sem valor)

@@ -87,6 +87,18 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+async function fetchAllRows<T>(queryFactory: () => any, pageSize = 1000): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return rows;
+}
+
 /**
  * Compute the invoice (fatura) month/year for a credit-card purchase.
  *

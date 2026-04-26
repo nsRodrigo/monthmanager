@@ -91,7 +91,7 @@ function ImportPage() {
 
   // Cartões filtrados pela conta selecionada (ou todos)
   const filteredCards = useMemo(
-    () => (filterAccountId ? cards.filter((c) => c.account_id === filterAccountId) : cards),
+    () => (filterAccountId ? cards.filter((c) => c.accountId === filterAccountId) : cards),
     [cards, filterAccountId],
   );
 

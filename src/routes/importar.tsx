@@ -77,13 +77,23 @@ function parsePaid(raw: string | undefined) {
 }
 
 function ImportPage() {
+  const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const importMut = useImportPurchases();
+  // Filtro opcional: conta da qual queremos listar os cartões.
+  // "" = todas as contas.
+  const [filterAccountId, setFilterAccountId] = useState("");
   const [defaultCardId, setDefaultCardId] = useState("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Cartões filtrados pela conta selecionada (ou todos)
+  const filteredCards = useMemo(
+    () => (filterAccountId ? cards.filter((c) => c.account_id === filterAccountId) : cards),
+    [cards, filterAccountId],
+  );
 
   const onFile = (file: File) => {
     setError(null);

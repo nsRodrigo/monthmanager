@@ -1,20 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import {
   useAccounts,
   useCards,
-  useInstallments,
   usePurchases,
+  useInstallments,
   useDebits,
   useIncomes,
   useInvestments,
+  computeAccountBalance,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
-  filterCardsByAccount,
-  filterDebitsByAccount,
-  filterIncomesByAccount,
-  filterInvestmentsByAccount,
-  computeAccountBalance,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -22,234 +19,218 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   CreditCard,
-  Wallet,
-  ChevronRight,
-  Building2,
   TrendingUp,
-  CalendarDays,
+  ChevronRight,
+  Wallet,
+  Building2,
+  Smartphone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Finanças" },
-      { name: "description", content: "Visão geral do mês com saldo previsto." },
+      { title: "Consolidado — Finanças" },
+      { name: "description", content: "Visão consolidada de todas as suas contas." },
     ],
   }),
-  component: Dashboard,
+  component: Consolidated,
 });
 
-function Dashboard() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+const ICON_BY_TYPE = {
+  corrente: Building2,
+  digital: Smartphone,
+  carteira: Wallet,
+  investimento: TrendingUp,
+} as const;
 
-  const { accountId } = useAccountFilter();
+function Consolidated() {
   const { data: accounts = [] } = useAccounts();
-  const { data: allCards = [] } = useCards();
+  const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
   const { data: installments = [] } = useInstallments();
-  const { data: allDebits = [] } = useDebits();
-  const { data: allIncomes = [] } = useIncomes();
-  const { data: allInvestments = [] } = useInvestments();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
+  const { data: investments = [] } = useInvestments();
 
-  const cards = filterCardsByAccount(allCards, accountId);
-  const debits = filterDebitsByAccount(allDebits, accountId);
-  const incomes = filterIncomesByAccount(allIncomes, accountId);
-  const investments = filterInvestmentsByAccount(allInvestments, accountId);
+  // On the consolidated dashboard the global filter must be cleared,
+  // so dialogs (new card / new debit) ask for the account explicitly.
+  const { setAccountId } = useAccountFilter();
+  useEffect(() => setAccountId(null), [setAccountId]);
 
-  const visibleCardIds = new Set(cards.map((c) => c.id));
-  const visiblePurchaseIds = new Set(
-    purchases.filter((p) => visibleCardIds.has(p.cardId)).map((p) => p.id),
-  );
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
 
-  const allMonthInst = getMonthInstallments(installments, year, month);
+  const monthInst = getMonthInstallments(installments, year, month);
   const monthDebits = getMonthDebits(debits, installments, year, month);
   const monthIncomes = getMonthIncomes(incomes, installments, year, month);
 
-  const credInst = allMonthInst.filter(
-    (i) => i.parentType === "purchase" && (accountId ? visiblePurchaseIds.has(i.parentId) : true),
-  );
-  const totalCredit = credInst.reduce((s, i) => s + i.amount, 0);
+  const totalCredit = monthInst
+    .filter((i) => i.parentType === "purchase")
+    .reduce((s, i) => s + i.amount, 0);
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
     monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
   const totalIncome =
     monthIncomes.single.reduce((s, i) => s + i.amount, 0) +
     monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-  const totalInvestments = investments.reduce((s, i) => s + i.amount, 0);
+  const totalInvested = investments.reduce((s, i) => s + i.amount, 0);
 
-  const expectedBalance = totalIncome - totalCredit - totalDebits;
-
-  const visibleAccounts = accountId ? accounts.filter((a) => a.id === accountId) : accounts;
-  const totalAccountBalance = visibleAccounts.reduce(
-    (sum, a) => sum + computeAccountBalance(a, allCards, purchases, installments, allDebits, allIncomes),
+  const accountBalance = accounts.reduce(
+    (s, a) => s + computeAccountBalance(a, cards, purchases, installments, debits, incomes),
     0,
   );
+  const expected = accountBalance + totalIncome - totalDebits - totalCredit;
 
-  const filterLabel = accountId
-    ? accounts.find((a) => a.id === accountId)?.name ?? "Conta"
-    : "Todas as contas";
+  if (accounts.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <Wallet className="h-8 w-8" />
+        </div>
+        <h1 className="mt-6 text-3xl font-bold tracking-tight">Bem-vindo!</h1>
+        <p className="mt-2 text-muted-foreground">
+          Comece criando sua primeira conta bancária. Cada conta organiza seus cartões,
+          débitos, recebimentos e investimentos.
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Use o botão <strong>Adicionar conta</strong> na lateral para começar.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">
       <header className="mb-8">
-        <p className="text-sm font-medium text-muted-foreground">{MONTHS[month]} de {year}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Olá 👋</h1>
-          <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Building2 className="h-3 w-3" /> {filterLabel}
-          </span>
-        </div>
-        <p className="mt-2 text-muted-foreground">Resumo do mês com base no vencimento das faturas.</p>
+        <p className="text-sm font-medium text-primary capitalize">
+          {MONTHS[month]} {year}
+        </p>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Consolidado</h1>
+        <p className="mt-1 text-muted-foreground">
+          Visão geral de todas as suas {accounts.length}{" "}
+          {accounts.length === 1 ? "conta" : "contas"}.
+        </p>
       </header>
 
-      {accounts.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <p className="text-sm text-muted-foreground">Você ainda não tem nenhuma conta cadastrada.</p>
-          <Link
-            to="/contas"
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-105"
-          >
-            <Building2 className="h-4 w-4" /> Cadastrar primeira conta
-          </Link>
+      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-6 shadow-elegant">
+        <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
+        <p
+          className={`mt-1 text-4xl font-bold tracking-tight md:text-5xl ${
+            expected >= 0 ? "text-foreground" : "text-destructive"
+          }`}
+        >
+          {formatCurrency(expected)}
+        </p>
+        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+          <Stat label="Saldo das contas" value={formatCurrency(accountBalance)} icon={Wallet} />
+          <Stat
+            label="A receber"
+            value={formatCurrency(totalIncome)}
+            icon={ArrowUpRight}
+            tone="success"
+          />
+          <Stat
+            label="A pagar (débito)"
+            value={formatCurrency(totalDebits)}
+            icon={ArrowDownRight}
+            tone="debit"
+          />
+          <Stat
+            label="Faturas"
+            value={formatCurrency(totalCredit)}
+            icon={CreditCard}
+            tone="credit"
+          />
+          <Stat
+            label="Investido"
+            value={formatCurrency(totalInvested)}
+            icon={TrendingUp}
+            tone="primary"
+          />
         </div>
-      )}
+      </section>
 
-      {accounts.length > 0 && (
-        <>
-          {/* Saldo previsto destacado */}
-          <div className="bg-gradient-hero relative mb-6 overflow-hidden rounded-3xl border border-border p-8 shadow-elevated">
-            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
-            <p className="text-sm font-medium text-muted-foreground">Saldo previsto · {MONTHS[month]}</p>
-            <p className={`mt-2 text-4xl font-bold tracking-tight md:text-5xl ${expectedBalance >= 0 ? "text-success" : "text-destructive"}`}>
-              {formatCurrency(expectedBalance)}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">Recebimentos − faturas − débitos</p>
-            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-              <MiniStat label="Saldo das contas" value={formatCurrency(totalAccountBalance)} icon={<Wallet className="h-4 w-4" />} />
-              <MiniStat label="Investido" value={formatCurrency(totalInvestments)} icon={<TrendingUp className="h-4 w-4" />} />
-              <MiniStat label="A receber" value={formatCurrency(totalIncome)} icon={<ArrowUpRight className="h-4 w-4" />} />
-            </div>
-          </div>
-
-          {/* Cards grandes por categoria */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <CategoryCard
-              to="/credito"
-              title="Crédito"
-              subtitle="Faturas do mês"
-              value={formatCurrency(totalCredit)}
-              count={`${credInst.length} parcelas`}
-              icon={<CreditCard className="h-5 w-5" />}
-              gradient="bg-gradient-credit"
-            />
-            <CategoryCard
-              to="/debito"
-              title="Débito"
-              subtitle="Conta corrente"
-              value={formatCurrency(totalDebits)}
-              count={`${monthDebits.single.length + monthDebits.parcelled.length} lançamentos`}
-              icon={<ArrowDownRight className="h-5 w-5" />}
-              gradient="bg-gradient-debit"
-            />
-            <CategoryCard
-              to="/recebimentos"
-              title="Recebimentos"
-              subtitle="Entradas do mês"
-              value={formatCurrency(totalIncome)}
-              count={`${monthIncomes.single.length + monthIncomes.parcelled.length} a receber`}
-              icon={<ArrowUpRight className="h-5 w-5" />}
-              gradient="bg-gradient-income"
-            />
-            <CategoryCard
-              to="/meses"
-              title="Visão mensal"
-              subtitle="Todos os meses"
-              value={formatCurrency(totalCredit + totalDebits)}
-              count="ver outros meses"
-              icon={<CalendarDays className="h-5 w-5" />}
-              gradient="bg-gradient-card"
-              dark
-            />
-          </div>
-
-          {/* Contas detalhadas (apenas no consolidado) */}
-          {!accountId && visibleAccounts.length > 0 && (
-            <section className="mt-10">
-              <h2 className="mb-4 text-xl font-semibold">Suas contas</h2>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {visibleAccounts.map((a) => {
-                  const bal = computeAccountBalance(a, allCards, purchases, installments, allDebits, allIncomes);
-                  return (
-                    <div key={a.id} className="rounded-2xl border border-border bg-gradient-card p-5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: a.color }} />
-                        <p className="font-semibold">{a.name}</p>
-                        <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground">{a.type}</span>
-                      </div>
-                      <p className={`mt-3 text-2xl font-bold ${bal >= 0 ? "text-success" : "text-destructive"}`}>
-                        {formatCurrency(bal)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </>
-      )}
+      <section className="mt-8">
+        <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          {accounts.map((a) => {
+            const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
+            const balance = computeAccountBalance(
+              a,
+              cards,
+              purchases,
+              installments,
+              debits,
+              incomes,
+            );
+            const cardCount = cards.filter((c) => c.accountId === a.id).length;
+            return (
+              <Link
+                key={a.id}
+                to="/contas/$contaId"
+                params={{ contaId: a.id }}
+                className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-glow"
+              >
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: a.color + "25", color: a.color }}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{a.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {a.type} · {cardCount} {cardCount === 1 ? "cartão" : "cartões"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p
+                    className={`text-base font-bold ${
+                      balance >= 0 ? "text-foreground" : "text-destructive"
+                    }`}
+                  >
+                    {formatCurrency(balance)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">saldo atual</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
 
-function MiniStat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
-  return (
-    <div className="rounded-xl bg-card/60 p-4 backdrop-blur-sm">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        {icon} {label}
-      </div>
-      <p className="mt-2 text-lg font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function CategoryCard({
-  to,
-  title,
-  subtitle,
+function Stat({
+  label,
   value,
-  count,
-  icon,
-  gradient,
-  dark,
+  icon: Icon,
+  tone = "default",
 }: {
-  to: "/credito" | "/debito" | "/recebimentos" | "/meses";
-  title: string;
-  subtitle: string;
+  label: string;
   value: string;
-  count: string;
-  icon: React.ReactNode;
-  gradient: string;
-  dark?: boolean;
+  icon: typeof Wallet;
+  tone?: "default" | "success" | "debit" | "credit" | "primary";
 }) {
-  const text = dark ? "text-foreground" : "text-white";
-  const muted = dark ? "text-muted-foreground" : "text-white/85";
+  const c =
+    tone === "success"
+      ? "text-success"
+      : tone === "debit"
+        ? "text-debit"
+        : tone === "credit"
+          ? "text-credit"
+          : tone === "primary"
+            ? "text-primary"
+            : "text-foreground";
   return (
-    <Link
-      to={to}
-      className={`group relative overflow-hidden rounded-2xl ${gradient} p-5 shadow-elegant transition-transform hover:scale-[1.02]`}
-    >
-      <div className="flex items-center justify-between">
-        <p className={`text-xs font-semibold uppercase tracking-wide ${muted}`}>{subtitle}</p>
-        <div className={`rounded-lg ${dark ? "bg-secondary" : "bg-white/15"} p-2 ${text}`}>{icon}</div>
+    <div className="rounded-xl border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Icon className="h-3 w-3" /> {label}
       </div>
-      <p className={`mt-3 text-base font-bold ${text}`}>{title}</p>
-      <p className={`mt-2 text-2xl font-bold ${text}`}>{value}</p>
-      <div className={`mt-2 flex items-center justify-between text-xs ${muted}`}>
-        <span>{count}</span>
-        <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-      </div>
-    </Link>
+      <p className={`mt-1 text-base font-bold ${c}`}>{value}</p>
+    </div>
   );
 }

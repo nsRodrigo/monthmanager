@@ -1292,23 +1292,53 @@ export function useImportHistorical() {
         defaultAccountId = (data as { id: string }).id;
       }
 
+      // Dedup de compras parceladas: a mesma compra aparece em N linhas
+      // (uma por mês), cada linha sendo uma parcela. Agrupamos por
+      // (cartão + descrição + total de parcelas + valor da parcela)
+      // e ficamos apenas com a entry de MENOR installmentNumber, que vira a
+      // âncora real da compra. As demais são descartadas para evitar duplicação.
+      const purchaseDedup = new Map<string, HistoricalImportEntry>();
+      const purchaseEntries: HistoricalImportEntry[] = [];
       for (const e of plan.entries) {
-        if (e.kind === "purchase") {
-          const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
-          if (!card) continue; // pula se não há cartão associado
-          const totalParcelas = e.installmentTotal ?? 1;
-          const totalAmount =
-            totalParcelas > 1 ? round2(e.amount * totalParcelas) : e.amount;
-          purchaseRows.push({
-            user_id: user.id,
-            card_id: card.id,
-            description: e.description,
-            total_amount: totalAmount,
-            purchase_date: e.date,
-            installments_count: totalParcelas,
-            _entry: e,
-          });
-        } else if (e.kind === "debit") {
+        if (e.kind !== "purchase") continue;
+        if (e.installmentTotal && e.installmentTotal > 1 && e.installmentNumber) {
+          const key = [
+            (e.cardName || "").toLowerCase(),
+            e.description.trim().toLowerCase(),
+            e.installmentTotal,
+            Math.round(e.amount * 100),
+          ].join("|");
+          const existing = purchaseDedup.get(key);
+          if (!existing || (e.installmentNumber ?? 999) < (existing.installmentNumber ?? 999)) {
+            purchaseDedup.set(key, e);
+          }
+        } else {
+          // Compra à vista ou sem info de parcelas: passa direto
+          purchaseEntries.push(e);
+        }
+      }
+      purchaseEntries.push(...purchaseDedup.values());
+
+      for (const e of purchaseEntries) {
+        const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
+        if (!card) continue; // pula se não há cartão associado
+        const totalParcelas = e.installmentTotal ?? 1;
+        const totalAmount =
+          totalParcelas > 1 ? round2(e.amount * totalParcelas) : e.amount;
+        purchaseRows.push({
+          user_id: user.id,
+          card_id: card.id,
+          description: e.description,
+          total_amount: totalAmount,
+          purchase_date: e.date,
+          installments_count: totalParcelas,
+          _entry: e,
+        });
+      }
+
+      for (const e of plan.entries) {
+        if (e.kind === "purchase") continue; // já tratados acima
+        if (e.kind === "debit") {
           const accId = e.accountName
             ? accByName.get(e.accountName.toLowerCase())
             : defaultAccountId;

@@ -18,7 +18,7 @@ import { ChevronLeft, Plus, Check, Pencil, Trash2 } from "lucide-react";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
 
-export const Route = createFileRoute("/contas/$contaId/$ano/$mes_/cartao/$cartaoId")({
+export const Route = createFileRoute("/contas/$contaId_/$ano/$mes_/cartao/$cartaoId")({
   head: ({ params }) => ({
     meta: [{ title: `Fatura — ${MONTHS[Number(params.mes)]} ${params.ano}` }],
   }),

@@ -43,7 +43,7 @@ import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
 import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
 
-export const Route = createFileRoute("/contas/$contaId/$ano/$mes")({
+export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
     meta: [
       {

@@ -53,6 +53,27 @@ function AccountHome() {
   const [year, setYear] = useState(today.getFullYear());
   const currentMonth = today.getMonth();
 
+  const accountCardIds = useMemo(
+    () => new Set(cards.filter((c) => c.accountId === contaId).map((c) => c.id)),
+    [cards, contaId],
+  );
+  const accountCards = useMemo(
+    () => cards.filter((c) => c.accountId === contaId),
+    [cards, contaId],
+  );
+  const accountDebits = useMemo(
+    () => debits.filter((d) => d.accountId === contaId),
+    [debits, contaId],
+  );
+  const accountIncomes = useMemo(
+    () => incomes.filter((i) => i.accountId === contaId),
+    [incomes, contaId],
+  );
+  const accountInvestments = useMemo(
+    () => investments.filter((i) => i.accountId === contaId),
+    [investments, contaId],
+  );
+
   if (!account) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center">
@@ -64,26 +85,6 @@ function AccountHome() {
     );
   }
 
-  const accountCardIds = useMemo(
-    () => new Set(cards.filter((c) => c.accountId === account.id).map((c) => c.id)),
-    [cards, account.id],
-  );
-  const accountCards = useMemo(
-    () => cards.filter((c) => c.accountId === account.id),
-    [cards, account.id],
-  );
-  const accountDebits = useMemo(
-    () => debits.filter((d) => d.accountId === account.id),
-    [debits, account.id],
-  );
-  const accountIncomes = useMemo(
-    () => incomes.filter((i) => i.accountId === account.id),
-    [incomes, account.id],
-  );
-  const accountInvestments = useMemo(
-    () => investments.filter((i) => i.accountId === account.id),
-    [investments, account.id],
-  );
 
   const balance = computeAccountBalance(account, cards, purchases, installments, debits, incomes);
   const totalInvested = accountInvestments.reduce((s, i) => s + i.amount, 0);

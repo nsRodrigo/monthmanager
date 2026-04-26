@@ -1,16 +1,24 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, CreditCard, ArrowDownRight, ArrowUpRight, LogOut, Building2, Upload, CalendarDays, Settings, Wallet, FileSpreadsheet } from "lucide-react";
+import { LogOut, Upload, Settings, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
 import { AccountFilterProvider } from "@/store/account-filter";
-import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { useAccounts, type AccountType } from "@/store/finance";
+import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
 });
+
+const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
+  corrente: Building2,
+  digital: Smartphone,
+  carteira: Wallet,
+  investimento: TrendingUp,
+};
 
 function NotFoundComponent() {
   return (
@@ -35,11 +43,11 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Finanças — Gestão pessoal" },
-      { name: "description", content: "Controle detalhado de gastos, cartões e parcelamentos." },
+      { name: "description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
       { property: "og:title", content: "Finanças — Gestão pessoal" },
       { name: "twitter:title", content: "Finanças — Gestão pessoal" },
-      { property: "og:description", content: "Controle detalhado de gastos, cartões e parcelamentos." },
-      { name: "twitter:description", content: "Controle detalhado de gastos, cartões e parcelamentos." },
+      { property: "og:description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
+      { name: "twitter:description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -77,161 +85,121 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function BottomNav() {
-  const loc = useLocation();
-  const items = [
-    { to: "/", label: "Início", icon: LayoutDashboard, exact: true },
-    { to: "/credito", label: "Crédito", icon: CreditCard, exact: false },
-    { to: "/debito", label: "Débito", icon: ArrowDownRight, exact: false },
-    { to: "/recebimentos", label: "Receber", icon: ArrowUpRight, exact: false },
-    { to: "/meses", label: "Meses", icon: CalendarDays, exact: false },
-  ] as const;
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-lg md:hidden">
-      <div className="mx-auto flex max-w-2xl items-center justify-around px-1 py-2">
-        {items.map((it) => {
-          const active = it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to);
-          const Icon = it.icon;
-          return (
-            <Link
-              key={it.to}
-              to={it.to}
-              className={`flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors ${
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-              {it.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-function SideNav() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const loc = useLocation();
   const { signOut, user } = useAuth();
-  const items = [
-    { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    { to: "/credito", label: "Crédito", icon: CreditCard, exact: false },
-    { to: "/debito", label: "Débito + Investimentos", icon: ArrowDownRight, exact: false },
-    { to: "/recebimentos", label: "Recebimentos", icon: ArrowUpRight, exact: false },
-    { to: "/meses", label: "Visão mensal", icon: CalendarDays, exact: false },
-    { to: "/contas", label: "Contas", icon: Building2, exact: false },
-  ] as const;
+  const { data: accounts = [] } = useAccounts();
+  const [manageOpen, setManageOpen] = useState(false);
+
+  const isConsolidated = loc.pathname === "/";
+
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/40 p-6 md:flex">
-      <div className="mb-8 flex items-center gap-2">
+    <>
+      <div className="mb-6 flex items-center gap-2">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
           <Wallet className="h-5 w-5 text-primary-foreground" />
         </div>
         <span className="text-lg font-bold tracking-tight">Finanças</span>
       </div>
-      <div className="mb-6">
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Conta ativa</p>
-        <AccountSwitcher />
-      </div>
-      <nav className="flex-1 space-y-1">
-        {items.map((it) => {
-          const active = it.exact ? loc.pathname === it.to : loc.pathname.startsWith(it.to);
-          const Icon = it.icon;
+
+      <Link
+        to="/"
+        onClick={onNavigate}
+        className={`mb-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+          isConsolidated
+            ? "bg-gradient-primary text-primary-foreground shadow-glow"
+            : "border border-border text-foreground hover:bg-secondary"
+        }`}
+      >
+        <LayoutDashboard className="h-4 w-4" />
+        Consolidado
+      </Link>
+
+      <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Contas
+      </p>
+      <nav className="flex-1 space-y-1 overflow-y-auto">
+        {accounts.length === 0 && (
+          <p className="px-2 py-3 text-xs text-muted-foreground">
+            Nenhuma conta. Clique em <strong>Adicionar conta</strong>.
+          </p>
+        )}
+        {accounts.map((a) => {
+          const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
+          const active = loc.pathname.startsWith(`/contas/${a.id}`);
           return (
             <Link
-              key={it.to}
-              to={it.to}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+              key={a.id}
+              to="/contas/$contaId"
+              params={{ contaId: a.id }}
+              onClick={onNavigate}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                 active
                   ? "bg-secondary text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {it.label}
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: a.color + "25", color: a.color }}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </div>
+              <span className="truncate">{a.name}</span>
             </Link>
           );
         })}
-        <div className="my-2 border-t border-border" />
-        <Link
-          to="/importar"
-          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            loc.pathname === "/importar"
-              ? "bg-secondary text-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
+        <button
+          onClick={() => setManageOpen(true)}
+          className="mt-2 flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
         >
-          <Upload className="h-4 w-4" />
-          Importar CSV
-        </Link>
+          <Plus className="h-3.5 w-3.5" /> Adicionar conta
+        </button>
+      </nav>
+
+      <div className="mt-4 space-y-1 border-t border-border pt-4">
         <Link
           to="/importar-historico"
-          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+          onClick={onNavigate}
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
             loc.pathname === "/importar-historico"
-              ? "bg-secondary text-foreground shadow-sm"
+              ? "bg-secondary text-foreground"
               : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           }`}
         >
-          <FileSpreadsheet className="h-4 w-4" />
-          Planilha histórica
+          <FileSpreadsheet className="h-3.5 w-3.5" /> Importar planilha
         </Link>
-      </nav>
-      <div className="mt-6 border-t border-border pt-4">
+        <Link
+          to="/importar"
+          onClick={onNavigate}
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+            loc.pathname === "/importar"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <Upload className="h-3.5 w-3.5" /> Importar CSV
+        </Link>
+        <button
+          onClick={() => setManageOpen(true)}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+        >
+          <Settings className="h-3.5 w-3.5" /> Configurações
+        </button>
+      </div>
+
+      <div className="mt-4 border-t border-border pt-4">
         <p className="mb-2 truncate text-xs text-muted-foreground">{user?.email}</p>
         <button
           onClick={() => signOut()}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
         >
-          <LogOut className="h-4 w-4" /> Sair
+          <LogOut className="h-3.5 w-3.5" /> Sair
         </button>
       </div>
-    </aside>
-  );
-}
 
-function SettingsMenu() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground"
-        aria-label="Configurações"
-      >
-        <Settings className="h-4 w-4" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
-            <p className="border-b border-border px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Configurações
-            </p>
-            <Link
-              to="/importar"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"
-            >
-              <Upload className="h-4 w-4" /> Importar CSV
-            </Link>
-            <Link
-              to="/importar-historico"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"
-            >
-              <FileSpreadsheet className="h-4 w-4" /> Importar planilha histórica
-            </Link>
-            <Link
-              to="/contas"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-secondary"
-            >
-              <Building2 className="h-4 w-4" /> Gerenciar contas
-            </Link>
-          </div>
-        </>
-      )}
-    </div>
+      <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
+    </>
   );
 }
 
@@ -240,15 +208,20 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
-    const path = location.pathname;
-    if (!user && path !== "/auth" && !redirected) {
+    if (!user && location.pathname !== "/auth" && !redirected) {
       setRedirected(true);
       navigate({ to: "/auth" });
     }
   }, [user, loading, location.pathname, navigate, redirected]);
+
+  // close mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   if (loading) {
     return (
@@ -259,27 +232,48 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!user && location.pathname !== "/auth") return null;
-
-  if (location.pathname === "/auth") {
-    return <>{children}</>;
-  }
+  if (location.pathname === "/auth") return <>{children}</>;
 
   return (
     <div className="flex min-h-screen bg-background">
-      <SideNav />
-      <div className="flex-1 pb-24 md:pb-0">
-        <div className="flex items-center gap-3 border-b border-border bg-card/40 px-5 py-3 md:hidden">
-          <div className="flex-1 min-w-0">
-            <AccountSwitcher compact />
+      {/* Desktop sidebar */}
+      <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-card/40 p-5 md:flex">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card p-5 md:hidden">
+            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          </aside>
+        </>
+      )}
+
+      <div className="flex-1">
+        {/* Mobile top bar */}
+        <header className="flex items-center gap-3 border-b border-border bg-card/40 px-4 py-3 md:hidden">
+          <button
+            onClick={() => setMobileOpen((v) => !v)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-secondary"
+            aria-label="Abrir menu"
+          >
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
+              <Wallet className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="text-sm font-bold tracking-tight">Finanças</span>
           </div>
-          <SettingsMenu />
-        </div>
-        <div className="hidden md:flex justify-end px-6 pt-4">
-          <SettingsMenu />
-        </div>
+        </header>
+
         <main>{children}</main>
       </div>
-      <BottomNav />
     </div>
   );
 }

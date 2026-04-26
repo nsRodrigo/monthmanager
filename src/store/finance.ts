@@ -725,6 +725,20 @@ export function useRemovePurchase() {
 // =======================
 // Installments
 // =======================
+/**
+ * Parse "YYYY-MM-DD" as a *local* calendar date (no timezone shift).
+ * `new Date("2025-07-07")` interprets the string as UTC midnight, so in
+ * negative offsets (e.g. America/Sao_Paulo, UTC-3) `.getDate()` returns 6.
+ * We must read the components from the literal string instead.
+ */
+function parseLocalDate(iso: string): { y: number; m: number; d: number } {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return { y, m: (m || 1) - 1, d: d || 1 };
+}
+function fmtLocalDate(y: number, m: number, d: number): string {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 export function useUpdateInstallment() {
   const inv = useInvalidate();
   return useMutation({
@@ -732,10 +746,10 @@ export function useUpdateInstallment() {
       const patch: { amount?: number; due_date?: string; year?: number; month?: number; paid?: boolean } = {};
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.dueDate !== undefined) {
+        const { y, m } = parseLocalDate(args.dueDate);
         patch.due_date = args.dueDate;
-        const d = new Date(args.dueDate);
-        patch.year = d.getFullYear();
-        patch.month = d.getMonth();
+        patch.year = y;
+        patch.month = m;
       }
       if (args.paid !== undefined) patch.paid = args.paid;
       const { error } = await supabase.from("installments").update(patch).eq("id", args.id);
@@ -749,10 +763,10 @@ export function useShiftInstallmentDate() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { installment: Installment; newDate: string; applyToFuture: boolean }) => {
-      const newD = new Date(args.newDate);
+      const { y: ny, m: nm, d: nd } = parseLocalDate(args.newDate);
       const { error: eCur } = await supabase
         .from("installments")
-        .update({ due_date: args.newDate, year: newD.getFullYear(), month: newD.getMonth() })
+        .update({ due_date: args.newDate, year: ny, month: nm })
         .eq("id", args.installment.id);
       if (eCur) throw eCur;
 
@@ -764,19 +778,77 @@ export function useShiftInstallmentDate() {
           .eq("parent_type", args.installment.parentType)
           .gt("number", args.installment.number);
         if (error) throw error;
-        const day = newD.getDate();
         for (const r of (rows ?? []) as Array<{ id: string; number: number }>) {
           const offset = r.number - args.installment.number;
-          const target = new Date(newD.getFullYear(), newD.getMonth() + offset, 1);
-          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-          const d = new Date(target.getFullYear(), target.getMonth(), Math.min(day, lastDay));
+          // Calendar arithmetic in local terms (avoid Date constructor for ISO).
+          const targetMonthIdx = nm + offset;
+          const targetY = ny + Math.floor(targetMonthIdx / 12);
+          const targetM = ((targetMonthIdx % 12) + 12) % 12;
+          const lastDay = new Date(targetY, targetM + 1, 0).getDate();
+          const day = Math.min(nd, lastDay);
+          const dueDate = fmtLocalDate(targetY, targetM, day);
           const { error: eUpd } = await supabase
             .from("installments")
-            .update({ due_date: d.toISOString().slice(0, 10), year: d.getFullYear(), month: d.getMonth() })
+            .update({ due_date: dueDate, year: targetY, month: targetM })
             .eq("id", r.id);
           if (eUpd) throw eUpd;
         }
       }
+    },
+    onSuccess: () => inv(["installments", "card_payments"]),
+  });
+}
+
+/**
+ * Antecipar parcelas: traz as N próximas parcelas (a partir da que serve de
+ * âncora) para o mês/ano da âncora, marcando-as como pagas. Útil quando o
+ * usuário quitou várias parcelas adiantadas dentro da mesma fatura.
+ *
+ * Regra:
+ *   - Pega `count` parcelas com `number > installment.number` (as próximas).
+ *   - Move cada uma para o mesmo mês/ano da âncora, usando o mesmo `due_date`.
+ *   - Marca como `paid = true`.
+ *   - Não mexe nas parcelas posteriores às antecipadas — elas continuam onde
+ *     estão (apenas o "buraco" deixado fica visível e o usuário sabe que
+ *     parcelas finais ainda existem).
+ *
+ * Retorna o número de parcelas efetivamente antecipadas.
+ */
+export function useAdvanceInstallments() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { installment: Installment; count: number }) => {
+      const anchor = args.installment;
+      const count = Math.max(1, Math.floor(args.count));
+      const { data: rows, error } = await supabase
+        .from("installments")
+        .select("id,number")
+        .eq("parent_id", anchor.parentId)
+        .eq("parent_type", anchor.parentType)
+        .gt("number", anchor.number)
+        .order("number", { ascending: true })
+        .limit(count);
+      if (error) throw error;
+      const target = (rows ?? []) as Array<{ id: string; number: number }>;
+      for (const r of target) {
+        const { error: eUpd } = await supabase
+          .from("installments")
+          .update({
+            due_date: anchor.dueDate,
+            year: anchor.year,
+            month: anchor.month,
+            paid: true,
+          })
+          .eq("id", r.id);
+        if (eUpd) throw eUpd;
+      }
+      // Marca a própria âncora como paga também (foi paga junto).
+      const { error: eAnchor } = await supabase
+        .from("installments")
+        .update({ paid: true })
+        .eq("id", anchor.id);
+      if (eAnchor) throw eAnchor;
+      return target.length;
     },
     onSuccess: () => inv(["installments", "card_payments"]),
   });

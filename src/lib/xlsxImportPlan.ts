@@ -80,10 +80,12 @@ export function buildImportPlan(
   let cardColorIdx = 0;
 
   for (const e of parsed) {
-    // A coluna/mês da planilha é a competência real do lançamento.
-    // A célula DATA pode ser a data original da compra (meses/anos anteriores),
-    // então mantemos o dia, mas forçamos ano/mês detectados pelo parser.
+    // A coluna/mês da planilha é a competência real do lançamento (ex.:
+    // a parcela 05/21 da compra foi listada em março/2026 = essa parcela
+    // específica vence em março/2026, independente do que diz a célula DATA).
+    // Já a célula DATA contém a DATA ORIGINAL da compra (quando informada).
     const dateStr = dateInParsedMonth(e, approxDay);
+    const purchaseDateStr = e.date ?? undefined;
 
     if (e.kind === "purchase") {
       // Cartão de crédito: cria 1 cartão por sectionLabel limpo, todos sob a conta default
@@ -100,18 +102,19 @@ export function buildImportPlan(
         description: e.description,
         amount: e.amount,
         date: dateStr,
+        purchaseDate: purchaseDateStr,
         paid: e.paid,
         cardName,
         installmentNumber: e.installmentCurrent ?? undefined,
         installmentTotal: e.installmentTotal ?? undefined,
       });
     } else if (e.kind === "debit") {
-      // Débito automático / despesa de conta corrente — vai para a conta default
       entries.push({
         kind: "debit",
         description: e.description,
         amount: e.amount,
         date: dateStr,
+        purchaseDate: purchaseDateStr,
         paid: e.paid,
         accountName: DEFAULT_ACCOUNT,
       });
@@ -121,6 +124,7 @@ export function buildImportPlan(
         description: e.description,
         amount: e.amount,
         date: dateStr,
+        purchaseDate: purchaseDateStr,
         paid: e.paid,
         accountName: DEFAULT_ACCOUNT,
       });
@@ -130,6 +134,7 @@ export function buildImportPlan(
         description: e.description,
         amount: e.amount,
         date: dateStr,
+        purchaseDate: purchaseDateStr,
         paid: e.paid,
         accountName: DEFAULT_ACCOUNT,
       });

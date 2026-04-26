@@ -1139,7 +1139,18 @@ export type HistoricalImportEntry = {
   kind: "purchase" | "debit" | "income" | "investment";
   description: string;
   amount: number;
-  date: string; // YYYY-MM-DD (aproximada para legacy)
+  /**
+   * Data de competência da linha na planilha (YYYY-MM-DD).
+   * Para parceladas: representa o mês/ano em que ESTA parcela específica
+   * cai (derivado da coluna do mês onde a linha apareceu).
+   */
+  date: string;
+  /**
+   * Data ORIGINAL da compra (célula DATA da planilha), quando disponível.
+   * Para parceladas, todas as linhas da mesma compra trazem a mesma
+   * purchaseDate — usada como purchase_date no banco.
+   */
+  purchaseDate?: string;
   paid: boolean;
   // Para purchase
   cardName?: string;
@@ -1373,7 +1384,13 @@ export function useImportHistorical() {
           const knownTotal = round2(listed.reduce((sum, e) => sum + e.amount, 0));
           const projectedTotal = round2((knownTotal / listed.length) * totalParcelas);
           const totalAmount = listed.length >= totalParcelas ? knownTotal : projectedTotal;
-          const purchaseDate = listed.find((e) => e.installmentNumber === 1)?.date ?? listed[0].date;
+
+          // purchase_date = data ORIGINAL da compra (célula DATA da planilha),
+          // tipicamente igual em todas as parcelas. Fallback: data da 1ª parcela.
+          const purchaseDate =
+            listed.find((e) => e.purchaseDate)?.purchaseDate ??
+            listed.find((e) => e.installmentNumber === 1)?.date ??
+            listed[0].date;
 
           purchaseRows.push({
             user_id: user.id,
@@ -1438,8 +1455,11 @@ export function useImportHistorical() {
         }
       }
 
-      // 4) Inserir purchases em chunks e gravar as parcelas exatamente nos
-      // meses listados pela planilha histórica.
+      // 4) Inserir purchases em chunks. Para parceladas usamos
+      // buildInstallmentsAnchored: o mês da coluna onde a parcela X apareceu
+      // serve de âncora (X cai naquele mês), e as demais parcelas são
+      // distribuídas mês a mês a partir daí. Isso corrige planilhas onde
+      // várias parcelas foram empilhadas no mesmo mês por engano.
       const CHUNK = 100;
       for (let i = 0; i < purchaseRows.length; i += CHUNK) {
         const slice = purchaseRows.slice(i, i + CHUNK);
@@ -1462,23 +1482,62 @@ export function useImportHistorical() {
         for (let j = 0; j < inserted.length; j++) {
           const p = slice[j];
           const purchaseId = inserted[j].id;
-          for (const e of p._entries) {
+          const total = Math.max(1, p.installments_count || 1);
+
+          if (total === 1) {
+            // À vista: 1 parcela única, vencendo na data da própria linha.
+            const e = p._entries[0];
             const [year, month, day] = e.date.split("-").map((n) => parseInt(n, 10));
-            const total = Math.max(1, e.installmentTotal || p.installments_count || 1);
-            const number = Math.min(Math.max(1, e.installmentNumber || 1), total);
             allInstallments.push({
               user_id: user.id,
               parent_id: purchaseId,
               parent_type: "purchase",
               purchase_id: purchaseId,
-              number,
-              total,
+              number: 1,
+              total: 1,
               amount: e.amount,
               due_date: `${year}-${String(month).padStart(2, "0")}-${String(day || 1).padStart(2, "0")}`,
               year,
               month: month - 1,
               paid: e.paid,
             });
+            continue;
+          }
+
+          // Parcelado: âncora = parcela com menor número listada (preferindo a 1ª se houver).
+          // O mês dessa parcela = mês onde ela apareceu na planilha.
+          const anchor = p._entries[0]; // já estão ordenadas por installmentNumber
+          const anchorNumber = Math.min(
+            Math.max(1, anchor.installmentNumber || 1),
+            total,
+          );
+          const anchorDate = anchor.date; // YYYY-MM-DD do slot da planilha
+
+          // paid status por número, vindo das linhas listadas
+          const paidByNumber = new Map<number, boolean>();
+          for (const e of p._entries) {
+            const n = Math.min(
+              Math.max(1, e.installmentNumber || 1),
+              total,
+            );
+            paidByNumber.set(n, e.paid);
+          }
+
+          const computed = buildInstallmentsAnchored(
+            purchaseId,
+            user.id,
+            p.total_amount,
+            total,
+            anchorNumber,
+            anchorDate,
+          );
+
+          for (const it of computed) {
+            // Sobrescreve paid se a planilha listou explicitamente esta parcela.
+            if (paidByNumber.has(it.number)) {
+              it.paid = paidByNumber.get(it.number)!;
+            }
+            allInstallments.push(it);
           }
         }
 

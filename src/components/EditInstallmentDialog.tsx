@@ -3,10 +3,11 @@ import { Modal, Field, inputClass } from "./Modal";
 import {
   useUpdateInstallment,
   useShiftInstallmentDate,
+  useAdvanceInstallments,
   type Installment,
 } from "@/store/finance";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Trash2 } from "lucide-react";
+import { Trash2, FastForward } from "lucide-react";
 
 export function EditInstallmentDialog({
   open,
@@ -26,10 +27,12 @@ export function EditInstallmentDialog({
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
+  const advance = useAdvanceInstallments();
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [paid, setPaid] = useState(false);
   const [askDateScope, setAskDateScope] = useState(false);
+  const [advanceCount, setAdvanceCount] = useState("");
 
   useEffect(() => {
     if (open && installment) {
@@ -37,6 +40,7 @@ export function EditInstallmentDialog({
       setDueDate(installment.dueDate);
       setPaid(installment.paid);
       setAskDateScope(false);
+      setAdvanceCount("");
     }
   }, [open, installment]);
 
@@ -46,6 +50,7 @@ export function EditInstallmentDialog({
   const amountChanged = parseFloat(amount) !== installment.amount;
   const paidChanged = paid !== installment.paid;
   const isLast = installment.number === installment.total;
+  const remaining = Math.max(0, installment.total - installment.number);
 
   async function commit(applyToFuture: boolean) {
     if (!installment) return;

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Papa from "papaparse";
-import { useCards, useImportPurchases, type ImportedRow } from "@/store/finance";
+import { useAccounts, useCards, useImportPurchases, type ImportedRow } from "@/store/finance";
 import { Upload, FileText, Check, AlertCircle, Download } from "lucide-react";
 
 export const Route = createFileRoute("/importar")({
@@ -77,13 +77,23 @@ function parsePaid(raw: string | undefined) {
 }
 
 function ImportPage() {
+  const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const importMut = useImportPurchases();
+  // Filtro opcional: conta da qual queremos listar os cartões.
+  // "" = todas as contas.
+  const [filterAccountId, setFilterAccountId] = useState("");
   const [defaultCardId, setDefaultCardId] = useState("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Cartões filtrados pela conta selecionada (ou todos)
+  const filteredCards = useMemo(
+    () => (filterAccountId ? cards.filter((c) => c.accountId === filterAccountId) : cards),
+    [cards, filterAccountId],
+  );
 
   const onFile = (file: File) => {
     setError(null);
@@ -190,16 +200,42 @@ Mercado;2024-04-02;320,50;1;;;;nao;Cartão Principal`;
       </header>
 
       <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Cartão padrão (fallback)</span>
+            <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Filtrar por conta
+            </span>
+            <select
+              className="w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none focus:border-primary"
+              value={filterAccountId}
+              onChange={(e) => {
+                setFilterAccountId(e.target.value);
+                setDefaultCardId(""); // reseta o cartão escolhido ao trocar a conta
+              }}
+            >
+              <option value="">Todas as contas</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Restringe a lista abaixo aos cartões de uma conta específica.
+            </p>
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Cartão padrão (fallback)
+            </span>
             <select
               className="w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none focus:border-primary"
               value={defaultCardId}
               onChange={(e) => setDefaultCardId(e.target.value)}
             >
-              <option value="">Selecione um cartão…</option>
-              {cards.map((c) => (
+              <option value="">
+                {filteredCards.length === 0 ? "Nenhum cartão disponível" : "Selecione um cartão…"}
+              </option>
+              {filteredCards.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

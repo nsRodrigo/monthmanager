@@ -7,7 +7,7 @@ import {
   type ParseResult,
 } from "@/lib/xlsxParser";
 import { buildImportPlan } from "@/lib/xlsxImportPlan";
-import { useImportHistorical, usePurgeAllMovements } from "@/store/finance";
+import { useAccounts, useImportHistorical, usePurgeAllMovements } from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
 import {
   Upload,
@@ -49,6 +49,12 @@ function HistoricalImportPage() {
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const [confirmingPurge, setConfirmingPurge] = useState(false);
 
+  // Conta padrão para débitos/recebimentos/investimentos sem banco identificável
+  // (CARTEIRA, RECEBIDOS, INVESTIMENTO). Pode ser uma conta existente ou nova.
+  const { data: accounts = [] } = useAccounts();
+  const [defaultAccountChoice, setDefaultAccountChoice] = useState<string>("__new__");
+  const [defaultAccountName, setDefaultAccountName] = useState("Geral");
+
   const importMut = useImportHistorical();
   const purgeMut = usePurgeAllMovements();
 
@@ -67,9 +73,19 @@ function HistoricalImportPage() {
     return { byKind, total, count: allEntries.length };
   }, [allEntries]);
 
+  // Resolve o nome da conta padrão: usa a selecionada OU o input "Nova"
+  const resolvedDefaultName = useMemo(() => {
+    if (defaultAccountChoice === "__new__") return defaultAccountName.trim() || "Geral";
+    const a = accounts.find((x) => x.id === defaultAccountChoice);
+    return a?.name ?? "Geral";
+  }, [defaultAccountChoice, defaultAccountName, accounts]);
+
   const plan = useMemo(
-    () => (allEntries.length > 0 ? buildImportPlan(allEntries) : null),
-    [allEntries],
+    () =>
+      allEntries.length > 0
+        ? buildImportPlan(allEntries, { defaultAccountName: resolvedDefaultName })
+        : null,
+    [allEntries, resolvedDefaultName],
   );
 
   const byYear = useMemo(() => {
@@ -202,6 +218,48 @@ function HistoricalImportPage() {
 
       {/* Upload */}
       <div className="rounded-2xl border border-border bg-card p-6">
+        {/* Seletor de conta destino padrão */}
+        <div className="mb-5 grid gap-3 rounded-xl border border-border bg-background/40 p-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Conta destino padrão
+            </label>
+            <select
+              value={defaultAccountChoice}
+              onChange={(e) => setDefaultAccountChoice(e.target.value)}
+              className="w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none focus:border-primary"
+            >
+              <option value="__new__">+ Criar nova conta…</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} · {a.type}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Usada para CARTEIRA, RECEBIDOS e itens sem banco identificável na planilha.
+              Bancos detectados (Itaú, Nubank, Caixa, etc.) sempre vão para suas próprias contas.
+            </p>
+          </div>
+          {defaultAccountChoice === "__new__" && (
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Nome da nova conta
+              </label>
+              <input
+                type="text"
+                value={defaultAccountName}
+                onChange={(e) => setDefaultAccountName(e.target.value)}
+                placeholder="Ex: Geral, Principal…"
+                className="w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none focus:border-primary"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Será criada automaticamente como conta corrente se ainda não existir.
+              </p>
+            </div>
+          )}
+        </div>
+
         <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-background/50 p-10 text-center transition-colors hover:border-primary">
           <Upload className="h-8 w-8 text-muted-foreground" />
           <p className="text-sm font-medium">

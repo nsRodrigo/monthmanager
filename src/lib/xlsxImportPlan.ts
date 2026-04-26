@@ -73,6 +73,16 @@ function pickColor(idx: number): string {
 
 export type BuildPlanOptions = {
   approxDayForLegacy?: number; // dia usado quando entry não tem data exata (default 15)
+  /**
+   * Nome da conta padrão usada para débitos/recebidos/investimentos quando
+   * a planilha não permite inferir o banco (ex: "CARTEIRA", "RECEBIDOS",
+   * "INVESTIMENTO"). Default: "Geral".
+   * Se o nome corresponder a uma conta já existente, ela será reutilizada
+   * (sem criar duplicada).
+   */
+  defaultAccountName?: string;
+  defaultAccountColor?: string;
+  defaultAccountType?: AccountType;
 };
 
 export function buildImportPlan(
@@ -80,17 +90,18 @@ export function buildImportPlan(
   opts: BuildPlanOptions = {},
 ): HistoricalImportPlan {
   const approxDay = opts.approxDayForLegacy ?? 15;
+  const DEFAULT_ACCOUNT = opts.defaultAccountName?.trim() || "Geral";
+  const DEFAULT_ACCOUNT_COLOR = opts.defaultAccountColor || "#8b5cf6";
+  const DEFAULT_ACCOUNT_TYPE: AccountType = opts.defaultAccountType || "corrente";
 
   const accountsMap = new Map<string, { name: string; type: AccountType; color: string }>();
   const cardsMap = new Map<string, { name: string; accountName: string; color: string }>();
   const entries: HistoricalImportEntry[] = [];
 
-  // Conta padrão para fallback (RECEBIDOS, INVESTIMENTO sem banco identificado)
-  const DEFAULT_ACCOUNT = "Geral";
   accountsMap.set(DEFAULT_ACCOUNT.toLowerCase(), {
     name: DEFAULT_ACCOUNT,
-    type: "corrente",
-    color: "#8b5cf6",
+    type: DEFAULT_ACCOUNT_TYPE,
+    color: DEFAULT_ACCOUNT_COLOR,
   });
 
   let colorIdx = 0;
@@ -204,3 +215,4 @@ export function buildImportPlan(
     entries,
   };
 }
+

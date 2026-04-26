@@ -107,7 +107,10 @@ const parseAmount = (v: unknown): number => {
 const parseDateCell = (v: unknown): string | null => {
   if (v === null || v === undefined || v === "" || v === "-") return null;
   if (v instanceof Date) {
-    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+    // xlsx parseia datas como UTC midnight. Em fusos negativos (ex. UTC-3),
+    // usar getDate()/getMonth() locais devolve o dia anterior. Usamos UTC
+    // para preservar exatamente a data digitada na célula.
+    return `${v.getUTCFullYear()}-${String(v.getUTCMonth() + 1).padStart(2, "0")}-${String(v.getUTCDate()).padStart(2, "0")}`;
   }
   if (typeof v === "number") {
     // Excel serial date

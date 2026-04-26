@@ -3,10 +3,11 @@ import { Modal, Field, inputClass } from "./Modal";
 import {
   useUpdateInstallment,
   useShiftInstallmentDate,
+  useAdvanceInstallments,
   type Installment,
 } from "@/store/finance";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Trash2 } from "lucide-react";
+import { Trash2, FastForward } from "lucide-react";
 
 export function EditInstallmentDialog({
   open,
@@ -26,10 +27,12 @@ export function EditInstallmentDialog({
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
+  const advance = useAdvanceInstallments();
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [paid, setPaid] = useState(false);
   const [askDateScope, setAskDateScope] = useState(false);
+  const [advanceCount, setAdvanceCount] = useState("");
 
   useEffect(() => {
     if (open && installment) {
@@ -37,6 +40,7 @@ export function EditInstallmentDialog({
       setDueDate(installment.dueDate);
       setPaid(installment.paid);
       setAskDateScope(false);
+      setAdvanceCount("");
     }
   }, [open, installment]);
 
@@ -46,6 +50,7 @@ export function EditInstallmentDialog({
   const amountChanged = parseFloat(amount) !== installment.amount;
   const paidChanged = paid !== installment.paid;
   const isLast = installment.number === installment.total;
+  const remaining = Math.max(0, installment.total - installment.number);
 
   async function commit(applyToFuture: boolean) {
     if (!installment) return;
@@ -100,7 +105,7 @@ export function EditInstallmentDialog({
           >
             <span className="font-semibold">Esta e as próximas parcelas</span>
             <span className="text-xs text-muted-foreground">
-              As {installment.total - installment.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {new Date(dueDate).getDate()}.
+              As {installment.total - installment.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {Number(dueDate.slice(8, 10))}.
               Parcelas anteriores não são afetadas.
             </span>
           </button>
@@ -163,6 +168,43 @@ export function EditInstallmentDialog({
           />
           <span className="text-sm font-medium">Marcada como paga</span>
         </label>
+
+        {remaining > 0 && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <div className="flex items-center gap-2">
+              <FastForward className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Antecipar parcelas</p>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Quantas parcelas futuras você antecipou para esta fatura? Elas serão movidas
+              para {formatDate(installment.dueDate)} e marcadas como pagas. Restam {remaining}.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={remaining}
+                placeholder={`1 a ${remaining}`}
+                className={inputClass}
+                value={advanceCount}
+                onChange={(e) => setAdvanceCount(e.target.value)}
+              />
+              <button
+                onClick={async () => {
+                  const n = Math.min(remaining, Math.max(1, parseInt(advanceCount) || 0));
+                  if (!n) return;
+                  if (!confirm(`Antecipar ${n} parcela(s) para a fatura de ${formatDate(installment.dueDate)}?`)) return;
+                  await advance.mutateAsync({ installment, count: n });
+                  onClose();
+                }}
+                disabled={advance.isPending || !advanceCount}
+                className="whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {advance.isPending ? "Antecipando…" : "Antecipar"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 pt-2">
           {onDeleteParent && (

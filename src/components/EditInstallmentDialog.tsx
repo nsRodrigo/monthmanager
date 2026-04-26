@@ -105,7 +105,7 @@ export function EditInstallmentDialog({
           >
             <span className="font-semibold">Esta e as próximas parcelas</span>
             <span className="text-xs text-muted-foreground">
-              As {installment.total - installment.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {new Date(dueDate).getDate()}.
+              As {installment.total - installment.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {Number(dueDate.slice(8, 10))}.
               Parcelas anteriores não são afetadas.
             </span>
           </button>

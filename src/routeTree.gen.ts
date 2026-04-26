@@ -22,6 +22,7 @@ import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
 import { Route as MesesYearMonthRouteImport } from './routes/meses.$year.$month'
 import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaId.$ano.$mes'
 import { Route as MesesYearMonthCartaoCardIdRouteImport } from './routes/meses.$year.$month_.cartao.$cardId'
+import { Route as ContasContaIdAnoMesCartaoCartaoIdRouteImport } from './routes/contas.$contaId.$ano.$mes_.cartao.$cartaoId'
 
 const RecebimentosRoute = RecebimentosRouteImport.update({
   id: '/recebimentos',
@@ -89,6 +90,12 @@ const MesesYearMonthCartaoCardIdRoute =
     path: '/meses/$year/$month/cartao/$cardId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ContasContaIdAnoMesCartaoCartaoIdRoute =
+  ContasContaIdAnoMesCartaoCartaoIdRouteImport.update({
+    id: '/$ano/$mes_/cartao/$cartaoId',
+    path: '/$ano/$mes/cartao/$cartaoId',
+    getParentRoute: () => ContasContaIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
+  '/contas/$contaId/$ano/$mes/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -119,6 +127,7 @@ export interface FileRoutesByTo {
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
   '/meses/$year/$month/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
+  '/contas/$contaId/$ano/$mes/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -135,6 +144,7 @@ export interface FileRoutesById {
   '/meses/$year/$month': typeof MesesYearMonthRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
   '/meses/$year/$month_/cartao/$cardId': typeof MesesYearMonthCartaoCardIdRoute
+  '/contas/$contaId/$ano/$mes_/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/meses/$year/$month'
     | '/contas/$contaId/$ano/$mes'
     | '/meses/$year/$month/cartao/$cardId'
+    | '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/meses/$year/$month'
     | '/contas/$contaId/$ano/$mes'
     | '/meses/$year/$month/cartao/$cardId'
+    | '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
   id:
     | '__root__'
     | '/'
@@ -182,6 +194,7 @@ export interface FileRouteTypes {
     | '/meses/$year/$month'
     | '/contas/$contaId/$ano/$mes'
     | '/meses/$year/$month_/cartao/$cardId'
+    | '/contas/$contaId/$ano/$mes_/cartao/$cartaoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -291,15 +304,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MesesYearMonthCartaoCardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contas/$contaId/$ano/$mes_/cartao/$cartaoId': {
+      id: '/contas/$contaId/$ano/$mes_/cartao/$cartaoId'
+      path: '/$ano/$mes/cartao/$cartaoId'
+      fullPath: '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
+      preLoaderRoute: typeof ContasContaIdAnoMesCartaoCartaoIdRouteImport
+      parentRoute: typeof ContasContaIdRoute
+    }
   }
 }
 
 interface ContasContaIdRouteChildren {
   ContasContaIdAnoMesRoute: typeof ContasContaIdAnoMesRoute
+  ContasContaIdAnoMesCartaoCartaoIdRoute: typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 
 const ContasContaIdRouteChildren: ContasContaIdRouteChildren = {
   ContasContaIdAnoMesRoute: ContasContaIdAnoMesRoute,
+  ContasContaIdAnoMesCartaoCartaoIdRoute:
+    ContasContaIdAnoMesCartaoCartaoIdRoute,
 }
 
 const ContasContaIdRouteWithChildren = ContasContaIdRoute._addFileChildren(

@@ -360,11 +360,19 @@ export function usePurchases() {
     queryKey: ["purchases", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Purchase[]> => {
-      const { data, error } = await supabase
-        .from("purchases")
-        .select("id,card_id,description,total_amount,purchase_date,installments_count");
-      if (error) throw error;
-      return (data ?? []).map((p) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        card_id: string;
+        description: string;
+        total_amount: number | string;
+        purchase_date: string;
+        installments_count: number;
+      }>(() =>
+        supabase
+          .from("purchases")
+          .select("id,card_id,description,total_amount,purchase_date,installments_count"),
+      );
+      return data.map((p) => ({
         id: p.id,
         cardId: p.card_id,
         description: p.description,
@@ -382,14 +390,27 @@ export function useInstallments() {
     queryKey: ["installments", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Installment[]> => {
-      const { data, error } = await supabase
-        .from("installments")
-        .select("id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid")
-        .order("year", { ascending: true })
-        .order("month", { ascending: true })
-        .order("number", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((i) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        parent_type: string;
+        parent_id: string | null;
+        purchase_id: string | null;
+        number: number;
+        total: number;
+        amount: number | string;
+        due_date: string;
+        year: number;
+        month: number;
+        paid: boolean;
+      }>(() =>
+        supabase
+          .from("installments")
+          .select("id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid")
+          .order("year", { ascending: true })
+          .order("month", { ascending: true })
+          .order("number", { ascending: true }),
+      );
+      return data.map((i) => ({
         id: i.id,
         parentType: i.parent_type as ParentType,
         parentId: i.parent_id ?? "",

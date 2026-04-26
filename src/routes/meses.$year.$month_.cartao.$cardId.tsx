@@ -60,8 +60,8 @@ function CardDetail() {
     if (!grouped.has(pur.id)) grouped.set(pur.id, { purchase: pur, items: [] });
     grouped.get(pur.id)!.items.push(i);
   }
-  const groups = Array.from(grouped.values()).sort(
-    (a, b) => new Date(a.purchase.date).getTime() - new Date(b.purchase.date).getTime(),
+  const groups = Array.from(grouped.values()).sort((a, b) =>
+    a.purchase.date.localeCompare(b.purchase.date),
   );
 
   const editingPurchase = editing ? purchases.find((p) => p.id === editing.parentId) : null;

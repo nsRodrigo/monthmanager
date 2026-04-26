@@ -87,6 +87,18 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+async function fetchAllRows<T>(queryFactory: () => any, pageSize = 1000): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return rows;
+}
+
 /**
  * Compute the invoice (fatura) month/year for a credit-card purchase.
  *
@@ -348,11 +360,19 @@ export function usePurchases() {
     queryKey: ["purchases", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Purchase[]> => {
-      const { data, error } = await supabase
-        .from("purchases")
-        .select("id,card_id,description,total_amount,purchase_date,installments_count");
-      if (error) throw error;
-      return (data ?? []).map((p) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        card_id: string;
+        description: string;
+        total_amount: number | string;
+        purchase_date: string;
+        installments_count: number;
+      }>(() =>
+        supabase
+          .from("purchases")
+          .select("id,card_id,description,total_amount,purchase_date,installments_count"),
+      );
+      return data.map((p) => ({
         id: p.id,
         cardId: p.card_id,
         description: p.description,
@@ -370,14 +390,27 @@ export function useInstallments() {
     queryKey: ["installments", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Installment[]> => {
-      const { data, error } = await supabase
-        .from("installments")
-        .select("id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid")
-        .order("year", { ascending: true })
-        .order("month", { ascending: true })
-        .order("number", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((i) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        parent_type: string;
+        parent_id: string | null;
+        purchase_id: string | null;
+        number: number;
+        total: number;
+        amount: number | string;
+        due_date: string;
+        year: number;
+        month: number;
+        paid: boolean;
+      }>(() =>
+        supabase
+          .from("installments")
+          .select("id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid")
+          .order("year", { ascending: true })
+          .order("month", { ascending: true })
+          .order("number", { ascending: true }),
+      );
+      return data.map((i) => ({
         id: i.id,
         parentType: i.parent_type as ParentType,
         parentId: i.parent_id ?? "",
@@ -400,12 +433,25 @@ export function useDebits() {
     queryKey: ["debits", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Debit[]> => {
-      const { data, error } = await supabase
-        .from("debits")
-        .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
-        .order("date", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((d) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        account_id: string;
+        description: string;
+        amount: number | string;
+        date: string;
+        required: boolean;
+        paid: boolean;
+        auto_debit: boolean;
+        auto_debit_day: number | null;
+        installments_count: number;
+        is_parent: boolean;
+      }>(() =>
+        supabase
+          .from("debits")
+          .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
+          .order("date", { ascending: true }),
+      );
+      return data.map((d) => ({
         id: d.id,
         accountId: d.account_id,
         description: d.description,
@@ -428,12 +474,22 @@ export function useIncomes() {
     queryKey: ["incomes", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Income[]> => {
-      const { data, error } = await supabase
-        .from("incomes")
-        .select("id,account_id,description,amount,date,received,installments_count,is_parent")
-        .order("date", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((d) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        account_id: string;
+        description: string;
+        amount: number | string;
+        date: string;
+        received: boolean;
+        installments_count: number;
+        is_parent: boolean;
+      }>(() =>
+        supabase
+          .from("incomes")
+          .select("id,account_id,description,amount,date,received,installments_count,is_parent")
+          .order("date", { ascending: true }),
+      );
+      return data.map((d) => ({
         id: d.id,
         accountId: d.account_id,
         description: d.description,
@@ -453,11 +509,14 @@ export function useInvestments() {
     queryKey: ["investments", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Investment[]> => {
-      const { data, error } = await supabase
-        .from("investments")
-        .select("id,account_id,type,amount,percentage");
-      if (error) throw error;
-      return (data ?? []).map((i) => ({
+      const data = await fetchAllRows<{
+        id: string;
+        account_id: string;
+        type: string;
+        amount: number | string;
+        percentage: number | string;
+      }>(() => supabase.from("investments").select("id,account_id,type,amount,percentage"));
+      return data.map((i) => ({
         id: i.id,
         accountId: i.account_id,
         type: i.type,
@@ -474,12 +533,14 @@ export function useCardPayments() {
     queryKey: ["card_payments", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("card_payments")
-        .select("card_id,year,month,paid");
-      if (error) throw error;
+      const data = await fetchAllRows<{
+        card_id: string;
+        year: number;
+        month: number;
+        paid: boolean;
+      }>(() => supabase.from("card_payments").select("card_id,year,month,paid"));
       const map: Record<string, boolean> = {};
-      for (const r of (data ?? []) as Array<{ card_id: string; year: number; month: number; paid: boolean }>) {
+      for (const r of data) {
         map[`${r.card_id}-${r.year}-${r.month}`] = r.paid;
       }
       return map;

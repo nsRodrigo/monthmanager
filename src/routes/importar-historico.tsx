@@ -49,6 +49,12 @@ function HistoricalImportPage() {
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const [confirmingPurge, setConfirmingPurge] = useState(false);
 
+  // Conta padrão para débitos/recebimentos/investimentos sem banco identificável
+  // (CARTEIRA, RECEBIDOS, INVESTIMENTO). Pode ser uma conta existente ou nova.
+  const { data: accounts = [] } = useAccounts();
+  const [defaultAccountChoice, setDefaultAccountChoice] = useState<string>("__new__");
+  const [defaultAccountName, setDefaultAccountName] = useState("Geral");
+
   const importMut = useImportHistorical();
   const purgeMut = usePurgeAllMovements();
 
@@ -67,9 +73,19 @@ function HistoricalImportPage() {
     return { byKind, total, count: allEntries.length };
   }, [allEntries]);
 
+  // Resolve o nome da conta padrão: usa a selecionada OU o input "Nova"
+  const resolvedDefaultName = useMemo(() => {
+    if (defaultAccountChoice === "__new__") return defaultAccountName.trim() || "Geral";
+    const a = accounts.find((x) => x.id === defaultAccountChoice);
+    return a?.name ?? "Geral";
+  }, [defaultAccountChoice, defaultAccountName, accounts]);
+
   const plan = useMemo(
-    () => (allEntries.length > 0 ? buildImportPlan(allEntries) : null),
-    [allEntries],
+    () =>
+      allEntries.length > 0
+        ? buildImportPlan(allEntries, { defaultAccountName: resolvedDefaultName })
+        : null,
+    [allEntries, resolvedDefaultName],
   );
 
   const byYear = useMemo(() => {

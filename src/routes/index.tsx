@@ -1,0 +1,236 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
+import {
+  useAccounts,
+  useCards,
+  usePurchases,
+  useInstallments,
+  useDebits,
+  useIncomes,
+  useInvestments,
+  computeAccountBalance,
+  getMonthInstallments,
+  getMonthDebits,
+  getMonthIncomes,
+} from "@/store/finance";
+import { useAccountFilter } from "@/store/account-filter";
+import { formatCurrency, MONTHS } from "@/lib/format";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CreditCard,
+  TrendingUp,
+  ChevronRight,
+  Wallet,
+  Building2,
+  Smartphone,
+} from "lucide-react";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Consolidado — Finanças" },
+      { name: "description", content: "Visão consolidada de todas as suas contas." },
+    ],
+  }),
+  component: Consolidated,
+});
+
+const ICON_BY_TYPE = {
+  corrente: Building2,
+  digital: Smartphone,
+  carteira: Wallet,
+  investimento: TrendingUp,
+} as const;
+
+function Consolidated() {
+  const { data: accounts = [] } = useAccounts();
+  const { data: cards = [] } = useCards();
+  const { data: purchases = [] } = usePurchases();
+  const { data: installments = [] } = useInstallments();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
+  const { data: investments = [] } = useInvestments();
+
+  // On the consolidated dashboard the global filter must be cleared,
+  // so dialogs (new card / new debit) ask for the account explicitly.
+  const { setAccountId } = useAccountFilter();
+  useEffect(() => setAccountId(null), [setAccountId]);
+
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  const monthInst = getMonthInstallments(installments, year, month);
+  const monthDebits = getMonthDebits(debits, installments, year, month);
+  const monthIncomes = getMonthIncomes(incomes, installments, year, month);
+
+  const totalCredit = monthInst
+    .filter((i) => i.parentType === "purchase")
+    .reduce((s, i) => s + i.amount, 0);
+  const totalDebits =
+    monthDebits.single.reduce((s, d) => s + d.amount, 0) +
+    monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+  const totalIncome =
+    monthIncomes.single.reduce((s, i) => s + i.amount, 0) +
+    monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+  const totalInvested = investments.reduce((s, i) => s + i.amount, 0);
+
+  const accountBalance = accounts.reduce(
+    (s, a) => s + computeAccountBalance(a, cards, purchases, installments, debits, incomes),
+    0,
+  );
+  const expected = accountBalance + totalIncome - totalDebits - totalCredit;
+
+  if (accounts.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <Wallet className="h-8 w-8" />
+        </div>
+        <h1 className="mt-6 text-3xl font-bold tracking-tight">Bem-vindo!</h1>
+        <p className="mt-2 text-muted-foreground">
+          Comece criando sua primeira conta bancária. Cada conta organiza seus cartões,
+          débitos, recebimentos e investimentos.
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Use o botão <strong>Adicionar conta</strong> na lateral para começar.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">
+      <header className="mb-8">
+        <p className="text-sm font-medium text-primary capitalize">
+          {MONTHS[month]} {year}
+        </p>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Consolidado</h1>
+        <p className="mt-1 text-muted-foreground">
+          Visão geral de todas as suas {accounts.length}{" "}
+          {accounts.length === 1 ? "conta" : "contas"}.
+        </p>
+      </header>
+
+      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-6 shadow-elegant">
+        <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
+        <p
+          className={`mt-1 text-4xl font-bold tracking-tight md:text-5xl ${
+            expected >= 0 ? "text-foreground" : "text-destructive"
+          }`}
+        >
+          {formatCurrency(expected)}
+        </p>
+        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+          <Stat label="Saldo das contas" value={formatCurrency(accountBalance)} icon={Wallet} />
+          <Stat
+            label="A receber"
+            value={formatCurrency(totalIncome)}
+            icon={ArrowUpRight}
+            tone="success"
+          />
+          <Stat
+            label="A pagar (débito)"
+            value={formatCurrency(totalDebits)}
+            icon={ArrowDownRight}
+            tone="debit"
+          />
+          <Stat
+            label="Faturas"
+            value={formatCurrency(totalCredit)}
+            icon={CreditCard}
+            tone="credit"
+          />
+          <Stat
+            label="Investido"
+            value={formatCurrency(totalInvested)}
+            icon={TrendingUp}
+            tone="primary"
+          />
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          {accounts.map((a) => {
+            const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
+            const balance = computeAccountBalance(
+              a,
+              cards,
+              purchases,
+              installments,
+              debits,
+              incomes,
+            );
+            const cardCount = cards.filter((c) => c.accountId === a.id).length;
+            return (
+              <Link
+                key={a.id}
+                to="/contas/$contaId"
+                params={{ contaId: a.id }}
+                className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-glow"
+              >
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: a.color + "25", color: a.color }}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{a.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {a.type} · {cardCount} {cardCount === 1 ? "cartão" : "cartões"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p
+                    className={`text-base font-bold ${
+                      balance >= 0 ? "text-foreground" : "text-destructive"
+                    }`}
+                  >
+                    {formatCurrency(balance)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">saldo atual</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  icon: Icon,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  icon: typeof Wallet;
+  tone?: "default" | "success" | "debit" | "credit" | "primary";
+}) {
+  const c =
+    tone === "success"
+      ? "text-success"
+      : tone === "debit"
+        ? "text-debit"
+        : tone === "credit"
+          ? "text-credit"
+          : tone === "primary"
+            ? "text-primary"
+            : "text-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Icon className="h-3 w-3" /> {label}
+      </div>
+      <p className={`mt-1 text-base font-bold ${c}`}>{value}</p>
+    </div>
+  );
+}

@@ -38,9 +38,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContasContaIdRoute = ContasContaIdRouteImport.update({
-  id: '/$contaId',
-  path: '/$contaId',
-  getParentRoute: () => ContasRoute,
+  id: '/contas/$contaId',
+  path: '/contas/$contaId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ContasContaIdAnoMesRoute = ContasContaIdAnoMesRouteImport.update({
   id: '/$ano/$mes',
@@ -117,6 +117,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ImportarRoute: typeof ImportarRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
+  ContasContaIdRoute: typeof ContasContaIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -151,10 +152,10 @@ declare module '@tanstack/react-router' {
     }
     '/contas/$contaId': {
       id: '/contas/$contaId'
-      path: '/$contaId'
+      path: '/contas/$contaId'
       fullPath: '/contas/$contaId'
       preLoaderRoute: typeof ContasContaIdRouteImport
-      parentRoute: typeof ContasRoute
+      parentRoute: typeof rootRouteImport
     }
     '/contas/$contaId/$ano/$mes': {
       id: '/contas/$contaId/$ano/$mes'
@@ -173,11 +174,27 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ContasContaIdRouteChildren {
+  ContasContaIdAnoMesRoute: typeof ContasContaIdAnoMesRoute
+  ContasContaIdAnoMesCartaoCartaoIdRoute: typeof ContasContaIdAnoMesCartaoCartaoIdRoute
+}
+
+const ContasContaIdRouteChildren: ContasContaIdRouteChildren = {
+  ContasContaIdAnoMesRoute: ContasContaIdAnoMesRoute,
+  ContasContaIdAnoMesCartaoCartaoIdRoute:
+    ContasContaIdAnoMesCartaoCartaoIdRoute,
+}
+
+const ContasContaIdRouteWithChildren = ContasContaIdRoute._addFileChildren(
+  ContasContaIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   ImportarRoute: ImportarRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
+  ContasContaIdRoute: ContasContaIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

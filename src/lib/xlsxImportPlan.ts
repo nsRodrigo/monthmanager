@@ -38,6 +38,13 @@ export type BuildPlanOptions = {
   defaultAccountType?: AccountType;
 };
 
+function dateInParsedMonth(e: ParsedEntry, approxDay: number): string {
+  const dayFromCell = e.date ? Number(e.date.slice(8, 10)) : approxDay;
+  const lastDay = new Date(e.year, e.month + 1, 0).getDate();
+  const day = Math.min(Math.max(1, dayFromCell || approxDay), lastDay);
+  return `${e.year}-${String(e.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export function buildImportPlan(
   parsed: ParsedEntry[],
   opts: BuildPlanOptions = {},
@@ -73,12 +80,10 @@ export function buildImportPlan(
   let cardColorIdx = 0;
 
   for (const e of parsed) {
-    // Determina data
-    let dateStr = e.date;
-    if (!dateStr) {
-      const day = Math.min(approxDay, 28);
-      dateStr = `${e.year}-${String(e.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    }
+    // A coluna/mês da planilha é a competência real do lançamento.
+    // A célula DATA pode ser a data original da compra (meses/anos anteriores),
+    // então mantemos o dia, mas forçamos ano/mês detectados pelo parser.
+    const dateStr = dateInParsedMonth(e, approxDay);
 
     if (e.kind === "purchase") {
       // Cartão de crédito: cria 1 cartão por sectionLabel limpo, todos sob a conta default

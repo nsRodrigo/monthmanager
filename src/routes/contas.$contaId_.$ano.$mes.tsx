@@ -532,7 +532,7 @@ function GroupedSection({
   emptyText,
   total,
   count,
-  defaultOpen = true,
+  defaultOpen = false,
   children,
 }: {
   icon: typeof Building2;

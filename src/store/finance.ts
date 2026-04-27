@@ -945,6 +945,52 @@ export function useAddDebit() {
         );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
+      } else if (d.required) {
+        // Replicar débito obrigatório nos próximos 24 meses (mesmo dia,
+        // ajustando para meses mais curtos). Cada mês é um registro
+        // independente — o usuário pode editar/excluir um mês específico
+        // sem afetar os demais.
+        const RECUR_MONTHS = 24;
+        const start = new Date(d.date);
+        const day = start.getDate();
+        const rows: Array<{
+          user_id: string;
+          account_id: string;
+          description: string;
+          amount: number;
+          date: string;
+          required: boolean;
+          paid: boolean;
+          auto_debit: boolean;
+          auto_debit_day: number | null;
+          installments_count: number;
+          is_parent: boolean;
+        }> = [];
+        for (let i = 1; i <= RECUR_MONTHS; i++) {
+          const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
+          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+          const dd = Math.min(day, lastDay);
+          const dateStr = new Date(target.getFullYear(), target.getMonth(), dd)
+            .toISOString()
+            .slice(0, 10);
+          rows.push({
+            user_id: user!.id,
+            account_id: d.accountId,
+            description: d.description,
+            amount: d.amount,
+            date: dateStr,
+            required: true,
+            paid: false,
+            auto_debit: d.autoDebit ?? false,
+            auto_debit_day: d.autoDebitDay ?? null,
+            installments_count: 1,
+            is_parent: false,
+          });
+        }
+        if (rows.length) {
+          const { error: e3 } = await supabase.from("debits").insert(rows);
+          if (e3) throw e3;
+        }
       }
     },
     onSuccess: () => inv(["debits", "installments"]),

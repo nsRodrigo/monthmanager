@@ -800,7 +800,7 @@ function CardRow({
     <div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <span
           className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -808,22 +808,24 @@ function CardRow({
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{cardName}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Fatura atual: {formatCurrency(total)} • {dueLabel}
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {dueLabel}
           </p>
         </div>
-        <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-        <span
-          className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-            paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
-          }`}
-        >
-          {paid ? "Pago" : "Em aberto"}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+              paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+            }`}
+          >
+            {paid ? "Pago" : "Em aberto"}
+          </span>
+        </div>
         {open ? (
-          <ChevronUp className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (
-          <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         )}
       </button>
 

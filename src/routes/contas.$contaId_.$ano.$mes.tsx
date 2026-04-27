@@ -99,14 +99,14 @@ function AccountMonth() {
     onDeleteParent?: () => void;
   } | null>(null);
 
-  // expanded sections: cards expanded by default, others collapsed
+  // expanded sections
   const accountCards = useMemo(
     () => cards.filter((c) => c.accountId === contaId),
     [cards, contaId],
   );
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // initialize defaults once we know the cards: all cards expanded, debits + incomes expanded, investments collapsed
+  // initialize defaults: debits/incomes expanded, investments collapsed, cards expanded
   useEffect(() => {
     setExpanded((prev) => {
       if (Object.keys(prev).length > 0) return prev;
@@ -121,6 +121,31 @@ function AccountMonth() {
   }, [accountCards]);
 
   const toggle = (k: string) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
+
+  // hidden cards per month (persisted in localStorage); a card stays hidden
+  // for a given month until the user un-hides it OR new purchases land in it.
+  const hiddenKey = `fin:hiddenCards:${contaId}:${year}:${month}`;
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(hiddenKey);
+      setHiddenCardIds(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      setHiddenCardIds([]);
+    }
+  }, [hiddenKey]);
+  const persistHidden = (next: string[]) => {
+    setHiddenCardIds(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(hiddenKey, JSON.stringify(next));
+    }
+  };
+  const hideCardForMonth = (cardId: string) => {
+    if (hiddenCardIds.includes(cardId)) return;
+    persistHidden([...hiddenCardIds, cardId]);
+  };
+  const restoreHiddenCards = () => persistHidden([]);
 
   const accountCardIds = new Set(accountCards.map((c) => c.id));
   const debits = allDebits.filter((d) => d.accountId === contaId);

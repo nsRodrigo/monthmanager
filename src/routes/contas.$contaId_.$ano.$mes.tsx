@@ -246,7 +246,7 @@ function AccountMonth() {
       </div>
 
       {/* Stacked sections — order: Débito → Recebíveis → Investimentos → Cartões */}
-      <div className="space-y-7">
+      <div className="space-y-4">
         {/* DEBITS */}
         <GroupedSection
           icon={Building2}
@@ -255,87 +255,38 @@ function AccountMonth() {
           tone="debit"
           onAdd={() => setOpenDebit(true)}
           addLabel="Novo débito"
+          total={totalDebits}
+          count={monthDebits.single.length + monthDebits.parcelled.length}
           empty={
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
           emptyText="Nenhum débito neste mês."
         >
-          {(() => {
-            type GroupItem =
-              | { kind: "single"; debit: Debit }
-              | { kind: "parcelled"; installment: Installment; debit: Debit };
-            const groups = new Map<
-              string,
-              { label: string; subtitle: string; total: number; items: GroupItem[] }
-            >();
-            for (const d of monthDebits.single) {
-              const key = `s:${d.description.toLowerCase()}`;
-              const g = groups.get(key) ?? {
-                label: d.description,
-                subtitle: d.required ? "Recorrente" : "Avulso",
-                total: 0,
-                items: [],
-              };
-              g.total += d.amount;
-              g.items.push({ kind: "single", debit: d });
-              groups.set(key, g);
-            }
-            for (const p of monthDebits.parcelled) {
-              const key = `p:${p.debit!.id}`;
-              const g = groups.get(key) ?? {
-                label: p.debit!.description,
-                subtitle: `Parcelado em ${p.debit!.installmentsCount}x`,
-                total: 0,
-                items: [],
-              };
-              g.total += p.installment.amount;
-              g.items.push({ kind: "parcelled", installment: p.installment, debit: p.debit! });
-              groups.set(key, g);
-            }
-            const arr = Array.from(groups.entries());
-            return arr.map(([key, g]) => (
-              <GroupedRow
-                key={key}
-                label={g.label}
-                subtitle={g.subtitle}
-                value={g.total}
-                count={g.items.length}
-                tone="debit"
-                initial={g.label.charAt(0).toUpperCase()}
-              >
-                <div className="divide-y divide-border">
-                  {g.items.map((it) =>
-                    it.kind === "single" ? (
-                      <DebitRow
-                        key={it.debit.id}
-                        debit={it.debit}
-                        onToggle={() =>
-                          toggleDebit.mutate({ id: it.debit.id, paid: !it.debit.paid })
-                        }
-                        onRemove={() => removeDebit.mutate(it.debit.id)}
-                      />
-                    ) : (
-                      <ParcelledRow
-                        key={it.installment.id}
-                        kind="debit"
-                        installment={it.installment}
-                        parent={it.debit}
-                        onToggle={() => toggleInst(it.installment.id, !it.installment.paid)}
-                        onEdit={() =>
-                          setEditing({
-                            inst: it.installment,
-                            label: it.debit.description,
-                            subtitle: `Débito parcelado · Total ${formatCurrency(it.debit.amount)} em ${it.debit.installmentsCount}x`,
-                            onDeleteParent: () => removeDebit.mutate(it.debit.id),
-                          })
-                        }
-                      />
-                    ),
-                  )}
-                </div>
-              </GroupedRow>
-            ));
-          })()}
+          {monthDebits.single.map((d) => (
+            <DebitRow
+              key={d.id}
+              debit={d}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onRemove={() => removeDebit.mutate(d.id)}
+            />
+          ))}
+          {monthDebits.parcelled.map((p) => (
+            <ParcelledRow
+              key={p.installment.id}
+              kind="debit"
+              installment={p.installment}
+              parent={p.debit!}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onEdit={() =>
+                setEditing({
+                  inst: p.installment,
+                  label: p.debit!.description,
+                  subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
+                  onDeleteParent: () => removeDebit.mutate(p.debit!.id),
+                })
+              }
+            />
+          ))}
         </GroupedSection>
 
         {/* INCOMES */}
@@ -346,89 +297,40 @@ function AccountMonth() {
           tone="income"
           onAdd={() => setOpenIncome(true)}
           addLabel="Novo recebimento"
+          total={totalIncome}
+          count={monthIncomes.single.length + monthIncomes.parcelled.length}
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
           }
           emptyText="Nenhum recebimento neste mês."
         >
-          {(() => {
-            type GroupItem =
-              | { kind: "single"; income: Income }
-              | { kind: "parcelled"; installment: Installment; income: Income };
-            const groups = new Map<
-              string,
-              { label: string; subtitle: string; total: number; items: GroupItem[] }
-            >();
-            for (const i of monthIncomes.single) {
-              const key = `s:${i.description.toLowerCase()}`;
-              const g = groups.get(key) ?? {
-                label: i.description,
-                subtitle: "Recebimento",
-                total: 0,
-                items: [],
-              };
-              g.total += i.amount;
-              g.items.push({ kind: "single", income: i });
-              groups.set(key, g);
-            }
-            for (const p of monthIncomes.parcelled) {
-              const key = `p:${p.income!.id}`;
-              const g = groups.get(key) ?? {
-                label: p.income!.description,
-                subtitle: `Parcelado em ${p.income!.installmentsCount}x`,
-                total: 0,
-                items: [],
-              };
-              g.total += p.installment.amount;
-              g.items.push({ kind: "parcelled", installment: p.installment, income: p.income! });
-              groups.set(key, g);
-            }
-            return Array.from(groups.entries()).map(([key, g]) => (
-              <GroupedRow
-                key={key}
-                label={g.label}
-                subtitle={g.subtitle}
-                value={g.total}
-                count={g.items.length}
-                tone="income"
-                initial={g.label.charAt(0).toUpperCase()}
-              >
-                <div className="divide-y divide-border">
-                  {g.items.map((it) =>
-                    it.kind === "single" ? (
-                      <IncomeRow
-                        key={it.income.id}
-                        income={it.income}
-                        onToggle={() =>
-                          toggleIncome.mutate({
-                            id: it.income.id,
-                            received: !it.income.received,
-                          })
-                        }
-                        onRemove={() => removeIncome.mutate(it.income.id)}
-                      />
-                    ) : (
-                      <ParcelledRow
-                        key={it.installment.id}
-                        kind="income"
-                        installment={it.installment}
-                        parent={it.income}
-                        onToggle={() => toggleInst(it.installment.id, !it.installment.paid)}
-                        onEdit={() =>
-                          setEditing({
-                            inst: it.installment,
-                            label: it.income.description,
-                            subtitle: `Recebimento parcelado · Total ${formatCurrency(it.income.amount)} em ${it.income.installmentsCount}x`,
-                            onDeleteParent: () => removeIncome.mutate(it.income.id),
-                          })
-                        }
-                      />
-                    ),
-                  )}
-                </div>
-              </GroupedRow>
-            ));
-          })()}
+          {monthIncomes.single.map((i) => (
+            <IncomeRow
+              key={i.id}
+              income={i}
+              onToggle={() =>
+                toggleIncome.mutate({ id: i.id, received: !i.received })
+              }
+              onRemove={() => removeIncome.mutate(i.id)}
+            />
+          ))}
+          {monthIncomes.parcelled.map((p) => (
+            <ParcelledRow
+              key={p.installment.id}
+              kind="income"
+              installment={p.installment}
+              parent={p.income!}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onEdit={() =>
+                setEditing({
+                  inst: p.installment,
+                  label: p.income!.description,
+                  subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
+                  onDeleteParent: () => removeIncome.mutate(p.income!.id),
+                })
+              }
+            />
+          ))}
         </GroupedSection>
 
         {/* INVESTMENTS */}
@@ -439,48 +341,19 @@ function AccountMonth() {
           tone="primary"
           onAdd={() => setOpenInvest(true)}
           addLabel="Novo investimento"
+          total={totalInvested}
+          count={investments.length}
+          defaultOpen={false}
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
         >
-          {(() => {
-            const groups = new Map<
-              string,
-              { label: string; subtitle: string; total: number; items: Investment[] }
-            >();
-            for (const inv of investments) {
-              const key = inv.type.toLowerCase();
-              const g = groups.get(key) ?? {
-                label: inv.type,
-                subtitle: inv.percentage > 0 ? `${inv.percentage}% rendimento` : "Aplicação",
-                total: 0,
-                items: [],
-              };
-              g.total += inv.amount;
-              g.items.push(inv);
-              groups.set(key, g);
-            }
-            return Array.from(groups.entries()).map(([key, g]) => (
-              <GroupedRow
-                key={key}
-                label={g.label}
-                subtitle={g.subtitle}
-                value={g.total}
-                count={g.items.length}
-                tone="primary"
-                initial={g.label.charAt(0).toUpperCase()}
-              >
-                <div className="divide-y divide-border">
-                  {g.items.map((inv) => (
-                    <InvestmentRow
-                      key={inv.id}
-                      inv={inv}
-                      onRemove={() => removeInvestment.mutate(inv.id)}
-                    />
-                  ))}
-                </div>
-              </GroupedRow>
-            ));
-          })()}
+          {investments.map((inv) => (
+            <InvestmentRow
+              key={inv.id}
+              inv={inv}
+              onRemove={() => removeInvestment.mutate(inv.id)}
+            />
+          ))}
         </GroupedSection>
 
         {/* CARDS */}
@@ -489,6 +362,8 @@ function AccountMonth() {
           title="CARTÕES DE CRÉDITO"
           description="Faturas e compras no crédito"
           tone="credit"
+          total={totalCards}
+          count={accountCards.filter((c) => !hiddenCardIds.includes(c.id)).length}
           empty={accountCards.length === 0}
           emptyText="Nenhum cartão vinculado a esta conta."
         >
@@ -644,7 +519,7 @@ function BigSummary({
   );
 }
 
-/* ───────── GROUPED SECTION (header + children list) ───────── */
+/* ───────── GROUPED SECTION (collapsible category accordion) ───────── */
 
 function GroupedSection({
   icon: Icon,
@@ -655,6 +530,9 @@ function GroupedSection({
   addLabel,
   empty,
   emptyText,
+  total,
+  count,
+  defaultOpen = true,
   children,
 }: {
   icon: typeof Building2;
@@ -665,13 +543,20 @@ function GroupedSection({
   addLabel?: string;
   empty: boolean;
   emptyText: string;
+  total?: number;
+  count?: number;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <section>
-      {/* Section header */}
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      {/* Header (clickable to toggle) */}
+      <div className="flex items-center gap-2 px-3 py-3 md:px-4 md:py-3.5">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left md:gap-3"
+        >
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
           >
@@ -679,13 +564,31 @@ function GroupedSection({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
-            <p className="truncate text-xs text-muted-foreground">{description}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{description}</p>
           </div>
-        </div>
+          {typeof total === "number" && (
+            <div className="flex shrink-0 flex-col items-end">
+              <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(total)}</p>
+              {typeof count === "number" && (
+                <p className="text-[10px] text-muted-foreground">
+                  {count} {count === 1 ? "item" : "itens"}
+                </p>
+              )}
+            </div>
+          )}
+          {open ? (
+            <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+          ) : (
+            <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+          )}
+        </button>
         {onAdd && addLabel && (
           <button
-            onClick={onAdd}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
             aria-label={addLabel}
           >
             <Plus className="h-3 w-3" />
@@ -695,68 +598,19 @@ function GroupedSection({
       </div>
 
       {/* Body */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        {empty ? (
-          <Empty text={emptyText} />
-        ) : (
-          <div className="divide-y divide-border">{children}</div>
-        )}
-      </div>
+      {open && (
+        <div className="border-t border-border">
+          {empty ? (
+            <Empty text={emptyText} />
+          ) : (
+            <div className="divide-y divide-border">{children}</div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
-/* ───────── GROUPED ROW (collapsible inside a section) ───────── */
-
-function GroupedRow({
-  label,
-  subtitle,
-  value,
-  count,
-  tone,
-  initial,
-  children,
-}: {
-  label: string;
-  subtitle: string;
-  value: number;
-  count: number;
-  tone: Tone;
-  initial: string;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
-      >
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-10 md:w-10 ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
-        >
-          {initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{label}</p>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end">
-          <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(value)}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {count} {count === 1 ? "lanç." : "lanç."}
-          </p>
-        </div>
-        {open ? (
-          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-        ) : (
-          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-        )}
-      </button>
-      {open && <div className="border-t border-border bg-background/30">{children}</div>}
-    </div>
-  );
-}
 
 /* ───────── CARD ROW (collapsible card inside CARDS section) ───────── */
 

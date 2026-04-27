@@ -621,19 +621,21 @@ function BigSummary({
   tone: Tone;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 md:p-5">
-      <div className="flex items-start gap-3">
+    <div className="rounded-2xl border border-border bg-card p-3 md:p-5">
+      <div className="flex items-start gap-2 md:gap-3">
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneBg[tone]} ${toneText[tone]}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl md:h-9 md:w-9 ${toneBg[tone]} ${toneText[tone]}`}
         >
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className={`mt-1 text-lg font-bold leading-tight md:text-xl ${toneText[tone]}`}>
+          <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+          <p
+            className={`mt-1 truncate text-base font-bold leading-tight md:text-xl ${toneText[tone]}`}
+          >
             {formatCurrency(value)}
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">
             {count} {countLabel}
           </p>
         </div>

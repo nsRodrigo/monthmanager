@@ -246,7 +246,7 @@ function AccountMonth() {
       </div>
 
       {/* Stacked sections — order: Débito → Recebíveis → Investimentos → Cartões */}
-      <div className="space-y-7">
+      <div className="space-y-4">
         {/* DEBITS */}
         <GroupedSection
           icon={Building2}

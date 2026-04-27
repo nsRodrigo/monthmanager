@@ -922,6 +922,78 @@ function CardRow({
 
 /* ───────── ROWS ───────── */
 
+function PurchaseInstRow({
+  inst,
+  purchase,
+  cardColor,
+  onToggle,
+  onEdit,
+}: {
+  inst: Installment;
+  purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
+  cardColor: string;
+  onToggle: () => void;
+  onEdit: () => void;
+}) {
+  const isInstallment = inst.total > 1;
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <button
+        onClick={onToggle}
+        title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        style={{
+          backgroundColor: inst.paid
+            ? "transparent"
+            : `color-mix(in oklab, ${cardColor} 25%, transparent)`,
+          border: inst.paid ? `2px solid var(--success)` : "none",
+          color: inst.paid ? "var(--success)" : cardColor,
+        }}
+      >
+        {inst.paid ? (
+          <Check className="h-4 w-4" />
+        ) : (
+          <span className="text-[10px] font-bold">
+            {purchase.description.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </button>
+      <button onClick={onEdit} className="min-w-0 flex-1 text-left">
+        <p
+          className={`truncate text-sm font-semibold ${
+            inst.paid ? "text-muted-foreground line-through" : ""
+          }`}
+        >
+          {purchase.description}
+        </p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {formatDate(purchase.date)} ·{" "}
+          {isInstallment
+            ? `${inst.total}x de ${formatCurrency(inst.amount)}`
+            : "1x sem juros"}
+        </p>
+      </button>
+      <div className="flex flex-col items-end gap-0.5">
+        <p className="text-sm font-bold">
+          {formatCurrency(isInstallment ? purchase.totalAmount : inst.amount)}
+        </p>
+        {isInstallment && (
+          <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
+            {inst.number}/{inst.total}
+          </span>
+        )}
+      </div>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar parcela"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function DebitRow({
   debit,
   onToggle,

@@ -272,7 +272,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main>{children}</main>
+        <main className="min-w-0 overflow-x-hidden">{children}</main>
       </div>
     </div>
   );

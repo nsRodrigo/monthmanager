@@ -341,48 +341,19 @@ function AccountMonth() {
           tone="primary"
           onAdd={() => setOpenInvest(true)}
           addLabel="Novo investimento"
+          total={totalInvested}
+          count={investments.length}
+          defaultOpen={false}
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
         >
-          {(() => {
-            const groups = new Map<
-              string,
-              { label: string; subtitle: string; total: number; items: Investment[] }
-            >();
-            for (const inv of investments) {
-              const key = inv.type.toLowerCase();
-              const g = groups.get(key) ?? {
-                label: inv.type,
-                subtitle: inv.percentage > 0 ? `${inv.percentage}% rendimento` : "Aplicação",
-                total: 0,
-                items: [],
-              };
-              g.total += inv.amount;
-              g.items.push(inv);
-              groups.set(key, g);
-            }
-            return Array.from(groups.entries()).map(([key, g]) => (
-              <GroupedRow
-                key={key}
-                label={g.label}
-                subtitle={g.subtitle}
-                value={g.total}
-                count={g.items.length}
-                tone="primary"
-                initial={g.label.charAt(0).toUpperCase()}
-              >
-                <div className="divide-y divide-border">
-                  {g.items.map((inv) => (
-                    <InvestmentRow
-                      key={inv.id}
-                      inv={inv}
-                      onRemove={() => removeInvestment.mutate(inv.id)}
-                    />
-                  ))}
-                </div>
-              </GroupedRow>
-            ));
-          })()}
+          {investments.map((inv) => (
+            <InvestmentRow
+              key={inv.id}
+              inv={inv}
+              onRemove={() => removeInvestment.mutate(inv.id)}
+            />
+          ))}
         </GroupedSection>
 
         {/* CARDS */}

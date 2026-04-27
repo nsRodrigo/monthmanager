@@ -582,19 +582,6 @@ function GroupedSection({
             <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
           )}
         </button>
-        {onAdd && addLabel && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd();
-            }}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
-            aria-label={addLabel}
-          >
-            <Plus className="h-3 w-3" />
-            <span className="hidden sm:inline">{addLabel}</span>
-          </button>
-        )}
       </div>
 
       {/* Body */}

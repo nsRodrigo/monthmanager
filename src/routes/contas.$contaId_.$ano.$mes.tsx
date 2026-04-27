@@ -649,9 +649,17 @@ function CardRow({
   const [open, setOpen] = useState(false);
   return (
     <div>
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
+        className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <span
           className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -678,12 +686,13 @@ function CardRow({
         ) : (
           <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         )}
-      </button>
+      </div>
 
       {open && (
         <div className="border-t border-border bg-background/30">
           <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onTogglePaid();
@@ -699,19 +708,11 @@ function CardRow({
             <Link
               to="/contas/$contaId/$ano/$mes/cartao/$cartaoId"
               params={detailHref}
+              onClick={(e) => e.stopPropagation()}
               className="rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary/80"
             >
               Detalhes
             </Link>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdd();
-              }}
-              className="rounded-full bg-primary/15 px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/25"
-            >
-              + Compra
-            </button>
           </div>
 
           {items.length === 0 ? (
@@ -721,6 +722,7 @@ function CardRow({
               </p>
               {onHideMonth && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onHideMonth();
@@ -752,11 +754,25 @@ function CardRow({
                 })}
             </div>
           )}
+
+          <div className="border-t border-border p-3 md:p-4">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdd();
+              }}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-xs font-semibold text-credit transition-colors hover:bg-secondary"
+            >
+              <Plus className="h-3.5 w-3.5" /> Nova compra
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
+
 
 /* ───────── ROWS ───────── */
 

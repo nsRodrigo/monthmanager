@@ -565,8 +565,19 @@ function CardSection({
 
           {/* items */}
           {items.length === 0 ? (
-            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-              Nenhum lançamento neste mês.
+            <div className="space-y-3 px-4 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhum lançamento neste mês.</p>
+              {onHideMonth && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onHideMonth();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-3 py-1.5 text-[11px] font-semibold text-destructive transition-colors hover:bg-destructive/25"
+                >
+                  <Trash2 className="h-3 w-3" /> Remover deste mês
+                </button>
+              )}
             </div>
           ) : (
             <div>

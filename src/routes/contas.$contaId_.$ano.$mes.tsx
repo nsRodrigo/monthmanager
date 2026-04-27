@@ -234,63 +234,8 @@ function AccountMonth() {
         <SummaryPill label="Investido" value={formatCurrency(totalInvested)} tone="primary" />
       </div>
 
-      {/* Stacked sections */}
+      {/* Stacked sections — order: Débito → Recebíveis → Investimentos → Cartões */}
       <div className="space-y-3">
-        {/* CARDS */}
-        {accountCards.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-            Nenhum cartão vinculado a esta conta.
-          </div>
-        ) : (
-          accountCards.map((c) => {
-            const cardInst = monthInst.filter((i) => {
-              if (i.parentType !== "purchase") return false;
-              const pur = purchases.find((p) => p.id === i.parentId);
-              return pur?.cardId === c.id;
-            });
-            const total = cardInst.reduce((s, i) => s + i.amount, 0);
-            const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
-            const isOpen = expanded[`card:${c.id}`] ?? false;
-            return (
-              <CardSection
-                key={c.id}
-                cardName={c.name}
-                cardColor={c.color}
-                count={cardInst.length}
-                total={total}
-                paid={paid}
-                open={isOpen}
-                onToggleOpen={() => toggle(`card:${c.id}`)}
-                onTogglePaid={() =>
-                  setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
-                }
-                onAdd={() => setPurchaseFor(c.id)}
-                detailHref={{
-                  contaId,
-                  ano,
-                  mes,
-                  cartaoId: c.id,
-                }}
-                items={cardInst}
-                purchases={purchases}
-                onToggleInst={(id, p) => toggleInst(id, p)}
-                onEditInst={(inst) => {
-                  const pur = purchases.find((p) => p.id === inst.parentId);
-                  if (!pur) return;
-                  setEditing({
-                    inst,
-                    label: pur.description,
-                    subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
-                      pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
-                    }`,
-                    onDeleteParent: () => removePurchase.mutate(pur.id),
-                  });
-                }}
-              />
-            );
-          })
-        )}
-
         {/* DEBITS */}
         <SectionFrame
           icon={Building2}
@@ -406,6 +351,77 @@ function AccountMonth() {
             </div>
           )}
         </SectionFrame>
+
+        {/* CARDS — last */}
+        {accountCards.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            Nenhum cartão vinculado a esta conta.
+          </div>
+        ) : (
+          <>
+            {accountCards
+              .filter((c) => !hiddenCardIds.includes(c.id))
+              .map((c) => {
+                const cardInst = monthInst.filter((i) => {
+                  if (i.parentType !== "purchase") return false;
+                  const pur = purchases.find((p) => p.id === i.parentId);
+                  return pur?.cardId === c.id;
+                });
+                const total = cardInst.reduce((s, i) => s + i.amount, 0);
+                const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                const isOpen = expanded[`card:${c.id}`] ?? false;
+                return (
+                  <CardSection
+                    key={c.id}
+                    cardName={c.name}
+                    cardColor={c.color}
+                    count={cardInst.length}
+                    total={total}
+                    paid={paid}
+                    open={isOpen}
+                    onToggleOpen={() => toggle(`card:${c.id}`)}
+                    onTogglePaid={() =>
+                      setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
+                    }
+                    onAdd={() => setPurchaseFor(c.id)}
+                    onHideMonth={
+                      cardInst.length === 0 ? () => hideCardForMonth(c.id) : undefined
+                    }
+                    detailHref={{
+                      contaId,
+                      ano,
+                      mes,
+                      cartaoId: c.id,
+                    }}
+                    items={cardInst}
+                    purchases={purchases}
+                    onToggleInst={(id, p) => toggleInst(id, p)}
+                    onEditInst={(inst) => {
+                      const pur = purchases.find((p) => p.id === inst.parentId);
+                      if (!pur) return;
+                      setEditing({
+                        inst,
+                        label: pur.description,
+                        subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
+                          pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
+                        }`,
+                        onDeleteParent: () => removePurchase.mutate(pur.id),
+                      });
+                    }}
+                  />
+                );
+              })}
+            {hiddenCardIds.length > 0 && (
+              <button
+                onClick={restoreHiddenCards}
+                className="w-full rounded-2xl border border-dashed border-border py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                Mostrar {hiddenCardIds.length}{" "}
+                {hiddenCardIds.length === 1 ? "cartão oculto" : "cartões ocultos"} neste mês
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       <AddDebitDialog

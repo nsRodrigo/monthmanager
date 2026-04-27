@@ -730,27 +730,27 @@ function GroupedRow({
     <div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-10 md:w-10 ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
         >
           {initial}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{label}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</p>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle}</p>
         </div>
-        <div className="flex flex-col items-end">
+        <div className="flex shrink-0 flex-col items-end">
           <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(value)}</p>
           <p className="text-[10px] text-muted-foreground">
-            {count} {count === 1 ? "lançamento" : "lançamentos"}
+            {count} {count === 1 ? "lanç." : "lanç."}
           </p>
         </div>
         {open ? (
-          <ChevronUp className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         )}
       </button>
       {open && <div className="border-t border-border bg-background/30">{children}</div>}

@@ -924,7 +924,7 @@ function PurchaseInstRow({
 }) {
   const isInstallment = inst.total > 1;
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
@@ -991,7 +991,7 @@ function DebitRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -1046,7 +1046,7 @@ function IncomeRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -1094,7 +1094,7 @@ function ParcelledRow({
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -1142,7 +1142,7 @@ function ParcelledRow({
 
 function InvestmentRow({ inv, onRemove }: { inv: Investment; onRemove: () => void }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
         <TrendingUp className="h-3.5 w-3.5" />
       </div>

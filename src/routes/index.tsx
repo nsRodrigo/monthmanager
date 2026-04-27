@@ -113,16 +113,16 @@ function Consolidated() {
         </p>
       </header>
 
-      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-6 shadow-elegant">
+      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
         <p
-          className={`mt-1 text-4xl font-bold tracking-tight md:text-5xl ${
+          className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl ${
             expected >= 0 ? "text-foreground" : "text-destructive"
           }`}
         >
           {formatCurrency(expected)}
         </p>
-        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
           <Stat label="Saldo das contas" value={formatCurrency(accountBalance)} icon={Wallet} />
           <Stat
             label="A receber"
@@ -170,10 +170,10 @@ function Consolidated() {
                 key={a.id}
                 to="/contas/$contaId"
                 params={{ contaId: a.id }}
-                className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-glow"
+                className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:gap-4 sm:p-5"
               >
                 <div
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12"
                   style={{ backgroundColor: a.color + "25", color: a.color }}
                 >
                   <Icon className="h-5 w-5" />
@@ -184,9 +184,9 @@ function Consolidated() {
                     {a.type} · {cardCount} {cardCount === 1 ? "cartão" : "cartões"}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="min-w-0 text-right">
                   <p
-                    className={`text-base font-bold ${
+                    className={`truncate text-sm font-bold sm:text-base ${
                       balance >= 0 ? "text-foreground" : "text-destructive"
                     }`}
                   >

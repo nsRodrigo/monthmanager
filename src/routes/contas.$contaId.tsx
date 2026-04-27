@@ -114,26 +114,28 @@ function AccountHome() {
       </Link>
 
       {/* HEADER + DASHBOARD */}
-      <header className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-6 shadow-elegant">
-        <div className="flex items-center gap-4">
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: account.color + "30", color: account.color }}
-          >
-            <Wallet className="h-6 w-6" />
+      <header className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3 sm:gap-4 sm:flex-1 min-w-0">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: account.color + "30", color: account.color }}
+            >
+              <Wallet className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Conta
+              </p>
+              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
+                {account.name}
+              </h1>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Conta
-            </p>
-            <h1 className="truncate text-2xl font-bold tracking-tight md:text-3xl">
-              {account.name}
-            </h1>
-          </div>
-          <div className="text-right">
+          <div className="sm:text-right">
             <p className="text-xs text-muted-foreground">Saldo atual</p>
             <p
-              className={`text-2xl font-bold md:text-3xl ${
+              className={`break-words text-2xl font-bold sm:text-2xl md:text-3xl ${
                 balance >= 0 ? "text-foreground" : "text-destructive"
               }`}
             >
@@ -142,7 +144,7 @@ function AccountHome() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
           <Stat label="Recebimentos do mês" value={formatCurrency(cm.income)} tone="success" icon={ArrowUpRight} />
           <Stat label="Débitos do mês" value={formatCurrency(cm.debits)} tone="debit" icon={ArrowDownRight} />
           <Stat label="Faturas do mês" value={formatCurrency(cm.cardsTotal)} tone="credit" icon={CreditCard} />
@@ -200,12 +202,12 @@ function AccountHome() {
               key={m}
               to="/contas/$contaId/$ano/$mes"
               params={{ contaId: account.id, ano: String(year), mes: String(m) }}
-              className={`group flex items-center gap-4 rounded-2xl border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow ${
+              className={`group flex items-center gap-3 rounded-2xl border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-glow sm:gap-4 sm:p-4 ${
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
               <div
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold sm:h-12 sm:w-12 ${
                   isCurrent
                     ? "bg-gradient-primary text-primary-foreground"
                     : isFuture
@@ -217,14 +219,14 @@ function AccountHome() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{MONTHS[m]}</p>
+                  <p className="truncate font-semibold">{MONTHS[m]}</p>
                   {isCurrent && (
-                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
                       Atual
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   Movimentado: {formatCurrency(movement)}
                 </p>
               </div>
@@ -233,9 +235,9 @@ function AccountHome() {
                 <Mini label="Débitos" value={sum.debits} tone="debit" />
                 <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
               </div>
-              <div className="text-right">
+              <div className="min-w-0 text-right">
                 <p
-                  className={`text-sm font-bold ${
+                  className={`truncate text-xs font-bold sm:text-sm ${
                     monthBalance >= 0 ? "text-success" : "text-destructive"
                   }`}
                 >
@@ -243,7 +245,7 @@ function AccountHome() {
                 </p>
                 <p className="text-[10px] text-muted-foreground">balanço</p>
               </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+              <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary sm:block" />
             </Link>
           );
         })}

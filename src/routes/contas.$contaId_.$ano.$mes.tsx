@@ -100,28 +100,10 @@ function AccountMonth() {
     onDeleteParent?: () => void;
   } | null>(null);
 
-  // expanded sections
   const accountCards = useMemo(
     () => cards.filter((c) => c.accountId === contaId),
     [cards, contaId],
   );
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
-  // initialize defaults: debits/incomes expanded, investments collapsed, cards expanded
-  useEffect(() => {
-    setExpanded((prev) => {
-      if (Object.keys(prev).length > 0) return prev;
-      const next: Record<string, boolean> = {
-        debits: true,
-        incomes: true,
-        investments: false,
-      };
-      for (const c of accountCards) next[`card:${c.id}`] = true;
-      return next;
-    });
-  }, [accountCards]);
-
-  const toggle = (k: string) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
 
   // hidden cards per month (persisted in localStorage); a card stays hidden
   // for a given month until the user un-hides it OR new purchases land in it.

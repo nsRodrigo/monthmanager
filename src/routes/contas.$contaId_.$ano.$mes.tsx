@@ -362,6 +362,8 @@ function AccountMonth() {
           title="CARTÕES DE CRÉDITO"
           description="Faturas e compras no crédito"
           tone="credit"
+          total={totalCards}
+          count={accountCards.filter((c) => !hiddenCardIds.includes(c.id)).length}
           empty={accountCards.length === 0}
           emptyText="Nenhum cartão vinculado a esta conta."
         >

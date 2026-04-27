@@ -84,9 +84,16 @@ export function AddDebitDialog({
           </Field>
         </div>
 
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="h-4 w-4 accent-primary" />
-          <span className="text-sm font-medium">Débito obrigatório (recorrente)</span>
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" disabled={isInstallment} />
+          <span className="text-sm">
+            <span className="font-medium">Débito obrigatório (recorrente)</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {isInstallment
+                ? "Indisponível para parcelados — o parcelamento já cria as próximas faturas."
+                : "Será replicado automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído."}
+            </span>
+          </span>
         </label>
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">

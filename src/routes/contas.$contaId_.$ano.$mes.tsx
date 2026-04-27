@@ -232,7 +232,7 @@ function AccountMonth() {
           label="Cartões"
           value={totalCards}
           count={monthInst.filter((i) => i.parentType === "purchase").length}
-          countLabel={`${accountCards.length} ${accountCards.length === 1 ? "cartão" : "cartões"} • lançamentos`}
+          countLabel={`em ${accountCards.length} ${accountCards.length === 1 ? "cartão" : "cartões"}`}
           tone="credit"
         />
         <BigSummary
@@ -621,19 +621,21 @@ function BigSummary({
   tone: Tone;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 md:p-5">
-      <div className="flex items-start gap-3">
+    <div className="rounded-2xl border border-border bg-card p-3 md:p-5">
+      <div className="flex items-start gap-2 md:gap-3">
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneBg[tone]} ${toneText[tone]}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl md:h-9 md:w-9 ${toneBg[tone]} ${toneText[tone]}`}
         >
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className={`mt-1 text-lg font-bold leading-tight md:text-xl ${toneText[tone]}`}>
+          <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+          <p
+            className={`mt-1 truncate text-base font-bold leading-tight md:text-xl ${toneText[tone]}`}
+          >
             {formatCurrency(value)}
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">
             {count} {countLabel}
           </p>
         </div>
@@ -668,24 +670,26 @@ function GroupedSection({
   return (
     <section>
       {/* Section header */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
           >
             <Icon className="h-4 w-4" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider">{title}</h2>
-            <p className="text-xs text-muted-foreground">{description}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
+            <p className="truncate text-xs text-muted-foreground">{description}</p>
           </div>
         </div>
         {onAdd && addLabel && (
           <button
             onClick={onAdd}
-            className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+            aria-label={addLabel}
           >
-            <Plus className="h-3 w-3" /> {addLabel}
+            <Plus className="h-3 w-3" />
+            <span className="hidden sm:inline">{addLabel}</span>
           </button>
         )}
       </div>
@@ -726,27 +730,27 @@ function GroupedRow({
     <div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-10 md:w-10 ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
         >
           {initial}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{label}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</p>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle}</p>
         </div>
-        <div className="flex flex-col items-end">
+        <div className="flex shrink-0 flex-col items-end">
           <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(value)}</p>
           <p className="text-[10px] text-muted-foreground">
-            {count} {count === 1 ? "lançamento" : "lançamentos"}
+            {count} {count === 1 ? "lanç." : "lanç."}
           </p>
         </div>
         {open ? (
-          <ChevronUp className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         )}
       </button>
       {open && <div className="border-t border-border bg-background/30">{children}</div>}
@@ -796,7 +800,7 @@ function CardRow({
     <div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <span
           className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -804,28 +808,30 @@ function CardRow({
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{cardName}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Fatura atual: {formatCurrency(total)} • {dueLabel}
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {dueLabel}
           </p>
         </div>
-        <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-        <span
-          className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-            paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
-          }`}
-        >
-          {paid ? "Pago" : "Em aberto"}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+              paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+            }`}
+          >
+            {paid ? "Pago" : "Em aberto"}
+          </span>
+        </div>
         {open ? (
-          <ChevronUp className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (
-          <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         )}
       </button>
 
       {open && (
         <div className="border-t border-border bg-background/30">
-          <div className="flex items-center justify-end gap-2 px-4 py-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -918,7 +924,7 @@ function PurchaseInstRow({
 }) {
   const isInstallment = inst.total > 1;
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
@@ -985,7 +991,7 @@ function DebitRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -1040,7 +1046,7 @@ function IncomeRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -1088,7 +1094,7 @@ function ParcelledRow({
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
         onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
@@ -1136,7 +1142,7 @@ function ParcelledRow({
 
 function InvestmentRow({ inv, onRemove }: { inv: Investment; onRemove: () => void }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
         <TrendingUp className="h-3.5 w-3.5" />
       </div>

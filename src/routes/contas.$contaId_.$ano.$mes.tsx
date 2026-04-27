@@ -447,6 +447,11 @@ function AccountMonth() {
         defaultMonth={month}
         fixedCardId={purchaseFor ?? undefined}
       />
+      <AddInvestmentDialog
+        open={openInvest}
+        onClose={() => setOpenInvest(false)}
+        fixedAccountId={contaId}
+      />
       <EditInstallmentDialog
         open={!!editing}
         onClose={() => setEditing(null)}

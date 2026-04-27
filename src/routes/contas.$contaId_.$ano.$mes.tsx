@@ -644,7 +644,7 @@ function BigSummary({
   );
 }
 
-/* ───────── GROUPED SECTION (header + children list) ───────── */
+/* ───────── GROUPED SECTION (collapsible category accordion) ───────── */
 
 function GroupedSection({
   icon: Icon,
@@ -655,6 +655,9 @@ function GroupedSection({
   addLabel,
   empty,
   emptyText,
+  total,
+  count,
+  defaultOpen = true,
   children,
 }: {
   icon: typeof Building2;
@@ -665,13 +668,20 @@ function GroupedSection({
   addLabel?: string;
   empty: boolean;
   emptyText: string;
+  total?: number;
+  count?: number;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <section>
-      {/* Section header */}
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      {/* Header (clickable to toggle) */}
+      <div className="flex items-center gap-2 px-3 py-3 md:px-4 md:py-3.5">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left md:gap-3"
+        >
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
           >
@@ -679,13 +689,31 @@ function GroupedSection({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
-            <p className="truncate text-xs text-muted-foreground">{description}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{description}</p>
           </div>
-        </div>
+          {typeof total === "number" && (
+            <div className="flex shrink-0 flex-col items-end">
+              <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(total)}</p>
+              {typeof count === "number" && (
+                <p className="text-[10px] text-muted-foreground">
+                  {count} {count === 1 ? "item" : "itens"}
+                </p>
+              )}
+            </div>
+          )}
+          {open ? (
+            <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+          ) : (
+            <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+          )}
+        </button>
         {onAdd && addLabel && (
           <button
-            onClick={onAdd}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
             aria-label={addLabel}
           >
             <Plus className="h-3 w-3" />
@@ -695,13 +723,15 @@ function GroupedSection({
       </div>
 
       {/* Body */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        {empty ? (
-          <Empty text={emptyText} />
-        ) : (
-          <div className="divide-y divide-border">{children}</div>
-        )}
-      </div>
+      {open && (
+        <div className="border-t border-border">
+          {empty ? (
+            <Empty text={emptyText} />
+          ) : (
+            <div className="divide-y divide-border">{children}</div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

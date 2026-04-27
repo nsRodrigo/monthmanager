@@ -338,6 +338,8 @@ function AccountMonth() {
           tone="primary"
           open={expanded.investments ?? false}
           onToggle={() => toggle("investments")}
+          onAdd={() => setOpenInvest(true)}
+          addLabel="Novo investimento"
         >
           {investments.length === 0 ? (
             <Empty text="Nenhum investimento nesta conta." />

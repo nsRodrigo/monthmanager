@@ -607,16 +607,181 @@ function AccountMonth() {
   );
 }
 
-/* ───────── CARD SECTION (expandable) ───────── */
+/* ───────── BIG SUMMARY (top cards) ───────── */
 
-function CardSection({
+type Tone = "debit" | "income" | "primary" | "credit";
+
+const toneText: Record<Tone, string> = {
+  debit: "text-debit",
+  income: "text-success",
+  credit: "text-credit",
+  primary: "text-primary",
+};
+const toneBg: Record<Tone, string> = {
+  debit: "bg-debit/15",
+  income: "bg-success/15",
+  credit: "bg-credit/15",
+  primary: "bg-primary/15",
+};
+
+function BigSummary({
+  icon: Icon,
+  label,
+  value,
+  count,
+  countLabel,
+  tone,
+}: {
+  icon: typeof Building2;
+  label: string;
+  value: number;
+  count: number;
+  countLabel: string;
+  tone: Tone;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 md:p-5">
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneBg[tone]} ${toneText[tone]}`}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className={`mt-1 text-lg font-bold leading-tight md:text-xl ${toneText[tone]}`}>
+            {formatCurrency(value)}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {count} {countLabel}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───────── GROUPED SECTION (header + children list) ───────── */
+
+function GroupedSection({
+  icon: Icon,
+  title,
+  description,
+  tone,
+  onAdd,
+  addLabel,
+  empty,
+  emptyText,
+  children,
+}: {
+  icon: typeof Building2;
+  title: string;
+  description: string;
+  tone: Tone;
+  onAdd?: () => void;
+  addLabel?: string;
+  empty: boolean;
+  emptyText: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      {/* Section header */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
+          >
+            <Icon className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider">{title}</h2>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        {onAdd && addLabel && (
+          <button
+            onClick={onAdd}
+            className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+          >
+            <Plus className="h-3 w-3" /> {addLabel}
+          </button>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        {empty ? (
+          <Empty text={emptyText} />
+        ) : (
+          <div className="divide-y divide-border">{children}</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ───────── GROUPED ROW (collapsible inside a section) ───────── */
+
+function GroupedRow({
+  label,
+  subtitle,
+  value,
+  count,
+  tone,
+  initial,
+  children,
+}: {
+  label: string;
+  subtitle: string;
+  value: number;
+  count: number;
+  tone: Tone;
+  initial: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
+      >
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
+        >
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{label}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</p>
+        </div>
+        <div className="flex flex-col items-end">
+          <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(value)}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {count} {count === 1 ? "lançamento" : "lançamentos"}
+          </p>
+        </div>
+        {open ? (
+          <ChevronUp className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+      {open && <div className="border-t border-border bg-background/30">{children}</div>}
+    </div>
+  );
+}
+
+/* ───────── CARD ROW (collapsible card inside CARDS section) ───────── */
+
+function CardRow({
   cardName,
   cardColor,
-  count,
   total,
   paid,
-  open,
-  onToggleOpen,
+  count,
+  dueLabel,
   onTogglePaid,
   onAdd,
   onHideMonth,
@@ -628,11 +793,10 @@ function CardSection({
 }: {
   cardName: string;
   cardColor: string;
-  count: number;
   total: number;
   paid: boolean;
-  open: boolean;
-  onToggleOpen: () => void;
+  count: number;
+  dueLabel: string;
   onTogglePaid: () => void;
   onAdd: () => void;
   onHideMonth?: () => void;
@@ -646,79 +810,77 @@ function CardSection({
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card">
-      {/* HEADER */}
+    <div>
       <button
-        onClick={onToggleOpen}
-        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-secondary/30"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
       >
         <span
-          className="h-3 w-3 shrink-0 rounded-full"
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
           style={{ backgroundColor: cardColor }}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold uppercase tracking-wide">{cardName}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {count} {count === 1 ? "lançamento" : "lançamentos"}
+          <p className="truncate text-sm font-semibold">{cardName}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Fatura atual: {formatCurrency(total)} • {dueLabel}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <p className="text-base font-bold">{formatCurrency(total)}</p>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
-            }`}
-          >
-            {paid ? "Pago" : "Em aberto"}
-          </span>
-        </div>
+        <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
+        <span
+          className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+          }`}
+        >
+          {paid ? "Pago" : "Em aberto"}
+        </span>
         {open ? (
-          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronUp className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
         )}
       </button>
 
-      {/* BODY */}
       {open && (
-        <div className="border-t border-border">
-          {/* fatura summary */}
-          <div className="flex items-center justify-between gap-3 bg-background/30 px-4 py-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Fatura atual
-              </p>
-              <p className="mt-0.5 text-xl font-bold text-credit">{formatCurrency(total)}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTogglePaid();
-                }}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                  paid
-                    ? "bg-success/15 text-success hover:bg-success/25"
-                    : "bg-warning/15 text-warning hover:bg-warning/25"
-                }`}
-              >
-                {paid ? "✓ Paga" : "Marcar paga"}
-              </button>
-              <Link
-                to="/contas/$contaId/$ano/$mes/cartao/$cartaoId"
-                params={detailHref}
-                className="rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary/80"
-              >
-                Detalhes
-              </Link>
-            </div>
+        <div className="border-t border-border bg-background/30">
+          <div className="flex items-center justify-end gap-2 px-4 py-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePaid();
+              }}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                paid
+                  ? "bg-success/15 text-success hover:bg-success/25"
+                  : "bg-warning/15 text-warning hover:bg-warning/25"
+              }`}
+            >
+              {paid ? "✓ Paga" : "Marcar paga"}
+            </button>
+            <Link
+              to="/contas/$contaId/$ano/$mes/cartao/$cartaoId"
+              params={detailHref}
+              className="rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary/80"
+            >
+              Detalhes
+            </Link>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdd();
+              }}
+              className="rounded-full bg-primary/15 px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/25"
+            >
+              + Compra
+            </button>
           </div>
 
-          {/* items */}
           {items.length === 0 ? (
             <div className="space-y-3 px-4 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhum lançamento neste mês.</p>
+              <p className="text-xs text-muted-foreground">
+                Nenhum lançamento neste mês.
+              </p>
               {onHideMonth && (
                 <button
                   onClick={(e) => {
@@ -732,199 +894,29 @@ function CardSection({
               )}
             </div>
           ) : (
-            <div>
-              <p className="px-4 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Lançamentos da fatura
-              </p>
-              <div className="divide-y divide-border">
-                {items
-                  .slice()
-                  .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-                  .map((inst) => {
-                    const pur = purchases.find((p) => p.id === inst.parentId);
-                    if (!pur) return null;
-                    return (
-                      <PurchaseInstRow
-                        key={inst.id}
-                        inst={inst}
-                        purchase={pur}
-                        cardColor={cardColor}
-                        onToggle={() => onToggleInst(inst.id, !inst.paid)}
-                        onEdit={() => onEditInst(inst)}
-                      />
-                    );
-                  })}
-              </div>
+            <div className="divide-y divide-border">
+              {items
+                .slice()
+                .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                .map((inst) => {
+                  const pur = purchases.find((p) => p.id === inst.parentId);
+                  if (!pur) return null;
+                  return (
+                    <PurchaseInstRow
+                      key={inst.id}
+                      inst={inst}
+                      purchase={pur}
+                      cardColor={cardColor}
+                      onToggle={() => onToggleInst(inst.id, !inst.paid)}
+                      onEdit={() => onEditInst(inst)}
+                    />
+                  );
+                })}
             </div>
           )}
-
-          <button
-            onClick={onAdd}
-            className="flex w-full items-center justify-center gap-2 border-t border-border py-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary/30 hover:text-primary"
-          >
-            <Plus className="h-3.5 w-3.5" /> Adicionar compra
-          </button>
         </div>
       )}
-    </section>
-  );
-}
-
-function PurchaseInstRow({
-  inst,
-  purchase,
-  cardColor,
-  onToggle,
-  onEdit,
-}: {
-  inst: Installment;
-  purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
-  cardColor: string;
-  onToggle: () => void;
-  onEdit: () => void;
-}) {
-  const isInstallment = inst.total > 1;
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <button
-        onClick={onToggle}
-        title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-        style={{
-          backgroundColor: inst.paid ? "transparent" : `color-mix(in oklab, ${cardColor} 25%, transparent)`,
-          border: inst.paid ? `2px solid var(--success)` : "none",
-          color: inst.paid ? "var(--success)" : cardColor,
-        }}
-      >
-        {inst.paid ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <span className="text-[10px] font-bold">
-            {purchase.description.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </button>
-      <button onClick={onEdit} className="min-w-0 flex-1 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            inst.paid ? "text-muted-foreground line-through" : ""
-          }`}
-        >
-          {purchase.description}
-        </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(purchase.date)} ·{" "}
-          {isInstallment
-            ? `${inst.total}x de ${formatCurrency(inst.amount)}`
-            : "1x sem juros"}
-        </p>
-      </button>
-      <div className="flex flex-col items-end gap-0.5">
-        <p className="text-sm font-bold">
-          {formatCurrency(isInstallment ? purchase.totalAmount : inst.amount)}
-        </p>
-        {isInstallment && (
-          <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
-            {inst.number}/{inst.total}
-          </span>
-        )}
-      </div>
-      <button
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-primary"
-        title="Editar parcela"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
     </div>
-  );
-}
-
-/* ───────── COLLAPSIBLE SECTION FRAME ───────── */
-
-function SectionFrame({
-  icon: Icon,
-  title,
-  subtitle,
-  count,
-  total,
-  tone,
-  open,
-  onToggle,
-  onAdd,
-  addLabel,
-  children,
-}: {
-  icon: typeof Building2;
-  title: string;
-  subtitle?: string;
-  count: number;
-  total: number;
-  tone: "debit" | "income" | "primary" | "credit";
-  open: boolean;
-  onToggle: () => void;
-  onAdd?: () => void;
-  addLabel?: string;
-  children: React.ReactNode;
-}) {
-  const toneClass = {
-    debit: "text-debit",
-    income: "text-success",
-    credit: "text-credit",
-    primary: "text-primary",
-  } as const;
-  const bgClass = {
-    debit: "bg-debit/15",
-    income: "bg-success/15",
-    credit: "bg-credit/15",
-    primary: "bg-primary/15",
-  } as const;
-  return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-secondary/30"
-      >
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${bgClass[tone]} ${toneClass[tone]}`}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold uppercase tracking-wide">
-            {title}
-            {subtitle && (
-              <span className="ml-1.5 text-[11px] font-medium normal-case text-muted-foreground">
-                {subtitle}
-              </span>
-            )}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {count} {count === 1 ? "lançamento" : "lançamentos"}
-          </p>
-        </div>
-        <p className={`text-base font-bold ${toneClass[tone]}`}>{formatCurrency(total)}</p>
-        {open ? (
-          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
-        )}
-      </button>
-
-      {open && (
-        <div className="border-t border-border">
-          {children}
-          {onAdd && addLabel && (
-            <button
-              onClick={onAdd}
-              className="flex w-full items-center justify-center gap-2 border-t border-border py-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary/30 hover:text-primary"
-            >
-              <Plus className="h-3.5 w-3.5" /> {addLabel}
-            </button>
-          )}
-        </div>
-      )}
-    </section>
   );
 }
 

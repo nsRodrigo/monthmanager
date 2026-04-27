@@ -605,6 +605,16 @@ function GroupedSection({
           ) : (
             <div className="divide-y divide-border">{children}</div>
           )}
+          {onAdd && addLabel && (
+            <div className="border-t border-border bg-background/30 p-3 md:p-4">
+              <button
+                onClick={onAdd}
+                className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+              >
+                <Plus className="h-3.5 w-3.5" /> {addLabel}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -232,7 +232,7 @@ function AccountMonth() {
           label="Cartões"
           value={totalCards}
           count={monthInst.filter((i) => i.parentType === "purchase").length}
-          countLabel={`${accountCards.length} ${accountCards.length === 1 ? "cartão" : "cartões"} • lançamentos`}
+          countLabel={`em ${accountCards.length} ${accountCards.length === 1 ? "cartão" : "cartões"}`}
           tone="credit"
         />
         <BigSummary

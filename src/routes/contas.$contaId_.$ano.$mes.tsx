@@ -48,6 +48,7 @@ import {
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
+import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
@@ -91,6 +92,7 @@ function AccountMonth() {
 
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
+  const [openInvest, setOpenInvest] = useState(false);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
@@ -336,6 +338,8 @@ function AccountMonth() {
           tone="primary"
           open={expanded.investments ?? false}
           onToggle={() => toggle("investments")}
+          onAdd={() => setOpenInvest(true)}
+          addLabel="Novo investimento"
         >
           {investments.length === 0 ? (
             <Empty text="Nenhum investimento nesta conta." />
@@ -442,6 +446,11 @@ function AccountMonth() {
         defaultYear={year}
         defaultMonth={month}
         fixedCardId={purchaseFor ?? undefined}
+      />
+      <AddInvestmentDialog
+        open={openInvest}
+        onClose={() => setOpenInvest(false)}
+        fixedAccountId={contaId}
       />
       <EditInstallmentDialog
         open={!!editing}

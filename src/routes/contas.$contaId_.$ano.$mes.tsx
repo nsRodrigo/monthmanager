@@ -36,7 +36,6 @@ import {
   Plus,
   CreditCard,
   ArrowDownRight,
-  ArrowUpRight,
   TrendingUp,
   Trash2,
   Check,

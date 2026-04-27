@@ -611,57 +611,6 @@ function GroupedSection({
   );
 }
 
-/* ───────── GROUPED ROW (collapsible inside a section) ───────── */
-
-function GroupedRow({
-  label,
-  subtitle,
-  value,
-  count,
-  tone,
-  initial,
-  children,
-}: {
-  label: string;
-  subtitle: string;
-  value: number;
-  count: number;
-  tone: Tone;
-  initial: string;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
-      >
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-10 md:w-10 ${toneBg[tone]} ${toneText[tone]} text-sm font-bold`}
-        >
-          {initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{label}</p>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end">
-          <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(value)}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {count} {count === 1 ? "lanç." : "lanç."}
-          </p>
-        </div>
-        {open ? (
-          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-        ) : (
-          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-        )}
-      </button>
-      {open && <div className="border-t border-border bg-background/30">{children}</div>}
-    </div>
-  );
-}
 
 /* ───────── CARD ROW (collapsible card inside CARDS section) ───────── */
 

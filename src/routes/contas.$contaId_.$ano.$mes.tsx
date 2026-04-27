@@ -255,87 +255,38 @@ function AccountMonth() {
           tone="debit"
           onAdd={() => setOpenDebit(true)}
           addLabel="Novo débito"
+          total={totalDebits}
+          count={monthDebits.single.length + monthDebits.parcelled.length}
           empty={
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
           emptyText="Nenhum débito neste mês."
         >
-          {(() => {
-            type GroupItem =
-              | { kind: "single"; debit: Debit }
-              | { kind: "parcelled"; installment: Installment; debit: Debit };
-            const groups = new Map<
-              string,
-              { label: string; subtitle: string; total: number; items: GroupItem[] }
-            >();
-            for (const d of monthDebits.single) {
-              const key = `s:${d.description.toLowerCase()}`;
-              const g = groups.get(key) ?? {
-                label: d.description,
-                subtitle: d.required ? "Recorrente" : "Avulso",
-                total: 0,
-                items: [],
-              };
-              g.total += d.amount;
-              g.items.push({ kind: "single", debit: d });
-              groups.set(key, g);
-            }
-            for (const p of monthDebits.parcelled) {
-              const key = `p:${p.debit!.id}`;
-              const g = groups.get(key) ?? {
-                label: p.debit!.description,
-                subtitle: `Parcelado em ${p.debit!.installmentsCount}x`,
-                total: 0,
-                items: [],
-              };
-              g.total += p.installment.amount;
-              g.items.push({ kind: "parcelled", installment: p.installment, debit: p.debit! });
-              groups.set(key, g);
-            }
-            const arr = Array.from(groups.entries());
-            return arr.map(([key, g]) => (
-              <GroupedRow
-                key={key}
-                label={g.label}
-                subtitle={g.subtitle}
-                value={g.total}
-                count={g.items.length}
-                tone="debit"
-                initial={g.label.charAt(0).toUpperCase()}
-              >
-                <div className="divide-y divide-border">
-                  {g.items.map((it) =>
-                    it.kind === "single" ? (
-                      <DebitRow
-                        key={it.debit.id}
-                        debit={it.debit}
-                        onToggle={() =>
-                          toggleDebit.mutate({ id: it.debit.id, paid: !it.debit.paid })
-                        }
-                        onRemove={() => removeDebit.mutate(it.debit.id)}
-                      />
-                    ) : (
-                      <ParcelledRow
-                        key={it.installment.id}
-                        kind="debit"
-                        installment={it.installment}
-                        parent={it.debit}
-                        onToggle={() => toggleInst(it.installment.id, !it.installment.paid)}
-                        onEdit={() =>
-                          setEditing({
-                            inst: it.installment,
-                            label: it.debit.description,
-                            subtitle: `Débito parcelado · Total ${formatCurrency(it.debit.amount)} em ${it.debit.installmentsCount}x`,
-                            onDeleteParent: () => removeDebit.mutate(it.debit.id),
-                          })
-                        }
-                      />
-                    ),
-                  )}
-                </div>
-              </GroupedRow>
-            ));
-          })()}
+          {monthDebits.single.map((d) => (
+            <DebitRow
+              key={d.id}
+              debit={d}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onRemove={() => removeDebit.mutate(d.id)}
+            />
+          ))}
+          {monthDebits.parcelled.map((p) => (
+            <ParcelledRow
+              key={p.installment.id}
+              kind="debit"
+              installment={p.installment}
+              parent={p.debit!}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onEdit={() =>
+                setEditing({
+                  inst: p.installment,
+                  label: p.debit!.description,
+                  subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
+                  onDeleteParent: () => removeDebit.mutate(p.debit!.id),
+                })
+              }
+            />
+          ))}
         </GroupedSection>
 
         {/* INCOMES */}

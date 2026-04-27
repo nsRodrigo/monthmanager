@@ -1174,41 +1174,6 @@ function InvestmentRow({ inv, onRemove }: { inv: Investment; onRemove: () => voi
   );
 }
 
-function SummaryPill({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "credit" | "debit" | "income" | "primary";
-}) {
-  const c =
-    tone === "credit"
-      ? "text-credit"
-      : tone === "debit"
-        ? "text-debit"
-        : tone === "income"
-          ? "text-success"
-          : "text-primary";
-  const Icon =
-    tone === "income"
-      ? ArrowUpRight
-      : tone === "debit"
-        ? ArrowDownRight
-        : tone === "credit"
-          ? CreditCard
-          : TrendingUp;
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" /> {label}
-      </div>
-      <p className={`mt-1.5 text-base font-bold md:text-lg ${c}`}>{value}</p>
-    </div>
-  );
-}
-
 function Empty({ text }: { text: string }) {
   return (
     <div className="px-4 py-6 text-center text-xs text-muted-foreground">{text}</div>

@@ -670,24 +670,26 @@ function GroupedSection({
   return (
     <section>
       {/* Section header */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
           >
             <Icon className="h-4 w-4" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider">{title}</h2>
-            <p className="text-xs text-muted-foreground">{description}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
+            <p className="truncate text-xs text-muted-foreground">{description}</p>
           </div>
         </div>
         {onAdd && addLabel && (
           <button
             onClick={onAdd}
-            className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+            aria-label={addLabel}
           >
-            <Plus className="h-3 w-3" /> {addLabel}
+            <Plus className="h-3 w-3" />
+            <span className="hidden sm:inline">{addLabel}</span>
           </button>
         )}
       </div>

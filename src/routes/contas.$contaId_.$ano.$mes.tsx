@@ -92,6 +92,7 @@ function AccountMonth() {
 
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
+  const [openInvest, setOpenInvest] = useState(false);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;

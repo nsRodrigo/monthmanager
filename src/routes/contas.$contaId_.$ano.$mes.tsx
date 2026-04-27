@@ -297,89 +297,40 @@ function AccountMonth() {
           tone="income"
           onAdd={() => setOpenIncome(true)}
           addLabel="Novo recebimento"
+          total={totalIncome}
+          count={monthIncomes.single.length + monthIncomes.parcelled.length}
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
           }
           emptyText="Nenhum recebimento neste mês."
         >
-          {(() => {
-            type GroupItem =
-              | { kind: "single"; income: Income }
-              | { kind: "parcelled"; installment: Installment; income: Income };
-            const groups = new Map<
-              string,
-              { label: string; subtitle: string; total: number; items: GroupItem[] }
-            >();
-            for (const i of monthIncomes.single) {
-              const key = `s:${i.description.toLowerCase()}`;
-              const g = groups.get(key) ?? {
-                label: i.description,
-                subtitle: "Recebimento",
-                total: 0,
-                items: [],
-              };
-              g.total += i.amount;
-              g.items.push({ kind: "single", income: i });
-              groups.set(key, g);
-            }
-            for (const p of monthIncomes.parcelled) {
-              const key = `p:${p.income!.id}`;
-              const g = groups.get(key) ?? {
-                label: p.income!.description,
-                subtitle: `Parcelado em ${p.income!.installmentsCount}x`,
-                total: 0,
-                items: [],
-              };
-              g.total += p.installment.amount;
-              g.items.push({ kind: "parcelled", installment: p.installment, income: p.income! });
-              groups.set(key, g);
-            }
-            return Array.from(groups.entries()).map(([key, g]) => (
-              <GroupedRow
-                key={key}
-                label={g.label}
-                subtitle={g.subtitle}
-                value={g.total}
-                count={g.items.length}
-                tone="income"
-                initial={g.label.charAt(0).toUpperCase()}
-              >
-                <div className="divide-y divide-border">
-                  {g.items.map((it) =>
-                    it.kind === "single" ? (
-                      <IncomeRow
-                        key={it.income.id}
-                        income={it.income}
-                        onToggle={() =>
-                          toggleIncome.mutate({
-                            id: it.income.id,
-                            received: !it.income.received,
-                          })
-                        }
-                        onRemove={() => removeIncome.mutate(it.income.id)}
-                      />
-                    ) : (
-                      <ParcelledRow
-                        key={it.installment.id}
-                        kind="income"
-                        installment={it.installment}
-                        parent={it.income}
-                        onToggle={() => toggleInst(it.installment.id, !it.installment.paid)}
-                        onEdit={() =>
-                          setEditing({
-                            inst: it.installment,
-                            label: it.income.description,
-                            subtitle: `Recebimento parcelado · Total ${formatCurrency(it.income.amount)} em ${it.income.installmentsCount}x`,
-                            onDeleteParent: () => removeIncome.mutate(it.income.id),
-                          })
-                        }
-                      />
-                    ),
-                  )}
-                </div>
-              </GroupedRow>
-            ));
-          })()}
+          {monthIncomes.single.map((i) => (
+            <IncomeRow
+              key={i.id}
+              income={i}
+              onToggle={() =>
+                toggleIncome.mutate({ id: i.id, received: !i.received })
+              }
+              onRemove={() => removeIncome.mutate(i.id)}
+            />
+          ))}
+          {monthIncomes.parcelled.map((p) => (
+            <ParcelledRow
+              key={p.installment.id}
+              kind="income"
+              installment={p.installment}
+              parent={p.income!}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onEdit={() =>
+                setEditing({
+                  inst: p.installment,
+                  label: p.income!.description,
+                  subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
+                  onDeleteParent: () => removeIncome.mutate(p.income!.id),
+                })
+              }
+            />
+          ))}
         </GroupedSection>
 
         {/* INVESTMENTS */}

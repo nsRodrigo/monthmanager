@@ -467,6 +467,7 @@ function CardSection({
   onToggleOpen,
   onTogglePaid,
   onAdd,
+  onHideMonth,
   detailHref,
   items,
   purchases,
@@ -482,6 +483,7 @@ function CardSection({
   onToggleOpen: () => void;
   onTogglePaid: () => void;
   onAdd: () => void;
+  onHideMonth?: () => void;
   detailHref: { contaId: string; ano: string; mes: string; cartaoId: string };
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T

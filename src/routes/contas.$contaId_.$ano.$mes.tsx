@@ -20,6 +20,7 @@ import {
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
+  getMonthInvestments,
   isCardFullyPaid,
   type Installment,
   type Debit,
@@ -92,6 +93,7 @@ function AccountMonth() {
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
   const [openInvest, setOpenInvest] = useState(false);
+  const [openPurchase, setOpenPurchase] = useState(false);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
@@ -105,35 +107,14 @@ function AccountMonth() {
     [cards, contaId],
   );
 
-  // hidden cards per month (persisted in localStorage); a card stays hidden
-  // for a given month until the user un-hides it OR new purchases land in it.
-  const hiddenKey = `fin:hiddenCards:${contaId}:${year}:${month}`;
-  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>([]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(hiddenKey);
-      setHiddenCardIds(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      setHiddenCardIds([]);
-    }
-  }, [hiddenKey]);
-  const persistHidden = (next: string[]) => {
-    setHiddenCardIds(next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(hiddenKey, JSON.stringify(next));
-    }
-  };
-  const hideCardForMonth = (cardId: string) => {
-    if (hiddenCardIds.includes(cardId)) return;
-    persistHidden([...hiddenCardIds, cardId]);
-  };
-  const restoreHiddenCards = () => persistHidden([]);
-
   const accountCardIds = new Set(accountCards.map((c) => c.id));
   const debits = allDebits.filter((d) => d.accountId === contaId);
   const incomes = allIncomes.filter((i) => i.accountId === contaId);
-  const investments = allInvestments.filter((i) => i.accountId === contaId);
+  const investments = getMonthInvestments(
+    allInvestments.filter((i) => i.accountId === contaId),
+    year,
+    month,
+  );
 
   const visiblePurchaseIds = new Set(
     purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
@@ -322,75 +303,79 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
-        {/* CARDS */}
-        <GroupedSection
-          icon={CreditCard}
-          title="CARTÕES DE CRÉDITO"
-          description="Faturas e compras no crédito"
-          tone="credit"
-          total={totalCards}
-          count={accountCards.filter((c) => !hiddenCardIds.includes(c.id)).length}
-          empty={accountCards.length === 0}
-          emptyText="Nenhum cartão vinculado a esta conta."
-        >
-          {accountCards
-            .filter((c) => !hiddenCardIds.includes(c.id))
+        {/* CARDS — somente cartões com movimento no mês */}
+        {(() => {
+          const cardsWithMovement = accountCards
             .map((c) => {
-              const cardInst = monthInst.filter((i) => {
+              const items = monthInst.filter((i) => {
                 if (i.parentType !== "purchase") return false;
                 const pur = purchases.find((p) => p.id === i.parentId);
                 return pur?.cardId === c.id;
               });
-              const total = cardInst.reduce((s, i) => s + i.amount, 0);
-              const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
-              // due date approx: due_day of card in current month
-              const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
-              const dueDate = new Date(year, month, Math.min(dueDay, 28));
-              return (
-                <CardRow
-                  key={c.id}
-                  cardName={c.name}
-                  cardColor={c.color}
-                  total={total}
-                  paid={paid}
-                  count={cardInst.length}
-                  dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                  onTogglePaid={() =>
-                    setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
-                  }
-                  onAdd={() => setPurchaseFor(c.id)}
-                  onHideMonth={
-                    cardInst.length === 0 ? () => hideCardForMonth(c.id) : undefined
-                  }
-                  detailHref={{ contaId, ano, mes, cartaoId: c.id }}
-                  items={cardInst}
-                  purchases={purchases}
-                  onToggleInst={(id, p) => toggleInst(id, p)}
-                  onEditInst={(inst) => {
-                    const pur = purchases.find((p) => p.id === inst.parentId);
-                    if (!pur) return;
-                    setEditing({
-                      inst,
-                      label: pur.description,
-                      subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
-                        pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
-                      }`,
-                      onDeleteParent: () => removePurchase.mutate(pur.id),
-                    });
-                  }}
-                />
-              );
-            })}
-          {hiddenCardIds.length > 0 && (
-            <button
-              onClick={restoreHiddenCards}
-              className="mt-2 w-full rounded-xl border border-dashed border-border py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              return { card: c, items };
+            })
+            .filter(({ items }) => items.length > 0);
+
+          return (
+            <GroupedSection
+              icon={CreditCard}
+              title="CARTÕES DE CRÉDITO"
+              description="Faturas e compras no crédito"
+              tone="credit"
+              totalTone="debit"
+              total={totalCards}
+              count={cardsWithMovement.length}
+              empty={accountCards.length === 0}
+              emptyText="Nenhum cartão vinculado a esta conta."
+              onAdd={accountCards.length > 0 ? () => setOpenPurchase(true) : undefined}
+              addLabel="Adicionar gasto a um cartão"
             >
-              Mostrar {hiddenCardIds.length}{" "}
-              {hiddenCardIds.length === 1 ? "cartão oculto" : "cartões ocultos"} neste mês
-            </button>
-          )}
-        </GroupedSection>
+              {cardsWithMovement.length === 0 ? (
+                <p className="px-4 py-3 text-center text-xs text-muted-foreground">
+                  Nenhum cartão com lançamentos neste mês.
+                </p>
+              ) : (
+                cardsWithMovement.map(({ card: c, items: cardInst }) => {
+                  const total = cardInst.reduce((s, i) => s + i.amount, 0);
+                  const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
+                  const dueDate = new Date(year, month, Math.min(dueDay, 28));
+                  return (
+                    <CardRow
+                      key={c.id}
+                      cardName={c.name}
+                      cardColor={c.color}
+                      total={total}
+                      paid={paid}
+                      count={cardInst.length}
+                      dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
+                      onTogglePaid={() =>
+                        setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
+                      }
+                      onAdd={() => setPurchaseFor(c.id)}
+                      detailHref={{ contaId, ano, mes, cartaoId: c.id }}
+                      items={cardInst}
+                      purchases={purchases}
+                      onToggleInst={(id, p) => toggleInst(id, p)}
+                      onEditInst={(inst) => {
+                        const pur = purchases.find((p) => p.id === inst.parentId);
+                        if (!pur) return;
+                        setEditing({
+                          inst,
+                          label: pur.description,
+                          subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
+                            pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
+                          }`,
+                          onDeleteParent: () => removePurchase.mutate(pur.id),
+                        });
+                      }}
+                    />
+                  );
+                })
+              )}
+            </GroupedSection>
+          );
+        })()}
       </div>
 
       <AddDebitDialog
@@ -411,6 +396,12 @@ function AccountMonth() {
         defaultYear={year}
         defaultMonth={month}
         fixedCardId={purchaseFor ?? undefined}
+      />
+      <AddPurchaseDialog
+        open={openPurchase}
+        onClose={() => setOpenPurchase(false)}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <AddInvestmentDialog
         open={openInvest}
@@ -454,6 +445,7 @@ function GroupedSection({
   title,
   description,
   tone,
+  totalTone,
   onAdd,
   addLabel,
   empty,
@@ -467,6 +459,7 @@ function GroupedSection({
   title: string;
   description: string;
   tone: Tone;
+  totalTone?: Tone;
   onAdd?: () => void;
   addLabel?: string;
   empty: boolean;
@@ -477,6 +470,7 @@ function GroupedSection({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const totalColor = toneText[totalTone ?? tone];
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
       {/* Header (clickable to toggle) */}
@@ -496,7 +490,7 @@ function GroupedSection({
           </div>
           {typeof total === "number" && (
             <div className="flex shrink-0 flex-col items-end">
-              <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(total)}</p>
+              <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
               {typeof count === "number" && (
                 <p className="text-[10px] text-muted-foreground">
                   {count} {count === 1 ? "item" : "itens"}

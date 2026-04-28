@@ -1,64 +1,75 @@
 ## Ajustes solicitados
 
-### 1. Regra de mês para débitos, recebimentos e investimentos
+Combinando os pedidos pendentes em um plano só:
 
-**Regra:** lançamento feito em `01/01/2014` deve aparecer em **Janeiro/2014**, sempre baseado no mês da `date` do lançamento (não no fuso UTC).
+### 1. Total de "CARTÕES DE CRÉDITO" em vermelho
 
-**Cartão de crédito:** mantém regra atual (`getInvoiceMonth` em `src/store/finance.ts` linhas 114-133) — compras agrupam pela fatura (fechamento/vencimento), aparecendo no mês de vencimento.
+Hoje o total no header da `GroupedSection` de cartões usa `toneText["credit"]` (roxo). Como cartão também é saída, deve ficar vermelho como débitos.
 
-**Bug atual:** `getMonthDebits` e `getMonthIncomes` (`src/store/finance.ts` linhas 1731-1772) usam `new Date(d.date)` numa string `"YYYY-MM-DD"`, que JS interpreta como UTC midnight. Em UTC-3, `2014-01-01` vira `31/12/2013` → o débito cai em Dezembro/2013 em vez de Janeiro/2014.
+**Como aplicar:** adicionar prop opcional `totalTone?: Tone` em `GroupedSection` (`src/routes/contas.$contaId_.$ano.$mes.tsx` ~linha 452). Quando informada, o `<p>` do total (linha 499) usa `toneText[totalTone]`. Na seção de cartões (linha 326), passar `totalTone="debit"`. Ícone, descrição e "6 itens" continuam no tom `credit`.
 
-**Correção:** parsear a data como local (mesmo padrão já usado em `formatDate` de `src/lib/format.ts` e `buildInstallmentsAnchored`). Trocar:
-```ts
-const dt = new Date(d.date);
-return dt.getFullYear() === year && dt.getMonth() === month;
-```
-por:
-```ts
-const [y, m] = d.date.slice(0, 10).split("-").map(Number);
-return y === year && (m - 1) === month;
-```
-Aplicar em `getMonthDebits` e `getMonthIncomes`. Investimentos hoje não têm campo de data — eles aparecem em **todos os meses** porque o filtro é só por conta. Manter como está (são posições, não eventos), a menos que você queira que invistam apenas no mês de criação — me avise.
+### 2. Investimentos por mês (mesma regra de débitos/recebíveis)
 
-### 2. Eliminar duplicidade dos cards de resumo (tela do mês — imagem 1)
+Hoje `Investment` não tem campo de data — todos aparecem em qualquer mês visitado.
 
-**Hoje:** `src/routes/contas.$contaId_.$ano.$mes.tsx` mostra 4 `BigSummary` (Recebimentos / Débitos / Cartões / Investimentos) **e logo abaixo** as mesmas 4 seções `GroupedSection` colapsáveis com o mesmo total.
+**Migration:** `ALTER TABLE public.investments ADD COLUMN date date NOT NULL DEFAULT CURRENT_DATE;` (investimentos antigos caem no mês atual; usuário pode editar/recriar se quiser).
 
-**Mudança:** remover completamente o bloco `BigSummary` (linhas ~213-246). Manter apenas as `GroupedSection`, que já mostram total + contagem no header e expandem com os itens. A ordem segue a atual: Débitos → Recebimentos → Investimentos → Cartões.
+**`src/store/finance.ts`:**
+- Adicionar `date: string` ao type `Investment` (linha 77).
+- `useInvestments` (linha 506): incluir `date` no select e map.
+- `useAddInvestment` (linha 1163): aceitar e gravar `date`.
+- Importer (linha 1639-1650): gravar `e.date` no investmentRow.
+- Novo helper `getMonthInvestments(invs, year, month)` parseando `date` como local (split de `YYYY-MM-DD`, sem `new Date()` UTC).
 
-### 3. Tela da conta (imagem 2) — saldo com pop-up de detalhes
+**`src/components/AddInvestmentDialog.tsx`:** novo Field "Data" (`<input type="date">`) com default = hoje.
 
-**Hoje:** `src/routes/contas.$contaId.tsx` mostra header com saldo + grid de 5 stats (Recebimentos / Débitos / Faturas / Investido / Saldo previsto) sempre visível.
+**`src/routes/contas.$contaId_.$ano.$mes.tsx`** (linhas 136, 157, 303-323): filtrar `investments` por `getMonthInvestments`. `totalInvested`, `count` e `map` da seção INVESTIMENTOS passam a usar a lista do mês.
 
-**Mudança:**
-- Header mostra apenas: ícone + nome da conta + **Saldo atual** (clicável).
-- Ao clicar no saldo, abre um Modal (usando `src/components/Modal.tsx`) com os 5 stats consolidados do mês corrente: Recebimentos do mês, Débitos do mês, Faturas do mês, Investido, Saldo previsto.
-- O grid de stats sai da página; vira conteúdo do modal.
-- Adicionar uma dica visual (ícone `Info` ou cursor pointer + underline sutil) no saldo para indicar interatividade.
+**`src/routes/index.tsx`** e **`src/routes/contas.$contaId.tsx`**: nos mini-stats / modal "Investido no mês", aplicar o mesmo filtro mensal. `computeAccountBalance` mantém a soma de **todos** os investimentos da conta (é posição acumulada, não evento do mês).
 
-### 4. Tela Consolidado (imagem 3) — mais detalhes nas contas
+### 3. Esconder cartões sem compra no mês + botão "Adicionar cartão" no fim
 
-**Hoje:** `src/routes/index.tsx` lista cada conta como linha simples: ícone + nome + tipo/qtd cartões + saldo atual.
+Hoje todos os cartões da conta são listados em CARTÕES DE CRÉDITO mesmo quando não têm parcela no mês. O usuário tem um "ocultar" manual; queremos automático.
 
-**Mudança:** enriquecer cada card de conta (mantendo clicável e navegando para `/contas/$contaId`) com mini-stats do mês corrente daquela conta:
-- Saldo atual (já existe, em destaque)
-- A receber no mês
-- A pagar (débitos) no mês
-- Faturas do mês
-- Saldo previsto fim do mês
+**Mudança em `src/routes/contas.$contaId_.$ano.$mes.tsx` (~linha 336):**
 
-Layout proposto: card maior (não mais uma linha), com header (ícone + nome + saldo) e abaixo um mini-grid 2x2 ou 4 colunas em desktop / 2 em mobile com os valores do mês. Cálculo reusa as mesmas funções (`getMonthDebits`, `getMonthIncomes`, `getMonthInstallments`) já filtradas por `accountId`/`cardIds` da conta.
+- Filtrar antes do `.map`: incluir só cartões com `cardInst.length > 0` no mês.
+  ```ts
+  const cardsWithMovement = accountCards
+    .filter((c) => !hiddenCardIds.includes(c.id))
+    .map((c) => ({ card: c, items: monthInst.filter(...) }))
+    .filter(({ items }) => items.length > 0);
+  ```
+- Renderizar a partir desse array. `count` da seção também passa a ser `cardsWithMovement.length`.
+- Cartões sem movimento ficam **invisíveis nessa tela** (continuam existindo no banco, aparecem em outros meses se tiverem compras, e estão disponíveis no seletor do diálogo de nova compra).
+
+**Botão "Adicionar a um cartão" no fim do accordion:**
+
+- Após a lista de cartões com movimento, renderizar um botão tracejado (mesmo estilo do `onAdd` da `GroupedSection`) com texto "Adicionar gasto a um cartão".
+- Ao clicar, abre `AddPurchaseDialog` (sem `fixedCardId`) já existente, com `defaultYear={year}` / `defaultMonth={month}` — o usuário escolhe qualquer cartão da conta no select interno do diálogo.
+- Para isso, passar pela prop `onAdd` da `GroupedSection` (que já renderiza o botão tracejado). Hoje a seção CARTÕES não tem `onAdd`; vamos adicionar:
+  ```tsx
+  onAdd={accountCards.length > 0 ? () => setOpenPurchase(true) : undefined}
+  addLabel="Adicionar gasto a um cartão"
+  ```
+  e criar estado `openPurchase` ligado a um novo `<AddPurchaseDialog open={openPurchase} onClose={...} defaultYear={year} defaultMonth={month} />` (sem `fixedCardId`, então o select aparece).
+
+- Estado `emptyText` quando `accountCards.length === 0` continua igual; quando há cartões mas nenhum com movimento, o `empty` deve ser `false` para o botão tracejado aparecer — ajustar `empty={accountCards.length === 0}` (já é assim) e mostrar uma linha sutil tipo "Nenhum cartão com lançamentos neste mês." acima do botão quando `cardsWithMovement.length === 0 && accountCards.length > 0`.
+
+- Remover (ou manter desabilitado) a UI de "ocultar cartão / mostrar X cartões ocultos" — fica redundante com o filtro automático. Vou **remover** `hideCardForMonth` / `restoreHiddenCards` / botões correspondentes e o `localStorage` `hiddenKey` para simplificar.
+
+### Não muda
+
+- Regra de fatura de cartão (`getInvoiceMonth`).
+- `computeAccountBalance` (saldo da conta soma todos investimentos como posição).
+- Dialogs e fluxos de débito/recebível.
+- RLS, autenticação, schema dos demais campos.
 
 ## Arquivos a alterar
 
-- `src/store/finance.ts` — corrigir parsing de data em `getMonthDebits` e `getMonthIncomes`.
-- `src/routes/contas.$contaId_.$ano.$mes.tsx` — remover bloco `BigSummary` e o componente não usado.
-- `src/routes/contas.$contaId.tsx` — header simplificado + modal de detalhes ao clicar no saldo.
-- `src/routes/index.tsx` — cards de conta enriquecidos com stats do mês corrente.
-
-## Não muda
-
-- Regra de fatura de cartão (`getInvoiceMonth`).
-- Cálculo de saldo (`computeAccountBalance`).
-- Dialogs de adicionar débito/recebimento/compra/investimento.
-- Persistência, RLS, autenticação.
+- **Migration:** adicionar `date` em `public.investments`.
+- `src/store/finance.ts` — type `Investment`, `useInvestments`, `useAddInvestment`, importer, novo `getMonthInvestments`.
+- `src/components/AddInvestmentDialog.tsx` — campo Data.
+- `src/routes/contas.$contaId_.$ano.$mes.tsx` — `totalTone="debit"` em cartões; filtrar cartões sem movimento; botão "Adicionar gasto a um cartão" no fim; remover lógica de ocultar manual; filtro mensal de investimentos.
+- `src/routes/index.tsx` — investimentos do mês no mini-stat da conta.
+- `src/routes/contas.$contaId.tsx` — investido do mês no modal de detalhes.

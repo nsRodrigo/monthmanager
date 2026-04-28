@@ -80,6 +80,7 @@ export type Investment = {
   type: string;
   amount: number;
   percentage: number;
+  date: string;
 };
 
 // =======================
@@ -515,13 +516,15 @@ export function useInvestments() {
         type: string;
         amount: number | string;
         percentage: number | string;
-      }>(() => supabase.from("investments").select("id,account_id,type,amount,percentage"));
+        date: string;
+      }>(() => supabase.from("investments").select("id,account_id,type,amount,percentage,date"));
       return data.map((i) => ({
         id: i.id,
         accountId: i.account_id,
         type: i.type,
         amount: num(i.amount as number | string),
         percentage: num(i.percentage as number | string),
+        date: i.date,
       }));
     },
   });
@@ -1171,6 +1174,7 @@ export function useAddInvestment() {
         type: i.type,
         amount: i.amount,
         percentage: i.percentage,
+        date: i.date,
       });
       if (error) throw error;
     },
@@ -1465,6 +1469,7 @@ export function useImportHistorical() {
         type: string;
         amount: number;
         percentage: number;
+        date: string;
       }> = [];
 
       // Conta padrão para entries sem accountName
@@ -1647,6 +1652,7 @@ export function useImportHistorical() {
             type: e.description,
             amount: e.amount,
             percentage: 0,
+            date: e.date,
           });
         }
       }
@@ -1790,6 +1796,14 @@ export function useImportHistorical() {
 // =======================
 export function getMonthInstallments(installments: Installment[], year: number, month: number) {
   return installments.filter((i) => i.year === year && i.month === month);
+}
+
+export function getMonthInvestments(invs: Investment[], year: number, month: number) {
+  return invs.filter((i) => {
+    if (!i.date) return false;
+    const [y, m] = i.date.slice(0, 10).split("-").map(Number);
+    return y === year && m - 1 === month;
+  });
 }
 
 export function getMonthDebits(

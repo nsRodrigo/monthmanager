@@ -3,6 +3,7 @@ import { useAddInvestment } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { Modal, Field, inputClass } from "./Modal";
 import { AccountSelect } from "./AccountSelect";
+import { todayISO } from "@/lib/format";
 
 const TYPES = [
   "CDB",
@@ -30,6 +31,7 @@ export function AddInvestmentDialog({
   const [type, setType] = useState(TYPES[0]);
   const [amount, setAmount] = useState("");
   const [percentage, setPercentage] = useState("");
+  const [date, setDate] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -37,15 +39,17 @@ export function AddInvestmentDialog({
     setType(TYPES[0]);
     setAmount("");
     setPercentage("");
+    setDate(todayISO());
   }, [open, fixedAccountId, filterAccountId]);
 
   async function submit() {
-    if (!accountId || !amount) return;
+    if (!accountId || !amount || !date) return;
     await addInv.mutateAsync({
       accountId,
       type,
       amount: Number(amount),
       percentage: Number(percentage) || 0,
+      date,
     });
     onClose();
   }
@@ -89,6 +93,15 @@ export function AddInvestmentDialog({
             />
           </Field>
         </div>
+
+        <Field label="Data">
+          <input
+            type="date"
+            className={inputClass}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </Field>
 
         <div className="flex justify-end gap-2 pt-2">
           <button

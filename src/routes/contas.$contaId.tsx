@@ -13,6 +13,7 @@ import {
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
+  getMonthInvestments,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -89,7 +90,8 @@ function AccountHome() {
 
 
   const balance = computeAccountBalance(account, cards, purchases, installments, debits, incomes);
-  const totalInvested = accountInvestments.reduce((s, i) => s + i.amount, 0);
+  const monthInvested = getMonthInvestments(accountInvestments, today.getFullYear(), currentMonth)
+    .reduce((s, i) => s + i.amount, 0);
 
   // current month numbers (for the top dashboard)
   const cm = currentMonthSummary(
@@ -156,7 +158,7 @@ function AccountHome() {
           <Stat label="Recebimentos do mês" value={formatCurrency(cm.income)} tone="success" icon={ArrowUpRight} />
           <Stat label="Débitos do mês" value={formatCurrency(cm.debits)} tone="debit" icon={ArrowDownRight} />
           <Stat label="Faturas do mês" value={formatCurrency(cm.cardsTotal)} tone="credit" icon={CreditCard} />
-          <Stat label="Investido" value={formatCurrency(totalInvested)} tone="primary" icon={TrendingUp} />
+          <Stat label="Investido no mês" value={formatCurrency(monthInvested)} tone="primary" icon={TrendingUp} />
           <Stat
             label="Saldo previsto"
             value={formatCurrency(expectedEnd)}

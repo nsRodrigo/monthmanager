@@ -95,9 +95,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const loc = useLocation();
   const { signOut, user } = useAuth();
   const { data: accounts = [] } = useAccounts();
+  const { data: profile } = useProfile();
   const [manageOpen, setManageOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const isConsolidated = loc.pathname === "/";
+
+  const displayName = profile?.displayName || user?.email?.split("@")[0] || "Você";
+  const initials = displayName
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <>
@@ -195,16 +206,38 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="mt-4 border-t border-border pt-4">
-        <p className="mb-2 truncate text-xs text-muted-foreground">{user?.email}</p>
+        <button
+          onClick={() => setProfileOpen(true)}
+          className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-secondary"
+          aria-label="Abrir meu perfil"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground">
+            {profile?.avatarUrl ? (
+              <img
+                src={profile.avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+              />
+            ) : (
+              initials || <User className="h-4 w-4" aria-hidden="true" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold">{displayName}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{user?.email}</p>
+          </div>
+        </button>
         <button
           onClick={() => signOut()}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+          className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
         >
-          <LogOut className="h-3.5 w-3.5" /> Sair
+          <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> Sair
         </button>
       </div>
 
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
     </>
   );
 }
@@ -280,7 +313,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="min-w-0 overflow-x-hidden">{children}</main>
+        <a href="#main-content" className="skip-link">
+          Pular para o conteúdo
+        </a>
+        <main id="main-content" className="min-w-0 overflow-x-hidden" tabIndex={-1}>
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -289,13 +327,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AccountFilterProvider>
-          <AuthGate>
-            <Outlet />
-          </AuthGate>
-        </AccountFilterProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AccountFilterProvider>
+            <AuthGate>
+              <Outlet />
+            </AuthGate>
+          </AccountFilterProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

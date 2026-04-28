@@ -160,47 +160,50 @@ export const startAuthentication = createServerFn({ method: "POST" })
     const rpId = getRpId(origin);
     const admin = adminClient();
 
-    const { data: usersList } = await admin.auth.admin.listUsers();
-    const user = usersList?.users.find(
-      (u) => u.email?.toLowerCase() === data.email.toLowerCase()
-    );
+    const emailLc = data.email.toLowerCase();
 
-    if (!user) {
-      const options = await generateAuthenticationOptions({
-        rpID: rpId,
-        userVerification: "preferred",
-        allowCredentials: [],
-      });
-      await admin.from("webauthn_challenges").insert({
-        challenge: options.challenge,
-        email: data.email.toLowerCase(),
-        type: "authentication",
-      });
-      return options;
+    // Lookup user with pagination (avoids missing users beyond default 50)
+    let user: { id: string } | undefined;
+    let page = 1;
+    const perPage = 1000;
+    while (!user) {
+      const { data: list } = await admin.auth.admin.listUsers({ page, perPage });
+      if (!list?.users?.length) break;
+      const found = list.users.find((u) => u.email?.toLowerCase() === emailLc);
+      if (found) {
+        user = { id: found.id };
+        break;
+      }
+      if (list.users.length < perPage) break;
+      page += 1;
     }
 
-    const { data: passkeys } = await admin
-      .from("user_passkeys")
-      .select("credential_id, transports")
-      .eq("user_id", user.id);
-
-    if (!passkeys || passkeys.length === 0) {
-      throw new Error("Nenhuma biometria cadastrada para este e-mail");
+    let allowCredentials: { id: string; transports?: AuthenticatorTransport[] }[] = [];
+    if (user) {
+      const { data: passkeys } = await admin
+        .from("user_passkeys")
+        .select("credential_id, transports")
+        .eq("user_id", user.id);
+      if (passkeys && passkeys.length > 0) {
+        allowCredentials = passkeys.map((p) => ({
+          id: p.credential_id,
+          transports: (p.transports as AuthenticatorTransport[] | null) ?? undefined,
+        }));
+      }
     }
 
+    // Always return options uniformly to prevent email enumeration.
+    // Failures (no user, no passkeys) are surfaced only at finishAuthentication.
     const options = await generateAuthenticationOptions({
       rpID: rpId,
       userVerification: "preferred",
-      allowCredentials: passkeys.map((p) => ({
-        id: p.credential_id,
-        transports: (p.transports as AuthenticatorTransport[] | null) ?? undefined,
-      })),
+      allowCredentials,
     });
 
     await admin.from("webauthn_challenges").insert({
       challenge: options.challenge,
-      email: data.email.toLowerCase(),
-      user_id: user.id,
+      email: emailLc,
+      user_id: user?.id ?? null,
       type: "authentication",
     });
 

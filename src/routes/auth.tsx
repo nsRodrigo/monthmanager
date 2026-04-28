@@ -1,9 +1,14 @@
 import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Wallet, Eye, EyeOff } from "lucide-react";
+import { Wallet, Eye, EyeOff, Fingerprint } from "lucide-react";
+import {
+  isWebAuthnSupported,
+  isPlatformAuthenticatorAvailable,
+  loginWithPasskey,
+} from "@/lib/passkeys";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -24,6 +29,13 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [bioAvailable, setBioAvailable] = useState(false);
+
+  useEffect(() => {
+    if (isWebAuthnSupported()) {
+      isPlatformAuthenticatorAvailable().then(setBioAvailable);
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

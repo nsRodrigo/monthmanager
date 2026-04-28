@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Upload, Settings, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User } from "lucide-react";
+import { LogOut, Upload, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -202,12 +202,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         >
           <Upload className="h-3.5 w-3.5" /> Importar CSV
         </Link>
-        <button
-          onClick={() => setManageOpen(true)}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-        >
-          <Settings className="h-3.5 w-3.5" /> Configurações
-        </button>
       </div>
 
       <div className="mt-4 border-t border-border pt-4">

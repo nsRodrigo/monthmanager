@@ -741,6 +741,7 @@ function fmtLocalDate(y: number, m: number, d: number): string {
 
 export function useUpdateInstallment() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; amount?: number; dueDate?: string; paid?: boolean }) => {
       const patch: { amount?: number; due_date?: string; year?: number; month?: number; paid?: boolean } = {};
@@ -755,7 +756,31 @@ export function useUpdateInstallment() {
       const { error } = await supabase.from("installments").update(patch).eq("id", args.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["installments", "card_payments"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["installments"] });
+      const prev = qc.getQueriesData<Installment[]>({ queryKey: ["installments"] });
+      qc.setQueriesData<Installment[]>({ queryKey: ["installments"] }, (old) => {
+        if (!old) return old;
+        return old.map((it) => {
+          if (it.id !== args.id) return it;
+          const next = { ...it };
+          if (args.amount !== undefined) next.amount = args.amount;
+          if (args.paid !== undefined) next.paid = args.paid;
+          if (args.dueDate !== undefined) {
+            const { y, m } = parseLocalDate(args.dueDate);
+            next.dueDate = args.dueDate;
+            next.year = y;
+            next.month = m;
+          }
+          return next;
+        });
+      });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSettled: () => inv(["installments", "card_payments"]),
   });
 }
 

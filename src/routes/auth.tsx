@@ -207,6 +207,17 @@ function AuthPage() {
                 </svg>
                 Continuar com Google
               </button>
+              {mode === "signin" && bioAvailable && (
+                <button
+                  type="button"
+                  onClick={signInBio}
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-input bg-background py-2.5 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-50"
+                >
+                  <Fingerprint className="h-4 w-4 text-primary" aria-hidden="true" />
+                  Entrar com biometria
+                </button>
+              )}
             </>
           )}
 

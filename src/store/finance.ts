@@ -1737,8 +1737,8 @@ export function getMonthDebits(
   const single = debits
     .filter((d) => !d.isParent)
     .filter((d) => {
-      const dt = new Date(d.date);
-      return dt.getFullYear() === year && dt.getMonth() === month;
+      const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+      return y === year && m - 1 === month;
     });
   const parcelled = installments
     .filter((i) => i.parentType === "debit" && i.year === year && i.month === month)
@@ -1759,8 +1759,8 @@ export function getMonthIncomes(
   const single = incomes
     .filter((d) => !d.isParent)
     .filter((d) => {
-      const dt = new Date(d.date);
-      return dt.getFullYear() === year && dt.getMonth() === month;
+      const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+      return y === year && m - 1 === month;
     });
   const parcelled = installments
     .filter((i) => i.parentType === "income" && i.year === year && i.month === month)

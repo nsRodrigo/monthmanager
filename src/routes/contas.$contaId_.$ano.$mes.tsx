@@ -209,41 +209,7 @@ function AccountMonth() {
         </h1>
       </header>
 
-      {/* Top summary cards */}
-      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-        <BigSummary
-          icon={Download}
-          label="Recebimentos"
-          value={totalIncome}
-          count={monthIncomes.single.length + monthIncomes.parcelled.length}
-          countLabel="lançamentos"
-          tone="income"
-        />
-        <BigSummary
-          icon={ArrowDownRight}
-          label="Débitos"
-          value={totalDebits}
-          count={monthDebits.single.length + monthDebits.parcelled.length}
-          countLabel="lançamentos"
-          tone="debit"
-        />
-        <BigSummary
-          icon={CreditCard}
-          label="Cartões"
-          value={totalCards}
-          count={monthInst.filter((i) => i.parentType === "purchase").length}
-          countLabel={`em ${accountCards.length} ${accountCards.length === 1 ? "cartão" : "cartões"}`}
-          tone="credit"
-        />
-        <BigSummary
-          icon={TrendingUp}
-          label="Investimentos"
-          value={totalInvested}
-          count={investments.length}
-          countLabel="lançamentos"
-          tone="primary"
-        />
-      </div>
+      {/* Summary now lives inside each GroupedSection header — no duplicate cards */}
 
       {/* Stacked sections — order: Débito → Recebíveis → Investimentos → Cartões */}
       <div className="space-y-4">
@@ -463,7 +429,7 @@ function AccountMonth() {
   );
 }
 
-/* ───────── BIG SUMMARY (top cards) ───────── */
+/* ───────── tone helpers ───────── */
 
 type Tone = "debit" | "income" | "primary" | "credit";
 
@@ -480,44 +446,6 @@ const toneBg: Record<Tone, string> = {
   primary: "bg-primary/15",
 };
 
-function BigSummary({
-  icon: Icon,
-  label,
-  value,
-  count,
-  countLabel,
-  tone,
-}: {
-  icon: typeof Building2;
-  label: string;
-  value: number;
-  count: number;
-  countLabel: string;
-  tone: Tone;
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-border bg-card p-3 md:p-5">
-      <div className="flex items-start gap-2 md:gap-3">
-        <div
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl md:h-9 md:w-9 ${toneBg[tone]} ${toneText[tone]}`}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-          <p
-            className={`mt-1 truncate text-base font-bold leading-tight md:text-xl ${toneText[tone]}`}
-          >
-            {formatCurrency(value)}
-          </p>
-          <p className="mt-1 truncate text-[11px] text-muted-foreground">
-            {count} {countLabel}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ───────── GROUPED SECTION (collapsible category accordion) ───────── */
 

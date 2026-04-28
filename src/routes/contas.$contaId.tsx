@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { Modal } from "@/components/Modal";
 import {
   useAccounts,
   useCards,
@@ -51,6 +52,7 @@ function AccountHome() {
 
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const currentMonth = today.getMonth();
 
   const accountCardIds = useMemo(
@@ -132,19 +134,25 @@ function AccountHome() {
               </h1>
             </div>
           </div>
-          <div className="sm:text-right">
-            <p className="text-xs text-muted-foreground">Saldo atual</p>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="text-left transition-opacity hover:opacity-80 sm:text-right"
+          >
+            <p className="text-xs text-muted-foreground">Saldo atual · toque para ver detalhes do mês</p>
             <p
-              className={`break-words text-2xl font-bold sm:text-2xl md:text-3xl ${
+              className={`break-words text-2xl font-bold underline-offset-4 hover:underline sm:text-2xl md:text-3xl ${
                 balance >= 0 ? "text-foreground" : "text-destructive"
               }`}
             >
               {formatCurrency(balance)}
             </p>
-          </div>
+          </button>
         </div>
+      </header>
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
+      <Modal open={detailsOpen} onClose={() => setDetailsOpen(false)} title={`${MONTHS[currentMonth]} · ${account.name}`}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Stat label="Recebimentos do mês" value={formatCurrency(cm.income)} tone="success" icon={ArrowUpRight} />
           <Stat label="Débitos do mês" value={formatCurrency(cm.debits)} tone="debit" icon={ArrowDownRight} />
           <Stat label="Faturas do mês" value={formatCurrency(cm.cardsTotal)} tone="credit" icon={CreditCard} />
@@ -156,7 +164,7 @@ function AccountHome() {
             icon={Wallet}
           />
         </div>
-      </header>
+      </Modal>
 
       {/* YEAR PICKER */}
       <div className="mt-8 flex items-center justify-between">

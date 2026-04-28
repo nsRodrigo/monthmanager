@@ -169,7 +169,7 @@ function AccountHome() {
       </Modal>
 
       {/* YEAR PICKER */}
-      <div className="mt-8 flex items-center justify-between">
+      <div className="mt-8 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Meses de {year}</h2>
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
@@ -177,15 +177,36 @@ function AccountHome() {
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Ano anterior"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
-          <span className="px-2 text-sm font-semibold">{year}</span>
+          <label htmlFor="account-year" className="sr-only">
+            Selecionar ano
+          </label>
+          <select
+            id="account-year"
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-0.5 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {(() => {
+              const baseY = today.getFullYear();
+              const ys: number[] = [];
+              for (let y = baseY - 5; y <= baseY + 5; y++) ys.push(y);
+              if (!ys.includes(year)) ys.push(year);
+              ys.sort((a, b) => a - b);
+              return ys.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ));
+            })()}
+          </select>
           <button
             onClick={() => setYear((y) => y + 1)}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Próximo ano"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>

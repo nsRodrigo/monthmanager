@@ -28,6 +28,7 @@ import {
   type Investment,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
+import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronLeft,
@@ -159,25 +160,13 @@ function AccountMonth() {
         >
           <ChevronLeft className="h-4 w-4" /> {account.name}
         </Link>
-        <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
-          <Link
-            to="/contas/$contaId/$ano/$mes"
-            params={{ contaId, ano: String(prevMonth.y), mes: String(prevMonth.m) }}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-          <span className="px-2 text-xs font-semibold capitalize">
-            {MONTHS[month]} {year}
-          </span>
-          <Link
-            to="/contas/$contaId/$ano/$mes"
-            params={{ contaId, ano: String(nextMonth.y), mes: String(nextMonth.m) }}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
+        <MonthYearPicker
+          contaId={contaId}
+          year={year}
+          month={month}
+          prev={prevMonth}
+          next={nextMonth}
+        />
       </div>
 
       {/* Header */}

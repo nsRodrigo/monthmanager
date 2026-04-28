@@ -24,6 +24,7 @@ type Props = {
 export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
   const navigate = useNavigate();
   const { data: cards = [] } = useCards();
+  const { data: purchases = [] } = usePurchases();
   const { data: installments = [] } = useInstallments();
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
@@ -39,15 +40,14 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
     const accountCardIds = new Set(
       cards.filter((c) => c.accountId === contaId).map((c) => c.id),
     );
+    const accountPurchaseIds = new Set(
+      purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+    );
 
-    // Installments (purchase via card / debit / income via account)
+    // Installments
     for (const i of installments) {
       if (i.parentType === "purchase") {
-        const pur = (window as unknown) ; // placeholder, we use purchase relation via cardId? we only have parentId here.
-        // Without purchases data we can't map back; instead include all installments whose parent debit/income matches account
-        // But purchase installments — fall back to including ones from cards in this account using parent lookup below
-        // We'll handle purchases separately.
-        void pur;
+        if (accountPurchaseIds.has(i.parentId)) add(i.year, i.month);
       } else if (i.parentType === "debit") {
         const d = debits.find((d) => d.id === i.parentId);
         if (d?.accountId === contaId) add(i.year, i.month);
@@ -55,15 +55,6 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
         const inc = incomes.find((d) => d.id === i.parentId);
         if (inc?.accountId === contaId) add(i.year, i.month);
       }
-    }
-    // Purchase installments — match via accountCardIds through purchaseId
-    for (const i of installments) {
-      if (i.parentType !== "purchase") continue;
-      // Installment.purchaseId is set; we need card -> account check
-      // We don't have purchases here, but installment.purchaseId references purchase id; skip if cannot resolve.
-      // To keep it correct, we try matching via any installment whose purchaseId belongs to a purchase of an account card.
-      // Simpler: include if the card-related purchases are present via purchases hook.
-      void i;
     }
 
     // Debits single
@@ -87,12 +78,11 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
       if (y && m) add(y, m - 1);
     }
 
-    void accountCardIds;
     // Always include the currently viewed month so the picker can render it
     add(year, month);
 
     return map;
-  }, [cards, installments, debits, incomes, investments, contaId, year, month]);
+  }, [cards, purchases, installments, debits, incomes, investments, contaId, year, month]);
 
   const yearList = useMemo(
     () => Array.from(yearMonthMap.keys()).sort((a, b) => a - b),

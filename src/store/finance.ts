@@ -741,6 +741,7 @@ function fmtLocalDate(y: number, m: number, d: number): string {
 
 export function useUpdateInstallment() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; amount?: number; dueDate?: string; paid?: boolean }) => {
       const patch: { amount?: number; due_date?: string; year?: number; month?: number; paid?: boolean } = {};
@@ -755,7 +756,31 @@ export function useUpdateInstallment() {
       const { error } = await supabase.from("installments").update(patch).eq("id", args.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["installments", "card_payments"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["installments"] });
+      const prev = qc.getQueriesData<Installment[]>({ queryKey: ["installments"] });
+      qc.setQueriesData<Installment[]>({ queryKey: ["installments"] }, (old) => {
+        if (!old) return old;
+        return old.map((it) => {
+          if (it.id !== args.id) return it;
+          const next = { ...it };
+          if (args.amount !== undefined) next.amount = args.amount;
+          if (args.paid !== undefined) next.paid = args.paid;
+          if (args.dueDate !== undefined) {
+            const { y, m } = parseLocalDate(args.dueDate);
+            next.dueDate = args.dueDate;
+            next.year = y;
+            next.month = m;
+          }
+          return next;
+        });
+      });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSettled: () => inv(["installments", "card_payments"]),
   });
 }
 
@@ -862,6 +887,7 @@ export function useToggleInstallmentPaid() {
 export function useSetCardPaid() {
   const { user } = useAuth();
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { cardId: string; year: number; month: number; paid: boolean }) => {
       const { data: pursRaw, error: e1 } = await supabase
@@ -894,7 +920,21 @@ export function useSetCardPaid() {
         );
       if (e3) throw e3;
     },
-    onSuccess: () => inv(["installments", "card_payments"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["card_payments"] });
+      const prevCp = qc.getQueriesData<Record<string, boolean>>({ queryKey: ["card_payments"] });
+      const prevInst = qc.getQueriesData<Installment[]>({ queryKey: ["installments"] });
+      qc.setQueriesData<Record<string, boolean>>({ queryKey: ["card_payments"] }, (old) => {
+        if (!old) return old;
+        return { ...old, [`${args.cardId}-${args.year}-${args.month}`]: args.paid };
+      });
+      return { prevCp, prevInst };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prevCp?.forEach(([k, d]) => qc.setQueryData(k, d));
+      ctx?.prevInst?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["installments", "card_payments"]),
   });
 }
 
@@ -999,12 +1039,24 @@ export function useAddDebit() {
 
 export function useToggleDebitPaid() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; paid: boolean }) => {
       const { error } = await supabase.from("debits").update({ paid: args.paid }).eq("id", args.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["debits"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["debits"] });
+      const prev = qc.getQueriesData<Debit[]>({ queryKey: ["debits"] });
+      qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
+        old ? old.map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["debits"]),
   });
 }
 
@@ -1069,6 +1121,7 @@ export function useAddIncome() {
 
 export function useToggleIncomeReceived() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; received: boolean }) => {
       const { error } = await supabase
@@ -1077,7 +1130,18 @@ export function useToggleIncomeReceived() {
         .eq("id", args.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["incomes"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["incomes"] });
+      const prev = qc.getQueriesData<Income[]>({ queryKey: ["incomes"] });
+      qc.setQueriesData<Income[]>({ queryKey: ["incomes"] }, (old) =>
+        old ? old.map((i) => (i.id === args.id ? { ...i, received: args.received } : i)) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["incomes"]),
   });
 }
 

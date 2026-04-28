@@ -4,6 +4,7 @@ import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
 import { User, Sun, Moon, Contrast, Check } from "lucide-react";
+import { PasskeyManager } from "./PasskeyManager";
 
 export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
@@ -122,6 +123,14 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
               );
             })}
           </div>
+        </div>
+
+        {/* Segurança / Biometria */}
+        <div className="border-t border-border pt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Segurança
+          </p>
+          <PasskeyManager />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

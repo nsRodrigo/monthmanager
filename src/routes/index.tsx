@@ -165,41 +165,107 @@ function Consolidated() {
               incomes,
             );
             const cardCount = cards.filter((c) => c.accountId === a.id).length;
+
+            // Stats do mês corrente filtrados por conta
+            const accCardIds = new Set(
+              cards.filter((c) => c.accountId === a.id).map((c) => c.id),
+            );
+            const accDebits = debits.filter((d) => d.accountId === a.id);
+            const accIncomes = incomes.filter((i) => i.accountId === a.id);
+            const accInvested = investments
+              .filter((i) => i.accountId === a.id)
+              .reduce((s, i) => s + i.amount, 0);
+
+            const md = getMonthDebits(accDebits, installments, year, month);
+            const mi = getMonthIncomes(accIncomes, installments, year, month);
+            const accDebitsTotal =
+              md.single.reduce((s, d) => s + d.amount, 0) +
+              md.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+            const accIncomesTotal =
+              mi.single.reduce((s, i) => s + i.amount, 0) +
+              mi.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+            const accCardsTotal = monthInst
+              .filter((i) => {
+                if (i.parentType !== "purchase") return false;
+                const pur = purchases.find((p) => p.id === i.parentId);
+                return pur ? accCardIds.has(pur.cardId) : false;
+              })
+              .reduce((s, i) => s + i.amount, 0);
+            const accExpected =
+              balance + accIncomesTotal - accDebitsTotal - accCardsTotal;
+
             return (
               <Link
                 key={a.id}
                 to="/contas/$contaId"
                 params={{ contaId: a.id }}
-                className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:gap-4 sm:p-5"
+                className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
               >
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12"
-                  style={{ backgroundColor: a.color + "25", color: a.color }}
-                >
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{a.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {a.type} · {cardCount} {cardCount === 1 ? "cartão" : "cartões"}
-                  </p>
-                </div>
-                <div className="min-w-0 text-right">
-                  <p
-                    className={`truncate text-sm font-bold sm:text-base ${
-                      balance >= 0 ? "text-foreground" : "text-destructive"
-                    }`}
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12"
+                    style={{ backgroundColor: a.color + "25", color: a.color }}
                   >
-                    {formatCurrency(balance)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">saldo atual</p>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{a.name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {a.type} · {cardCount} {cardCount === 1 ? "cartão" : "cartões"}
+                    </p>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p
+                      className={`truncate text-sm font-bold sm:text-base ${
+                        balance >= 0 ? "text-foreground" : "text-destructive"
+                      }`}
+                    >
+                      {formatCurrency(balance)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">saldo atual</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+
+                <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 sm:grid-cols-4">
+                  <MiniStat label="A receber" value={accIncomesTotal} tone="success" />
+                  <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
+                  <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
+                  <MiniStat
+                    label="Previsto"
+                    value={accExpected}
+                    tone={accExpected >= 0 ? "success" : "debit"}
+                  />
+                </div>
+                {accInvested > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Investido: <span className="font-semibold text-primary">{formatCurrency(accInvested)}</span>
+                  </p>
+                )}
               </Link>
             );
           })}
         </div>
       </section>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "success" | "debit" | "credit";
+}) {
+  const c =
+    tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
+  return (
+    <div className="min-w-0 rounded-lg bg-background/40 px-2 py-1.5">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`truncate text-xs font-bold ${c}`}>{formatCurrency(value)}</p>
     </div>
   );
 }

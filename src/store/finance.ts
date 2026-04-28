@@ -1469,6 +1469,7 @@ export function useImportHistorical() {
         type: string;
         amount: number;
         percentage: number;
+        date: string;
       }> = [];
 
       // Conta padrão para entries sem accountName

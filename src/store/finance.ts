@@ -1121,6 +1121,7 @@ export function useAddIncome() {
 
 export function useToggleIncomeReceived() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; received: boolean }) => {
       const { error } = await supabase
@@ -1129,7 +1130,18 @@ export function useToggleIncomeReceived() {
         .eq("id", args.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["incomes"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["incomes"] });
+      const prev = qc.getQueriesData<Income[]>({ queryKey: ["incomes"] });
+      qc.setQueriesData<Income[]>({ queryKey: ["incomes"] }, (old) =>
+        old ? old.map((i) => (i.id === args.id ? { ...i, received: args.received } : i)) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["incomes"]),
   });
 }
 

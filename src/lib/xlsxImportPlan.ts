@@ -108,7 +108,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         cardName,
         installmentNumber: e.installmentCurrent ?? undefined,
         installmentTotal: e.installmentTotal ?? undefined,
@@ -120,7 +120,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         accountName: DEFAULT_ACCOUNT,
       });
     } else if (e.kind === "income") {
@@ -130,7 +130,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         accountName: DEFAULT_ACCOUNT,
       });
     } else if (e.kind === "investment") {
@@ -140,7 +140,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         accountName: DEFAULT_ACCOUNT,
       });
     }

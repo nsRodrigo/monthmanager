@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -7,8 +8,12 @@ import { Wallet, Eye, EyeOff, Fingerprint } from "lucide-react";
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
-  loginWithPasskey,
+  browserStartAuthentication,
 } from "@/lib/passkeys";
+import {
+  startAuthentication as srvStartAuth,
+  finishAuthentication as srvFinishAuth,
+} from "@/server/webauthn";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -83,6 +88,9 @@ function AuthPage() {
     navigate({ to: "/" });
   };
 
+  const startAuthFn = useServerFn(srvStartAuth);
+  const finishAuthFn = useServerFn(srvFinishAuth);
+
   const signInBio = async () => {
     if (!email) {
       setError("Digite seu email primeiro");
@@ -91,7 +99,18 @@ function AuthPage() {
     setError(null);
     setLoading(true);
     try {
-      await loginWithPasskey(email);
+      if (!isWebAuthnSupported()) throw new Error("Seu navegador não suporta biometria");
+      const options = await startAuthFn({ data: { email } });
+      const response = await browserStartAuthentication({ optionsJSON: options as any });
+      const result = (await finishAuthFn({ data: { email, response } })) as {
+        success: boolean;
+        tokenHash: string;
+      };
+      const { error: vErr } = await supabase.auth.verifyOtp({
+        type: "magiclink",
+        token_hash: result.tokenHash,
+      });
+      if (vErr) throw vErr;
       navigate({ to: "/" });
     } catch (e: any) {
       setError(e?.message ?? "Falha no login com biometria");

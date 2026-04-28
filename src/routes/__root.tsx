@@ -11,6 +11,7 @@ import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { ProfileDialog } from "@/components/ProfileDialog";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -48,6 +49,9 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#0f172a" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Gestão" },
+      { name: "format-detection", content: "telephone=no" },
       { title: "Gestão Financeira" },
       { name: "description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
       { property: "og:title", content: "Gestão Financeira" },
@@ -64,6 +68,7 @@ export const Route = createRootRoute({
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "icon", href: "/icon-512.png", type: "image/png" },
       { rel: "apple-touch-icon", href: "/icon-512.png" },
+      { rel: "apple-touch-icon", sizes: "192x192", href: "/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -332,6 +337,7 @@ function RootComponent() {
           <AccountFilterProvider>
             <AuthGate>
               <Outlet />
+              <InstallPrompt />
             </AuthGate>
           </AccountFilterProvider>
         </AuthProvider>

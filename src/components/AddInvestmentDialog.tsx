@@ -94,6 +94,15 @@ export function AddInvestmentDialog({
           </Field>
         </div>
 
+        <Field label="Data">
+          <input
+            type="date"
+            className={inputClass}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </Field>
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}

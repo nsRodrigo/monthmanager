@@ -285,7 +285,7 @@ function AccountHome() {
                 <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary sm:block" />
               </div>
             </Link>
-
+          );
         })}
       </div>
     </div>

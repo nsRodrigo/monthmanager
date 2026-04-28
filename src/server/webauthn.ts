@@ -26,8 +26,7 @@ function getRpId(origin: string) {
 function getOrigin() {
   const req = getRequest();
   const origin = req?.headers.get("origin") || req?.headers.get("referer");
-  if (!origin) throw new Error("Origin not found");
-  // se vier referer com path, extrair só o origin
+  if (!origin) throw new Error("Origin não encontrado");
   return new URL(origin).origin;
 }
 
@@ -39,17 +38,13 @@ function adminClient() {
   );
 }
 
-async function getAuthenticatedUserId(): Promise<string | null> {
-  const req = getRequest();
-  const auth = req?.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) return null;
-  const token = auth.replace("Bearer ", "");
+async function userIdFromToken(accessToken: string): Promise<string> {
   const supa = createClient<Database>(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PUBLISHABLE_KEY!
   );
-  const { data, error } = await supa.auth.getClaims(token);
-  if (error || !data?.claims?.sub) return null;
+  const { data, error } = await supa.auth.getClaims(accessToken);
+  if (error || !data?.claims?.sub) throw new Error("Token inválido");
   return data.claims.sub;
 }
 
@@ -58,20 +53,16 @@ async function getAuthenticatedUserId(): Promise<string | null> {
 // ============================================================
 
 export const startRegistration = createServerFn({ method: "POST" })
-  .inputValidator((d: { deviceName?: string }) => d)
-  .handler(async () => {
-    const userId = await getAuthenticatedUserId();
-    if (!userId) throw new Error("Não autenticado");
-
+  .inputValidator((d: { accessToken: string; deviceName?: string }) => d)
+  .handler(async ({ data }) => {
+    const userId = await userIdFromToken(data.accessToken);
     const origin = getOrigin();
     const rpId = getRpId(origin);
     const admin = adminClient();
 
-    // Buscar email do usuário
     const { data: userData } = await admin.auth.admin.getUserById(userId);
     const email = userData?.user?.email ?? "user";
 
-    // Buscar passkeys existentes para excluir
     const { data: existing } = await admin
       .from("user_passkeys")
       .select("credential_id, transports")
@@ -94,7 +85,6 @@ export const startRegistration = createServerFn({ method: "POST" })
       },
     });
 
-    // Salvar challenge
     await admin.from("webauthn_challenges").insert({
       challenge: options.challenge,
       user_id: userId,
@@ -105,16 +95,17 @@ export const startRegistration = createServerFn({ method: "POST" })
   });
 
 export const finishRegistration = createServerFn({ method: "POST" })
-  .inputValidator((d: { response: RegistrationResponseJSON; deviceName: string }) => d)
+  .inputValidator((d: {
+    accessToken: string;
+    response: RegistrationResponseJSON;
+    deviceName: string;
+  }) => d)
   .handler(async ({ data }) => {
-    const userId = await getAuthenticatedUserId();
-    if (!userId) throw new Error("Não autenticado");
-
+    const userId = await userIdFromToken(data.accessToken);
     const origin = getOrigin();
     const rpId = getRpId(origin);
     const admin = adminClient();
 
-    // Recuperar challenge mais recente
     const { data: challengeRow } = await admin
       .from("webauthn_challenges")
       .select("challenge, expires_at")
@@ -149,14 +140,17 @@ export const finishRegistration = createServerFn({ method: "POST" })
       device_name: data.deviceName || "Dispositivo",
     });
 
-    // Limpar challenges usados
-    await admin.from("webauthn_challenges").delete().eq("user_id", userId).eq("type", "registration");
+    await admin
+      .from("webauthn_challenges")
+      .delete()
+      .eq("user_id", userId)
+      .eq("type", "registration");
 
     return { success: true };
   });
 
 // ============================================================
-// AUTHENTICATION (login com biometria)
+// AUTHENTICATION
 // ============================================================
 
 export const startAuthentication = createServerFn({ method: "POST" })
@@ -166,12 +160,12 @@ export const startAuthentication = createServerFn({ method: "POST" })
     const rpId = getRpId(origin);
     const admin = adminClient();
 
-    // Buscar usuário pelo email
     const { data: usersList } = await admin.auth.admin.listUsers();
-    const user = usersList?.users.find((u) => u.email?.toLowerCase() === data.email.toLowerCase());
+    const user = usersList?.users.find(
+      (u) => u.email?.toLowerCase() === data.email.toLowerCase()
+    );
 
     if (!user) {
-      // Não revelar se o usuário existe — gerar challenge genérico
       const options = await generateAuthenticationOptions({
         rpID: rpId,
         userVerification: "preferred",
@@ -262,7 +256,6 @@ export const finishAuthentication = createServerFn({ method: "POST" })
 
     if (!verification.verified) throw new Error("Falha na verificação biométrica");
 
-    // Atualizar contador e last_used
     await admin
       .from("user_passkeys")
       .update({
@@ -271,10 +264,12 @@ export const finishAuthentication = createServerFn({ method: "POST" })
       })
       .eq("id", passkey.id);
 
-    // Limpar challenges
-    await admin.from("webauthn_challenges").delete().eq("email", email).eq("type", "authentication");
+    await admin
+      .from("webauthn_challenges")
+      .delete()
+      .eq("email", email)
+      .eq("type", "authentication");
 
-    // Gerar magic link e extrair tokens
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "magiclink",
       email,
@@ -286,7 +281,6 @@ export const finishAuthentication = createServerFn({ method: "POST" })
 
     return {
       success: true,
-      // Cliente usará verifyOtp com este token_hash
       tokenHash: linkData.properties.hashed_token,
       email,
     };
@@ -296,24 +290,28 @@ export const finishAuthentication = createServerFn({ method: "POST" })
 // LIST / DELETE
 // ============================================================
 
-export const listPasskeys = createServerFn({ method: "POST" }).handler(async () => {
-  const userId = await getAuthenticatedUserId();
-  if (!userId) throw new Error("Não autenticado");
-  const admin = adminClient();
-  const { data } = await admin
-    .from("user_passkeys")
-    .select("id, device_name, created_at, last_used_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  return data ?? [];
-});
+export const listPasskeys = createServerFn({ method: "POST" })
+  .inputValidator((d: { accessToken: string }) => d)
+  .handler(async ({ data }) => {
+    const userId = await userIdFromToken(data.accessToken);
+    const admin = adminClient();
+    const { data: rows } = await admin
+      .from("user_passkeys")
+      .select("id, device_name, created_at, last_used_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    return rows ?? [];
+  });
 
 export const deletePasskey = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { accessToken: string; id: string }) => d)
   .handler(async ({ data }) => {
-    const userId = await getAuthenticatedUserId();
-    if (!userId) throw new Error("Não autenticado");
+    const userId = await userIdFromToken(data.accessToken);
     const admin = adminClient();
-    await admin.from("user_passkeys").delete().eq("id", data.id).eq("user_id", userId);
+    await admin
+      .from("user_passkeys")
+      .delete()
+      .eq("id", data.id)
+      .eq("user_id", userId);
     return { success: true };
   });

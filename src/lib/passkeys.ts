@@ -27,46 +27,34 @@ export async function isPlatformAuthenticatorAvailable() {
   }
 }
 
-async function withAuthHeaders<T>(fn: () => Promise<T>): Promise<T> {
+async function getToken(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) throw new Error("Sessão não encontrada");
-  // TanStack server functions automatically include cookies but not auth header.
-  // We pass it via fetch interception by setting a global header on the supabase client; here we rely on a workaround:
-  // simplewebauthn server functions read getRequest() headers, so we need the browser to send Authorization.
-  // TanStack Start forwards request headers from the browser fetch, so we set it via a custom fetch.
-  return fn();
+  if (!token) throw new Error("Sessão não encontrada. Faça login novamente.");
+  return token;
 }
 
-// Wrap server functions to include Authorization header (TanStack passes through fetch headers)
-async function callWithAuth<T>(serverFn: any, payload?: any): Promise<T> {
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess.session?.access_token;
-  if (!token) throw new Error("Sessão não encontrada");
-  return serverFn({ data: payload, headers: { Authorization: `Bearer ${token}` } });
-}
-
-// ===== Registro de passkey (usuário já logado) =====
+// ===== Registro de passkey (usuário logado) =====
 export async function registerPasskey(deviceName: string) {
   if (!isWebAuthnSupported()) throw new Error("Seu navegador não suporta biometria");
-  const options = await callWithAuth<any>(srvStartReg, { deviceName });
-  const response = await browserStartRegistration({ optionsJSON: options });
-  await callWithAuth<any>(srvFinishReg, { response, deviceName });
+  const accessToken = await getToken();
+  const options = await srvStartReg({ data: { accessToken, deviceName } });
+  const response = await browserStartRegistration({ optionsJSON: options as any });
+  await srvFinishReg({ data: { accessToken, response, deviceName } });
   return { success: true };
 }
 
-// ===== Login com passkey (sem sessão prévia) =====
+// ===== Login com passkey =====
 export async function loginWithPasskey(email: string) {
   if (!isWebAuthnSupported()) throw new Error("Seu navegador não suporta biometria");
-  const options = await srvStartAuth({ data: { email } } as any);
+  const options = await srvStartAuth({ data: { email } });
   const response = await browserStartAuthentication({ optionsJSON: options as any });
-  const result = (await srvFinishAuth({ data: { email, response } } as any)) as {
+  const result = (await srvFinishAuth({ data: { email, response } })) as {
     success: boolean;
     tokenHash: string;
     email: string;
   };
 
-  // Trocar token_hash por sessão ativa
   const { error } = await supabase.auth.verifyOtp({
     type: "magiclink",
     token_hash: result.tokenHash,
@@ -76,11 +64,11 @@ export async function loginWithPasskey(email: string) {
 }
 
 export async function listMyPasskeys() {
-  return callWithAuth<Array<{ id: string; device_name: string; created_at: string; last_used_at: string | null }>>(
-    srvList,
-  );
+  const accessToken = await getToken();
+  return srvList({ data: { accessToken } });
 }
 
 export async function removePasskey(id: string) {
-  return callWithAuth(srvDelete, { id });
+  const accessToken = await getToken();
+  return srvDelete({ data: { accessToken, id } });
 }

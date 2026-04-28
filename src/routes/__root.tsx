@@ -337,8 +337,8 @@ function RootComponent() {
           <AccountFilterProvider>
             <AuthGate>
               <Outlet />
-              <InstallPrompt />
             </AuthGate>
+            <InstallPrompt />
           </AccountFilterProvider>
         </AuthProvider>
       </ThemeProvider>

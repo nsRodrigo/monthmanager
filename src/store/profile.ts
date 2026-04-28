@@ -39,7 +39,9 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: async (input: { displayName?: string | null; avatarUrl?: string | null }) => {
       if (!user) throw new Error("Não autenticado");
-      const payload: Record<string, unknown> = { user_id: user.id };
+      const payload: { user_id: string; display_name?: string | null; avatar_url?: string | null } = {
+        user_id: user.id,
+      };
       if (input.displayName !== undefined) payload.display_name = input.displayName;
       if (input.avatarUrl !== undefined) payload.avatar_url = input.avatarUrl;
       const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "user_id" });

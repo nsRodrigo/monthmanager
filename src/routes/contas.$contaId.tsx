@@ -285,9 +285,20 @@ function AccountHome() {
       </div>
 
 
-      {/* MONTHS LIST */}
+      {/* MONTHS LIST — only months that have any value */}
       <div className="mt-4 space-y-2">
-        {Array.from({ length: 12 }, (_, m) => m).map((m) => {
+        {(() => {
+          const setM = new Set(monthsForYear);
+          if (year === today.getFullYear()) setM.add(currentMonth);
+          const monthList = Array.from(setM).sort((a, b) => a - b);
+          if (monthList.length === 0) {
+            return (
+              <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+                Nenhum lançamento em {year}.
+              </p>
+            );
+          }
+          return monthList.map((m) => {
           const sum = currentMonthSummary(
             year,
             m,

@@ -45,10 +45,10 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#0f172a" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { title: "Finanças — Gestão pessoal" },
+      { title: "Gestão Financeira" },
       { name: "description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
-      { property: "og:title", content: "Finanças — Gestão pessoal" },
-      { name: "twitter:title", content: "Finanças — Gestão pessoal" },
+      { property: "og:title", content: "Gestão Financeira" },
+      { name: "twitter:title", content: "Gestão Financeira" },
       { property: "og:description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
       { name: "twitter:description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6" },
@@ -102,7 +102,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
           <Wallet className="h-5 w-5 text-primary-foreground" />
         </div>
-        <span className="text-lg font-bold tracking-tight">Finanças</span>
+        <span className="text-lg font-bold tracking-tight">Gestão Financeira</span>
       </div>
 
       <Link
@@ -115,7 +115,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         }`}
       >
         <LayoutDashboard className="h-4 w-4" />
-        Consolidado
+        Home
       </Link>
 
       <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -213,13 +213,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [redirected, setRedirected] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
+
   useEffect(() => {
     if (loading) return;
-    if (!user && location.pathname !== "/auth" && !redirected) {
+    if (!user && !isPublic && !redirected) {
       setRedirected(true);
       navigate({ to: "/auth" });
     }
-  }, [user, loading, location.pathname, navigate, redirected]);
+  }, [user, loading, isPublic, navigate, redirected]);
 
   // close mobile drawer on route change
   useEffect(() => {
@@ -234,8 +236,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user && location.pathname !== "/auth") return null;
-  if (location.pathname === "/auth") return <>{children}</>;
+  if (!user && !isPublic) return null;
+  if (isPublic) return <>{children}</>;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -271,7 +273,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
               <Wallet className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-sm font-bold tracking-tight">Finanças</span>
+            <span className="text-sm font-bold tracking-tight">Gestão Financeira</span>
           </div>
         </header>
 

@@ -30,7 +30,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Consolidado — Finanças" },
+      { title: "Home — Gestão Financeira" },
       { name: "description", content: "Visão consolidada de todas as suas contas." },
     ],
   }),
@@ -107,7 +107,7 @@ function Consolidated() {
         <p className="text-sm font-medium text-primary capitalize">
           {MONTHS[month]} {year}
         </p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Consolidado</h1>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Home</h1>
         <p className="mt-1 text-muted-foreground">
           Visão geral de todas as suas {accounts.length}{" "}
           {accounts.length === 1 ? "conta" : "contas"}.

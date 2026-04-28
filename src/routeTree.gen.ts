@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -17,6 +18,11 @@ import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
 import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaId_.$ano.$mes'
 import { Route as ContasContaIdAnoMesCartaoCartaoIdRouteImport } from './routes/contas.$contaId_.$ano.$mes_.cartao.$cartaoId'
 
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ImportarHistoricoRoute = ImportarHistoricoRouteImport.update({
   id: '/importar-historico',
   path: '/importar-historico',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
   '/contas/$contaId/$ano/$mes/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
   '/contas/$contaId/$ano/$mes/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId_/$ano/$mes': typeof ContasContaIdAnoMesRoute
   '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/importar'
     | '/importar-historico'
+    | '/reset-password'
     | '/contas/$contaId'
     | '/contas/$contaId/$ano/$mes'
     | '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/importar'
     | '/importar-historico'
+    | '/reset-password'
     | '/contas/$contaId'
     | '/contas/$contaId/$ano/$mes'
     | '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/importar'
     | '/importar-historico'
+    | '/reset-password'
     | '/contas/$contaId'
     | '/contas/$contaId_/$ano/$mes'
     | '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId'
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ImportarRoute: typeof ImportarRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
   ContasContaIdAnoMesRoute: typeof ContasContaIdAnoMesRoute
   ContasContaIdAnoMesCartaoCartaoIdRoute: typeof ContasContaIdAnoMesCartaoCartaoIdRoute
@@ -124,6 +137,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/importar-historico': {
       id: '/importar-historico'
       path: '/importar-historico'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ImportarRoute: ImportarRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   ContasContaIdRoute: ContasContaIdRoute,
   ContasContaIdAnoMesRoute: ContasContaIdAnoMesRoute,
   ContasContaIdAnoMesCartaoCartaoIdRoute:
@@ -189,12 +210,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

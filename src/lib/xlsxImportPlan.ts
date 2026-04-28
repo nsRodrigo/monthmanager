@@ -87,6 +87,11 @@ export function buildImportPlan(
     const dateStr = dateInParsedMonth(e, approxDay);
     const purchaseDateStr = e.date ?? undefined;
 
+    // Regra provisória: lançamentos antes de março/2026 são marcados como
+    // pagos/recebidos automaticamente (histórico já consolidado).
+    const isLegacy = e.year < 2026 || (e.year === 2026 && e.month < 2);
+    const paidFlag = isLegacy ? true : e.paid;
+
     if (e.kind === "purchase") {
       // Cartão de crédito: cria 1 cartão por sectionLabel limpo, todos sob a conta default
       const cardName = cleanCardLabel(e.sectionLabel);
@@ -103,7 +108,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         cardName,
         installmentNumber: e.installmentCurrent ?? undefined,
         installmentTotal: e.installmentTotal ?? undefined,
@@ -115,7 +120,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         accountName: DEFAULT_ACCOUNT,
       });
     } else if (e.kind === "income") {
@@ -125,7 +130,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         accountName: DEFAULT_ACCOUNT,
       });
     } else if (e.kind === "investment") {
@@ -135,7 +140,7 @@ export function buildImportPlan(
         amount: e.amount,
         date: dateStr,
         purchaseDate: purchaseDateStr,
-        paid: e.paid,
+        paid: paidFlag,
         accountName: DEFAULT_ACCOUNT,
       });
     }

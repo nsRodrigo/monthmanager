@@ -30,7 +30,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Consolidado — Finanças" },
+      { title: "Home — Gestão Financeira" },
       { name: "description", content: "Visão consolidada de todas as suas contas." },
     ],
   }),

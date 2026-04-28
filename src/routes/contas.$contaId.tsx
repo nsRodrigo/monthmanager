@@ -17,6 +17,8 @@ import {
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -76,6 +78,57 @@ function AccountHome() {
     () => investments.filter((i) => i.accountId === contaId),
     [investments, contaId],
   );
+
+  // Build map year -> Set<month> of months with ANY value for this account
+  const yearMonthMap = useMemo(() => {
+    const map = new Map<number, Set<number>>();
+    const add = (y: number, m: number) => {
+      if (!map.has(y)) map.set(y, new Set());
+      map.get(y)!.add(m);
+    };
+    const accPurchaseIds = new Set(
+      purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+    );
+    for (const i of installments) {
+      if (i.parentType === "purchase") {
+        if (accPurchaseIds.has(i.parentId)) add(i.year, i.month);
+      } else if (i.parentType === "debit") {
+        const d = debits.find((x) => x.id === i.parentId);
+        if (d?.accountId === contaId) add(i.year, i.month);
+      } else if (i.parentType === "income") {
+        const inc = incomes.find((x) => x.id === i.parentId);
+        if (inc?.accountId === contaId) add(i.year, i.month);
+      }
+    }
+    for (const d of debits) {
+      if (d.accountId !== contaId || d.isParent || !d.date) continue;
+      const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+      if (y && m) add(y, m - 1);
+    }
+    for (const inc of incomes) {
+      if (inc.accountId !== contaId || inc.isParent || !inc.date) continue;
+      const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
+      if (y && m) add(y, m - 1);
+    }
+    for (const inv of investments) {
+      if (inv.accountId !== contaId || !inv.date) continue;
+      const [y, m] = inv.date.slice(0, 10).split("-").map(Number);
+      if (y && m) add(y, m - 1);
+    }
+    return map;
+  }, [accountCardIds, purchases, installments, debits, incomes, investments, contaId]);
+
+  const yearList = useMemo(() => {
+    const ys = Array.from(yearMonthMap.keys()).sort((a, b) => a - b);
+    return ys.length > 0 ? ys : [new Date().getFullYear()];
+  }, [yearMonthMap]);
+
+  const monthsForYear = useMemo(() => {
+    const set = yearMonthMap.get(year);
+    return set ? Array.from(set).sort((a, b) => a - b) : [];
+  }, [yearMonthMap, year]);
+
+  const [openYear, setOpenYear] = useState(false);
 
   if (!account) {
     return (
@@ -169,40 +222,60 @@ function AccountHome() {
       </Modal>
 
       {/* YEAR PICKER */}
-      <div className="mt-8 flex items-center justify-between gap-3">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Meses de {year}</h2>
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
-            onClick={() => setYear((y) => y - 1)}
+            type="button"
+            onClick={() => {
+              const idx = yearList.indexOf(year);
+              if (idx > 0) setYear(yearList[idx - 1]);
+              else setYear(yearList[0] - 1);
+            }}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Ano anterior"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
-          <label htmlFor="account-year" className="sr-only">
-            Selecionar ano
-          </label>
-          <select
-            id="account-year"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-0.5 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {(() => {
-              const baseY = today.getFullYear();
-              const ys: number[] = [];
-              for (let y = baseY - 5; y <= baseY + 5; y++) ys.push(y);
-              if (!ys.includes(year)) ys.push(year);
-              ys.sort((a, b) => a - b);
-              return ys.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ));
-            })()}
-          </select>
+          <Popover open={openYear} onOpenChange={setOpenYear}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="cursor-pointer rounded-md bg-transparent px-2 py-0.5 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Selecionar ano"
+              >
+                {year}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="center" className="w-28 p-1">
+              <ul className="max-h-64 overflow-y-auto">
+                {(yearList.includes(year) ? yearList : [...yearList, year].sort((a, b) => a - b)).map((y) => (
+                  <li key={y}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setYear(y);
+                        setOpenYear(false);
+                      }}
+                      className={cn(
+                        "w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-secondary",
+                        y === year && "bg-secondary font-semibold",
+                      )}
+                    >
+                      {y}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
           <button
-            onClick={() => setYear((y) => y + 1)}
+            type="button"
+            onClick={() => {
+              const idx = yearList.indexOf(year);
+              if (idx >= 0 && idx < yearList.length - 1) setYear(yearList[idx + 1]);
+              else setYear(yearList[yearList.length - 1] + 1);
+            }}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Próximo ano"
           >
@@ -211,9 +284,21 @@ function AccountHome() {
         </div>
       </div>
 
-      {/* MONTHS LIST */}
+
+      {/* MONTHS LIST — only months that have any value */}
       <div className="mt-4 space-y-2">
-        {Array.from({ length: 12 }, (_, m) => m).map((m) => {
+        {(() => {
+          const setM = new Set(monthsForYear);
+          if (year === today.getFullYear()) setM.add(currentMonth);
+          const monthList = Array.from(setM).sort((a, b) => a - b);
+          if (monthList.length === 0) {
+            return (
+              <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+                Nenhum lançamento em {year}.
+              </p>
+            );
+          }
+          return monthList.map((m) => {
           const sum = currentMonthSummary(
             year,
             m,
@@ -233,14 +318,14 @@ function AccountHome() {
               key={m}
               to="/contas/$contaId/$ano/$mes"
               params={{ contaId: account.id, ano: String(year), mes: String(m) }}
-              className={`group flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-glow sm:flex-row sm:items-center sm:gap-4 sm:p-4 ${
+              className={`group flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-glow xl:flex-row xl:items-center xl:gap-4 xl:p-4 ${
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
               {/* Header: número + nome do mês + balanço (mobile) / linha completa (desktop) */}
-              <div className="flex items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 xl:gap-4">
                 <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold sm:h-12 sm:w-12 ${
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold xl:h-12 xl:w-12 ${
                     isCurrent
                       ? "bg-gradient-primary text-primary-foreground"
                       : isFuture
@@ -266,15 +351,15 @@ function AccountHome() {
               </div>
 
               {/* Valores: abaixo no mobile, ao lado no desktop */}
-              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 sm:ml-auto sm:border-t-0 sm:pt-0">
-                <div className="flex flex-1 gap-3 sm:flex-none">
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 xl:ml-auto xl:border-t-0 xl:pt-0">
+                <div className="flex flex-1 gap-3 xl:flex-none">
                   <Mini label="Receb." value={sum.income} tone="success" />
                   <Mini label="Débitos" value={sum.debits} tone="debit" />
                   <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
                 </div>
                 <div className="min-w-0 text-right">
                   <p
-                    className={`truncate text-xs font-bold sm:text-sm ${
+                    className={`truncate text-xs font-bold xl:text-sm ${
                       monthBalance >= 0 ? "text-success" : "text-destructive"
                     }`}
                   >
@@ -282,11 +367,12 @@ function AccountHome() {
                   </p>
                   <p className="text-[10px] text-muted-foreground">balanço</p>
                 </div>
-                <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary sm:block" />
+                <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary xl:block" />
               </div>
             </Link>
           );
-        })}
+        });
+        })()}
       </div>
     </div>
   );

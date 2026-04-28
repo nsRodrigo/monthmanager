@@ -318,14 +318,14 @@ function AccountHome() {
               key={m}
               to="/contas/$contaId/$ano/$mes"
               params={{ contaId: account.id, ano: String(year), mes: String(m) }}
-              className={`group flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-glow sm:flex-row sm:items-center sm:gap-4 sm:p-4 ${
+              className={`group flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-glow xl:flex-row xl:items-center xl:gap-4 xl:p-4 ${
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
               {/* Header: número + nome do mês + balanço (mobile) / linha completa (desktop) */}
-              <div className="flex items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 xl:gap-4">
                 <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold sm:h-12 sm:w-12 ${
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold xl:h-12 xl:w-12 ${
                     isCurrent
                       ? "bg-gradient-primary text-primary-foreground"
                       : isFuture
@@ -351,15 +351,15 @@ function AccountHome() {
               </div>
 
               {/* Valores: abaixo no mobile, ao lado no desktop */}
-              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 sm:ml-auto sm:border-t-0 sm:pt-0">
-                <div className="flex flex-1 gap-3 sm:flex-none">
+              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 xl:ml-auto xl:border-t-0 xl:pt-0">
+                <div className="flex flex-1 gap-3 xl:flex-none">
                   <Mini label="Receb." value={sum.income} tone="success" />
                   <Mini label="Débitos" value={sum.debits} tone="debit" />
                   <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
                 </div>
                 <div className="min-w-0 text-right">
                   <p
-                    className={`truncate text-xs font-bold sm:text-sm ${
+                    className={`truncate text-xs font-bold xl:text-sm ${
                       monthBalance >= 0 ? "text-success" : "text-destructive"
                     }`}
                   >
@@ -367,7 +367,7 @@ function AccountHome() {
                   </p>
                   <p className="text-[10px] text-muted-foreground">balanço</p>
                 </div>
-                <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary sm:block" />
+                <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary xl:block" />
               </div>
             </Link>
           );

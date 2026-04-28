@@ -1,9 +1,14 @@
 import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Wallet, Eye, EyeOff } from "lucide-react";
+import { Wallet, Eye, EyeOff, Fingerprint } from "lucide-react";
+import {
+  isWebAuthnSupported,
+  isPlatformAuthenticatorAvailable,
+  loginWithPasskey,
+} from "@/lib/passkeys";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -24,6 +29,13 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [bioAvailable, setBioAvailable] = useState(false);
+
+  useEffect(() => {
+    if (isWebAuthnSupported()) {
+      isPlatformAuthenticatorAvailable().then(setBioAvailable);
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +81,23 @@ function AuthPage() {
     }
     if (result.redirected) return;
     navigate({ to: "/" });
+  };
+
+  const signInBio = async () => {
+    if (!email) {
+      setError("Digite seu email primeiro");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      await loginWithPasskey(email);
+      navigate({ to: "/" });
+    } catch (e: any) {
+      setError(e?.message ?? "Falha no login com biometria");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const title =
@@ -178,6 +207,17 @@ function AuthPage() {
                 </svg>
                 Continuar com Google
               </button>
+              {mode === "signin" && bioAvailable && (
+                <button
+                  type="button"
+                  onClick={signInBio}
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-input bg-background py-2.5 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-50"
+                >
+                  <Fingerprint className="h-4 w-4 text-primary" aria-hidden="true" />
+                  Entrar com biometria
+                </button>
+              )}
             </>
           )}
 

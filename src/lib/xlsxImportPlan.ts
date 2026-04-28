@@ -87,6 +87,11 @@ export function buildImportPlan(
     const dateStr = dateInParsedMonth(e, approxDay);
     const purchaseDateStr = e.date ?? undefined;
 
+    // Regra provisória: lançamentos antes de março/2026 são marcados como
+    // pagos/recebidos automaticamente (histórico já consolidado).
+    const isLegacy = e.year < 2026 || (e.year === 2026 && e.month < 2);
+    const paidFlag = isLegacy ? true : e.paid;
+
     if (e.kind === "purchase") {
       // Cartão de crédito: cria 1 cartão por sectionLabel limpo, todos sob a conta default
       const cardName = cleanCardLabel(e.sectionLabel);

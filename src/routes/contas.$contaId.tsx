@@ -79,6 +79,57 @@ function AccountHome() {
     [investments, contaId],
   );
 
+  // Build map year -> Set<month> of months with ANY value for this account
+  const yearMonthMap = useMemo(() => {
+    const map = new Map<number, Set<number>>();
+    const add = (y: number, m: number) => {
+      if (!map.has(y)) map.set(y, new Set());
+      map.get(y)!.add(m);
+    };
+    const accPurchaseIds = new Set(
+      purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+    );
+    for (const i of installments) {
+      if (i.parentType === "purchase") {
+        if (accPurchaseIds.has(i.parentId)) add(i.year, i.month);
+      } else if (i.parentType === "debit") {
+        const d = debits.find((x) => x.id === i.parentId);
+        if (d?.accountId === contaId) add(i.year, i.month);
+      } else if (i.parentType === "income") {
+        const inc = incomes.find((x) => x.id === i.parentId);
+        if (inc?.accountId === contaId) add(i.year, i.month);
+      }
+    }
+    for (const d of debits) {
+      if (d.accountId !== contaId || d.isParent || !d.date) continue;
+      const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+      if (y && m) add(y, m - 1);
+    }
+    for (const inc of incomes) {
+      if (inc.accountId !== contaId || inc.isParent || !inc.date) continue;
+      const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
+      if (y && m) add(y, m - 1);
+    }
+    for (const inv of investments) {
+      if (inv.accountId !== contaId || !inv.date) continue;
+      const [y, m] = inv.date.slice(0, 10).split("-").map(Number);
+      if (y && m) add(y, m - 1);
+    }
+    return map;
+  }, [accountCardIds, purchases, installments, debits, incomes, investments, contaId]);
+
+  const yearList = useMemo(() => {
+    const ys = Array.from(yearMonthMap.keys()).sort((a, b) => a - b);
+    return ys.length > 0 ? ys : [today.getFullYear()];
+  }, [yearMonthMap, today]);
+
+  const monthsForYear = useMemo(() => {
+    const set = yearMonthMap.get(year);
+    return set ? Array.from(set).sort((a, b) => a - b) : [];
+  }, [yearMonthMap, year]);
+
+  const [openYear, setOpenYear] = useState(false);
+
   if (!account) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center">

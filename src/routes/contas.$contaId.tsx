@@ -228,6 +228,7 @@ function AccountHome() {
           const monthBalance = sum.income - sum.debits - sum.cardsTotal;
           const isCurrent = year === today.getFullYear() && m === currentMonth;
           const isFuture = year > today.getFullYear() || (year === today.getFullYear() && m > currentMonth);
+          return (
             <Link
               key={m}
               to="/contas/$contaId/$ano/$mes"

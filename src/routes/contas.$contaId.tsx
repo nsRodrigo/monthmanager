@@ -52,6 +52,7 @@ function AccountHome() {
 
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const currentMonth = today.getMonth();
 
   const accountCardIds = useMemo(

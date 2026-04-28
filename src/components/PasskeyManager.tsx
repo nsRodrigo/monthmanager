@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Fingerprint, Trash2, Plus, Check, AlertCircle } from "lucide-react";
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
-  registerPasskey,
-  listMyPasskeys,
-  removePasskey,
+  getAccessToken,
+  browserStartRegistration,
 } from "@/lib/passkeys";
+import {
+  startRegistration as srvStartReg,
+  finishRegistration as srvFinishReg,
+  listPasskeys as srvList,
+  deletePasskey as srvDelete,
+} from "@/server/webauthn";
+import { supabase } from "@/integrations/supabase/client";
 
 type Passkey = {
   id: string;
@@ -16,6 +23,12 @@ type Passkey = {
 };
 
 export function PasskeyManager() {
+  const startRegFn = useServerFn(srvStartReg);
+  const finishRegFn = useServerFn(srvFinishReg);
+  const listFn = useServerFn(srvList);
+  const deleteFn = useServerFn(srvDelete);
+
+  const [hydrated, setHydrated] = useState(false);
   const [supported, setSupported] = useState(false);
   const [platformAvailable, setPlatformAvailable] = useState(false);
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
@@ -27,18 +40,28 @@ export function PasskeyManager() {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
+    setHydrated(true);
     setSupported(isWebAuthnSupported());
     isPlatformAuthenticatorAvailable().then(setPlatformAvailable);
-    refresh();
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    refresh();
+  }, [hydrated]);
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const list = (await listMyPasskeys()) as Passkey[];
-      setPasskeys(list);
-    } catch (e) {
-      // silencioso — provavelmente sem sessão
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session?.access_token) {
+        setPasskeys([]);
+        return;
+      }
+      const list = await listFn({ data: { accessToken: sess.session.access_token } });
+      setPasskeys(Array.isArray(list) ? (list as Passkey[]) : []);
+    } catch {
+      setPasskeys([]);
     } finally {
       setLoading(false);
     }
@@ -60,7 +83,12 @@ export function PasskeyManager() {
     setSuccess(null);
     setBusy(true);
     try {
-      await registerPasskey(deviceName.trim() || guessDeviceName());
+      if (!isWebAuthnSupported()) throw new Error("Seu navegador não suporta biometria");
+      const accessToken = await getAccessToken();
+      const name = deviceName.trim() || guessDeviceName();
+      const options = await startRegFn({ data: { accessToken, deviceName: name } });
+      const response = await browserStartRegistration({ optionsJSON: options as any });
+      await finishRegFn({ data: { accessToken, response, deviceName: name } });
       setSuccess("Biometria cadastrada!");
       setShowForm(false);
       setDeviceName("");
@@ -76,7 +104,8 @@ export function PasskeyManager() {
     if (!confirm("Remover esta biometria?")) return;
     setBusy(true);
     try {
-      await removePasskey(id);
+      const accessToken = await getAccessToken();
+      await deleteFn({ data: { accessToken, id } });
       await refresh();
     } catch (e: any) {
       setError(e?.message ?? "Erro ao remover");
@@ -84,6 +113,10 @@ export function PasskeyManager() {
       setBusy(false);
     }
   };
+
+  if (!hydrated) {
+    return <p className="text-xs text-muted-foreground">Carregando…</p>;
+  }
 
   if (!supported) {
     return (
@@ -159,7 +192,10 @@ export function PasskeyManager() {
         </p>
       )}
       {success && (
-        <p role="status" className="flex items-center gap-1.5 rounded-lg bg-success/10 p-2 text-xs text-success">
+        <p
+          role="status"
+          className="flex items-center gap-1.5 rounded-lg bg-success/10 p-2 text-xs text-success"
+        >
           <Check className="h-3.5 w-3.5" /> {success}
         </p>
       )}

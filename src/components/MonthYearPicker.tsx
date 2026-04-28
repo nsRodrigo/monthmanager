@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MONTHS } from "@/lib/format";
 import {
   useCards,
+  usePurchases,
   useInstallments,
   useDebits,
   useIncomes,

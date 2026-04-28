@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Upload, Settings, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User } from "lucide-react";
+import { LogOut, Upload, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 

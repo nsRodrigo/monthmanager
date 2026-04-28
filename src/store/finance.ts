@@ -887,6 +887,7 @@ export function useToggleInstallmentPaid() {
 export function useSetCardPaid() {
   const { user } = useAuth();
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { cardId: string; year: number; month: number; paid: boolean }) => {
       const { data: pursRaw, error: e1 } = await supabase
@@ -919,7 +920,21 @@ export function useSetCardPaid() {
         );
       if (e3) throw e3;
     },
-    onSuccess: () => inv(["installments", "card_payments"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["card_payments"] });
+      const prevCp = qc.getQueriesData<Record<string, boolean>>({ queryKey: ["card_payments"] });
+      const prevInst = qc.getQueriesData<Installment[]>({ queryKey: ["installments"] });
+      qc.setQueriesData<Record<string, boolean>>({ queryKey: ["card_payments"] }, (old) => {
+        if (!old) return old;
+        return { ...old, [`${args.cardId}-${args.year}-${args.month}`]: args.paid };
+      });
+      return { prevCp, prevInst };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prevCp?.forEach(([k, d]) => qc.setQueryData(k, d));
+      ctx?.prevInst?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["installments", "card_payments"]),
   });
 }
 

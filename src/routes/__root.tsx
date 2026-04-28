@@ -277,7 +277,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
-      <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-card/40 p-5 md:flex">
+      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col self-start overflow-y-auto border-r border-border bg-card/40 p-5 md:flex">
         <SidebarContent />
       </aside>
 

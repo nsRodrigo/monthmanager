@@ -20,6 +20,7 @@ import {
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
+  getMonthInvestments,
   isCardFullyPaid,
   type Installment,
   type Debit,
@@ -92,6 +93,7 @@ function AccountMonth() {
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
   const [openInvest, setOpenInvest] = useState(false);
+  const [openPurchase, setOpenPurchase] = useState(false);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
@@ -105,35 +107,14 @@ function AccountMonth() {
     [cards, contaId],
   );
 
-  // hidden cards per month (persisted in localStorage); a card stays hidden
-  // for a given month until the user un-hides it OR new purchases land in it.
-  const hiddenKey = `fin:hiddenCards:${contaId}:${year}:${month}`;
-  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>([]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(hiddenKey);
-      setHiddenCardIds(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      setHiddenCardIds([]);
-    }
-  }, [hiddenKey]);
-  const persistHidden = (next: string[]) => {
-    setHiddenCardIds(next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(hiddenKey, JSON.stringify(next));
-    }
-  };
-  const hideCardForMonth = (cardId: string) => {
-    if (hiddenCardIds.includes(cardId)) return;
-    persistHidden([...hiddenCardIds, cardId]);
-  };
-  const restoreHiddenCards = () => persistHidden([]);
-
   const accountCardIds = new Set(accountCards.map((c) => c.id));
   const debits = allDebits.filter((d) => d.accountId === contaId);
   const incomes = allIncomes.filter((i) => i.accountId === contaId);
-  const investments = allInvestments.filter((i) => i.accountId === contaId);
+  const investments = getMonthInvestments(
+    allInvestments.filter((i) => i.accountId === contaId),
+    year,
+    month,
+  );
 
   const visiblePurchaseIds = new Set(
     purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),

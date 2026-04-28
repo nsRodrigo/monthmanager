@@ -287,19 +287,13 @@ function AccountHome() {
 
       {/* MONTHS LIST — only months that have any value */}
       <div className="mt-4 space-y-2">
-        {(() => {
-          const setM = new Set(monthsForYear);
-          if (year === today.getFullYear()) setM.add(currentMonth);
-          const monthList = Array.from(setM).sort((a, b) => a - b);
-          if (monthList.length === 0) {
-            return (
-              <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
-                Nenhum lançamento em {year}.
-              </p>
-            );
-          }
-          return monthList.map((m) => {
-          const sum = currentMonthSummary(
+        {monthsForYear.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+            Nenhum lançamento em {year}.
+          </p>
+        ) : (
+          monthsForYear.map((m) => {
+            const sum = currentMonthSummary(
             year,
             m,
             accountCardIds,
@@ -309,11 +303,12 @@ function AccountHome() {
             purchases,
             installments,
           );
-          const movement = sum.income + sum.debits + sum.cardsTotal;
-          const monthBalance = sum.income - sum.debits - sum.cardsTotal;
-          const isCurrent = year === today.getFullYear() && m === currentMonth;
-          const isFuture = year > today.getFullYear() || (year === today.getFullYear() && m > currentMonth);
-          return (
+            const movement = sum.income + sum.debits + sum.cardsTotal;
+            const monthBalance = sum.income - sum.debits - sum.cardsTotal;
+            const isCurrent = year === today.getFullYear() && m === currentMonth;
+            const isFuture = year > today.getFullYear() || (year === today.getFullYear() && m > currentMonth);
+
+            return (
             <Link
               key={m}
               to="/contas/$contaId/$ano/$mes"
@@ -370,9 +365,9 @@ function AccountHome() {
                 <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary xl:block" />
               </div>
             </Link>
-          );
-        });
-        })()}
+            );
+          })
+        )}
       </div>
     </div>
   );

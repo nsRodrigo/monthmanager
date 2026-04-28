@@ -120,8 +120,8 @@ function AccountHome() {
 
   const yearList = useMemo(() => {
     const ys = Array.from(yearMonthMap.keys()).sort((a, b) => a - b);
-    return ys.length > 0 ? ys : [today.getFullYear()];
-  }, [yearMonthMap, today]);
+    return ys.length > 0 ? ys : [new Date().getFullYear()];
+  }, [yearMonthMap]);
 
   const monthsForYear = useMemo(() => {
     const set = yearMonthMap.get(year);

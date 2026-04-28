@@ -6,8 +6,19 @@ import {
 } from "@simplewebauthn/browser";
 import { supabase } from "@/integrations/supabase/client";
 
+export function isInIframe() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 export function isWebAuthnSupported() {
-  return typeof window !== "undefined" && browserSupportsWebAuthn();
+  if (typeof window === "undefined") return false;
+  if (isInIframe()) return false;
+  return browserSupportsWebAuthn();
 }
 
 export async function isPlatformAuthenticatorAvailable() {

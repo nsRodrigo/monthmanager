@@ -4,6 +4,7 @@ import { Fingerprint, ScanFace, Monitor, AlertCircle, Trash2 } from "lucide-reac
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
+  isInIframe,
   getAccessToken,
   browserStartRegistration,
 } from "@/lib/passkeys";
@@ -158,6 +159,20 @@ export function PasskeyManager() {
 
   if (!hydrated || loading) {
     return <p className="text-xs text-muted-foreground">Carregando…</p>;
+  }
+
+  if (isInIframe()) {
+    return (
+      <div className="rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            A biometria não funciona dentro do preview do editor. Abra o app publicado
+            no navegador (ou instale como PWA) para ativar Face ID, Windows Hello ou digital.
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!supported) {

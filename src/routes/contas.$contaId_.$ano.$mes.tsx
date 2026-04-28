@@ -397,6 +397,12 @@ function AccountMonth() {
         defaultMonth={month}
         fixedCardId={purchaseFor ?? undefined}
       />
+      <AddPurchaseDialog
+        open={openPurchase}
+        onClose={() => setOpenPurchase(false)}
+        defaultYear={year}
+        defaultMonth={month}
+      />
       <AddInvestmentDialog
         open={openInvest}
         onClose={() => setOpenInvest(false)}

@@ -303,75 +303,79 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
-        {/* CARDS */}
-        <GroupedSection
-          icon={CreditCard}
-          title="CARTÕES DE CRÉDITO"
-          description="Faturas e compras no crédito"
-          tone="credit"
-          total={totalCards}
-          count={accountCards.filter((c) => !hiddenCardIds.includes(c.id)).length}
-          empty={accountCards.length === 0}
-          emptyText="Nenhum cartão vinculado a esta conta."
-        >
-          {accountCards
-            .filter((c) => !hiddenCardIds.includes(c.id))
+        {/* CARDS — somente cartões com movimento no mês */}
+        {(() => {
+          const cardsWithMovement = accountCards
             .map((c) => {
-              const cardInst = monthInst.filter((i) => {
+              const items = monthInst.filter((i) => {
                 if (i.parentType !== "purchase") return false;
                 const pur = purchases.find((p) => p.id === i.parentId);
                 return pur?.cardId === c.id;
               });
-              const total = cardInst.reduce((s, i) => s + i.amount, 0);
-              const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
-              // due date approx: due_day of card in current month
-              const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
-              const dueDate = new Date(year, month, Math.min(dueDay, 28));
-              return (
-                <CardRow
-                  key={c.id}
-                  cardName={c.name}
-                  cardColor={c.color}
-                  total={total}
-                  paid={paid}
-                  count={cardInst.length}
-                  dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                  onTogglePaid={() =>
-                    setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
-                  }
-                  onAdd={() => setPurchaseFor(c.id)}
-                  onHideMonth={
-                    cardInst.length === 0 ? () => hideCardForMonth(c.id) : undefined
-                  }
-                  detailHref={{ contaId, ano, mes, cartaoId: c.id }}
-                  items={cardInst}
-                  purchases={purchases}
-                  onToggleInst={(id, p) => toggleInst(id, p)}
-                  onEditInst={(inst) => {
-                    const pur = purchases.find((p) => p.id === inst.parentId);
-                    if (!pur) return;
-                    setEditing({
-                      inst,
-                      label: pur.description,
-                      subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
-                        pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
-                      }`,
-                      onDeleteParent: () => removePurchase.mutate(pur.id),
-                    });
-                  }}
-                />
-              );
-            })}
-          {hiddenCardIds.length > 0 && (
-            <button
-              onClick={restoreHiddenCards}
-              className="mt-2 w-full rounded-xl border border-dashed border-border py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              return { card: c, items };
+            })
+            .filter(({ items }) => items.length > 0);
+
+          return (
+            <GroupedSection
+              icon={CreditCard}
+              title="CARTÕES DE CRÉDITO"
+              description="Faturas e compras no crédito"
+              tone="credit"
+              totalTone="debit"
+              total={totalCards}
+              count={cardsWithMovement.length}
+              empty={accountCards.length === 0}
+              emptyText="Nenhum cartão vinculado a esta conta."
+              onAdd={accountCards.length > 0 ? () => setOpenPurchase(true) : undefined}
+              addLabel="Adicionar gasto a um cartão"
             >
-              Mostrar {hiddenCardIds.length}{" "}
-              {hiddenCardIds.length === 1 ? "cartão oculto" : "cartões ocultos"} neste mês
-            </button>
-          )}
-        </GroupedSection>
+              {cardsWithMovement.length === 0 ? (
+                <p className="px-4 py-3 text-center text-xs text-muted-foreground">
+                  Nenhum cartão com lançamentos neste mês.
+                </p>
+              ) : (
+                cardsWithMovement.map(({ card: c, items: cardInst }) => {
+                  const total = cardInst.reduce((s, i) => s + i.amount, 0);
+                  const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
+                  const dueDate = new Date(year, month, Math.min(dueDay, 28));
+                  return (
+                    <CardRow
+                      key={c.id}
+                      cardName={c.name}
+                      cardColor={c.color}
+                      total={total}
+                      paid={paid}
+                      count={cardInst.length}
+                      dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
+                      onTogglePaid={() =>
+                        setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
+                      }
+                      onAdd={() => setPurchaseFor(c.id)}
+                      detailHref={{ contaId, ano, mes, cartaoId: c.id }}
+                      items={cardInst}
+                      purchases={purchases}
+                      onToggleInst={(id, p) => toggleInst(id, p)}
+                      onEditInst={(inst) => {
+                        const pur = purchases.find((p) => p.id === inst.parentId);
+                        if (!pur) return;
+                        setEditing({
+                          inst,
+                          label: pur.description,
+                          subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
+                            pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
+                          }`,
+                          onDeleteParent: () => removePurchase.mutate(pur.id),
+                        });
+                      }}
+                    />
+                  );
+                })
+              )}
+            </GroupedSection>
+          );
+        })()}
       </div>
 
       <AddDebitDialog

@@ -284,6 +284,7 @@ export type Database = {
           account_id: string
           amount: number
           created_at: string
+          date: string
           id: string
           percentage: number
           type: string
@@ -293,6 +294,7 @@ export type Database = {
           account_id: string
           amount: number
           created_at?: string
+          date?: string
           id?: string
           percentage?: number
           type: string
@@ -302,6 +304,7 @@ export type Database = {
           account_id?: string
           amount?: number
           created_at?: string
+          date?: string
           id?: string
           percentage?: number
           type?: string

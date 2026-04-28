@@ -1,0 +1,1 @@
+ALTER TABLE public.investments ADD COLUMN date date NOT NULL DEFAULT CURRENT_DATE;

@@ -439,6 +439,7 @@ function GroupedSection({
   title,
   description,
   tone,
+  totalTone,
   onAdd,
   addLabel,
   empty,
@@ -452,6 +453,7 @@ function GroupedSection({
   title: string;
   description: string;
   tone: Tone;
+  totalTone?: Tone;
   onAdd?: () => void;
   addLabel?: string;
   empty: boolean;
@@ -462,6 +464,7 @@ function GroupedSection({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const totalColor = toneText[totalTone ?? tone];
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
       {/* Header (clickable to toggle) */}
@@ -481,7 +484,7 @@ function GroupedSection({
           </div>
           {typeof total === "number" && (
             <div className="flex shrink-0 flex-col items-end">
-              <p className={`text-sm font-bold ${toneText[tone]}`}>{formatCurrency(total)}</p>
+              <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
               {typeof count === "number" && (
                 <p className="text-[10px] text-muted-foreground">
                   {count} {count === 1 ? "item" : "itens"}

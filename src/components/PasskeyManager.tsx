@@ -4,6 +4,7 @@ import { Fingerprint, ScanFace, Monitor, AlertCircle, Trash2 } from "lucide-reac
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
+  isInIframe,
   getAccessToken,
   browserStartRegistration,
 } from "@/lib/passkeys";

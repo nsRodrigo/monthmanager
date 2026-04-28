@@ -3,8 +3,9 @@ import { Modal, Field, inputClass } from "./Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check } from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff } from "lucide-react";
 import { PasskeyManager } from "./PasskeyManager";
+import { supabase } from "@/integrations/supabase/client";
 
 export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
@@ -13,23 +14,58 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
   const { theme, setTheme } = useTheme();
 
   const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState("");
+
+  // Identifica se o usuário tem login por email/senha (e não só OAuth Google)
+  const identities = (user?.identities ?? []) as Array<{ provider: string }>;
+  const hasPasswordLogin =
+    identities.some((i) => i.provider === "email") ||
+    (identities.length === 0 && !!user?.email); // fallback
+
+  const [showPwd, setShowPwd] = useState(false);
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [pwdVisible, setPwdVisible] = useState(false);
+  const [pwdMsg, setPwdMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setName(profile?.displayName ?? "");
-      setAvatar(profile?.avatarUrl ?? "");
+      setShowPwd(false);
+      setNewPwd("");
+      setConfirmPwd("");
+      setPwdMsg(null);
     }
   }, [open, profile]);
 
   const save = () => {
     update.mutate(
-      {
-        displayName: name.trim() || null,
-        avatarUrl: avatar.trim() || null,
-      },
+      { displayName: name.trim() || null },
       { onSuccess: () => onClose() },
     );
+  };
+
+  const changePassword = async () => {
+    setPwdMsg(null);
+    if (newPwd.length < 6) {
+      setPwdMsg({ type: "err", text: "A senha deve ter pelo menos 6 caracteres." });
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      setPwdMsg({ type: "err", text: "As senhas não coincidem." });
+      return;
+    }
+    setPwdSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPwd });
+    setPwdSaving(false);
+    if (error) {
+      setPwdMsg({ type: "err", text: error.message });
+      return;
+    }
+    setPwdMsg({ type: "ok", text: "Senha alterada com sucesso!" });
+    setNewPwd("");
+    setConfirmPwd("");
+    setTimeout(() => setShowPwd(false), 1200);
   };
 
   const initials = (name || profile?.displayName || user?.email || "?")
@@ -52,9 +88,9 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
         {/* Avatar + email */}
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
-            {avatar ? (
+            {profile?.avatarUrl ? (
               <img
-                src={avatar}
+                src={profile.avatarUrl}
                 alt=""
                 className="h-full w-full object-cover"
                 onError={(e) => {
@@ -78,17 +114,6 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
             placeholder="Como devemos te chamar?"
             className={inputClass}
             maxLength={80}
-          />
-        </Field>
-
-        <Field label="URL do avatar (opcional)">
-          <input
-            value={avatar}
-            onChange={(e) => setAvatar(e.target.value)}
-            placeholder="https://…"
-            className={inputClass}
-            maxLength={500}
-            inputMode="url"
           />
         </Field>
 
@@ -132,6 +157,77 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           </p>
           <PasskeyManager />
         </div>
+
+        {/* Alterar senha (apenas se tiver login por senha) */}
+        {hasPasswordLogin && (
+          <div className="border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={() => setShowPwd((v) => !v)}
+              className="flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 text-left hover:bg-secondary/50"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <KeyRound className="h-4 w-4 text-primary" /> Alterar senha
+              </span>
+              <span className="text-xs text-muted-foreground">{showPwd ? "Fechar" : "Abrir"}</span>
+            </button>
+
+            {showPwd && (
+              <div className="mt-3 space-y-2 rounded-lg border border-border bg-card p-3">
+                <Field label="Nova senha">
+                  <div className="relative">
+                    <input
+                      type={pwdVisible ? "text" : "password"}
+                      value={newPwd}
+                      onChange={(e) => setNewPwd(e.target.value)}
+                      className={inputClass}
+                      autoComplete="new-password"
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPwdVisible((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-secondary"
+                      aria-label={pwdVisible ? "Ocultar" : "Mostrar"}
+                    >
+                      {pwdVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </Field>
+                <Field label="Confirmar nova senha">
+                  <input
+                    type={pwdVisible ? "text" : "password"}
+                    value={confirmPwd}
+                    onChange={(e) => setConfirmPwd(e.target.value)}
+                    className={inputClass}
+                    autoComplete="new-password"
+                    minLength={6}
+                  />
+                </Field>
+
+                {pwdMsg && (
+                  <p
+                    className={`rounded-lg p-2 text-xs ${
+                      pwdMsg.type === "ok"
+                        ? "bg-success/10 text-success"
+                        : "bg-destructive/10 text-destructive"
+                    }`}
+                  >
+                    {pwdMsg.text}
+                  </p>
+                )}
+
+                <button
+                  onClick={changePassword}
+                  disabled={pwdSaving || !newPwd || !confirmPwd}
+                  className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {pwdSaving ? "Salvando…" : "Atualizar senha"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <button

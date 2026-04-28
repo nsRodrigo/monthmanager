@@ -83,6 +83,23 @@ function AuthPage() {
     navigate({ to: "/" });
   };
 
+  const signInBio = async () => {
+    if (!email) {
+      setError("Digite seu email primeiro");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      await loginWithPasskey(email);
+      navigate({ to: "/" });
+    } catch (e: any) {
+      setError(e?.message ?? "Falha no login com biometria");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const title =
     mode === "signin" ? "Entre na sua conta" : mode === "signup" ? "Crie sua conta" : "Recuperar senha";
 

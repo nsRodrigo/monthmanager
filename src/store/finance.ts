@@ -1039,12 +1039,24 @@ export function useAddDebit() {
 
 export function useToggleDebitPaid() {
   const inv = useInvalidate();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; paid: boolean }) => {
       const { error } = await supabase.from("debits").update({ paid: args.paid }).eq("id", args.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["debits"]),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["debits"] });
+      const prev = qc.getQueriesData<Debit[]>({ queryKey: ["debits"] });
+      qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
+        old ? old.map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["debits"]),
   });
 }
 

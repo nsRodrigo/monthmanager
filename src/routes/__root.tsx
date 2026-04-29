@@ -12,6 +12,7 @@ import { useProfile } from "@/store/profile";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { BiometricLock } from "@/components/BiometricLock";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -329,9 +330,11 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <AccountFilterProvider>
-            <AuthGate>
-              <Outlet />
-            </AuthGate>
+            <BiometricLock>
+              <AuthGate>
+                <Outlet />
+              </AuthGate>
+            </BiometricLock>
             <InstallPrompt />
           </AccountFilterProvider>
         </AuthProvider>

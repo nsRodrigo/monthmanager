@@ -23,7 +23,7 @@ type Passkey = {
   last_used_at: string | null;
 };
 
-type MethodKey = "biometric" | "faceid" | "windows-hello";
+type MethodKey = "biometric" | "faceid" | "windows-hello" | "face-android";
 
 type Method = {
   key: MethodKey;
@@ -70,7 +70,7 @@ export function PasskeyManager() {
       description: "Reconhecimento facial do iPhone/iPad",
       icon: ScanFace,
       matches: (n) => /face\s?id|iphone|ipad/i.test(n),
-      defaultName: platform.isIOS ? "Face ID" : "Face ID",
+      defaultName: "Face ID",
       available: platform.isIOS && platformAvailable,
     },
     {
@@ -83,17 +83,32 @@ export function PasskeyManager() {
       available: platform.isWindows && platformAvailable,
     },
     {
+      key: "face-android",
+      label: "Reconhecimento facial",
+      description: "Face Unlock do Android",
+      icon: ScanFace,
+      // Casa apenas com nomes que mencionem "face" / "rosto" no Android
+      matches: (n) => /face\s?unlock|rosto|android.*face|face.*android/i.test(n),
+      defaultName: "Android Face Unlock",
+      // No WebAuthn o Android decide o método na hora; tecnicamente este
+      // toggle cadastra outra passkey marcada como "face".
+      available: platform.isAndroid && platformAvailable,
+    },
+    {
       key: "biometric",
-      label: "Biometria",
+      label: platform.isAndroid ? "Digital" : "Biometria",
       description: platform.isAndroid
-        ? "Digital ou face do Android"
+        ? "Impressão digital do Android"
         : platform.isMac
           ? "Touch ID do Mac"
           : "Digital ou chave de segurança",
       icon: Fingerprint,
-      matches: (n) => /digital|biometr|touch|android|fingerprint/i.test(n),
+      // Não casar com nomes de Face Unlock no Android
+      matches: (n) =>
+        /digital|biometr|touch|fingerprint/i.test(n) ||
+        (/android/i.test(n) && !/face|rosto/i.test(n)),
       defaultName: platform.isAndroid
-        ? "Android"
+        ? "Android Digital"
         : platform.isMac
           ? "Touch ID"
           : "Biometria",

@@ -739,9 +739,7 @@ function PurchaseInstRow({
         </p>
       </button>
       <div className="flex flex-col items-end gap-0.5">
-        <p className="text-sm font-bold">
-          {formatCurrency(isInstallment ? purchase.totalAmount : inst.amount)}
-        </p>
+        <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
         {isInstallment && (
           <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
             {inst.number}/{inst.total}

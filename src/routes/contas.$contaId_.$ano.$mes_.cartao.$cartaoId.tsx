@@ -14,7 +14,7 @@ import {
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
-import { ChevronLeft, Plus, Check, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, Plus, Check, Pencil, Trash2, CheckSquare, Square } from "lucide-react";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
 
@@ -104,16 +104,51 @@ function CardInvoice() {
             <h1 className="text-2xl font-bold tracking-tight">{card.name}</h1>
           </div>
           <button
-            onClick={() => setCardPaid.mutate({ cardId: cartaoId, year, month, paid: !fullyPaid })}
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+            type="button"
+            onClick={() => {
+              setCardPaid.mutate(
+                { cardId: cartaoId, year, month, paid: !fullyPaid },
+                {
+                  onError: (e: any) =>
+                    alert(`Erro ao atualizar fatura: ${e?.message ?? "tente novamente"}`),
+                },
+              );
+            }}
+            disabled={setCardPaid.isPending}
+            className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
               fullyPaid
                 ? "bg-success/15 text-success hover:bg-success/25"
                 : "bg-warning/15 text-warning hover:bg-warning/25"
             }`}
           >
-            {fullyPaid ? "✓ Fatura paga" : "Marcar paga"}
+            {setCardPaid.isPending ? "..." : fullyPaid ? "✓ Fatura paga" : "Marcar paga"}
           </button>
         </div>
+
+        {monthInst.length > 0 && (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                const allPaid = monthInst.every((i) => i.paid);
+                monthInst.forEach((i) => {
+                  if (i.paid !== !allPaid) toggleInst(i.id, !allPaid);
+                });
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary/80"
+            >
+              {monthInst.every((i) => i.paid) ? (
+                <>
+                  <Square className="h-3.5 w-3.5" /> Desmarcar todas
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="h-3.5 w-3.5" /> Marcar todas como pagas
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <Stat label="Total" value={formatCurrency(total)} />

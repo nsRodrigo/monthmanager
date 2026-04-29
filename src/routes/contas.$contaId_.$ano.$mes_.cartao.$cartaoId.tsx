@@ -169,23 +169,31 @@ function CardInvoice() {
 
       <div className="space-y-4">
         {groups.map(({ purchase, items }) => {
-          const totalPurchase = items.reduce((s, i) => s + i.amount, 0);
+          // Valor em destaque = valor da parcela do mês.
+          // Se houver múltiplas parcelas da mesma compra no mesmo mês (raro),
+          // mostramos a soma — ainda assim continua sendo "o que cai neste mês".
+          const headlineAmount =
+            items.length === 1 ? items[0].amount : items.reduce((s, i) => s + i.amount, 0);
+          const installmentsCount = purchase.installmentsCount;
           return (
             <div
               key={purchase.id}
               className="overflow-hidden rounded-2xl border border-border bg-card"
             >
               <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{purchase.description}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Compra em {formatDate(purchase.date)} · Total{" "}
-                    {formatCurrency(purchase.totalAmount)}
-                    {purchase.installmentsCount > 1 && ` em ${purchase.installmentsCount}x`}
+                    Compra em {formatDate(purchase.date)}
+                    {installmentsCount > 1
+                      ? ` · ${formatCurrency(purchase.totalAmount)} em ${installmentsCount}x`
+                      : ` · ${formatCurrency(purchase.totalAmount)}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">{formatCurrency(totalPurchase)}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-base font-bold text-credit">
+                    {formatCurrency(headlineAmount)}
+                  </span>
                   <button
                     onClick={() => {
                       if (confirm(`Excluir "${purchase.description}" e todas as parcelas?`)) {

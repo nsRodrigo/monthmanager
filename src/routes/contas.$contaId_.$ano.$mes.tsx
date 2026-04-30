@@ -799,7 +799,9 @@ function DebitRow({
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(debit.date)}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {formatDate(debit.date)} · {formatCurrency(debit.amount)} à vista
+        </p>
       </div>
       <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
       <button
@@ -841,7 +843,10 @@ function IncomeRow({
         >
           {income.description}
         </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(income.date)}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {formatDate(income.date)} · {formatCurrency(income.amount)}{" "}
+          {income.received ? "recebido" : "a receber"}
+        </p>
       </div>
       <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
       <button
@@ -901,7 +906,9 @@ function ParcelledRow({
           )}
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          venc. {formatDate(installment.dueDate)}
+          {formatDate(parent.date)} · {kind === "debit" ? "Débito" : "Recebimento"}{" "}
+          parcelado em {installment.total}x · Total {formatCurrency(parent.amount)} · venc.{" "}
+          {formatDate(installment.dueDate)}
         </p>
       </button>
       <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>

@@ -154,7 +154,7 @@ function Consolidated() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
             const balance = computeAccountBalance(
@@ -202,7 +202,7 @@ function Consolidated() {
                 key={a.id}
                 to="/contas/$contaId"
                 params={{ contaId: a.id }}
-                className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
+                className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
               >
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div

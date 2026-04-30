@@ -85,14 +85,20 @@ export function PasskeyManager() {
     {
       key: "face-android",
       label: "Reconhecimento facial",
-      description: "Face Unlock do Android",
+      description: "Face Unlock do Android (apenas devices compatíveis)",
       icon: ScanFace,
-      // Casa apenas com nomes que mencionem "face" / "rosto" no Android
       matches: (n) => /face\s?unlock|rosto|android.*face|face.*android/i.test(n),
       defaultName: "Android Face Unlock",
-      // No WebAuthn o Android decide o método na hora; tecnicamente este
-      // toggle cadastra outra passkey marcada como "face".
-      available: platform.isAndroid && platformAvailable,
+      // Face Unlock só é exposto ao WebAuthn em devices que registraram o rosto
+      // como "strong biometric" no Android Keystore (ex.: Pixel 8+, Galaxy S24+).
+      // Na maioria dos Androids o sistema cai automaticamente pra digital — então
+      // só mostramos o toggle quando há um forte indício de suporte.
+      available:
+        platform.isAndroid &&
+        platformAvailable &&
+        /Pixel\s?[89]|Pixel\s?1[0-9]|SM-S(2[4-9]|[3-9])/i.test(
+          typeof navigator !== "undefined" ? navigator.userAgent : "",
+        ),
     },
     {
       key: "biometric",
@@ -204,7 +210,9 @@ export function PasskeyManager() {
   return (
     <div className="space-y-3">
       <ul className="space-y-2">
-        {methods.map((m) => {
+        {methods
+          .filter((m) => m.available || passkeys.some((p) => m.matches(p.device_name)))
+          .map((m) => {
           const Icon = m.icon;
           const pk = findPasskey(m);
           const on = !!pk;

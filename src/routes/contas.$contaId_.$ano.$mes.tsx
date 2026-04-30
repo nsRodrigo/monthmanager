@@ -799,7 +799,9 @@ function DebitRow({
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(debit.date)}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          {formatDate(debit.date)} · {formatCurrency(debit.amount)} à vista
+        </p>
       </div>
       <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
       <button

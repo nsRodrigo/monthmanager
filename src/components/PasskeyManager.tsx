@@ -210,7 +210,9 @@ export function PasskeyManager() {
   return (
     <div className="space-y-3">
       <ul className="space-y-2">
-        {methods.map((m) => {
+        {methods
+          .filter((m) => m.available || passkeys.some((p) => m.matches(p.device_name)))
+          .map((m) => {
           const Icon = m.icon;
           const pk = findPasskey(m);
           const on = !!pk;

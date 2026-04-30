@@ -202,7 +202,7 @@ function Consolidated() {
                 key={a.id}
                 to="/contas/$contaId"
                 params={{ contaId: a.id }}
-                className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
+                className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
               >
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div

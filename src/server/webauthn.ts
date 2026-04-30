@@ -81,7 +81,9 @@ export const startRegistration = createServerFn({ method: "POST" })
       })),
       authenticatorSelection: {
         residentKey: "preferred",
-        userVerification: "preferred",
+        // CRITICAL para app financeiro: exige challenge biométrico/PIN real,
+        // sem aproveitar "presença recente" do navegador.
+        userVerification: "required",
       },
     });
 
@@ -196,7 +198,8 @@ export const startAuthentication = createServerFn({ method: "POST" })
     // Failures (no user, no passkeys) are surfaced only at finishAuthentication.
     const options = await generateAuthenticationOptions({
       rpID: rpId,
-      userVerification: "preferred",
+      // CRITICAL: força digital/PIN/face REAL toda vez (sem silent auth).
+      userVerification: "required",
       allowCredentials,
     });
 

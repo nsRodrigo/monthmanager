@@ -906,7 +906,9 @@ function ParcelledRow({
           )}
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          venc. {formatDate(installment.dueDate)}
+          {formatDate(parent.date)} · {kind === "debit" ? "Débito" : "Recebimento"}{" "}
+          parcelado em {installment.total}x · Total {formatCurrency(parent.amount)} · venc.{" "}
+          {formatDate(installment.dueDate)}
         </p>
       </button>
       <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>

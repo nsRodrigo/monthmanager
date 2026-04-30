@@ -252,6 +252,9 @@ export const finishAuthentication = createServerFn({ method: "POST" })
       expectedChallenge: challengeRow.challenge,
       expectedOrigin: origin,
       expectedRPID: rpId,
+      // Garante que o autenticador efetivamente verificou o usuário
+      // (digital/PIN/face) — bloqueia falso positivo silencioso.
+      requireUserVerification: true,
       credential: {
         id: passkey.credential_id,
         publicKey: new Uint8Array(Buffer.from(passkey.public_key, "base64")),

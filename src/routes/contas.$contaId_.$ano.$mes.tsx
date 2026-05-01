@@ -844,8 +844,7 @@ function IncomeRow({
           {income.description}
         </p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(income.date)} · {formatCurrency(income.amount)}{" "}
-          {income.received ? "recebido" : "a receber"}
+          {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>
       </div>
       <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>

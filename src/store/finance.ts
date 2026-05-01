@@ -925,11 +925,28 @@ export function useSetCardPaid() {
     },
     onMutate: async (args) => {
       await qc.cancelQueries({ queryKey: ["card_payments"] });
+      await qc.cancelQueries({ queryKey: ["installments"] });
       const prevCp = qc.getQueriesData<Record<string, boolean>>({ queryKey: ["card_payments"] });
       const prevInst = qc.getQueriesData<Installment[]>({ queryKey: ["installments"] });
+      const prevPurchases = qc.getQueryData<Purchase[]>(["purchases"]) ?? [];
+      const purIds = new Set(
+        prevPurchases.filter((p) => p.cardId === args.cardId).map((p) => p.id),
+      );
       qc.setQueriesData<Record<string, boolean>>({ queryKey: ["card_payments"] }, (old) => {
         if (!old) return old;
         return { ...old, [`${args.cardId}-${args.year}-${args.month}`]: args.paid };
+      });
+      qc.setQueriesData<Installment[]>({ queryKey: ["installments"] }, (old) => {
+        if (!old) return old;
+        return old.map((i) =>
+          i.parentType === "purchase" &&
+          i.year === args.year &&
+          i.month === args.month &&
+          i.parentId &&
+          purIds.has(i.parentId)
+            ? { ...i, paid: args.paid }
+            : i,
+        );
       });
       return { prevCp, prevInst };
     },

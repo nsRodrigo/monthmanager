@@ -154,7 +154,7 @@ function Consolidated() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
             const balance = computeAccountBalance(

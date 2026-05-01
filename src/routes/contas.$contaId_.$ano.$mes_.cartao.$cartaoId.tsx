@@ -184,10 +184,10 @@ function CardInvoice() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{purchase.description}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Compra em {formatDate(purchase.date)}
+                    {formatDate(purchase.date)}
                     {installmentsCount > 1
                       ? ` · ${formatCurrency(purchase.totalAmount)} em ${installmentsCount}x`
-                      : ` · ${formatCurrency(purchase.totalAmount)}`}
+                      : ` · ${formatCurrency(purchase.totalAmount)} à vista`}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

@@ -734,8 +734,8 @@ function PurchaseInstRow({
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatDate(purchase.date)} ·{" "}
           {isInstallment
-            ? `${inst.total}x de ${formatCurrency(inst.amount)}`
-            : "1x sem juros"}
+            ? `${formatCurrency(purchase.totalAmount)} em ${inst.total}x`
+            : `${formatCurrency(purchase.totalAmount)} à vista`}
         </p>
       </button>
       <div className="flex flex-col items-end gap-0.5">

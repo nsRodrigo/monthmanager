@@ -844,8 +844,7 @@ function IncomeRow({
           {income.description}
         </p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(income.date)} · {formatCurrency(income.amount)}{" "}
-          {income.received ? "recebido" : "a receber"}
+          {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>
       </div>
       <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
@@ -906,8 +905,7 @@ function ParcelledRow({
           )}
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(parent.date)} · {kind === "debit" ? "Débito" : "Recebimento"}{" "}
-          parcelado em {installment.total}x · Total {formatCurrency(parent.amount)} · venc.{" "}
+          {formatDate(parent.date)} · {formatCurrency(parent.amount)} em {installment.total}x · venc.{" "}
           {formatDate(installment.dueDate)}
         </p>
       </button>

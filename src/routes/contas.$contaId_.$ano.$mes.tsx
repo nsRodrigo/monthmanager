@@ -32,7 +32,6 @@ import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronLeft,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -342,7 +341,6 @@ function AccountMonth() {
                         setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
                       }
                       onAdd={() => setPurchaseFor(c.id)}
-                      detailHref={{ contaId, ano, mes, cartaoId: c.id }}
                       items={cardInst}
                       purchases={purchases}
                       onToggleInst={(id, p) => toggleInst(id, p)}
@@ -532,7 +530,6 @@ function CardRow({
   onTogglePaid,
   onAdd,
   onHideMonth,
-  detailHref,
   items,
   purchases,
   onToggleInst,
@@ -547,7 +544,6 @@ function CardRow({
   onTogglePaid: () => void;
   onAdd: () => void;
   onHideMonth?: () => void;
-  detailHref: { contaId: string; ano: string; mes: string; cartaoId: string };
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T
     ? T extends Array<infer P>
@@ -595,7 +591,7 @@ function CardRow({
         {open ? (
           <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (
-          <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         )}
       </div>
 
@@ -616,14 +612,6 @@ function CardRow({
             >
               {paid ? "✓ Paga" : "Marcar paga"}
             </button>
-            <Link
-              to="/contas/$contaId/$ano/$mes/cartao/$cartaoId"
-              params={detailHref}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary/80"
-            >
-              Detalhes
-            </Link>
           </div>
 
           {items.length === 0 ? (

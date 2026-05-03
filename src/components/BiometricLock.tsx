@@ -44,12 +44,14 @@ export function BiometricLock({ children }: { children: ReactNode }) {
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hiddenAt = useRef<number | null>(null);
   const autoTriggered = useRef(false);
+  const initialLockDone = useRef(false);
 
   // Detect: user has passkeys + supported environment
   useEffect(() => {
     if (!user) {
       setEnabled(false);
       setLocked(false);
+      initialLockDone.current = false;
       return;
     }
     if (typeof window === "undefined") return;
@@ -60,7 +62,13 @@ export function BiometricLock({ children }: { children: ReactNode }) {
         const token = sess.session?.access_token;
         if (!token) return;
         const list = (await listFn({ data: { accessToken: token } })) as Array<unknown>;
-        if (Array.isArray(list) && list.length > 0) setEnabled(true);
+        if (Array.isArray(list) && list.length > 0) {
+          setEnabled(true);
+          if (!initialLockDone.current) {
+            initialLockDone.current = true;
+            setLocked(true);
+          }
+        }
       } catch {
         // silently disabled
       }
@@ -83,8 +91,8 @@ export function BiometricLock({ children }: { children: ReactNode }) {
       } else if (document.visibilityState === "visible") {
         const elapsed = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
         hiddenAt.current = null;
-        // Sempre bloqueia se voltou ao foreground depois de >= BG_MS
-        if (elapsed >= BG_MS) {
+        // Ao reabrir/voltar ao foreground, exige biometria imediatamente.
+        if (hiddenAt.current !== null || elapsed >= BG_MS) {
           setLocked(true);
         } else {
           resetIdle();
@@ -93,9 +101,8 @@ export function BiometricLock({ children }: { children: ReactNode }) {
     };
 
     // pageshow detecta retorno via bfcache (PWA reaberto)
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) setLocked(true);
-    };
+    const onPageShow = () => setLocked(true);
+    const onPageHide = () => setLocked(true);
 
     const events: Array<keyof DocumentEventMap> = [
       "mousemove",
@@ -107,6 +114,7 @@ export function BiometricLock({ children }: { children: ReactNode }) {
     events.forEach((e) => document.addEventListener(e, resetIdle, { passive: true }));
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("pagehide", onPageHide);
 
     resetIdle();
 
@@ -114,6 +122,7 @@ export function BiometricLock({ children }: { children: ReactNode }) {
       events.forEach((e) => document.removeEventListener(e, resetIdle));
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("pagehide", onPageHide);
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
   }, [enabled, user, locked]);

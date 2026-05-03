@@ -428,9 +428,9 @@ function Stat({
 function Mini({ label, value, tone }: { label: string; value: number; tone: "success" | "debit" | "credit" }) {
   const c = tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
   return (
-    <div className="text-right">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`text-xs font-semibold ${c}`}>{formatCurrency(value)}</p>
+    <div className="min-w-0 px-2 text-left first:pl-0 last:pr-0 sm:px-3">
+      <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`truncate text-xs font-semibold sm:text-sm ${c}`}>{formatCurrency(value)}</p>
     </div>
   );
 }

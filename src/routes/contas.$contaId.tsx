@@ -166,54 +166,45 @@ function AccountHome() {
 
       {/* HEADER + DASHBOARD */}
       <header className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3 sm:gap-4 sm:flex-1 min-w-0">
-            <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: account.color + "30", color: account.color }}
-            >
-              <Wallet className="h-6 w-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Conta
-              </p>
-              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
-                {account.name}
-              </h1>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(true)}
-            className="text-left transition-opacity hover:opacity-80 sm:text-right"
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: account.color + "30", color: account.color }}
           >
-            <p className="text-xs text-muted-foreground">Saldo atual · toque para ver detalhes do mês</p>
+            <Wallet className="h-6 w-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {account.type}
+            </p>
+            <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
+              {account.name}
+            </h1>
+          </div>
+          <div className="text-right">
             <p
-              className={`break-words text-2xl font-bold underline-offset-4 hover:underline sm:text-2xl md:text-3xl ${
+              className={`whitespace-nowrap text-sm font-bold sm:text-base ${
                 balance >= 0 ? "text-foreground" : "text-destructive"
               }`}
             >
               {formatCurrency(balance)}
             </p>
-          </button>
+            <p className="text-[10px] text-muted-foreground">saldo atual</p>
+          </div>
         </div>
-      </header>
 
-      <Modal open={detailsOpen} onClose={() => setDetailsOpen(false)} title={`${MONTHS[currentMonth]} · ${account.name}`}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Stat label="Recebimentos do mês" value={formatCurrency(cm.income)} tone="success" icon={ArrowUpRight} />
-          <Stat label="Débitos do mês" value={formatCurrency(cm.debits)} tone="debit" icon={ArrowDownRight} />
-          <Stat label="Faturas do mês" value={formatCurrency(cm.cardsTotal)} tone="credit" icon={CreditCard} />
-          <Stat label="Investido no mês" value={formatCurrency(monthInvested)} tone="primary" icon={TrendingUp} />
-          <Stat
-            label="Saldo previsto"
-            value={formatCurrency(expectedEnd)}
-            tone={expectedEnd >= 0 ? "success" : "debit"}
-            icon={Wallet}
-          />
+        <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border/60 pt-4 lg:grid-cols-4">
+          <MiniStat label="A receber" value={cm.income} tone="success" />
+          <MiniStat label="A pagar" value={cm.debits} tone="debit" />
+          <MiniStat label="Faturas" value={cm.cardsTotal} tone="credit" />
+          <MiniStat label="Previsto" value={expectedEnd} tone={expectedEnd >= 0 ? "success" : "debit"} />
         </div>
-      </Modal>
+        {monthInvested > 0 && (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Investido: <span className="font-semibold text-primary">{formatCurrency(monthInvested)}</span>
+          </p>
+        )}
+      </header>
 
       {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">

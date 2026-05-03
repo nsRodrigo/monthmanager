@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Modal } from "@/components/Modal";
 import {
   useAccounts,
   useCards,
@@ -20,10 +19,6 @@ import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  CreditCard,
-  TrendingUp,
   ChevronRight,
   Wallet,
   ChevronLeft,
@@ -55,7 +50,6 @@ function AccountHome() {
 
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const currentMonth = today.getMonth();
 
   const accountCardIds = useMemo(

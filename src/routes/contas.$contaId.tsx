@@ -298,56 +298,45 @@ function AccountHome() {
               key={m}
               to="/contas/$contaId/$ano/$mes"
               params={{ contaId: account.id, ano: String(year), mes: String(m) }}
-              className={`group flex flex-col gap-2 rounded-2xl border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-glow xl:flex-row xl:items-center xl:gap-4 xl:p-4 ${
+              className={`group block rounded-3xl border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
-              {/* Header: número + nome do mês + balanço (mobile) / linha completa (desktop) */}
-              <div className="flex items-center gap-3 xl:gap-4">
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold xl:h-12 xl:w-12 ${
-                    isCurrent
-                      ? "bg-gradient-primary text-primary-foreground"
-                      : isFuture
-                        ? "bg-secondary/50 text-muted-foreground"
-                        : "bg-secondary text-foreground"
-                  }`}
-                >
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-bold ${
+                  isCurrent
+                    ? "bg-gradient-primary text-primary-foreground"
+                    : isFuture
+                      ? "bg-secondary/50 text-muted-foreground"
+                      : "bg-secondary text-foreground"
+                }`}>
                   {String(m + 1).padStart(2, "0")}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold">{MONTHS[m]}</p>
-                    {isCurrent && (
-                      <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                        Atual
-                      </span>
-                    )}
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="truncate text-lg font-bold">{MONTHS[m]}</p>
+                    {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
                     Movimentado: {formatCurrency(movement)}
                   </p>
                 </div>
-              </div>
-
-              {/* Valores: abaixo no mobile, ao lado no desktop */}
-              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-2 xl:ml-auto xl:border-t-0 xl:pt-0">
-                <div className="flex flex-1 gap-3 xl:flex-none">
-                  <Mini label="Receb." value={sum.income} tone="success" />
-                  <Mini label="Débitos" value={sum.debits} tone="debit" />
-                  <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
-                </div>
-                <div className="min-w-0 text-right">
+                <div className="text-right">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Balanço</p>
                   <p
-                    className={`truncate text-xs font-bold xl:text-sm ${
+                    className={`whitespace-nowrap text-lg font-bold ${
                       monthBalance >= 0 ? "text-success" : "text-destructive"
                     }`}
                   >
                     {formatCurrency(monthBalance)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">balanço</p>
                 </div>
-                <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary xl:block" />
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3">
+                <Mini label="Receb." value={sum.income} tone="success" />
+                <Mini label="Débitos" value={sum.debits} tone="debit" />
+                <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
               </div>
             </Link>
             );

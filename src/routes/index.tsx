@@ -117,14 +117,13 @@ function Consolidated() {
       <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
         <p
-          className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl ${
+          className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
             expected >= 0 ? "text-foreground" : "text-destructive"
           }`}
         >
           {formatCurrency(expected)}
         </p>
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-5">
-          <Stat label="Saldo das contas" value={formatCurrency(accountBalance)} icon={Wallet} />
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
           <Stat
             label="A receber"
             value={formatCurrency(totalIncome)}
@@ -150,6 +149,9 @@ function Consolidated() {
             tone="primary"
           />
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(accountBalance)}</span>
+        </p>
       </section>
 
       <section className="mt-8">
@@ -204,7 +206,7 @@ function Consolidated() {
                 params={{ contaId: a.id }}
                 className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
               >
-                <div className="flex items-center gap-3 sm:gap-4">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2.5 sm:gap-4">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12"
                     style={{ backgroundColor: a.color + "25", color: a.color }}
@@ -217,9 +219,9 @@ function Consolidated() {
                       {a.type} · {cardCount} {cardCount === 1 ? "cartão" : "cartões"}
                     </p>
                   </div>
-                  <div className="min-w-0 text-right">
+                  <div className="text-right">
                     <p
-                      className={`truncate text-sm font-bold sm:text-base ${
+                      className={`whitespace-nowrap text-sm font-bold sm:text-base ${
                         balance >= 0 ? "text-foreground" : "text-destructive"
                       }`}
                     >
@@ -230,7 +232,7 @@ function Consolidated() {
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 lg:grid-cols-4">
                   <MiniStat label="A receber" value={accIncomesTotal} tone="success" />
                   <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
                   <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />

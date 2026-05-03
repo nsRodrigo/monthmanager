@@ -16,7 +16,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
 import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaId_.$ano.$mes'
-import { Route as ContasContaIdAnoMesCartaoCartaoIdRouteImport } from './routes/contas.$contaId_.$ano.$mes_.cartao.$cartaoId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -53,12 +52,6 @@ const ContasContaIdAnoMesRoute = ContasContaIdAnoMesRouteImport.update({
   path: '/contas/$contaId/$ano/$mes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContasContaIdAnoMesCartaoCartaoIdRoute =
-  ContasContaIdAnoMesCartaoCartaoIdRouteImport.update({
-    id: '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId',
-    path: '/contas/$contaId/$ano/$mes/cartao/$cartaoId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,7 +61,6 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
-  '/contas/$contaId/$ano/$mes/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,7 +70,6 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
-  '/contas/$contaId/$ano/$mes/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,7 +80,6 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId_/$ano/$mes': typeof ContasContaIdAnoMesRoute
-  '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId': typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,7 +91,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/contas/$contaId'
     | '/contas/$contaId/$ano/$mes'
-    | '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,7 +100,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/contas/$contaId'
     | '/contas/$contaId/$ano/$mes'
-    | '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
   id:
     | '__root__'
     | '/'
@@ -121,7 +109,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/contas/$contaId'
     | '/contas/$contaId_/$ano/$mes'
-    | '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,7 +119,6 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
   ContasContaIdAnoMesRoute: typeof ContasContaIdAnoMesRoute
-  ContasContaIdAnoMesCartaoCartaoIdRoute: typeof ContasContaIdAnoMesCartaoCartaoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -186,13 +172,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContasContaIdAnoMesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId': {
-      id: '/contas/$contaId_/$ano/$mes_/cartao/$cartaoId'
-      path: '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
-      fullPath: '/contas/$contaId/$ano/$mes/cartao/$cartaoId'
-      preLoaderRoute: typeof ContasContaIdAnoMesCartaoCartaoIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -204,8 +183,6 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ContasContaIdRoute: ContasContaIdRoute,
   ContasContaIdAnoMesRoute: ContasContaIdAnoMesRoute,
-  ContasContaIdAnoMesCartaoCartaoIdRoute:
-    ContasContaIdAnoMesCartaoCartaoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

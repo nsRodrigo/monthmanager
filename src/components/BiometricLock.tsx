@@ -89,11 +89,10 @@ export function BiometricLock({ children }: { children: ReactNode }) {
       if (document.visibilityState === "hidden") {
         hiddenAt.current = Date.now();
       } else if (document.visibilityState === "visible") {
-        const wasHidden = hiddenAt.current !== null;
         const elapsed = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
         hiddenAt.current = null;
-        // Ao reabrir/voltar ao foreground, exige biometria imediatamente.
-        if (wasHidden || elapsed >= BG_MS) {
+        // Em segundo plano: exige biometria após o timeout configurado.
+        if (elapsed >= BG_MS) {
           setLocked(true);
         } else {
           resetIdle();

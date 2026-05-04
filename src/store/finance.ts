@@ -677,8 +677,7 @@ export function useAddPurchase() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (p: Omit<Purchase, "id">) => {
-      // Need card's closing/due day to calculate the invoice month.
+    mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number }) => {
       const { data: card, error: eCard } = await supabase
         .from("cards")
         .select("closing_day,due_day")
@@ -698,19 +697,35 @@ export function useAddPurchase() {
         .select("id")
         .single();
       if (error) throw error;
-      const inst = buildInstallmentsForPurchase(
-        (data as { id: string }).id,
-        user!.id,
-        p.totalAmount,
-        p.installmentsCount,
-        p.date,
-        (card as { closing_day: number; due_day: number }).closing_day,
-        (card as { closing_day: number; due_day: number }).due_day,
-      );
+      const purchaseId = (data as { id: string }).id;
+      const anchor = Math.max(1, p.installmentNumber ?? 1);
+      let inst;
+      if (p.installmentsCount > 1 && anchor > 1) {
+        inst = buildInstallmentsAnchored(
+          purchaseId,
+          user!.id,
+          p.totalAmount,
+          p.installmentsCount,
+          anchor,
+          p.date,
+          "purchase",
+          true,
+        );
+      } else {
+        inst = buildInstallmentsForPurchase(
+          purchaseId,
+          user!.id,
+          p.totalAmount,
+          p.installmentsCount,
+          p.date,
+          (card as { closing_day: number; due_day: number }).closing_day,
+          (card as { closing_day: number; due_day: number }).due_day,
+        );
+      }
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
     },
-    onSuccess: () => inv(["purchases", "installments"]),
+    onSettled: () => inv(["purchases", "installments"]),
   });
 }
 

@@ -1137,8 +1137,10 @@ export function useAddIncome() {
       amount: number;
       date: string;
       installmentsCount?: number;
+      installmentNumber?: number;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
+      const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const { data: ins, error } = await supabase
         .from("incomes")
         .insert({
@@ -1155,14 +1157,25 @@ export function useAddIncome() {
         .single();
       if (error) throw error;
       if (count > 1) {
-        const inst = buildInstallments(
-          (ins as { id: string }).id,
-          "income",
-          user!.id,
-          i.amount,
-          count,
-          i.date,
-        );
+        const inst = anchor > 1
+          ? buildInstallmentsAnchored(
+              (ins as { id: string }).id,
+              user!.id,
+              i.amount,
+              count,
+              anchor,
+              i.date,
+              "income",
+              true,
+            )
+          : buildInstallments(
+              (ins as { id: string }).id,
+              "income",
+              user!.id,
+              i.amount,
+              count,
+              i.date,
+            );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       }

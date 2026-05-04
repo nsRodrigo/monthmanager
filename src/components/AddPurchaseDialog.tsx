@@ -23,6 +23,7 @@ export function AddPurchaseDialog({
   const [date, setDate] = useState("");
   const [cardId, setCardId] = useState("");
   const [installments, setInstallments] = useState("1");
+  const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
 
   useEffect(() => {
@@ -33,18 +34,22 @@ export function AddPurchaseDialog({
       setDescription("");
       setAmount("");
       setInstallments("1");
+      setInstallmentNumber("1");
       setIsInstallment(false);
     }
   }, [open, defaultYear, defaultMonth, cards, fixedCardId]);
 
   const submit = async () => {
     if (!description.trim() || !amount || !cardId) return;
+    const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
+    const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     await addPurchase.mutateAsync({
       cardId,
       description: description.trim(),
       totalAmount: parseFloat(amount),
       date,
-      installmentsCount: isInstallment ? Math.max(1, parseInt(installments)) : 1,
+      installmentsCount: n,
+      installmentNumber: cur,
     });
     onClose();
   };
@@ -52,6 +57,7 @@ export function AddPurchaseDialog({
   const total = parseFloat(amount) || 0;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
   const perInstallment = n > 0 ? total / n : 0;
+  const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
 
   return (
     <Modal open={open} onClose={onClose} title={fixedCardId ? "Adicionar à fatura" : "Nova compra no cartão"}>
@@ -88,21 +94,35 @@ export function AddPurchaseDialog({
         </label>
 
         {isInstallment && (
-          <Field label="Número de parcelas">
-            <input
-              type="number"
-              min="2"
-              max="48"
-              className={inputClass}
-              value={installments}
-              onChange={(e) => setInstallments(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Total de parcelas">
+              <input
+                type="number"
+                min="2"
+                max="48"
+                className={inputClass}
+                value={installments}
+                onChange={(e) => setInstallments(e.target.value)}
+              />
+            </Field>
+            <Field label="Parcela atual">
+              <input
+                type="number"
+                min="1"
+                max={n}
+                className={inputClass}
+                value={installmentNumber}
+                onChange={(e) => setInstallmentNumber(e.target.value)}
+              />
+            </Field>
             {total > 0 && n > 1 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> — última parcela ajusta os centavos. Mesma data ({new Date(date).getDate()}) em todos os meses.
+              <p className="col-span-2 text-xs text-muted-foreground">
+                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span>.
+                Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas e ${n - cur} futura(s) serão criadas nos próximos meses.`}
               </p>
             )}
-          </Field>
+          </div>
         )}
 
         <div className="flex gap-2 pt-2">

@@ -25,6 +25,7 @@ export function AddIncomeDialog({
   const [isInstallment, setIsInstallment] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
+  const [installmentNumber, setInstallmentNumber] = useState("1");
 
   useEffect(() => {
     if (open) {
@@ -35,6 +36,7 @@ export function AddIncomeDialog({
       setAmount("");
       setIsInstallment(false);
       setInstallments("2");
+      setInstallmentNumber("1");
       setMode("total");
     }
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId]);
@@ -42,6 +44,7 @@ export function AddIncomeDialog({
   const submit = async () => {
     if (!description.trim() || !amount || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
+    const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = parseFloat(amount);
     const totalAmount = mode === "perInstallment" && n > 1 ? value * n : value;
     await addIncome.mutateAsync({
@@ -50,6 +53,7 @@ export function AddIncomeDialog({
       amount: totalAmount,
       date,
       installmentsCount: n,
+      installmentNumber: cur,
     });
     onClose();
   };
@@ -90,15 +94,24 @@ export function AddIncomeDialog({
                 Valor por parcela
               </button>
             </div>
-            <Field label="Número de parcelas">
-              <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
-            </Field>
-            {value > 0 && n > 1 && (
-              <p className="text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
-                <br />Mesma data ({new Date(date).getDate()}) em todos os meses.
-              </p>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Total de parcelas">
+                <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
+              </Field>
+              <Field label="Parcela atual">
+                <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
+              </Field>
+            </div>
+            {value > 0 && n > 1 && (() => {
+              const cur = Math.max(1, Math.min(n, parseInt(installmentNumber) || 1));
+              return (
+                <p className="text-xs text-muted-foreground">
+                  {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
+                  <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                  {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como recebidas.`}
+                </p>
+              );
+            })()}
           </div>
         )}
 

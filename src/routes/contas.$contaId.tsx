@@ -13,6 +13,7 @@ import {
   getMonthDebits,
   getMonthIncomes,
   getMonthInvestments,
+  computeMonthlyAccountBalance,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -123,6 +124,11 @@ function AccountHome() {
   }, [yearMonthMap, year]);
 
   const [openYear, setOpenYear] = useState(false);
+
+  const monthlyBalances = useMemo(
+    () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),
+    [account, cards, purchases, installments, debits, incomes, investments],
+  );
 
   if (!account) {
     return (
@@ -318,17 +324,20 @@ function AccountHome() {
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    Movimentado: {formatCurrency(movement)}
+                    <span className="xs:hidden">Mov:</span><span className="hidden xs:inline">Movimentado:</span> {formatCurrency(movement)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Balanço</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
                   <p
                     className={`whitespace-nowrap text-lg font-bold ${
-                      monthBalance >= 0 ? "text-success" : "text-destructive"
+                      (monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0) >= 0 ? "text-foreground" : "text-destructive"
                     }`}
                   >
-                    {formatCurrency(monthBalance)}
+                    {formatCurrency(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0)}
+                  </p>
+                  <p className={`mt-0.5 whitespace-nowrap text-xs font-semibold ${monthBalance >= 0 ? "text-success" : "text-destructive"}`}>
+                    Bal: {formatCurrency(monthBalance)}
                   </p>
                 </div>
               </div>

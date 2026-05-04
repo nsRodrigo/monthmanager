@@ -251,17 +251,18 @@ export function buildInstallmentsForPurchase(
  * - Later installments roll forward month-by-month, not paid.
  */
 export function buildInstallmentsAnchored(
-  purchaseId: string,
+  parentId: string,
   userId: string,
   totalAmount: number,
   installmentsCount: number,
   anchorNumber: number,
   anchorDate: string,
+  parentType: ParentType = "purchase",
+  paidPast = true,
 ) {
   const count = Math.max(1, installmentsCount);
   const anchor = Math.min(Math.max(1, anchorNumber), count);
   const base = round2(totalAmount / count);
-  // Parse anchorDate como data LOCAL (evita shift de fuso com new Date("YYYY-MM-DD") que assume UTC)
   const [ay, am, ad] = anchorDate.slice(0, 10).split("-").map((n) => parseInt(n, 10));
   const anchorYear = ay;
   const anchorMonth = (am || 1) - 1;
@@ -290,16 +291,16 @@ export function buildInstallmentsAnchored(
     accum += amount;
     items.push({
       user_id: userId,
-      parent_id: purchaseId,
-      parent_type: "purchase",
-      purchase_id: purchaseId,
+      parent_id: parentId,
+      parent_type: parentType,
+      purchase_id: parentType === "purchase" ? parentId : null,
       number: i,
       total: count,
       amount,
       due_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       year: d.getFullYear(),
       month: d.getMonth(),
-      paid: i < anchor,
+      paid: paidPast ? i < anchor : false,
     });
   }
   return items;
@@ -556,7 +557,8 @@ export function useCardPayments() {
 // =======================
 function useInvalidate() {
   const qc = useQueryClient();
-  return (keys: string[]) => keys.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  return (keys: string[]) =>
+    keys.forEach((k) => qc.invalidateQueries({ queryKey: [k], refetchType: "active" }));
 }
 
 export function useAddAccount() {
@@ -573,7 +575,7 @@ export function useAddAccount() {
       });
       if (error) throw error;
     },
-    onSuccess: () => inv(["accounts"]),
+    onSettled: () => inv(["accounts"]),
   });
 }
 
@@ -629,7 +631,7 @@ export function useUpdateAccount() {
       const { error } = await supabase.from("accounts").update(patch).eq("id", a.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["accounts"]),
+    onSettled: () => inv(["accounts"]),
   });
 }
 
@@ -651,7 +653,7 @@ export function useAddCard() {
       });
       if (error) throw error;
     },
-    onSuccess: () => inv(["cards"]),
+    onSettled: () => inv(["cards"]),
   });
 }
 
@@ -676,8 +678,7 @@ export function useAddPurchase() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (p: Omit<Purchase, "id">) => {
-      // Need card's closing/due day to calculate the invoice month.
+    mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number }) => {
       const { data: card, error: eCard } = await supabase
         .from("cards")
         .select("closing_day,due_day")
@@ -697,19 +698,35 @@ export function useAddPurchase() {
         .select("id")
         .single();
       if (error) throw error;
-      const inst = buildInstallmentsForPurchase(
-        (data as { id: string }).id,
-        user!.id,
-        p.totalAmount,
-        p.installmentsCount,
-        p.date,
-        (card as { closing_day: number; due_day: number }).closing_day,
-        (card as { closing_day: number; due_day: number }).due_day,
-      );
+      const purchaseId = (data as { id: string }).id;
+      const anchor = Math.max(1, p.installmentNumber ?? 1);
+      let inst;
+      if (p.installmentsCount > 1 && anchor > 1) {
+        inst = buildInstallmentsAnchored(
+          purchaseId,
+          user!.id,
+          p.totalAmount,
+          p.installmentsCount,
+          anchor,
+          p.date,
+          "purchase",
+          true,
+        );
+      } else {
+        inst = buildInstallmentsForPurchase(
+          purchaseId,
+          user!.id,
+          p.totalAmount,
+          p.installmentsCount,
+          p.date,
+          (card as { closing_day: number; due_day: number }).closing_day,
+          (card as { closing_day: number; due_day: number }).due_day,
+        );
+      }
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
     },
-    onSuccess: () => inv(["purchases", "installments"]),
+    onSettled: () => inv(["purchases", "installments"]),
   });
 }
 
@@ -976,8 +993,10 @@ export function useAddDebit() {
       autoDebit?: boolean;
       autoDebitDay?: number | null;
       installmentsCount?: number;
+      installmentNumber?: number;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
+      const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
       const { data: ins, error } = await supabase
         .from("debits")
         .insert({
@@ -997,14 +1016,25 @@ export function useAddDebit() {
         .single();
       if (error) throw error;
       if (count > 1) {
-        const inst = buildInstallments(
-          (ins as { id: string }).id,
-          "debit",
-          user!.id,
-          d.amount,
-          count,
-          d.date,
-        );
+        const inst = anchor > 1
+          ? buildInstallmentsAnchored(
+              (ins as { id: string }).id,
+              user!.id,
+              d.amount,
+              count,
+              anchor,
+              d.date,
+              "debit",
+              true,
+            )
+          : buildInstallments(
+              (ins as { id: string }).id,
+              "debit",
+              user!.id,
+              d.amount,
+              count,
+              d.date,
+            );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (d.required) {
@@ -1055,7 +1085,7 @@ export function useAddDebit() {
         }
       }
     },
-    onSuccess: () => inv(["debits", "installments"]),
+    onSettled: () => inv(["debits", "installments"]),
   });
 }
 
@@ -1090,7 +1120,7 @@ export function useRemoveDebit() {
       const { error } = await supabase.from("debits").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["debits", "installments"]),
+    onSettled: () => inv(["debits", "installments"]),
   });
 }
 
@@ -1107,8 +1137,10 @@ export function useAddIncome() {
       amount: number;
       date: string;
       installmentsCount?: number;
+      installmentNumber?: number;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
+      const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const { data: ins, error } = await supabase
         .from("incomes")
         .insert({
@@ -1125,19 +1157,30 @@ export function useAddIncome() {
         .single();
       if (error) throw error;
       if (count > 1) {
-        const inst = buildInstallments(
-          (ins as { id: string }).id,
-          "income",
-          user!.id,
-          i.amount,
-          count,
-          i.date,
-        );
+        const inst = anchor > 1
+          ? buildInstallmentsAnchored(
+              (ins as { id: string }).id,
+              user!.id,
+              i.amount,
+              count,
+              anchor,
+              i.date,
+              "income",
+              true,
+            )
+          : buildInstallments(
+              (ins as { id: string }).id,
+              "income",
+              user!.id,
+              i.amount,
+              count,
+              i.date,
+            );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       }
     },
-    onSuccess: () => inv(["incomes", "installments"]),
+    onSettled: () => inv(["incomes", "installments"]),
   });
 }
 
@@ -1175,7 +1218,7 @@ export function useRemoveIncome() {
       const { error } = await supabase.from("incomes").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["incomes", "installments"]),
+    onSettled: () => inv(["incomes", "installments"]),
   });
 }
 
@@ -1197,7 +1240,7 @@ export function useAddInvestment() {
       });
       if (error) throw error;
     },
-    onSuccess: () => inv(["investments"]),
+    onSettled: () => inv(["investments"]),
   });
 }
 
@@ -1208,7 +1251,7 @@ export function useRemoveInvestment() {
       const { error } = await supabase.from("investments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["investments"]),
+    onSettled: () => inv(["investments"]),
   });
 }
 
@@ -1943,4 +1986,109 @@ export function computeAccountBalance(
     if (pur && accountCardIds.has(pur.cardId)) bal -= i.amount;
   }
   return bal;
+}
+
+// =======================
+// Monthly running balance per account
+// =======================
+export type MonthlyBalance = {
+  year: number;
+  month: number;
+  recebimentos: number;
+  debitos: number;
+  faturas: number;
+  investido: number;
+  balanco: number; // recebimentos - despesas (sem investimento)
+  saldoEmConta: number; // saldo acumulado real ao fim do mês
+};
+
+/**
+ * Compute month-by-month running balance for an account, starting from
+ * initialBalance. Includes ALL movements (regardless of paid status), since
+ * the metric represents the projected end-of-month balance.
+ */
+export function computeMonthlyAccountBalance(
+  account: Account,
+  cards: Card[],
+  purchases: Purchase[],
+  installments: Installment[],
+  debits: Debit[],
+  incomes: Income[],
+  investments: Investment[],
+): Map<string, MonthlyBalance> {
+  const accountCardIds = new Set(
+    cards.filter((c) => c.accountId === account.id).map((c) => c.id),
+  );
+  const accPurchaseIds = new Set(
+    purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+  );
+
+  const buckets = new Map<string, { rec: number; deb: number; fat: number; inv: number }>();
+  const ensure = (y: number, m: number) => {
+    const k = `${y}-${m}`;
+    let b = buckets.get(k);
+    if (!b) {
+      b = { rec: 0, deb: 0, fat: 0, inv: 0 };
+      buckets.set(k, b);
+    }
+    return b;
+  };
+
+  // single incomes
+  for (const inc of incomes) {
+    if (inc.accountId !== account.id || inc.isParent || !inc.date) continue;
+    const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
+    if (y && m) ensure(y, m - 1).rec += inc.amount;
+  }
+  // single debits
+  for (const d of debits) {
+    if (d.accountId !== account.id || d.isParent || !d.date) continue;
+    const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+    if (y && m) ensure(y, m - 1).deb += d.amount;
+  }
+  // installments
+  for (const i of installments) {
+    if (i.parentType === "income") {
+      const parent = incomes.find((x) => x.id === i.parentId);
+      if (parent?.accountId === account.id) ensure(i.year, i.month).rec += i.amount;
+    } else if (i.parentType === "debit") {
+      const parent = debits.find((x) => x.id === i.parentId);
+      if (parent?.accountId === account.id) ensure(i.year, i.month).deb += i.amount;
+    } else if (i.parentType === "purchase") {
+      if (i.parentId && accPurchaseIds.has(i.parentId)) ensure(i.year, i.month).fat += i.amount;
+    }
+  }
+  // investments
+  for (const inv of investments) {
+    if (inv.accountId !== account.id || !inv.date) continue;
+    const [y, m] = inv.date.slice(0, 10).split("-").map(Number);
+    if (y && m) ensure(y, m - 1).inv += inv.amount;
+  }
+
+  // Sort chronologically and accumulate
+  const sortedKeys = Array.from(buckets.keys()).sort((a, b) => {
+    const [ay, am] = a.split("-").map(Number);
+    const [by, bm] = b.split("-").map(Number);
+    return ay !== by ? ay - by : am - bm;
+  });
+
+  const result = new Map<string, MonthlyBalance>();
+  let running = account.initialBalance;
+  for (const k of sortedKeys) {
+    const b = buckets.get(k)!;
+    const [y, m] = k.split("-").map(Number);
+    const balanco = b.rec - b.deb - b.fat;
+    running = running + b.rec - b.deb - b.fat - b.inv;
+    result.set(k, {
+      year: y,
+      month: m,
+      recebimentos: b.rec,
+      debitos: b.deb,
+      faturas: b.fat,
+      investido: b.inv,
+      balanco,
+      saldoEmConta: round2(running),
+    });
+  }
+  return result;
 }

@@ -135,6 +135,10 @@ function AccountHome() {
       </div>
     );
   }
+  const monthlyBalances = useMemo(
+    () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),
+    [account, cards, purchases, installments, debits, incomes, investments],
+  );
 
 
   const balance = computeAccountBalance(account, cards, purchases, installments, debits, incomes);

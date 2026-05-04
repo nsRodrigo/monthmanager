@@ -94,21 +94,35 @@ export function AddPurchaseDialog({
         </label>
 
         {isInstallment && (
-          <Field label="Número de parcelas">
-            <input
-              type="number"
-              min="2"
-              max="48"
-              className={inputClass}
-              value={installments}
-              onChange={(e) => setInstallments(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Total de parcelas">
+              <input
+                type="number"
+                min="2"
+                max="48"
+                className={inputClass}
+                value={installments}
+                onChange={(e) => setInstallments(e.target.value)}
+              />
+            </Field>
+            <Field label="Parcela atual">
+              <input
+                type="number"
+                min="1"
+                max={n}
+                className={inputClass}
+                value={installmentNumber}
+                onChange={(e) => setInstallmentNumber(e.target.value)}
+              />
+            </Field>
             {total > 0 && n > 1 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> — última parcela ajusta os centavos. Mesma data ({new Date(date).getDate()}) em todos os meses.
+              <p className="col-span-2 text-xs text-muted-foreground">
+                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span>.
+                Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas e ${n - cur} futura(s) serão criadas nos próximos meses.`}
               </p>
             )}
-          </Field>
+          </div>
         )}
 
         <div className="flex gap-2 pt-2">

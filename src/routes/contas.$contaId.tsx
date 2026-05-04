@@ -13,6 +13,7 @@ import {
   getMonthDebits,
   getMonthIncomes,
   getMonthInvestments,
+  computeMonthlyAccountBalance,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";

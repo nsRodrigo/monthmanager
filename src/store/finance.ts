@@ -251,17 +251,18 @@ export function buildInstallmentsForPurchase(
  * - Later installments roll forward month-by-month, not paid.
  */
 export function buildInstallmentsAnchored(
-  purchaseId: string,
+  parentId: string,
   userId: string,
   totalAmount: number,
   installmentsCount: number,
   anchorNumber: number,
   anchorDate: string,
+  parentType: ParentType = "purchase",
+  paidPast = true,
 ) {
   const count = Math.max(1, installmentsCount);
   const anchor = Math.min(Math.max(1, anchorNumber), count);
   const base = round2(totalAmount / count);
-  // Parse anchorDate como data LOCAL (evita shift de fuso com new Date("YYYY-MM-DD") que assume UTC)
   const [ay, am, ad] = anchorDate.slice(0, 10).split("-").map((n) => parseInt(n, 10));
   const anchorYear = ay;
   const anchorMonth = (am || 1) - 1;
@@ -290,16 +291,16 @@ export function buildInstallmentsAnchored(
     accum += amount;
     items.push({
       user_id: userId,
-      parent_id: purchaseId,
-      parent_type: "purchase",
-      purchase_id: purchaseId,
+      parent_id: parentId,
+      parent_type: parentType,
+      purchase_id: parentType === "purchase" ? parentId : null,
       number: i,
       total: count,
       amount,
       due_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       year: d.getFullYear(),
       month: d.getMonth(),
-      paid: i < anchor,
+      paid: paidPast ? i < anchor : false,
     });
   }
   return items;

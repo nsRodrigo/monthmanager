@@ -992,8 +992,10 @@ export function useAddDebit() {
       autoDebit?: boolean;
       autoDebitDay?: number | null;
       installmentsCount?: number;
+      installmentNumber?: number;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
+      const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
       const { data: ins, error } = await supabase
         .from("debits")
         .insert({
@@ -1013,14 +1015,25 @@ export function useAddDebit() {
         .single();
       if (error) throw error;
       if (count > 1) {
-        const inst = buildInstallments(
-          (ins as { id: string }).id,
-          "debit",
-          user!.id,
-          d.amount,
-          count,
-          d.date,
-        );
+        const inst = anchor > 1
+          ? buildInstallmentsAnchored(
+              (ins as { id: string }).id,
+              user!.id,
+              d.amount,
+              count,
+              anchor,
+              d.date,
+              "debit",
+              true,
+            )
+          : buildInstallments(
+              (ins as { id: string }).id,
+              "debit",
+              user!.id,
+              d.amount,
+              count,
+              d.date,
+            );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (d.required) {

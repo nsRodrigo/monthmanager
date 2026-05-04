@@ -557,7 +557,8 @@ export function useCardPayments() {
 // =======================
 function useInvalidate() {
   const qc = useQueryClient();
-  return (keys: string[]) => keys.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+  return (keys: string[]) =>
+    keys.forEach((k) => qc.invalidateQueries({ queryKey: [k], refetchType: "active" }));
 }
 
 export function useAddAccount() {

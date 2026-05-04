@@ -23,6 +23,7 @@ export function AddPurchaseDialog({
   const [date, setDate] = useState("");
   const [cardId, setCardId] = useState("");
   const [installments, setInstallments] = useState("1");
+  const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
 
   useEffect(() => {
@@ -33,18 +34,22 @@ export function AddPurchaseDialog({
       setDescription("");
       setAmount("");
       setInstallments("1");
+      setInstallmentNumber("1");
       setIsInstallment(false);
     }
   }, [open, defaultYear, defaultMonth, cards, fixedCardId]);
 
   const submit = async () => {
     if (!description.trim() || !amount || !cardId) return;
+    const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
+    const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     await addPurchase.mutateAsync({
       cardId,
       description: description.trim(),
       totalAmount: parseFloat(amount),
       date,
-      installmentsCount: isInstallment ? Math.max(1, parseInt(installments)) : 1,
+      installmentsCount: n,
+      installmentNumber: cur,
     });
     onClose();
   };
@@ -52,6 +57,7 @@ export function AddPurchaseDialog({
   const total = parseFloat(amount) || 0;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
   const perInstallment = n > 0 ? total / n : 0;
+  const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
 
   return (
     <Modal open={open} onClose={onClose} title={fixedCardId ? "Adicionar à fatura" : "Nova compra no cartão"}>

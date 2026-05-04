@@ -125,15 +125,24 @@ export function AddDebitDialog({
                 Valor por parcela
               </button>
             </div>
-            <Field label="Número de parcelas">
-              <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
-            </Field>
-            {value > 0 && n > 1 && (
-              <p className="text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
-                <br />Mesma data ({new Date(date).getDate()}) em todos os meses.
-              </p>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Total de parcelas">
+                <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
+              </Field>
+              <Field label="Parcela atual">
+                <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
+              </Field>
+            </div>
+            {value > 0 && n > 1 && (() => {
+              const cur = Math.max(1, Math.min(n, parseInt(installmentNumber) || 1));
+              return (
+                <p className="text-xs text-muted-foreground">
+                  {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
+                  <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                  {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas.`}
+                </p>
+              );
+            })()}
           </div>
         )}
 

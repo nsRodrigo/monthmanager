@@ -575,7 +575,7 @@ export function useAddAccount() {
       });
       if (error) throw error;
     },
-    onSuccess: () => inv(["accounts"]),
+    onSettled: () => inv(["accounts"]),
   });
 }
 
@@ -631,7 +631,7 @@ export function useUpdateAccount() {
       const { error } = await supabase.from("accounts").update(patch).eq("id", a.id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["accounts"]),
+    onSettled: () => inv(["accounts"]),
   });
 }
 
@@ -653,7 +653,7 @@ export function useAddCard() {
       });
       if (error) throw error;
     },
-    onSuccess: () => inv(["cards"]),
+    onSettled: () => inv(["cards"]),
   });
 }
 
@@ -1085,7 +1085,7 @@ export function useAddDebit() {
         }
       }
     },
-    onSuccess: () => inv(["debits", "installments"]),
+    onSettled: () => inv(["debits", "installments"]),
   });
 }
 
@@ -1120,7 +1120,7 @@ export function useRemoveDebit() {
       const { error } = await supabase.from("debits").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["debits", "installments"]),
+    onSettled: () => inv(["debits", "installments"]),
   });
 }
 
@@ -1167,7 +1167,7 @@ export function useAddIncome() {
         if (e2) throw e2;
       }
     },
-    onSuccess: () => inv(["incomes", "installments"]),
+    onSettled: () => inv(["incomes", "installments"]),
   });
 }
 
@@ -1205,7 +1205,7 @@ export function useRemoveIncome() {
       const { error } = await supabase.from("incomes").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["incomes", "installments"]),
+    onSettled: () => inv(["incomes", "installments"]),
   });
 }
 
@@ -1227,7 +1227,7 @@ export function useAddInvestment() {
       });
       if (error) throw error;
     },
-    onSuccess: () => inv(["investments"]),
+    onSettled: () => inv(["investments"]),
   });
 }
 
@@ -1238,7 +1238,7 @@ export function useRemoveInvestment() {
       const { error } = await supabase.from("investments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => inv(["investments"]),
+    onSettled: () => inv(["investments"]),
   });
 }
 

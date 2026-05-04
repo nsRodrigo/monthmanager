@@ -125,6 +125,11 @@ function AccountHome() {
 
   const [openYear, setOpenYear] = useState(false);
 
+  const monthlyBalances = useMemo(
+    () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),
+    [account, cards, purchases, installments, debits, incomes, investments],
+  );
+
   if (!account) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center">
@@ -135,10 +140,6 @@ function AccountHome() {
       </div>
     );
   }
-  const monthlyBalances = useMemo(
-    () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),
-    [account, cards, purchases, installments, debits, incomes, investments],
-  );
 
 
   const balance = computeAccountBalance(account, cards, purchases, installments, debits, incomes);

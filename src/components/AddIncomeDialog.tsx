@@ -25,6 +25,7 @@ export function AddIncomeDialog({
   const [isInstallment, setIsInstallment] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
+  const [installmentNumber, setInstallmentNumber] = useState("1");
 
   useEffect(() => {
     if (open) {
@@ -35,6 +36,7 @@ export function AddIncomeDialog({
       setAmount("");
       setIsInstallment(false);
       setInstallments("2");
+      setInstallmentNumber("1");
       setMode("total");
     }
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId]);
@@ -42,6 +44,7 @@ export function AddIncomeDialog({
   const submit = async () => {
     if (!description.trim() || !amount || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
+    const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = parseFloat(amount);
     const totalAmount = mode === "perInstallment" && n > 1 ? value * n : value;
     await addIncome.mutateAsync({
@@ -50,6 +53,7 @@ export function AddIncomeDialog({
       amount: totalAmount,
       date,
       installmentsCount: n,
+      installmentNumber: cur,
     });
     onClose();
   };

@@ -28,6 +28,7 @@ export function AddDebitDialog({
   const [isInstallment, setIsInstallment] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
+  const [installmentNumber, setInstallmentNumber] = useState("1");
 
   useEffect(() => {
     if (open) {
@@ -41,6 +42,7 @@ export function AddDebitDialog({
       setAutoDebitDay("");
       setIsInstallment(false);
       setInstallments("2");
+      setInstallmentNumber("1");
       setMode("total");
     }
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId]);
@@ -48,6 +50,7 @@ export function AddDebitDialog({
   const submit = async () => {
     if (!description.trim() || !amount || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
+    const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = parseFloat(amount);
     const totalAmount = mode === "perInstallment" && n > 1 ? value * n : value;
     await addDebit.mutateAsync({
@@ -59,6 +62,7 @@ export function AddDebitDialog({
       autoDebit,
       autoDebitDay: autoDebit && autoDebitDay ? Math.max(1, Math.min(31, parseInt(autoDebitDay))) : null,
       installmentsCount: n,
+      installmentNumber: cur,
     });
     onClose();
   };

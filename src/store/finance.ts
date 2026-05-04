@@ -1987,3 +1987,108 @@ export function computeAccountBalance(
   }
   return bal;
 }
+
+// =======================
+// Monthly running balance per account
+// =======================
+export type MonthlyBalance = {
+  year: number;
+  month: number;
+  recebimentos: number;
+  debitos: number;
+  faturas: number;
+  investido: number;
+  balanco: number; // recebimentos - despesas (sem investimento)
+  saldoEmConta: number; // saldo acumulado real ao fim do mês
+};
+
+/**
+ * Compute month-by-month running balance for an account, starting from
+ * initialBalance. Includes ALL movements (regardless of paid status), since
+ * the metric represents the projected end-of-month balance.
+ */
+export function computeMonthlyAccountBalance(
+  account: Account,
+  cards: Card[],
+  purchases: Purchase[],
+  installments: Installment[],
+  debits: Debit[],
+  incomes: Income[],
+  investments: Investment[],
+): Map<string, MonthlyBalance> {
+  const accountCardIds = new Set(
+    cards.filter((c) => c.accountId === account.id).map((c) => c.id),
+  );
+  const accPurchaseIds = new Set(
+    purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+  );
+
+  const buckets = new Map<string, { rec: number; deb: number; fat: number; inv: number }>();
+  const ensure = (y: number, m: number) => {
+    const k = `${y}-${m}`;
+    let b = buckets.get(k);
+    if (!b) {
+      b = { rec: 0, deb: 0, fat: 0, inv: 0 };
+      buckets.set(k, b);
+    }
+    return b;
+  };
+
+  // single incomes
+  for (const inc of incomes) {
+    if (inc.accountId !== account.id || inc.isParent || !inc.date) continue;
+    const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
+    if (y && m) ensure(y, m - 1).rec += inc.amount;
+  }
+  // single debits
+  for (const d of debits) {
+    if (d.accountId !== account.id || d.isParent || !d.date) continue;
+    const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+    if (y && m) ensure(y, m - 1).deb += d.amount;
+  }
+  // installments
+  for (const i of installments) {
+    if (i.parentType === "income") {
+      const parent = incomes.find((x) => x.id === i.parentId);
+      if (parent?.accountId === account.id) ensure(i.year, i.month).rec += i.amount;
+    } else if (i.parentType === "debit") {
+      const parent = debits.find((x) => x.id === i.parentId);
+      if (parent?.accountId === account.id) ensure(i.year, i.month).deb += i.amount;
+    } else if (i.parentType === "purchase") {
+      if (i.parentId && accPurchaseIds.has(i.parentId)) ensure(i.year, i.month).fat += i.amount;
+    }
+  }
+  // investments
+  for (const inv of investments) {
+    if (inv.accountId !== account.id || !inv.date) continue;
+    const [y, m] = inv.date.slice(0, 10).split("-").map(Number);
+    if (y && m) ensure(y, m - 1).inv += inv.amount;
+  }
+
+  // Sort chronologically and accumulate
+  const sortedKeys = Array.from(buckets.keys()).sort((a, b) => {
+    const [ay, am] = a.split("-").map(Number);
+    const [by, bm] = b.split("-").map(Number);
+    return ay !== by ? ay - by : am - bm;
+  });
+
+  const result = new Map<string, MonthlyBalance>();
+  let running = account.initialBalance;
+  for (const k of sortedKeys) {
+    const b = buckets.get(k)!;
+    const [y, m] = k.split("-").map(Number);
+    const balanco = b.rec - b.deb - b.fat;
+    running = running + b.rec - b.deb - b.fat - b.inv;
+    result.set(k, {
+      year: y,
+      month: m,
+      recebimentos: b.rec,
+      debitos: b.deb,
+      faturas: b.fat,
+      investido: b.inv,
+      balanco,
+      saldoEmConta: round2(running),
+    });
+  }
+  return result;
+}

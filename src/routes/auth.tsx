@@ -322,17 +322,30 @@ function AuthPage() {
           )}
 
           {mode === "signin" && (
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setError(null);
-                setInfo(null);
-              }}
-              className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-            >
-              Não tem conta? Criar agora
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+              >
+                Não tem conta? Criar agora
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("request");
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="w-full text-center text-xs text-primary hover:underline"
+              >
+                Solicitar acesso ao administrador
+              </button>
+            </>
           )}
           {mode === "signup" && (
             <button
@@ -347,7 +360,7 @@ function AuthPage() {
               Já tem conta? Entrar
             </button>
           )}
-          {mode === "forgot" && (
+          {(mode === "forgot" || mode === "request") && (
             <button
               type="button"
               onClick={() => {

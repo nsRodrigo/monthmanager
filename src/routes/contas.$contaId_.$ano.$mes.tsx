@@ -770,6 +770,7 @@ function CardRow({
                       cardColor={cardColor}
                       onToggle={() => onToggleInst(inst.id, !inst.paid)}
                       onEdit={() => onEditInst(inst)}
+                      onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                     />
                   );
                 })}

@@ -391,6 +391,12 @@ function AccountHome() {
           })
         )}
       </div>
+
+      <AddMonthDialog
+        open={openAddMonth}
+        onClose={() => setOpenAddMonth(false)}
+        contaId={account.id}
+      />
     </div>
   );
 }

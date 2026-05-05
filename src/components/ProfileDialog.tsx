@@ -3,15 +3,17 @@ import { Modal, Field, inputClass } from "./Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff } from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, ShieldCheck, Trash2, Plus } from "lucide-react";
 import { PasskeyManager } from "./PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsAdmin, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
 
 export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
+  const isAdmin = useIsAdmin();
 
   const [name, setName] = useState("");
 
@@ -229,6 +231,8 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
+        {isAdmin && <AdminSection />}
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
@@ -246,5 +250,78 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
         </div>
       </div>
     </Modal>
+  );
+}
+
+function AdminSection() {
+  const { data: list = [] } = useWhitelist();
+  const add = useAddToWhitelist();
+  const remove = useRemoveFromWhitelist();
+  const [email, setEmail] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    const v = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      setErr("E-mail inválido.");
+      return;
+    }
+    add.mutate(v, {
+      onSuccess: () => setEmail(""),
+      onError: (e: any) => setErr(e?.message ?? "Erro ao adicionar."),
+    });
+  };
+
+  return (
+    <div className="border-t border-border pt-4">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Administrador
+      </p>
+      <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Apenas e-mails na whitelist podem se cadastrar no app.
+        </p>
+        <form onSubmit={submit} className="flex gap-2">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@exemplo.com"
+            className={inputClass}
+          />
+          <button
+            type="submit"
+            disabled={add.isPending}
+            className="flex items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add
+          </button>
+        </form>
+        {err && <p className="text-xs text-destructive">{err}</p>}
+        <ul className="max-h-48 overflow-y-auto divide-y divide-border rounded-lg border border-border">
+          {list.length === 0 && (
+            <li className="p-2 text-center text-xs text-muted-foreground">
+              Nenhum e-mail na whitelist.
+            </li>
+          )}
+          {list.map((w) => (
+            <li key={w.id} className="flex items-center justify-between gap-2 p-2 text-xs">
+              <span className="truncate">{w.email}</span>
+              <button
+                onClick={() => {
+                  if (confirm(`Remover ${w.email} da whitelist?`)) remove.mutate(w.id);
+                }}
+                className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                aria-label="Remover"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }

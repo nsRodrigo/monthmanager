@@ -69,7 +69,9 @@ export function AddIncomeDialog({
   return (
     <Modal open={open} onClose={onClose} title="Novo recebimento">
       <div className="space-y-4">
-        <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
+        {!fixedAccountId && (
+          <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
+        )}
         <Field label="Descrição">
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Salário, freelance" />
         </Field>

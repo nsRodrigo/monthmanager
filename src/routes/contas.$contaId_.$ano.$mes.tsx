@@ -515,6 +515,22 @@ function AccountMonth() {
         single={editingSingle?.item ?? null}
         onDeleteParent={editingSingle?.onDeleteParent}
       />
+      <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} />
+      <DeleteParcelledDialog
+        open={!!deletingParcelled}
+        onClose={() => setDeletingParcelled(null)}
+        itemLabel={deletingParcelled?.label}
+        onDeleteOnlyThis={() => {
+          if (deletingParcelled) deleteSingleInst.mutate(deletingParcelled.inst.id);
+        }}
+        onDeleteAllUnpaid={() => {
+          if (deletingParcelled)
+            deleteParentKeepingPaid.mutate({
+              parentId: deletingParcelled.parentId,
+              parentType: deletingParcelled.parentType,
+            });
+        }}
+      />
     </div>
   );
 }

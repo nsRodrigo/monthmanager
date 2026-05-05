@@ -25,7 +25,9 @@ import {
   ChevronRight,
   Wallet,
   ChevronLeft,
+  Plus,
 } from "lucide-react";
+import { AddMonthDialog } from "@/components/AddMonthDialog";
 
 export const Route = createFileRoute("/contas/$contaId")({
   head: () => ({ meta: [{ title: "Conta — Finanças" }] }),
@@ -127,6 +129,7 @@ function AccountHome() {
   }, [yearMonthMap, year]);
 
   const [openYear, setOpenYear] = useState(false);
+  const [openAddMonth, setOpenAddMonth] = useState(false);
 
   const monthlyBalances = useMemo(
     () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),
@@ -218,7 +221,17 @@ function AccountHome() {
 
       {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Meses de {year}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Meses de {year}</h2>
+          <button
+            type="button"
+            onClick={() => setOpenAddMonth(true)}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25"
+            aria-label="Adicionar mês"
+          >
+            <Plus className="h-3.5 w-3.5" /> Adicionar mês
+          </button>
+        </div>
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
             type="button"
@@ -283,9 +296,21 @@ function AccountHome() {
       {/* MONTHS LIST — only months that have any value */}
       <div className="mt-4 space-y-2">
         {monthsForYear.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
-            Nenhum lançamento em {year}.
-          </p>
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Nenhum lançamento em {year}.
+            </p>
+            <button
+              type="button"
+              onClick={() => setOpenAddMonth(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Adicionar mês
+            </button>
+            <p className="text-[11px] text-muted-foreground">
+              Comece adicionando o mês atual para lançar recebimentos, débitos, investimentos e cartões.
+            </p>
+          </div>
         ) : (
           monthsForYear.map((m) => {
             const sum = currentMonthSummary(
@@ -366,6 +391,12 @@ function AccountHome() {
           })
         )}
       </div>
+
+      <AddMonthDialog
+        open={openAddMonth}
+        onClose={() => setOpenAddMonth(false)}
+        contaId={account.id}
+      />
     </div>
   );
 }

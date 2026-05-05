@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useCards, useAddPurchase } from "@/store/finance";
+import { CurrencyInput } from "./CurrencyInput";
 
 export function AddPurchaseDialog({
   open,
@@ -19,7 +20,7 @@ export function AddPurchaseDialog({
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
   const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [cardId, setCardId] = useState("");
   const [installments, setInstallments] = useState("1");
@@ -32,7 +33,7 @@ export function AddPurchaseDialog({
       setDate(d.toISOString().slice(0, 10));
       setCardId(fixedCardId ?? cards[0]?.id ?? "");
       setDescription("");
-      setAmount("");
+      setAmount(0);
       setInstallments("1");
       setInstallmentNumber("1");
       setIsInstallment(false);
@@ -40,13 +41,13 @@ export function AddPurchaseDialog({
   }, [open, defaultYear, defaultMonth, cards, fixedCardId]);
 
   const submit = async () => {
-    if (!description.trim() || !amount || !cardId) return;
+    if (!description.trim() || amount <= 0 || !cardId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     await addPurchase.mutateAsync({
       cardId,
       description: description.trim(),
-      totalAmount: parseFloat(amount),
+      totalAmount: amount,
       date,
       installmentsCount: n,
       installmentNumber: cur,
@@ -54,7 +55,7 @@ export function AddPurchaseDialog({
     onClose();
   };
 
-  const total = parseFloat(amount) || 0;
+  const total = amount || 0;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
   const perInstallment = n > 0 ? total / n : 0;
   const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
@@ -67,7 +68,7 @@ export function AddPurchaseDialog({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Valor total">
-            <input type="number" step="0.01" className={inputClass} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
+            <CurrencyInput value={amount} onValueChange={setAmount} />
           </Field>
           <Field label="Data da compra">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />

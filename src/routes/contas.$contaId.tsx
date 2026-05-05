@@ -298,10 +298,10 @@ function AccountHome() {
             purchases,
             installments,
           );
-            const movement = sum.income + sum.debits + sum.cardsTotal;
-            const monthBalance = sum.income - sum.debits - sum.cardsTotal;
-            const isCurrent = year === today.getFullYear() && m === currentMonth;
-            const isFuture = year > today.getFullYear() || (year === today.getFullYear() && m > currentMonth);
+            const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal);
+            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0);
+            const isCurrent = year === eff.year && m === currentMonth;
+            const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
 
             return (
             <Link
@@ -327,21 +327,18 @@ function AccountHome() {
                     <p className="truncate text-lg font-bold">{MONTHS[m]}</p>
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    <span className="xs:hidden">Mov:</span><span className="hidden xs:inline">Movimentado:</span> {formatCurrency(movement)}
+                  <p className={`mt-0.5 whitespace-nowrap text-xs font-semibold ${monthBal >= 0 ? "text-success" : "text-destructive"}`}>
+                    Balanço do mês: {formatCurrency(monthBal)}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
                   <p
                     className={`whitespace-nowrap text-lg font-bold ${
-                      (monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0) >= 0 ? "text-foreground" : "text-destructive"
+                      saldoConta >= 0 ? "text-foreground" : "text-destructive"
                     }`}
                   >
-                    {formatCurrency(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0)}
-                  </p>
-                  <p className={`mt-0.5 whitespace-nowrap text-xs font-semibold ${monthBalance >= 0 ? "text-success" : "text-destructive"}`}>
-                    Bal: {formatCurrency(monthBalance)}
+                    {formatCurrency(saldoConta)}
                   </p>
                 </div>
               </div>

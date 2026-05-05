@@ -8,11 +8,13 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  computeAccountBalance,
+  computeAccountBalanceUntilNow,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
   getMonthInvestments,
+  getEffectiveCurrentMonth,
+  normalizeZero,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -59,8 +61,9 @@ function Consolidated() {
   useEffect(() => setAccountId(null), [setAccountId]);
 
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const eff = getEffectiveCurrentMonth(today);
+  const year = eff.year;
+  const month = eff.month;
 
   const monthInst = getMonthInstallments(installments, year, month);
   const monthDebits = getMonthDebits(debits, installments, year, month);
@@ -78,10 +81,10 @@ function Consolidated() {
   const totalInvested = getMonthInvestments(investments, year, month).reduce((s, i) => s + i.amount, 0);
 
   const accountBalance = accounts.reduce(
-    (s, a) => s + computeAccountBalance(a, cards, purchases, installments, debits, incomes),
+    (s, a) => s + computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
     0,
   );
-  const expected = accountBalance + totalIncome - totalDebits - totalCredit;
+  const expected = normalizeZero(accountBalance + totalIncome - totalDebits - totalCredit);
 
   if (accounts.length === 0) {
     return (
@@ -150,7 +153,7 @@ function Consolidated() {
           />
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(accountBalance)}</span>
+          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>
 
@@ -159,13 +162,8 @@ function Consolidated() {
         <div className="grid gap-3 grid-cols-1">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-            const balance = computeAccountBalance(
-              a,
-              cards,
-              purchases,
-              installments,
-              debits,
-              incomes,
+            const balance = normalizeZero(
+              computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
             );
             const cardCount = cards.filter((c) => c.accountId === a.id).length;
 
@@ -196,8 +194,7 @@ function Consolidated() {
                 return pur ? accCardIds.has(pur.cardId) : false;
               })
               .reduce((s, i) => s + i.amount, 0);
-            const accExpected =
-              balance + accIncomesTotal - accDebitsTotal - accCardsTotal;
+            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal);
 
             return (
               <Link
@@ -237,9 +234,9 @@ function Consolidated() {
                   <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
                   <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
                   <MiniStat
-                    label="Previsto"
-                    value={accExpected}
-                    tone={accExpected >= 0 ? "success" : "debit"}
+                    label="Balanço do mês"
+                    value={accMonthBalance}
+                    tone={accMonthBalance >= 0 ? "success" : "debit"}
                   />
                 </div>
                 {accInvested > 0 && (

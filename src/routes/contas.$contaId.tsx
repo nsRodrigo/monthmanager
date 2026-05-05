@@ -296,9 +296,21 @@ function AccountHome() {
       {/* MONTHS LIST — only months that have any value */}
       <div className="mt-4 space-y-2">
         {monthsForYear.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
-            Nenhum lançamento em {year}.
-          </p>
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Nenhum lançamento em {year}.
+            </p>
+            <button
+              type="button"
+              onClick={() => setOpenAddMonth(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Adicionar mês
+            </button>
+            <p className="text-[11px] text-muted-foreground">
+              Comece adicionando o mês atual para lançar recebimentos, débitos, investimentos e cartões.
+            </p>
+          </div>
         ) : (
           monthsForYear.map((m) => {
             const sum = currentMonthSummary(

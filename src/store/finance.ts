@@ -679,12 +679,6 @@ export function useAddPurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number }) => {
-      const { data: card, error: eCard } = await supabase
-        .from("cards")
-        .select("closing_day,due_day")
-        .eq("id", p.cardId)
-        .single();
-      if (eCard) throw eCard;
       const { data, error } = await supabase
         .from("purchases")
         .insert({
@@ -699,8 +693,8 @@ export function useAddPurchase() {
         .single();
       if (error) throw error;
       const purchaseId = (data as { id: string }).id;
-      // Manual entry: anchor the installment at the chosen date so it
-      // appears in the month the user selected (no closing-day rollover).
+      // Manual entry: anchor at the chosen date so the installment lands
+      // in the month the user picked (no closing-day rollover surprises).
       const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
       const inst = buildInstallmentsAnchored(
         purchaseId,
@@ -712,12 +706,10 @@ export function useAddPurchase() {
         "purchase",
         true,
       );
-      // Suppress unused card var (kept fetch for future use)
-      void card;
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
     },
-    onSettled: () => inv(["purchases", "installments"]),
+    onSettled: () => inv(["purchases", "installments", "card_payments"]),
   });
 }
 

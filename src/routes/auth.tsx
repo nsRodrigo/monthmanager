@@ -156,25 +156,31 @@ function AuthPage() {
 
   const signInGoogle = async () => {
     setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes("@")) {
+      setError(
+        "Digite seu e-mail Google acima antes de continuar — assim conseguimos avisar o administrador caso precise de aprovação.",
+      );
+      return;
+    }
     setLoading(true);
-    if (email) {
-      const normalizedEmail = email.trim().toLowerCase();
-      const { data: allowed } = await supabase.rpc("is_email_whitelisted", { _email: normalizedEmail });
-      if (!allowed) {
-        try {
-          await reportPendingSignup({ data: { email: normalizedEmail } });
-          setInfo("Solicitação enviada! O administrador vai receber uma notificação.");
-        } catch (err: any) {
-          setError(err?.message ?? "Não foi possível enviar a solicitação.");
-        } finally {
-          setLoading(false);
-        }
-        return;
+    const { data: allowed } = await supabase.rpc("is_email_whitelisted", { _email: normalizedEmail });
+    if (!allowed) {
+      try {
+        await reportPendingSignup({ data: { email: normalizedEmail } });
+        setInfo(
+          "Solicitação enviada! O administrador foi notificado. Tente entrar novamente após a aprovação.",
+        );
+      } catch (err: any) {
+        setError(err?.message ?? "Não foi possível enviar a solicitação.");
+      } finally {
+        setLoading(false);
       }
+      return;
     }
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
-      extraParams: email ? { login_hint: email.trim().toLowerCase() } : undefined,
+      extraParams: { login_hint: normalizedEmail },
     });
     if (result.error) {
       setLoading(false);

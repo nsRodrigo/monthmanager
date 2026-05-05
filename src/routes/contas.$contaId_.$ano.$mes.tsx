@@ -654,6 +654,7 @@ function CardRow({
   purchases,
   onToggleInst,
   onEditInst,
+  onRemoveInst,
 }: {
   cardName: string;
   cardColor: string;
@@ -672,6 +673,7 @@ function CardRow({
     : never;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
+  onRemoveInst?: (inst: Installment) => void;
 }) {
   const [open, setOpen] = useState(false);
   return (

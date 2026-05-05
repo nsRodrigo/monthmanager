@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as IrpfRouteImport } from './routes/irpf'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -21,6 +22,11 @@ import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaI
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IrpfRoute = IrpfRouteImport.update({
+  id: '/irpf',
+  path: '/irpf',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportarHistoricoRoute = ImportarHistoricoRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/irpf': typeof IrpfRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/irpf': typeof IrpfRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/irpf': typeof IrpfRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/importar'
     | '/importar-historico'
+    | '/irpf'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/importar'
     | '/importar-historico'
+    | '/irpf'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/importar'
     | '/importar-historico'
+    | '/irpf'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ImportarRoute: typeof ImportarRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
+  IrpfRoute: typeof IrpfRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/irpf': {
+      id: '/irpf'
+      path: '/irpf'
+      fullPath: '/irpf'
+      preLoaderRoute: typeof IrpfRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/importar-historico': {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ImportarRoute: ImportarRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
+  IrpfRoute: IrpfRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,
   ContasContaIdRoute: ContasContaIdRoute,
@@ -208,12 +229,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

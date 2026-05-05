@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Upload, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User } from "lucide-react";
+import { LogOut, Upload, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User, Receipt } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -205,6 +205,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           }`}
         >
           <Upload className="h-3.5 w-3.5" /> Importar CSV
+        </Link>
+        <Link
+          to="/irpf"
+          onClick={onNavigate}
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+            loc.pathname.startsWith("/irpf")
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <Receipt className="h-3.5 w-3.5" /> Imposto de Renda
         </Link>
         {isAdmin && (
           <Link

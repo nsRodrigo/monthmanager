@@ -368,6 +368,131 @@ export type Database = {
           },
         ]
       }
+      irpf_documents: {
+        Row: {
+          file_path: string
+          id: string
+          kind: string
+          mime: string | null
+          original_name: string
+          size: number | null
+          uploaded_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          file_path: string
+          id?: string
+          kind?: string
+          mime?: string | null
+          original_name: string
+          size?: number | null
+          uploaded_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          file_path?: string
+          id?: string
+          kind?: string
+          mime?: string | null
+          original_name?: string
+          size?: number | null
+          uploaded_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      irpf_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          date: string | null
+          description: string
+          document_id: string | null
+          id: string
+          raw: Json | null
+          source: string | null
+          subcategory: string | null
+          user_id: string
+          year: number
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string | null
+          description?: string
+          document_id?: string | null
+          id?: string
+          raw?: Json | null
+          source?: string | null
+          subcategory?: string | null
+          user_id: string
+          year: number
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string | null
+          description?: string
+          document_id?: string | null
+          id?: string
+          raw?: Json | null
+          source?: string | null
+          subcategory?: string | null
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_entries_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "irpf_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_year_snapshots: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          id: string
+          investment_id: string | null
+          label: string
+          updated_at: string
+          user_id: string
+          value: number
+          year: number
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          id?: string
+          investment_id?: string | null
+          label: string
+          updated_at?: string
+          user_id: string
+          value?: number
+          year: number
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          id?: string
+          investment_id?: string | null
+          label?: string
+          updated_at?: string
+          user_id?: string
+          value?: number
+          year?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

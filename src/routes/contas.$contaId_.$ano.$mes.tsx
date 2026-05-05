@@ -276,6 +276,7 @@ function AccountMonth() {
                   onDeleteParent: () => removeIncome.mutate(p.income!.id),
                 })
               }
+              onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
             />
           ))}
         </GroupedSection>

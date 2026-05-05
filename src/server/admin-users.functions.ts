@@ -24,7 +24,7 @@ export type AdminUser = {
 };
 
 export const listUsers = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminUser[]> => {
     await assertAdmin(context.userId);
 
@@ -54,7 +54,7 @@ export const listUsers = createServerFn({ method: "GET" })
   });
 
 export const deleteUser = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((data) =>
     z.object({ userId: z.string().uuid(), alsoRemoveWhitelist: z.boolean().optional() }).parse(data),
   )

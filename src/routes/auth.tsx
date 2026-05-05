@@ -178,8 +178,30 @@ function AuthPage() {
     });
     if (result.error) {
       setLoading(false);
-      const msg = (result.error as Error)?.message ?? "Erro ao entrar com Google";
-      setError(msg);
+      const rawMsg = (result.error as Error)?.message ?? "Erro ao entrar com Google";
+      const msg = rawMsg.toLowerCase();
+      const isPending =
+        msg.includes("pending_approval") ||
+        msg.includes("database error") ||
+        msg.includes("failed to sign in with vendor") ||
+        msg.includes("vendor") ||
+        msg.includes("não está autorizado") ||
+        msg.includes("nao esta autorizado");
+      if (isPending) {
+        const normalized = email ? email.trim().toLowerCase() : "";
+        if (normalized) {
+          try { await reportPendingSignup({ data: { email: normalized } }); } catch (_) {}
+        }
+        // Cobre o caso em que o callback do Google não traz id_token com email:
+        // o trigger já persistiu via dblink, então só precisamos disparar o push.
+        try { await flushPendingNotifications({}); } catch (_) {}
+        setInfo(
+          "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente entrar novamente depois.",
+        );
+        setError(null);
+        return;
+      }
+      setError(rawMsg);
       return;
     }
     if (result.redirected) return;

@@ -227,7 +227,7 @@ function AuthPage() {
             />
           </label>
 
-          {mode !== "forgot" && (
+          {mode !== "forgot" && mode !== "request" && (
             <label className="block">
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Senha</span>

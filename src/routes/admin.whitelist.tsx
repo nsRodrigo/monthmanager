@@ -69,12 +69,8 @@ function WhitelistAdmin() {
   };
 
   const onRevoke = (u: AdminUser) => {
-    const alsoRemoveWhitelist = confirm(
-      `Revogar acesso de ${u.email}?\n\nIsso vai apagar a conta e todos os dados.\n\nClique OK para também remover o e-mail da whitelist (impede novo cadastro), ou Cancelar para apenas excluir o usuário.`,
-    );
-    // Segunda confirmação binária real (a primeira já serve de "também tirar da whitelist?")
-    if (!confirm(`Confirma exclusão de ${u.email}? Esta ação é irreversível.`)) return;
-    revokeMut.mutate({ userId: u.id, alsoRemoveWhitelist });
+    if (!confirm(`Revogar acesso de ${u.email}?\n\nIsso vai apagar a conta, todos os dados e remover o e-mail da whitelist. Ação irreversível.`)) return;
+    revokeMut.mutate({ userId: u.id, alsoRemoveWhitelist: true });
   };
 
   return (

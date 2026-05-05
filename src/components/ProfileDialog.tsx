@@ -3,9 +3,10 @@ import { Modal, Field, inputClass } from "./Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff } from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, ShieldCheck, Trash2, Plus } from "lucide-react";
 import { PasskeyManager } from "./PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsAdmin, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
 
 export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();

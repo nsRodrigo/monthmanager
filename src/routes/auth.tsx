@@ -87,6 +87,19 @@ function AuthPage() {
     setInfo(null);
     setLoading(true);
 
+    if (mode === "request") {
+      try {
+        if (!email.includes("@")) throw new Error("Informe um e-mail válido.");
+        await reportPendingSignup({ data: { email } });
+        setInfo("Solicitação enviada! O administrador vai receber uma notificação.");
+      } catch (err: any) {
+        setError(err?.message ?? "Não foi possível enviar a solicitação.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (mode === "forgot") {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,

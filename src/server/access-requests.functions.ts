@@ -90,6 +90,14 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const email = data.email.toLowerCase();
 
+    // Se já está liberado, não cria solicitação nem notifica.
+    const { data: wl } = await supabaseAdmin
+      .from("whitelist")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+    if (wl) return { ok: true, whitelisted: true };
+
     // Se já está na blacklist, não notifica nem cria
     const { data: bl } = await supabaseAdmin
       .from("blacklist")

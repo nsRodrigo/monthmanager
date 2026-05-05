@@ -445,6 +445,12 @@ function AccountMonth() {
         parentSubtitle={editing?.subtitle}
         onDeleteParent={editing?.onDeleteParent}
       />
+      <EditInstallmentDialog
+        open={!!editingSingle}
+        onClose={() => setEditingSingle(null)}
+        single={editingSingle?.item ?? null}
+        onDeleteParent={editingSingle?.onDeleteParent}
+      />
     </div>
   );
 }
@@ -790,10 +796,12 @@ function PurchaseInstRow({
 function DebitRow({
   debit,
   onToggle,
+  onEdit,
   onRemove,
 }: {
   debit: Debit;
   onToggle: () => void;
+  onEdit: () => void;
   onRemove: () => void;
 }) {
   return (
@@ -808,7 +816,7 @@ function DebitRow({
       >
         {debit.paid && <Check className="h-3.5 w-3.5" />}
       </button>
-      <div className="flex-1 min-w-0">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -832,8 +840,15 @@ function DebitRow({
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatDate(debit.date)} · {formatCurrency(debit.amount)} à vista
         </p>
-      </div>
+      </button>
       <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar débito"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"

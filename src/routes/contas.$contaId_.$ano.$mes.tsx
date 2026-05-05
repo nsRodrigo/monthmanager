@@ -49,7 +49,7 @@ import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
-import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
+import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
@@ -99,6 +99,10 @@ function AccountMonth() {
     inst: Installment;
     label: string;
     subtitle?: string;
+    onDeleteParent?: () => void;
+  } | null>(null);
+  const [editingSingle, setEditingSingle] = useState<{
+    item: SingleEditTarget;
     onDeleteParent?: () => void;
   } | null>(null);
 

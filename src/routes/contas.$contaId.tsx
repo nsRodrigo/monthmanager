@@ -207,7 +207,7 @@ function AccountHome() {
           <MiniStat label="A receber" value={cm.income} tone="success" />
           <MiniStat label="A pagar" value={cm.debits} tone="debit" />
           <MiniStat label="Faturas" value={cm.cardsTotal} tone="credit" />
-          <MiniStat label="Previsto" value={expectedEnd} tone={expectedEnd >= 0 ? "success" : "debit"} />
+          <MiniStat label="Balanço do mês" value={monthBalance} tone={monthBalance >= 0 ? "success" : "debit"} />
         </div>
         {monthInvested > 0 && (
           <p className="mt-3 text-[11px] text-muted-foreground">

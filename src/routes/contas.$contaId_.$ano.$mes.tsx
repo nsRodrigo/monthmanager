@@ -367,6 +367,7 @@ function AccountMonth() {
                   onDeleteParent: () => removeDebit.mutate(p.debit!.id),
                 })
               }
+              onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
             />
           ))}
         </GroupedSection>

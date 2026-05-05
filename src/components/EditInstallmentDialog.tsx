@@ -4,23 +4,35 @@ import {
   useUpdateInstallment,
   useShiftInstallmentDate,
   useAdvanceInstallments,
+  useUpdateDebit,
+  useUpdateIncome,
+  useUpdateInvestment,
   type Installment,
 } from "@/store/finance";
+import { CurrencyInput } from "./CurrencyInput";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Trash2, FastForward } from "lucide-react";
+
+type SingleEditTarget =
+  | { kind: "debit"; id: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "income"; id: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "investment"; id: string; description: string; amount: number; date: string };
 
 export function EditInstallmentDialog({
   open,
   onClose,
   installment,
+  single,
   parentLabel,
   parentSubtitle,
   onDeleteParent,
 }: {
   open: boolean;
   onClose: () => void;
-  installment: Installment | null;
-  /** e.g. "Notebook Dell" — used in the modal header card */
+  /** Editing an installment (parcela). */
+  installment?: Installment | null;
+  /** Editing a single (non-installment) Debit / Income / Investment. */
+  single?: SingleEditTarget | null;
   parentLabel?: string;
   parentSubtitle?: string;
   onDeleteParent?: () => void;
@@ -28,45 +40,152 @@ export function EditInstallmentDialog({
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
   const advance = useAdvanceInstallments();
-  const [amount, setAmount] = useState("");
+  const updateDebit = useUpdateDebit();
+  const updateIncome = useUpdateIncome();
+  const updateInvestment = useUpdateInvestment();
+
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
   const [paid, setPaid] = useState(false);
   const [askDateScope, setAskDateScope] = useState(false);
   const [advanceCount, setAdvanceCount] = useState("");
 
   useEffect(() => {
-    if (open && installment) {
-      setAmount(String(installment.amount));
+    if (!open) return;
+    if (installment) {
+      setDescription(parentLabel ?? "");
+      setAmount(installment.amount);
       setDueDate(installment.dueDate);
       setPaid(installment.paid);
-      setAskDateScope(false);
-      setAdvanceCount("");
+    } else if (single) {
+      setDescription(single.description);
+      setAmount(single.amount);
+      setDueDate(single.date);
+      setPaid(single.kind === "investment" ? false : single.paid);
     }
-  }, [open, installment]);
+    setAskDateScope(false);
+    setAdvanceCount("");
+  }, [open, installment, single, parentLabel]);
 
-  if (!installment) return null;
+  if (!installment && !single) return null;
 
-  const dateChanged = dueDate !== installment.dueDate;
-  const amountChanged = parseFloat(amount) !== installment.amount;
-  const paidChanged = paid !== installment.paid;
-  const isLast = installment.number === installment.total;
-  const remaining = Math.max(0, installment.total - installment.number);
+  // ───── SINGLE (Debit / Income / Investment) ─────
+  if (single) {
+    const handleSave = async () => {
+      if (single.kind === "debit") {
+        await updateDebit.mutateAsync({
+          id: single.id,
+          description: description.trim(),
+          amount,
+          date: dueDate,
+          paid,
+        });
+      } else if (single.kind === "income") {
+        await updateIncome.mutateAsync({
+          id: single.id,
+          description: description.trim(),
+          amount,
+          date: dueDate,
+          received: paid,
+        });
+      } else {
+        await updateInvestment.mutateAsync({
+          id: single.id,
+          type: description.trim(),
+          amount,
+          date: dueDate,
+        });
+      }
+      onClose();
+    };
+    const pending =
+      updateDebit.isPending || updateIncome.isPending || updateInvestment.isPending;
+    return (
+      <Modal open={open} onClose={onClose} title="Editar lançamento">
+        <div className="space-y-4">
+          <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
+            <input
+              className={inputClass}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Valor">
+              <CurrencyInput value={amount} onValueChange={setAmount} />
+            </Field>
+            <Field label="Data">
+              <input
+                type="date"
+                className={inputClass}
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </Field>
+          </div>
+          {single.kind !== "investment" && (
+            <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+              <input
+                type="checkbox"
+                checked={paid}
+                onChange={(e) => setPaid(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="text-sm font-medium">
+                {single.kind === "debit" ? "Marcado como pago" : "Marcado como recebido"}
+              </span>
+            </label>
+          )}
+          <div className="flex gap-2 pt-2">
+            {onDeleteParent && (
+              <button
+                onClick={() => {
+                  if (confirm("Excluir este lançamento?")) {
+                    onDeleteParent();
+                    onClose();
+                  }
+                }}
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={pending || !description.trim() || !amount}
+              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // ───── INSTALLMENT (parcela) ─────
+  const inst = installment!;
+  const dateChanged = dueDate !== inst.dueDate;
+  const amountChanged = amount !== inst.amount;
+  const paidChanged = paid !== inst.paid;
+  const isLast = inst.number === inst.total;
+  const remaining = Math.max(0, inst.total - inst.number);
 
   async function commit(applyToFuture: boolean) {
-    if (!installment) return;
-    // 1) shift date if changed
     if (dateChanged) {
-      await shift.mutateAsync({
-        installment,
-        newDate: dueDate,
-        applyToFuture,
-      });
+      await shift.mutateAsync({ installment: inst, newDate: dueDate, applyToFuture });
     }
-    // 2) amount/paid only on this installment
     if (amountChanged || paidChanged) {
       await update.mutateAsync({
-        id: installment.id,
-        amount: amountChanged ? parseFloat(amount) : undefined,
+        id: inst.id,
+        amount: amountChanged ? amount : undefined,
         paid: paidChanged ? paid : undefined,
       });
     }
@@ -74,7 +193,6 @@ export function EditInstallmentDialog({
   }
 
   const handleSave = async () => {
-    // If date changed and it isn't the last installment, ask scope.
     if (dateChanged && !isLast) {
       setAskDateScope(true);
       return;
@@ -96,7 +214,7 @@ export function EditInstallmentDialog({
           >
             <span className="font-semibold">Apenas esta parcela</span>
             <span className="text-xs text-muted-foreground">
-              Só a parcela {installment.number}/{installment.total} muda.
+              Só a parcela {inst.number}/{inst.total} muda.
             </span>
           </button>
           <button
@@ -105,8 +223,7 @@ export function EditInstallmentDialog({
           >
             <span className="font-semibold">Esta e as próximas parcelas</span>
             <span className="text-xs text-muted-foreground">
-              As {installment.total - installment.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {Number(dueDate.slice(8, 10))}.
-              Parcelas anteriores não são afetadas.
+              As {inst.total - inst.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {Number(dueDate.slice(8, 10))}.
             </span>
           </button>
           <button onClick={() => setAskDateScope(false)} className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary">
@@ -121,7 +238,7 @@ export function EditInstallmentDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title={installment.total > 1 ? `Parcela ${installment.number}/${installment.total}` : "Editar lançamento"}
+      title={inst.total > 1 ? `Parcela ${inst.number}/${inst.total}` : "Editar lançamento"}
     >
       <div className="space-y-4">
         {parentLabel && (
@@ -133,15 +250,9 @@ export function EditInstallmentDialog({
         )}
 
         <Field label="Valor">
-          <input
-            type="number"
-            step="0.01"
-            className={inputClass}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+          <CurrencyInput value={amount} onValueChange={setAmount} />
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Valor atual: {formatCurrency(installment.amount)}. Ajuste só esta parcela sem afetar as outras.
+            Valor atual: {formatCurrency(inst.amount)}.
           </p>
         </Field>
 
@@ -152,11 +263,6 @@ export function EditInstallmentDialog({
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
-          {dateChanged && !isLast && (
-            <p className="mt-1 text-[11px] text-primary">
-              Você poderá aplicar a nova data apenas a esta ou também às próximas.
-            </p>
-          )}
         </Field>
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
@@ -176,8 +282,7 @@ export function EditInstallmentDialog({
               <p className="text-sm font-semibold">Antecipar parcelas</p>
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Quantas parcelas futuras você antecipou para esta fatura? Elas serão movidas
-              para {formatDate(installment.dueDate)} e marcadas como pagas. Restam {remaining}.
+              Quantas parcelas futuras você antecipou? Restam {remaining}.
             </p>
             <div className="mt-2 flex gap-2">
               <input
@@ -193,8 +298,8 @@ export function EditInstallmentDialog({
                 onClick={async () => {
                   const n = Math.min(remaining, Math.max(1, parseInt(advanceCount) || 0));
                   if (!n) return;
-                  if (!confirm(`Antecipar ${n} parcela(s) para a fatura de ${formatDate(installment.dueDate)}?`)) return;
-                  await advance.mutateAsync({ installment, count: n });
+                  if (!confirm(`Antecipar ${n} parcela(s)?`)) return;
+                  await advance.mutateAsync({ installment: inst, count: n });
                   onClose();
                 }}
                 disabled={advance.isPending || !advanceCount}
@@ -216,7 +321,6 @@ export function EditInstallmentDialog({
                 }
               }}
               className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
-              title="Excluir item completo"
             >
               <Trash2 className="h-4 w-4" />
             </button>

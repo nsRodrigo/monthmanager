@@ -3,6 +3,7 @@ import { Modal, Field, inputClass } from "./Modal";
 import { useAddDebit, useAccounts } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
+import { CurrencyInput } from "./CurrencyInput";
 
 export function AddDebitDialog({
   open,
@@ -20,7 +21,7 @@ export function AddDebitDialog({
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [required, setRequired] = useState(false);
   const [autoDebit, setAutoDebit] = useState(false);
@@ -36,7 +37,7 @@ export function AddDebitDialog({
       setDate(d.toISOString().slice(0, 10));
       setAccountId(filterAccountId ?? accounts[0]?.id ?? "");
       setDescription("");
-      setAmount("");
+      setAmount(0);
       setRequired(false);
       setAutoDebit(false);
       setAutoDebitDay("");
@@ -48,10 +49,10 @@ export function AddDebitDialog({
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId]);
 
   const submit = async () => {
-    if (!description.trim() || !amount || !accountId) return;
+    if (!description.trim() || amount <= 0 || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
-    const value = parseFloat(amount);
+    const value = amount;
     const totalAmount = mode === "perInstallment" && n > 1 ? value * n : value;
     await addDebit.mutateAsync({
       accountId,
@@ -67,7 +68,7 @@ export function AddDebitDialog({
     onClose();
   };
 
-  const value = parseFloat(amount) || 0;
+  const value = amount || 0;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
   const total = mode === "perInstallment" && n > 1 ? value * n : value;
   const per = n > 0 ? total / n : 0;
@@ -81,7 +82,7 @@ export function AddDebitDialog({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
-            <input type="number" step="0.01" className={inputClass} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
+            <CurrencyInput value={amount} onValueChange={setAmount} />
           </Field>
           <Field label={isInstallment ? "Data da 1ª parcela" : "Data"}>
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />

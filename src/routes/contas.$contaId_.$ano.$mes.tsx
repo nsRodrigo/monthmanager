@@ -49,7 +49,7 @@ import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
-import { EditInstallmentDialog } from "@/components/EditInstallmentDialog";
+import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
@@ -99,6 +99,10 @@ function AccountMonth() {
     inst: Installment;
     label: string;
     subtitle?: string;
+    onDeleteParent?: () => void;
+  } | null>(null);
+  const [editingSingle, setEditingSingle] = useState<{
+    item: SingleEditTarget;
     onDeleteParent?: () => void;
   } | null>(null);
 
@@ -202,6 +206,19 @@ function AccountMonth() {
               key={d.id}
               debit={d}
               onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "debit",
+                    id: d.id,
+                    description: d.description,
+                    amount: d.amount,
+                    date: d.date,
+                    paid: d.paid,
+                  },
+                  onDeleteParent: () => removeDebit.mutate(d.id),
+                })
+              }
               onRemove={() => removeDebit.mutate(d.id)}
             />
           ))}
@@ -246,6 +263,19 @@ function AccountMonth() {
               onToggle={() =>
                 toggleIncome.mutate({ id: i.id, received: !i.received })
               }
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "income",
+                    id: i.id,
+                    description: i.description,
+                    amount: i.amount,
+                    date: i.date,
+                    paid: i.received,
+                  },
+                  onDeleteParent: () => removeIncome.mutate(i.id),
+                })
+              }
               onRemove={() => removeIncome.mutate(i.id)}
             />
           ))}
@@ -286,6 +316,18 @@ function AccountMonth() {
             <InvestmentRow
               key={inv.id}
               inv={inv}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "investment",
+                    id: inv.id,
+                    description: inv.type,
+                    amount: inv.amount,
+                    date: inv.date,
+                  },
+                  onDeleteParent: () => removeInvestment.mutate(inv.id),
+                })
+              }
               onRemove={() => removeInvestment.mutate(inv.id)}
             />
           ))}
@@ -402,6 +444,12 @@ function AccountMonth() {
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
         onDeleteParent={editing?.onDeleteParent}
+      />
+      <EditInstallmentDialog
+        open={!!editingSingle}
+        onClose={() => setEditingSingle(null)}
+        single={editingSingle?.item ?? null}
+        onDeleteParent={editingSingle?.onDeleteParent}
       />
     </div>
   );
@@ -748,10 +796,12 @@ function PurchaseInstRow({
 function DebitRow({
   debit,
   onToggle,
+  onEdit,
   onRemove,
 }: {
   debit: Debit;
   onToggle: () => void;
+  onEdit: () => void;
   onRemove: () => void;
 }) {
   return (
@@ -766,7 +816,7 @@ function DebitRow({
       >
         {debit.paid && <Check className="h-3.5 w-3.5" />}
       </button>
-      <div className="flex-1 min-w-0">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -790,8 +840,15 @@ function DebitRow({
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatDate(debit.date)} · {formatCurrency(debit.amount)} à vista
         </p>
-      </div>
+      </button>
       <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar débito"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"
@@ -805,10 +862,12 @@ function DebitRow({
 function IncomeRow({
   income,
   onToggle,
+  onEdit,
   onRemove,
 }: {
   income: Income;
   onToggle: () => void;
+  onEdit: () => void;
   onRemove: () => void;
 }) {
   return (
@@ -823,7 +882,7 @@ function IncomeRow({
       >
         {income.received && <Check className="h-3.5 w-3.5" />}
       </button>
-      <div className="flex-1 min-w-0">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${
             income.received ? "text-muted-foreground" : ""
@@ -834,8 +893,15 @@ function IncomeRow({
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>
-      </div>
+      </button>
       <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar recebimento"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"
@@ -909,17 +975,24 @@ function ParcelledRow({
   );
 }
 
-function InvestmentRow({ inv, onRemove }: { inv: Investment; onRemove: () => void }) {
+function InvestmentRow({ inv, onEdit, onRemove }: { inv: Investment; onEdit: () => void; onRemove: () => void }) {
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
         <TrendingUp className="h-3.5 w-3.5" />
       </div>
-      <div className="flex-1 min-w-0">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">{inv.percentage}% rendimento</p>
-      </div>
+      </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar investimento"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"

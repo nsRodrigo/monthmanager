@@ -14,6 +14,7 @@ import {
 } from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
 import { Modal, Field, inputClass } from "./Modal";
+import { CurrencyInput } from "./CurrencyInput";
 import { Plus, Trash2, Pencil, Check, X, Wallet, Building2, Smartphone, TrendingUp } from "lucide-react";
 
 const TYPES: { value: AccountType; label: string; icon: typeof Wallet }[] = [
@@ -38,19 +39,19 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
   const [name, setName] = useState("");
   const [type, setType] = useState<AccountType>("corrente");
   const [color, setColor] = useState("#8b5cf6");
-  const [initial, setInitial] = useState("");
+  const [initial, setInitial] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editInitial, setEditInitial] = useState("");
+  const [editInitial, setEditInitial] = useState(0);
 
   const submit = () => {
     if (!name.trim()) return;
     addAccount.mutate(
-      { name: name.trim(), type, color, initialBalance: parseFloat(initial) || 0 },
+      { name: name.trim(), type, color, initialBalance: initial || 0 },
       {
         onSuccess: () => {
           setName("");
-          setInitial("");
+          setInitial(0);
           setShowForm(false);
         },
       },
@@ -88,14 +89,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                         onChange={(e) => setEditName(e.target.value)}
                         className={inputClass}
                       />
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editInitial}
-                        onChange={(e) => setEditInitial(e.target.value)}
-                        placeholder="Saldo inicial"
-                        className={inputClass}
-                      />
+                      <CurrencyInput value={editInitial} onValueChange={setEditInitial} placeholder="Saldo inicial" />
                     </div>
                   ) : (
                     <>
@@ -124,7 +118,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                           updateAccount.mutate({
                             id: a.id,
                             name: editName.trim(),
-                            initialBalance: parseFloat(editInitial) || 0,
+                            initialBalance: editInitial || 0,
                           });
                           setEditingId(null);
                         }}
@@ -145,7 +139,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                         onClick={() => {
                           setEditingId(a.id);
                           setEditName(a.name);
-                          setEditInitial(String(a.initialBalance));
+                          setEditInitial(a.initialBalance);
                         }}
                         className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
                       >
@@ -209,14 +203,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                 </select>
               </Field>
               <Field label="Saldo inicial (R$)">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={initial}
-                  onChange={(e) => setInitial(e.target.value)}
-                  placeholder="0,00"
-                  className={inputClass}
-                />
+                <CurrencyInput value={initial} onValueChange={setInitial} />
               </Field>
             </div>
             <Field label="Cor">

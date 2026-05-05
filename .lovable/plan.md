@@ -1,113 +1,100 @@
+# Módulo de Análise de IRPF
 
-## Resumo
+Novo módulo dentro do app atual (sem quebrar nada). MVP focado em CSV/XLSX + cruzamento com os dados já existentes (contas, débitos, recebimentos, investimentos, parcelas, cartões). PDF/OCR fica para fase 2.
 
-Refatoração focada em corrigir regras financeiras (parcela atual configurável, saldo em conta por mês), melhorar UX em mobile, garantir atualização imediata das listas após criação e otimizar performance — sem quebrar importação, regras existentes ou histórico.
+## Arquitetura
 
----
+- Rota nova: `src/routes/irpf.tsx` (índice com tabs) usando `createFileRoute`, mobile-first, mesmos tokens do app.
+- Acesso restrito ao usuário logado (já protegido por whitelist + RLS).
+- Toda a lógica pesada roda no client (parsing CSV/XLSX) — seguindo o padrão do app (sem edge functions).
+- Storage privado para arquivos enviados (bucket `irpf-docs`, RLS por `user_id`, não público).
 
-## 1. Parcela atual configurável (regra crítica)
+## Schema (migrations)
 
-**Comportamento novo nos diálogos `AddPurchaseDialog`, `AddDebitDialog`, `AddIncomeDialog`** quando "É parcelado" estiver marcado:
+1. `irpf_documents` — `id, user_id, year, kind ('informe'|'extrato'|'planilha'|'outro'), file_path, original_name, mime, size, uploaded_at`. RLS own.
+2. `irpf_entries` — itens extraídos/normalizados de cada documento: `id, user_id, document_id, date, description, amount, source, category ('tributavel'|'isento'|'exclusiva'|'bens_direitos'|'dividas'|'nao_classificado'), subcategory, year, raw jsonb, created_at`. RLS own.
+3. `irpf_overrides` — ajustes manuais do usuário (reclassificação): `id, user_id, entry_id, category, subcategory, note`. RLS own.
+4. `irpf_year_snapshots` — saldos em 31/12 por conta/investimento congelados pelo usuário: `id, user_id, year, account_id (nullable), investment_id (nullable), label, value`. RLS own.
+5. Storage bucket `irpf-docs` privado + policies (`auth.uid()::text = (storage.foldername(name))[1]`).
 
-- Adicionar campo obrigatório **"Parcela atual"** (1..N) ao lado de "Número de parcelas".
-- Default = 1 (mantém comportamento atual).
-- Texto explicativo dinâmico: "Parcela 5/10 cai em <mês selecionado>. Serão criadas 1..4 nos meses anteriores e 6..10 nos próximos."
+## Telas (`src/routes/irpf.tsx` + sub-rotas dot-separated)
 
-**Lógica em `src/store/finance.ts`:**
+- `/irpf` — seletor de ano + 4 tabs:
+  1. **Documentos** — upload (drag-drop), lista, excluir, ver origem.
+  2. **Resumo IRPF** — cards com totais por categoria, comparativo com dados do app.
+  3. **Itens para declarar** — lista agrupada por ficha da Receita, com botão "Copiar" em cada bloco (Ficha/Grupo/Código/Descrição/Valor).
+  4. **Alertas & Checklist** — inconsistências detectadas + checklist do que falta.
 
-- Crédito (`useAddPurchase`): quando `installmentNumber > 1`, deixar de chamar `buildInstallmentsForPurchase` e usar `buildInstallmentsAnchored` (já existe e gera passado + futuro corretamente, marca anteriores como `paid: true`).
-- Débito (`useAddDebit`) e recebimento (`useAddIncome`): hoje só chamam `buildInstallments` que sempre começa em `startDate`. Criar nova função `buildInstallmentsAnchoredGeneric(parentId, parentType, userId, totalAmount, count, anchorNumber, anchorDate, paidPast)` análoga a `buildInstallmentsAnchored` mas paramétrica em `parent_type`. Usar quando `installmentNumber > 1`.
-- Para débitos passados anteriores marcar `paid = true`; para recebimentos passados anteriores marcar `paid = true` (= recebido).
+## Componentes novos (`src/components/irpf/`)
 
-**Edição de parcela:** já existe `EditInstallmentDialog` + `useShiftInstallmentDate({applyToFuture})`. Garantir que o diálogo apresenta as opções "Editar só esta" / "Editar esta e as próximas" claramente (já implementado para data; estender para valor — atualizar valor de todas as próximas com mesma diferença ou novo valor, decisão: aplicar mesmo valor às próximas).
+- `UploadDropzone.tsx` — aceita `.csv,.xlsx,.xls,.pdf` (PDF aceito mas marcado "processamento manual" no MVP).
+- `DocumentList.tsx`
+- `EntriesTable.tsx` — com reclassificação inline (dropdown de categoria; salva em `irpf_overrides`).
+- `IrpfSummaryCards.tsx`
+- `DeclarationBlock.tsx` — formato copiável.
+- `AlertsList.tsx`, `Checklist.tsx`.
+- `YearSnapshotDialog.tsx` — usuário confirma/edita saldos em 31/12.
 
----
+## Data layer (`src/store/irpf.ts`)
 
-## 2. Saldo em conta por mês (nova métrica)
+Mesmo padrão de `finance.ts`: hooks `useIrpfDocuments`, `useIrpfEntries(year)`, `useIrpfSummary(year)`, `useUploadIrpfDoc`, `useDeleteIrpfDoc`, `useReclassifyEntry` (optimistic update obrigatório), `useYearSnapshot`.
 
-**Conceito:**
+## Parsing (`src/lib/irpf/`)
 
-```text
-saldoEmConta(M) = saldoEmConta(M-1)
-               + recebimentos(M)
-               - débitos(M)
-               - faturas crédito(M)
-               - investimentos(M)   (entrada de aporte = saída da conta)
-```
+- `parseCsv.ts` — usa `papaparse` (já presente via `xlsxParser`? confirmar; senão `bun add papaparse`).
+- `parseXlsx.ts` — reaproveita `src/lib/xlsxParser.ts`.
+- `parsePdf.ts` — stub no MVP (extrai texto bruto se possível com `pdfjs-dist`; senão registra documento sem entries e avisa).
+- `classify.ts` — heurísticas por descrição/regex (palavras-chave: SALARIO/PROVENTOS/PIX RECEBIDO/CDB/IOF/RENDIMENTOS POUPANCA/TED/DOC/transferência entre contas próprias por nome do titular). Saída: `{category, subcategory, confidence}`.
+- `crossCheck.ts` — compara `irpf_entries` do ano com `incomes`, `debits`, `installments` do app e gera alertas.
 
-Distinto de **balanço(M) = recebimentos(M) - despesas(M)** que continua existindo.
+## Cálculo do Resumo
 
-**Implementação:**
+Para o ano selecionado:
+- **Tributáveis**: soma de `incomes` recebidos no ano + entries classificadas como `tributavel`.
+- **Isentos**: entries `isento` + transferências entre contas próprias detectadas.
+- **Exclusiva**: entries `exclusiva` (CDB, LCI/LCA marcados).
+- **Bens e Direitos**: para cada `account` → saldo em 31/12 (calculado via `computeAccountBalance` projetado até 31/12 do ano) + cada `investment` (snapshot do ano) + cada item classificado como `bens_direitos`.
+- **Dívidas**: parcelas em aberto em 31/12 + entries `dividas`.
 
-- Em `src/store/finance.ts` adicionar `computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments): Map<"YYYY-M", { saldoEmConta, balanco, recebimentos, debitos, faturas, investido }>` que itera cronologicamente partindo de `account.initialBalance`, agregando todos os meses que têm movimentação. Considera **todos** os lançamentos do mês (independente de pagos), pois a métrica é "saldo previsto/real ao final do mês".
-- Em `src/routes/contas.$contaId.tsx` (lista de meses), exibir tanto **Balanço** (já mostrado) quanto **Saldo em conta** ao lado, ambos com cor por sinal. Em mobile (<480px), empilhar verticalmente.
-- Adicionar um pequeno badge no canto superior direito do card mensal com "Saldo: R$ X" e manter "Balanço" abaixo.
+## Instruções de Declaração
 
----
+Mapa estático em `src/lib/irpf/fichas.ts` traduzindo cada subcategoria → `{ficha, grupo, codigo, descricaoTemplate}`. Renderizado por `DeclarationBlock` com botão copiar (clipboard API).
 
-## 3. Responsividade mobile
+## Alertas (exemplos)
 
-**Tailwind breakpoint customizado:** adicionar `xs: 480px` em `src/styles.css` (`@theme` block).
+- Recebimento no app sem entry correspondente importada.
+- Entry tributável sem `incomes` equivalente.
+- Conta sem snapshot de 31/12.
+- Investimento sem classificação fiscal.
+- Soma divergente entre extrato e movimentações.
 
-- Trocar label "Movimentado:" por "Mov:" em telas `<xs`. Implementar via `<span className="xs:hidden">Mov:</span><span className="hidden xs:inline">Movimentado:</span>` em `contas.$contaId.tsx`.
-- Aplicar mesma técnica para "A receber"→"Recb", "A pagar"→"Pagar", "Faturas"→"Fatura", "Previsto"→"Prev" em `MiniStat` (props opcionais `shortLabel`).
-- Reduzir paddings e tamanho de fonte em `<sm` no header da conta e cards de meses.
+## Segurança
 
----
+- Bucket `irpf-docs` privado, paths `${user_id}/${year}/${uuid}-${filename}`.
+- RLS em todas as tabelas (`auth.uid() = user_id`).
+- Sem logs de conteúdo de arquivo (só metadata).
+- Avisos visíveis: "análise não substitui contador, dados não enviados à Receita".
 
-## 4. Bug — itens não aparecem na lista após adicionar
+## Navegação
 
-**Causas identificadas:**
+- Adicionar item "Imposto de Renda" no menu/header existente (verificar `__root.tsx` / index) — só aparece para usuário logado.
 
-- `useAddPurchase`, `useAddDebit`, `useAddIncome`, `useAddInvestment` invalidam apenas as chaves de topo (ex.: `["purchases"]`), mas as queries são chaveadas por `["purchases", user.id]` — `invalidateQueries({ queryKey: ["purchases"] })` faz prefix match e funciona, **porém** o `mutateAsync` no diálogo fecha antes do `onSuccess` em alguns fluxos.
-- Mais crítico: para débitos/recebimentos parcelados, `installments` é invalidado mas a chave do React Query do `useDebits` que renderiza a lista pode ainda estar `staleTime` longo.
+## Fora do MVP (fase 2)
 
-**Fix:**
+- OCR de PDF de informes (Lovable AI vision).
+- Importação direta de informes oficiais por banco.
+- Simulação de imposto devido / restituição.
+- Score de malha fina.
 
-- Em todos os `useAdd*`/`useImport*`: trocar `onSuccess` por `onSettled` e usar `await qc.invalidateQueries(...)` com `refetchType: "active"` para garantir refetch imediato.
-- Adicionar `staleTime: 0` ou setar default global em `QueryClient` (`src/router.tsx` / provider) — verificar atual antes de mexer.
-- Nos diálogos, o `await mutateAsync` já espera; garantir que o `onClose()` ocorre **depois** do `await`. Já é o caso. O ponto chave é o invalidate síncrono.
-- Adicionar update otimista para `useAddDebit`/`useAddIncome`/`useAddInvestment`/`useAddPurchase` (push do novo item no cache via `setQueryData`) para feedback instantâneo.
+## Entregáveis do MVP
 
----
+1. Migrations (tabelas + bucket + policies).
+2. Rota `/irpf` com 4 tabs funcionais.
+3. Upload + listagem + exclusão de documentos.
+4. Parser CSV/XLSX + classificação heurística.
+5. Resumo com totais por categoria.
+6. Blocos de instrução copiáveis.
+7. Alertas + checklist baseados em cruzamento com dados do app.
+8. Snapshot de saldos 31/12 editável.
 
-## 5. Performance
-
-- **Memoização de selectors mensais:** `getMonthInstallments`, `getMonthDebits`, `getMonthIncomes` são chamadas múltiplas vezes por render no `index.tsx` (1 por conta × 4 stats). Indexar:
-  - Em `useInstallments` derivar `installmentsByYM = Map<"y-m", Installment[]>` via `useMemo` num hook `useInstallmentsIndex()`.
-  - Mesmo para debits/incomes/investments.
-- **Reduzir N+1 em `index.tsx`:** loop por conta refaz `getMonthDebits`/`getMonthIncomes` filtrando por todos os installments. Pré-computar uma vez `installmentsByParent`/`debitsByAccount` e reutilizar.
-- **Memo nos componentes de linha** (`MiniStat`, item de cartão/débito/recebimento) com `React.memo` + props estáveis.
-- **Virtualização** (apenas se lista de parcelas > 100 itens): adicionar `@tanstack/react-virtual` na lista de transações dentro de `contas.$contaId_.$ano.$mes.tsx`. Avaliar pós-medição — incluir lib só se necessário.
-- **Query staleTime razoável:** definir `staleTime: 30_000` por padrão para queries de leitura; manter invalidate explícito nas mutations.
-
----
-
-## 6. Detalhes técnicos
-
-**Arquivos a editar:**
-
-- `src/store/finance.ts` — nova função `buildInstallmentsAnchoredGeneric`, `computeMonthlyAccountBalance`; ajuste em `useAddPurchase`/`useAddDebit`/`useAddIncome` para aceitar `installmentNumber`; otimistic updates; `onSettled` + `refetchType: "active"`.
-- `src/components/AddPurchaseDialog.tsx`, `AddDebitDialog.tsx`, `AddIncomeDialog.tsx` — campo "Parcela atual".
-- `src/components/EditInstallmentDialog.tsx` — opção "Aplicar valor às próximas".
-- `src/routes/contas.$contaId.tsx` — coluna "Saldo em conta" + responsividade ("Mov:").
-- `src/routes/index.tsx` — usar índices memoizados; labels curtas em xs.
-- `src/styles.css` — breakpoint `xs: 480px`.
-- `src/router.tsx` (ou onde QueryClient é criado) — `defaultOptions.queries.staleTime`.
-
-**Compatibilidade:**
-
-- Importação CSV/XLSX (`useImportPurchases`, `useImportHistorical`) **não muda** — já usam `buildInstallmentsAnchored` corretamente.
-- Regras de fatura (closingDay/dueDay) preservadas: o "Parcela atual" é opcional; quando = 1 ou ausente, comportamento idêntico ao atual.
-- Histórico e múltiplas contas intactos.
-
----
-
-## 7. Validação
-
-1. Criar compra parcelada 5/10 em maio/2026 → verificar parcelas 1..4 (passadas, marcadas pagas) e 6..10 (futuras) geradas.
-2. Criar débito/recebimento parcelado com `installmentNumber > 1` — mesma verificação.
-3. Calcular saldo em conta jan→dez e conferir progressão.
-4. Em viewport 375×812 confirmar "Mov:" e labels curtas.
-5. Após adicionar item, listar imediatamente sem refresh.
-6. Profile com >2000 parcelas: verificar tempo de render do home <200ms.
+Posso seguir com a implementação assim?

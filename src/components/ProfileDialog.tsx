@@ -13,6 +13,7 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
+  const isAdmin = useIsAdmin();
 
   const [name, setName] = useState("");
 

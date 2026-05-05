@@ -206,6 +206,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         >
           <Upload className="h-3.5 w-3.5" /> Importar CSV
         </Link>
+        <Link
+          to="/irpf"
+          onClick={onNavigate}
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+            loc.pathname.startsWith("/irpf")
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <Receipt className="h-3.5 w-3.5" /> Imposto de Renda
+        </Link>
         {isAdmin && (
           <Link
             to="/admin/whitelist"

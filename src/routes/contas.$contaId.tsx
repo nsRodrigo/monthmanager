@@ -8,12 +8,14 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  computeAccountBalance,
+  computeAccountBalanceUntilNow,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
   getMonthInvestments,
   computeMonthlyAccountBalance,
+  getEffectiveCurrentMonth,
+  normalizeZero,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -50,8 +52,9 @@ function AccountHome() {
   }, [account, setAccountId]);
 
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const currentMonth = today.getMonth();
+  const eff = getEffectiveCurrentMonth(today);
+  const [year, setYear] = useState(eff.year);
+  const currentMonth = eff.month;
 
   const accountCardIds = useMemo(
     () => new Set(cards.filter((c) => c.accountId === contaId).map((c) => c.id)),
@@ -142,13 +145,15 @@ function AccountHome() {
   }
 
 
-  const balance = computeAccountBalance(account, cards, purchases, installments, debits, incomes);
-  const monthInvested = getMonthInvestments(accountInvestments, today.getFullYear(), currentMonth)
+  const balance = normalizeZero(
+    computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
+  );
+  const monthInvested = getMonthInvestments(accountInvestments, eff.year, currentMonth)
     .reduce((s, i) => s + i.amount, 0);
 
-  // current month numbers (for the top dashboard)
+  // current (effective) month numbers (for the top dashboard)
   const cm = currentMonthSummary(
-    today.getFullYear(),
+    eff.year,
     currentMonth,
     accountCardIds,
     accountCards,
@@ -158,8 +163,7 @@ function AccountHome() {
     installments,
   );
 
-  const expectedEnd =
-    balance + cm.income - cm.debits - cm.cardsTotal;
+  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">

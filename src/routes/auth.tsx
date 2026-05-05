@@ -14,7 +14,7 @@ import {
   startAuthentication as srvStartAuth,
   finishAuthentication as srvFinishAuth,
 } from "@/server/webauthn";
-import { reportPendingSignup, flushPendingNotifications } from "@/server/access-requests.functions";
+import { reportPendingSignup } from "@/server/access-requests.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, pendingMessage, clearPendingMessage } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
   const [email, setEmail] = useState("");
@@ -43,52 +43,14 @@ function AuthPage() {
     }
   }, []);
 
-  // Detecta erro vindo do callback OAuth (Google) — quando o trigger bloqueia
-  // o signup, o Supabase redireciona com #error=...&error_description=...
+  // Mensagem global quando o AuthProvider desloga um usuário fora da whitelist.
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash || !hash.includes("error")) return;
-    const params = new URLSearchParams(hash.replace(/^#/, ""));
-    const desc = (params.get("error_description") ?? "").toLowerCase();
-    if (!desc) return;
-    const isPending =
-      desc.includes("pending_approval") ||
-      desc.includes("não está autorizado") ||
-      desc.includes("nao esta autorizado") ||
-      desc.includes("database error saving new user") ||
-      desc.includes("database error");
-    if (isPending) {
-      // Tenta recuperar o email do provedor a partir do id_token, se houver
-      const idToken = params.get("id_token") ?? params.get("provider_token");
-      let providerEmail: string | undefined;
-      try {
-        if (idToken) {
-          const payload = JSON.parse(atob(idToken.split(".")[1] ?? ""));
-          providerEmail = payload?.email;
-        }
-      } catch (_) {}
-      if (providerEmail) {
-        reportPendingSignup({ data: { email: providerEmail } }).catch(() => {});
-      }
-      setInfo(
-        "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente entrar novamente depois.",
-      );
+    if (pendingMessage) {
+      setInfo(pendingMessage);
       setError(null);
-    } else {
-      setError(decodeURIComponent(params.get("error_description") ?? "Erro ao entrar"));
+      clearPendingMessage();
     }
-    // limpa o hash da URL
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    // Garante que admins recebam push para QUALQUER solicitação pendente sem notificação
-    // (ex.: signup via Google em que o callback não trouxe id_token com email)
-    flushPendingNotifications({}).catch(() => {});
-  }, []);
-
-  // No primeiro carregamento da tela de auth, sempre tenta esvaziar a fila de
-  // solicitações pendentes não notificadas — cobre o bug do callback do Google.
-  useEffect(() => {
-    flushPendingNotifications({}).catch(() => {});
-  }, []);
+  }, [pendingMessage, clearPendingMessage]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

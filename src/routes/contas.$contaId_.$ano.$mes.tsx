@@ -804,12 +804,14 @@ function PurchaseInstRow({
   cardColor,
   onToggle,
   onEdit,
+  onRemove,
 }: {
   inst: Installment;
   purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
   cardColor: string;
   onToggle: () => void;
   onEdit: () => void;
+  onRemove?: () => void;
 }) {
   const isInstallment = inst.total > 1;
   return (
@@ -864,6 +866,18 @@ function PurchaseInstRow({
       >
         <Pencil className="h-3.5 w-3.5" />
       </button>
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm("Excluir esta compra (e todas as parcelas)?")) onRemove();
+          }}
+          className="text-muted-foreground hover:text-destructive"
+          title="Excluir compra"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

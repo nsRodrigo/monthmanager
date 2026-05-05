@@ -129,7 +129,7 @@ export function getInvoiceMonth(
   return {
     year: due.getFullYear(),
     month: due.getMonth(),
-    dueDate: due.toISOString().slice(0, 10),
+    dueDate: fmtLocalDate(due.getFullYear(), due.getMonth(), due.getDate()),
   };
 }
 
@@ -175,7 +175,7 @@ export function buildInstallments(
       number: i + 1,
       total: count,
       amount,
-      due_date: d.toISOString().slice(0, 10),
+      due_date: fmtLocalDate(d.getFullYear(), d.getMonth(), d.getDate()),
       year: d.getFullYear(),
       month: d.getMonth(),
       paid,
@@ -232,7 +232,7 @@ export function buildInstallmentsForPurchase(
       number: i + 1,
       total: count,
       amount,
-      due_date: d.toISOString().slice(0, 10),
+      due_date: fmtLocalDate(d.getFullYear(), d.getMonth(), d.getDate()),
       year: d.getFullYear(),
       month: d.getMonth(),
       paid: false,

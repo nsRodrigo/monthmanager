@@ -31,7 +31,7 @@ export function AddIncomeDialog({
   useEffect(() => {
     if (open) {
       const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
-      setDate(d.toISOString().slice(0, 10));
+      setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
       setAccountId(filterAccountId ?? accounts[0]?.id ?? "");
       setDescription("");
       setAmount(0);

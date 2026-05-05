@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useCards, useAddPurchase } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
@@ -9,6 +9,7 @@ export function AddPurchaseDialog({
   defaultYear,
   defaultMonth,
   fixedCardId,
+  fixedAccountId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -16,9 +17,15 @@ export function AddPurchaseDialog({
   defaultMonth: number;
   /** When provided, the card selector is hidden and this card is used. */
   fixedCardId?: string;
+  /** When provided, only cards from this account are offered. */
+  fixedAccountId?: string;
 }) {
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
+  const selectableCards = useMemo(
+    () => (fixedAccountId ? cards.filter((card) => card.accountId === fixedAccountId) : cards),
+    [cards, fixedAccountId],
+  );
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
@@ -30,15 +37,15 @@ export function AddPurchaseDialog({
   useEffect(() => {
     if (open) {
       const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
-      setDate(d.toISOString().slice(0, 10));
-      setCardId(fixedCardId ?? cards[0]?.id ?? "");
+      setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+      setCardId(fixedCardId ?? selectableCards[0]?.id ?? "");
       setDescription("");
       setAmount(0);
       setInstallments("1");
       setInstallmentNumber("1");
       setIsInstallment(false);
     }
-  }, [open, defaultYear, defaultMonth, cards, fixedCardId]);
+  }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
   const submit = async () => {
     if (!description.trim() || amount <= 0 || !cardId) return;
@@ -77,7 +84,7 @@ export function AddPurchaseDialog({
         {!fixedCardId && (
           <Field label="Cartão">
             <select className={inputClass} value={cardId} onChange={(e) => setCardId(e.target.value)}>
-              {cards.map((c) => (
+              {selectableCards.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

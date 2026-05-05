@@ -106,24 +106,50 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
       .maybeSingle();
     if (bl) return { ok: true, blacklisted: true };
 
-    // Garante a solicitação (idempotente — índice único em pending)
-    await supabaseAdmin.from("access_requests").insert({ email }).select().maybeSingle();
+    // Garante a solicitação pendente de forma idempotente e falha explicitamente
+    // se o registro não for salvo — sem isso o cliente podia mostrar sucesso
+    // mesmo sem criar nada para o admin aprovar.
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("access_requests")
+      .select("id,notified_at")
+      .eq("status", "pending")
+      .ilike("email", email)
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
 
-    try {
-      await notifyAdmins({
-        title: "Nova solicitação de acesso",
-        body: email,
-        url: "/admin/whitelist",
-      });
-      await supabaseAdmin
+    let requestId = existing?.id;
+    let alreadyNotified = Boolean(existing?.notified_at);
+    if (!requestId) {
+      const { data: created, error: insertError } = await supabaseAdmin
         .from("access_requests")
-        .update({ notified_at: new Date().toISOString() })
-        .eq("status", "pending")
-        .ilike("email", email);
+        .insert({ email })
+        .select("id,notified_at")
+        .single();
+      if (insertError) throw new Error(insertError.message);
+      requestId = created.id;
+      alreadyNotified = Boolean(created.notified_at);
+    }
+
+    let notifiedCount = 0;
+    try {
+      if (!alreadyNotified) {
+        const result = await notifyAdmins({
+          title: "Nova solicitação de acesso",
+          body: email,
+          url: "/admin/whitelist",
+        });
+        notifiedCount = result.sent;
+        if (notifiedCount > 0) {
+          await supabaseAdmin
+            .from("access_requests")
+            .update({ notified_at: new Date().toISOString() })
+            .eq("id", requestId);
+        }
+      }
     } catch (err) {
       console.error("notifyAdmins failed", err);
     }
-    return { ok: true };
+    return { ok: true, requestId, notifiedCount };
   });
 
 // Notifica admins sobre solicitações pendentes que ainda não foram notificadas.
@@ -139,24 +165,27 @@ export const flushPendingNotifications = createServerFn({ method: "POST" }).hand
     .limit(50);
   if (!pending || pending.length === 0) return { ok: true, sent: 0 };
   let sent = 0;
+  const deliveredIds: string[] = [];
   for (const req of pending) {
     try {
-      await notifyAdmins({
+      const result = await notifyAdmins({
         title: "Nova solicitação de acesso",
         body: req.email,
         url: "/admin/whitelist",
       });
-      sent++;
+      if (result.sent > 0) {
+        sent += result.sent;
+        deliveredIds.push(req.id);
+      }
     } catch (err) {
       console.error("notifyAdmins failed", err);
     }
   }
-  await supabaseAdmin
-    .from("access_requests")
-    .update({ notified_at: new Date().toISOString() })
-    .in(
-      "id",
-      pending.map((p) => p.id),
-    );
+  if (deliveredIds.length > 0) {
+    await supabaseAdmin
+      .from("access_requests")
+      .update({ notified_at: new Date().toISOString() })
+      .in("id", deliveredIds);
+  }
   return { ok: true, sent };
 });

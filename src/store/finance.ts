@@ -887,7 +887,59 @@ export function useToggleInstallmentPaid() {
   return (id: string, paid: boolean) => upd.mutate({ id, paid });
 }
 
-export function useSetCardPaid() {
+/** Apaga uma única parcela (mantém o pai e demais parcelas intactos). */
+export function useDeleteSingleInstallment() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("installments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["installments", "card_payments"]),
+  });
+}
+
+/**
+ * Apaga o pai e todas as parcelas NÃO pagas. Parcelas já pagas (e o pai)
+ * são preservadas se houver alguma paga; caso contrário apaga tudo.
+ */
+export function useDeleteParentKeepingPaid() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { parentId: string; parentType: "purchase" | "debit" | "income" }) => {
+      const { data: paidRows } = await supabase
+        .from("installments")
+        .select("id")
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType)
+        .eq("paid", true);
+      const hasPaid = (paidRows ?? []).length > 0;
+
+      // Apaga todas as parcelas não pagas
+      await supabase
+        .from("installments")
+        .delete()
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType)
+        .eq("paid", false);
+
+      if (!hasPaid) {
+        // Sem parcelas pagas → remove o pai também
+        const table =
+          args.parentType === "purchase"
+            ? "purchases"
+            : args.parentType === "debit"
+              ? "debits"
+              : "incomes";
+        const { error } = await supabase.from(table).delete().eq("id", args.parentId);
+        if (error) throw error;
+      }
+    },
+    onSettled: () =>
+      inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
+  });
+}
+
   const { user } = useAuth();
   const inv = useInvalidate();
   const qc = useQueryClient();

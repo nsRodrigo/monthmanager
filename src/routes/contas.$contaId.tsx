@@ -25,7 +25,9 @@ import {
   ChevronRight,
   Wallet,
   ChevronLeft,
+  Plus,
 } from "lucide-react";
+import { AddMonthDialog } from "@/components/AddMonthDialog";
 
 export const Route = createFileRoute("/contas/$contaId")({
   head: () => ({ meta: [{ title: "Conta — Finanças" }] }),

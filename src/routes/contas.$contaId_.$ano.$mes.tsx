@@ -22,6 +22,8 @@ import {
   getMonthIncomes,
   getMonthInvestments,
   isCardFullyPaid,
+  computeAccountBalanceUntilNow,
+  normalizeZero,
   type Installment,
   type Debit,
   type Income,

@@ -940,6 +940,7 @@ export function useDeleteParentKeepingPaid() {
   });
 }
 
+export function useSetCardPaid() {
   const { user } = useAuth();
   const inv = useInvalidate();
   const qc = useQueryClient();

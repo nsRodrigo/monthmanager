@@ -2090,7 +2090,7 @@ export function useUpdateDebit() {
       date?: string;
       paid?: boolean;
     }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { description?: string; amount?: number; date?: string; paid?: boolean } = {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.date !== undefined) patch.date = args.date;
@@ -2136,7 +2136,7 @@ export function useUpdateIncome() {
       date?: string;
       received?: boolean;
     }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { description?: string; amount?: number; date?: string; received?: boolean } = {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.date !== undefined) patch.date = args.date;
@@ -2181,7 +2181,7 @@ export function useUpdateInvestment() {
       percentage?: number;
       date?: string;
     }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { type?: string; amount?: number; percentage?: number; date?: string } = {};
       if (args.type !== undefined) patch.type = args.type;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.percentage !== undefined) patch.percentage = args.percentage;

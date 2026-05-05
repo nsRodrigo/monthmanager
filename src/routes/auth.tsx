@@ -193,7 +193,13 @@ function AuthPage() {
   };
 
   const title =
-    mode === "signin" ? "Entre na sua conta" : mode === "signup" ? "Crie sua conta" : "Recuperar senha";
+    mode === "signin"
+      ? "Entre na sua conta"
+      : mode === "signup"
+        ? "Crie sua conta"
+        : mode === "request"
+          ? "Solicitar acesso"
+          : "Recuperar senha";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5">

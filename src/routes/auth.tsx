@@ -14,6 +14,7 @@ import {
   startAuthentication as srvStartAuth,
   finishAuthentication as srvFinishAuth,
 } from "@/server/webauthn";
+import { reportPendingSignup } from "@/server/access-requests.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -65,6 +66,27 @@ function AuthPage() {
     const { error: err } = await fn(email, password);
     setLoading(false);
     if (err) {
+      const msg = err.toLowerCase();
+      if (
+        mode === "signup" &&
+        (msg.includes("pending_approval") ||
+          msg.includes("não está autorizado") ||
+          msg.includes("nao esta autorizado") ||
+          msg.includes("database error saving new user"))
+      ) {
+        try {
+          await reportPendingSignup({ data: { email } });
+        } catch (_) {}
+        setInfo(
+          "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente cadastrar novamente depois.",
+        );
+        setError(null);
+        return;
+      }
+      if (mode === "signup" && msg.includes("bloquead")) {
+        setError("Este e-mail foi bloqueado. Entre em contato com o administrador.");
+        return;
+      }
       setError(err);
       return;
     }

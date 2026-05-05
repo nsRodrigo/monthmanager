@@ -862,10 +862,12 @@ function DebitRow({
 function IncomeRow({
   income,
   onToggle,
+  onEdit,
   onRemove,
 }: {
   income: Income;
   onToggle: () => void;
+  onEdit: () => void;
   onRemove: () => void;
 }) {
   return (
@@ -880,7 +882,7 @@ function IncomeRow({
       >
         {income.received && <Check className="h-3.5 w-3.5" />}
       </button>
-      <div className="flex-1 min-w-0">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${
             income.received ? "text-muted-foreground" : ""
@@ -891,8 +893,15 @@ function IncomeRow({
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>
-      </div>
+      </button>
       <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar recebimento"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"
@@ -966,17 +975,24 @@ function ParcelledRow({
   );
 }
 
-function InvestmentRow({ inv, onRemove }: { inv: Investment; onRemove: () => void }) {
+function InvestmentRow({ inv, onEdit, onRemove }: { inv: Investment; onEdit: () => void; onRemove: () => void }) {
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
         <TrendingUp className="h-3.5 w-3.5" />
       </div>
-      <div className="flex-1 min-w-0">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">{inv.percentage}% rendimento</p>
-      </div>
+      </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
+      <button
+        onClick={onEdit}
+        className="text-muted-foreground hover:text-primary"
+        title="Editar investimento"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"

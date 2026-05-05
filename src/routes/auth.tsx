@@ -14,7 +14,7 @@ import {
   startAuthentication as srvStartAuth,
   finishAuthentication as srvFinishAuth,
 } from "@/server/webauthn";
-import { reportPendingSignup, flushPendingNotifications } from "@/server/access-requests.functions";
+import { reportPendingSignup } from "@/server/access-requests.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, pendingMessage, clearPendingMessage } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
   const [email, setEmail] = useState("");
@@ -43,52 +43,14 @@ function AuthPage() {
     }
   }, []);
 
-  // Detecta erro vindo do callback OAuth (Google) — quando o trigger bloqueia
-  // o signup, o Supabase redireciona com #error=...&error_description=...
+  // Mensagem global quando o AuthProvider desloga um usuário fora da whitelist.
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash || !hash.includes("error")) return;
-    const params = new URLSearchParams(hash.replace(/^#/, ""));
-    const desc = (params.get("error_description") ?? "").toLowerCase();
-    if (!desc) return;
-    const isPending =
-      desc.includes("pending_approval") ||
-      desc.includes("não está autorizado") ||
-      desc.includes("nao esta autorizado") ||
-      desc.includes("database error saving new user") ||
-      desc.includes("database error");
-    if (isPending) {
-      // Tenta recuperar o email do provedor a partir do id_token, se houver
-      const idToken = params.get("id_token") ?? params.get("provider_token");
-      let providerEmail: string | undefined;
-      try {
-        if (idToken) {
-          const payload = JSON.parse(atob(idToken.split(".")[1] ?? ""));
-          providerEmail = payload?.email;
-        }
-      } catch (_) {}
-      if (providerEmail) {
-        reportPendingSignup({ data: { email: providerEmail } }).catch(() => {});
-      }
-      setInfo(
-        "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente entrar novamente depois.",
-      );
+    if (pendingMessage) {
+      setInfo(pendingMessage);
       setError(null);
-    } else {
-      setError(decodeURIComponent(params.get("error_description") ?? "Erro ao entrar"));
+      clearPendingMessage();
     }
-    // limpa o hash da URL
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    // Garante que admins recebam push para QUALQUER solicitação pendente sem notificação
-    // (ex.: signup via Google em que o callback não trouxe id_token com email)
-    flushPendingNotifications({}).catch(() => {});
-  }, []);
-
-  // No primeiro carregamento da tela de auth, sempre tenta esvaziar a fila de
-  // solicitações pendentes não notificadas — cobre o bug do callback do Google.
-  useEffect(() => {
-    flushPendingNotifications({}).catch(() => {});
-  }, []);
+  }, [pendingMessage, clearPendingMessage]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,67 +118,30 @@ function AuthPage() {
 
   const signInGoogle = async () => {
     setError(null);
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !normalizedEmail.includes("@")) {
-      setError(
-        "Digite seu e-mail Google acima antes de continuar — assim conseguimos avisar o administrador caso precise de aprovação.",
-      );
-      return;
-    }
+    setInfo(null);
     setLoading(true);
-    const { data: allowed } = await supabase.rpc("is_email_whitelisted", { _email: normalizedEmail });
-    if (!allowed) {
-      try {
-        const result = await reportPendingSignup({ data: { email: normalizedEmail } }) as {
-          ok: boolean;
-          notifiedCount?: number;
-        };
-        setInfo(
-          result.notifiedCount && result.notifiedCount > 0
-            ? "Solicitação enviada! O administrador foi notificado. Tente entrar novamente após a aprovação."
-            : "Solicitação enviada para a whitelist do administrador. Tente entrar novamente após a aprovação.",
-        );
-      } catch (err: any) {
-        setError(err?.message ?? "Não foi possível criar a solicitação de whitelist.");
-      } finally {
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+        extraParams: normalizedEmail && normalizedEmail.includes("@")
+          ? { login_hint: normalizedEmail }
+          : {},
+      });
+      if (result.error) {
+        const rawMsg = (result.error as Error)?.message ?? "Erro ao entrar com Google";
+        setError(rawMsg);
         setLoading(false);
-      }
-      return;
-    }
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-      extraParams: { login_hint: normalizedEmail },
-    });
-    if (result.error) {
-      setLoading(false);
-      const rawMsg = (result.error as Error)?.message ?? "Erro ao entrar com Google";
-      const msg = rawMsg.toLowerCase();
-      const isPending =
-        msg.includes("pending_approval") ||
-        msg.includes("database error") ||
-        msg.includes("failed to sign in with vendor") ||
-        msg.includes("vendor") ||
-        msg.includes("não está autorizado") ||
-        msg.includes("nao esta autorizado");
-      if (isPending) {
-        const normalized = email ? email.trim().toLowerCase() : "";
-        if (normalized) {
-          try { await reportPendingSignup({ data: { email: normalized } }); } catch (_) {}
-        }
-        // Cobre o caso em que o callback do Google não traz id_token com email:
-        // o trigger já persistiu via dblink, então só precisamos disparar o push.
-        try { await flushPendingNotifications({}); } catch (_) {}
-        setInfo(
-          "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente entrar novamente depois.",
-        );
-        setError(null);
         return;
       }
-      setError(rawMsg);
-      return;
+      if (result.redirected) return;
+      // Login OAuth bem-sucedido — o AuthProvider valida whitelist.
+      // Se autorizado, navega; se não, será deslogado e a mensagem aparece via pendingMessage.
+      navigate({ to: "/" });
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao entrar com Google");
+      setLoading(false);
     }
-    if (result.redirected) return;
-    navigate({ to: "/" });
   };
 
   const startAuthFn = useServerFn(srvStartAuth);

@@ -4,6 +4,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { Modal, Field, inputClass } from "./Modal";
 import { AccountSelect } from "./AccountSelect";
 import { todayISO } from "@/lib/format";
+import { CurrencyInput } from "./CurrencyInput";
 
 const TYPES = [
   "CDB",
@@ -29,7 +30,7 @@ export function AddInvestmentDialog({
 
   const [accountId, setAccountId] = useState("");
   const [type, setType] = useState(TYPES[0]);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
   const [percentage, setPercentage] = useState("");
   const [date, setDate] = useState("");
 
@@ -37,17 +38,17 @@ export function AddInvestmentDialog({
     if (!open) return;
     setAccountId(fixedAccountId ?? filterAccountId ?? "");
     setType(TYPES[0]);
-    setAmount("");
+    setAmount(0);
     setPercentage("");
     setDate(todayISO());
   }, [open, fixedAccountId, filterAccountId]);
 
   async function submit() {
-    if (!accountId || !amount || !date) return;
+    if (!accountId || amount <= 0 || !date) return;
     await addInv.mutateAsync({
       accountId,
       type,
-      amount: Number(amount),
+      amount,
       percentage: Number(percentage) || 0,
       date,
     });
@@ -73,14 +74,7 @@ export function AddInvestmentDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Valor aplicado">
-            <input
-              type="number"
-              step="0.01"
-              className={inputClass}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0,00"
-            />
+            <CurrencyInput value={amount} onValueChange={setAmount} />
           </Field>
           <Field label="Rendimento (% a.a.)">
             <input
@@ -112,7 +106,7 @@ export function AddInvestmentDialog({
           </button>
           <button
             onClick={submit}
-            disabled={addInv.isPending || !accountId || !amount}
+            disabled={addInv.isPending || !accountId || amount <= 0}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {addInv.isPending ? "Adicionando…" : "Adicionar"}

@@ -281,10 +281,12 @@ function AuthPage() {
                 ? "Entrar"
                 : mode === "signup"
                   ? "Criar conta"
-                  : "Enviar link"}
+                  : mode === "request"
+                    ? "Enviar solicitação"
+                    : "Enviar link"}
           </button>
 
-          {mode !== "forgot" && (
+          {mode !== "forgot" && mode !== "request" && (
             <>
               <div className="relative my-1 flex items-center">
                 <div className="flex-1 border-t border-border" />

@@ -231,6 +231,8 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
+        {isAdmin && <AdminSection />}
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}

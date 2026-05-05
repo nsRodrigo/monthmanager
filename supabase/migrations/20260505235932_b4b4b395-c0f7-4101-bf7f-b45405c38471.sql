@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.is_email_whitelisted(text) TO anon, authenticated;

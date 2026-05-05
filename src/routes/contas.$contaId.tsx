@@ -221,7 +221,17 @@ function AccountHome() {
 
       {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Meses de {year}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Meses de {year}</h2>
+          <button
+            type="button"
+            onClick={() => setOpenAddMonth(true)}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25"
+            aria-label="Adicionar mês"
+          >
+            <Plus className="h-3.5 w-3.5" /> Adicionar mês
+          </button>
+        </div>
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
             type="button"

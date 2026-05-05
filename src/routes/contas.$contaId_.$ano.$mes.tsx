@@ -54,10 +54,6 @@ import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
-import {
-  useDeleteSingleInstallment,
-  useDeleteParentKeepingPaid,
-} from "@/store/finance";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({

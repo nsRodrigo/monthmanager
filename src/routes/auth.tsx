@@ -43,6 +43,44 @@ function AuthPage() {
     }
   }, []);
 
+  // Detecta erro vindo do callback OAuth (Google) — quando o trigger bloqueia
+  // o signup, o Supabase redireciona com #error=...&error_description=...
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes("error")) return;
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const desc = (params.get("error_description") ?? "").toLowerCase();
+    if (!desc) return;
+    const isPending =
+      desc.includes("pending_approval") ||
+      desc.includes("não está autorizado") ||
+      desc.includes("nao esta autorizado") ||
+      desc.includes("database error saving new user") ||
+      desc.includes("database error");
+    if (isPending) {
+      // Tenta recuperar o email do provedor a partir do id_token, se houver
+      const idToken = params.get("id_token") ?? params.get("provider_token");
+      let providerEmail: string | undefined;
+      try {
+        if (idToken) {
+          const payload = JSON.parse(atob(idToken.split(".")[1] ?? ""));
+          providerEmail = payload?.email;
+        }
+      } catch (_) {}
+      if (providerEmail) {
+        reportPendingSignup({ data: { email: providerEmail } }).catch(() => {});
+      }
+      setInfo(
+        "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente entrar novamente depois.",
+      );
+      setError(null);
+    } else {
+      setError(decodeURIComponent(params.get("error_description") ?? "Erro ao entrar"));
+    }
+    // limpa o hash da URL
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, []);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);

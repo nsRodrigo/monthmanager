@@ -28,7 +28,7 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -86,6 +86,19 @@ function AuthPage() {
     setError(null);
     setInfo(null);
     setLoading(true);
+
+    if (mode === "request") {
+      try {
+        if (!email.includes("@")) throw new Error("Informe um e-mail válido.");
+        await reportPendingSignup({ data: { email } });
+        setInfo("Solicitação enviada! O administrador vai receber uma notificação.");
+      } catch (err: any) {
+        setError(err?.message ?? "Não foi possível enviar a solicitação.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     if (mode === "forgot") {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
@@ -180,7 +193,13 @@ function AuthPage() {
   };
 
   const title =
-    mode === "signin" ? "Entre na sua conta" : mode === "signup" ? "Crie sua conta" : "Recuperar senha";
+    mode === "signin"
+      ? "Entre na sua conta"
+      : mode === "signup"
+        ? "Crie sua conta"
+        : mode === "request"
+          ? "Solicitar acesso"
+          : "Recuperar senha";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5">
@@ -208,7 +227,7 @@ function AuthPage() {
             />
           </label>
 
-          {mode !== "forgot" && (
+          {mode !== "forgot" && mode !== "request" && (
             <label className="block">
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Senha</span>
@@ -262,10 +281,12 @@ function AuthPage() {
                 ? "Entrar"
                 : mode === "signup"
                   ? "Criar conta"
-                  : "Enviar link"}
+                  : mode === "request"
+                    ? "Enviar solicitação"
+                    : "Enviar link"}
           </button>
 
-          {mode !== "forgot" && (
+          {mode !== "forgot" && mode !== "request" && (
             <>
               <div className="relative my-1 flex items-center">
                 <div className="flex-1 border-t border-border" />
@@ -301,17 +322,30 @@ function AuthPage() {
           )}
 
           {mode === "signin" && (
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setError(null);
-                setInfo(null);
-              }}
-              className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-            >
-              Não tem conta? Criar agora
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+              >
+                Não tem conta? Criar agora
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("request");
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="w-full text-center text-xs text-primary hover:underline"
+              >
+                Solicitar acesso ao administrador
+              </button>
+            </>
           )}
           {mode === "signup" && (
             <button
@@ -326,7 +360,7 @@ function AuthPage() {
               Já tem conta? Entrar
             </button>
           )}
-          {mode === "forgot" && (
+          {(mode === "forgot" || mode === "request") && (
             <button
               type="button"
               onClick={() => {

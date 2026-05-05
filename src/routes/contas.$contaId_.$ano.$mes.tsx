@@ -1033,12 +1033,14 @@ function ParcelledRow({
   parent,
   onToggle,
   onEdit,
+  onRemove,
 }: {
   kind: "debit" | "income";
   installment: Installment;
   parent: Debit | Income;
   onToggle: () => void;
   onEdit: () => void;
+  onRemove?: () => void;
 }) {
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;

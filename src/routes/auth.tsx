@@ -14,7 +14,7 @@ import {
   startAuthentication as srvStartAuth,
   finishAuthentication as srvFinishAuth,
 } from "@/server/webauthn";
-import { reportPendingSignup } from "@/server/access-requests.functions";
+import { reportPendingSignup, flushPendingNotifications } from "@/server/access-requests.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),

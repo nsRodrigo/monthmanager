@@ -100,6 +100,7 @@ function AccountMonth() {
   const [openIncome, setOpenIncome] = useState(false);
   const [openInvest, setOpenInvest] = useState(false);
   const [openPurchase, setOpenPurchase] = useState(false);
+  const [openCard, setOpenCard] = useState(false);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
@@ -111,6 +112,22 @@ function AccountMonth() {
     item: SingleEditTarget;
     onDeleteParent?: () => void;
   } | null>(null);
+  const [deletingParcelled, setDeletingParcelled] = useState<{
+    inst: Installment;
+    label: string;
+    parentType: "purchase" | "debit" | "income";
+    parentId: string;
+  } | null>(null);
+
+  const deleteSingleInst = useDeleteSingleInstallment();
+  const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
+
+  const askDeleteInst = (
+    inst: Installment,
+    label: string,
+    parentType: "purchase" | "debit" | "income",
+    parentId: string,
+  ) => setDeletingParcelled({ inst, label, parentType, parentId });
 
   const accountCards = useMemo(
     () => cards.filter((c) => c.accountId === contaId),

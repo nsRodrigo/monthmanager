@@ -24,6 +24,8 @@ import {
   isCardFullyPaid,
   computeAccountBalanceUntilNow,
   normalizeZero,
+  useDeleteSingleInstallment,
+  useDeleteParentKeepingPaid,
   type Installment,
   type Debit,
   type Income,
@@ -52,6 +54,8 @@ import { AddIncomeDialog } from "@/components/AddIncomeDialog";
 import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
+import { AddCardDialog } from "@/components/AddCardDialog";
+import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
@@ -96,6 +100,7 @@ function AccountMonth() {
   const [openIncome, setOpenIncome] = useState(false);
   const [openInvest, setOpenInvest] = useState(false);
   const [openPurchase, setOpenPurchase] = useState(false);
+  const [openCard, setOpenCard] = useState(false);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
@@ -107,6 +112,22 @@ function AccountMonth() {
     item: SingleEditTarget;
     onDeleteParent?: () => void;
   } | null>(null);
+  const [deletingParcelled, setDeletingParcelled] = useState<{
+    inst: Installment;
+    label: string;
+    parentType: "purchase" | "debit" | "income";
+    parentId: string;
+  } | null>(null);
+
+  const deleteSingleInst = useDeleteSingleInstallment();
+  const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
+
+  const askDeleteInst = (
+    inst: Installment,
+    label: string,
+    parentType: "purchase" | "debit" | "income",
+    parentId: string,
+  ) => setDeletingParcelled({ inst, label, parentType, parentId });
 
   const accountCards = useMemo(
     () => cards.filter((c) => c.accountId === contaId),
@@ -255,6 +276,7 @@ function AccountMonth() {
                   onDeleteParent: () => removeIncome.mutate(p.income!.id),
                 })
               }
+              onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
             />
           ))}
         </GroupedSection>
@@ -345,6 +367,7 @@ function AccountMonth() {
                   onDeleteParent: () => removeDebit.mutate(p.debit!.id),
                 })
               }
+              onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
             />
           ))}
         </GroupedSection>
@@ -423,7 +446,12 @@ function AccountMonth() {
                         }}
                         onRemoveInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
-                          if (pur) removePurchase.mutate(pur.id);
+                          if (!pur) return;
+                          if (pur.installmentsCount > 1) {
+                            askDeleteInst(inst, pur.description, "purchase", pur.id);
+                          } else {
+                            if (confirm(`Excluir "${pur.description}"?`)) removePurchase.mutate(pur.id);
+                          }
                         }}
                       />
                     </div>
@@ -431,14 +459,12 @@ function AccountMonth() {
                 })
               )}
 
-              {accountCards.length > 0 && (
-                <button
-                  onClick={() => setOpenPurchase(true)}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
-                >
-                  <Plus className="h-4 w-4" /> Adicionar um cartão
-                </button>
-              )}
+              <button
+                onClick={() => setOpenCard(true)}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+              >
+                <Plus className="h-4 w-4" /> Novo cartão
+              </button>
             </section>
           );
         })()}
@@ -488,6 +514,22 @@ function AccountMonth() {
         onClose={() => setEditingSingle(null)}
         single={editingSingle?.item ?? null}
         onDeleteParent={editingSingle?.onDeleteParent}
+      />
+      <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} />
+      <DeleteParcelledDialog
+        open={!!deletingParcelled}
+        onClose={() => setDeletingParcelled(null)}
+        itemLabel={deletingParcelled?.label}
+        onDeleteOnlyThis={() => {
+          if (deletingParcelled) deleteSingleInst.mutate(deletingParcelled.inst.id);
+        }}
+        onDeleteAllUnpaid={() => {
+          if (deletingParcelled)
+            deleteParentKeepingPaid.mutate({
+              parentId: deletingParcelled.parentId,
+              parentType: deletingParcelled.parentType,
+            });
+        }}
       />
     </div>
   );
@@ -1007,12 +1049,14 @@ function ParcelledRow({
   parent,
   onToggle,
   onEdit,
+  onRemove,
 }: {
   kind: "debit" | "income";
   installment: Installment;
   parent: Debit | Income;
   onToggle: () => void;
   onEdit: () => void;
+  onRemove?: () => void;
 }) {
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;
@@ -1060,6 +1104,15 @@ function ParcelledRow({
       >
         <Pencil className="h-3.5 w-3.5" />
       </button>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+          title="Excluir"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

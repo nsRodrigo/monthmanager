@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           email: string
           id: string
+          notified_at: string | null
           requested_at: string
           resolved_at: string | null
           resolved_by: string | null
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           email: string
           id?: string
+          notified_at?: string | null
           requested_at?: string
           resolved_at?: string | null
           resolved_by?: string | null
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           email?: string
           id?: string
+          notified_at?: string | null
           requested_at?: string
           resolved_at?: string | null
           resolved_by?: string | null

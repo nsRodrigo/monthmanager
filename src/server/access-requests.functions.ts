@@ -115,8 +115,48 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
         body: email,
         url: "/admin/whitelist",
       });
+      await supabaseAdmin
+        .from("access_requests")
+        .update({ notified_at: new Date().toISOString() })
+        .eq("status", "pending")
+        .ilike("email", email);
     } catch (err) {
       console.error("notifyAdmins failed", err);
     }
     return { ok: true };
   });
+
+// Notifica admins sobre solicitações pendentes que ainda não foram notificadas.
+// Cobre o caso de signup via Google quando o callback OAuth não devolve o e-mail
+// no hash — o trigger já registrou em access_requests via record_pending_signup,
+// mas nenhuma push foi disparada.
+export const flushPendingNotifications = createServerFn({ method: "POST" }).handler(async () => {
+  const { data: pending } = await supabaseAdmin
+    .from("access_requests")
+    .select("id,email")
+    .eq("status", "pending")
+    .is("notified_at", null)
+    .limit(50);
+  if (!pending || pending.length === 0) return { ok: true, sent: 0 };
+  let sent = 0;
+  for (const req of pending) {
+    try {
+      await notifyAdmins({
+        title: "Nova solicitação de acesso",
+        body: req.email,
+        url: "/admin/whitelist",
+      });
+      sent++;
+    } catch (err) {
+      console.error("notifyAdmins failed", err);
+    }
+  }
+  await supabaseAdmin
+    .from("access_requests")
+    .update({ notified_at: new Date().toISOString() })
+    .in(
+      "id",
+      pending.map((p) => p.id),
+    );
+  return { ok: true, sent };
+});

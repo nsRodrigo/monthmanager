@@ -234,9 +234,9 @@ function Consolidated() {
                   <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
                   <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
                   <MiniStat
-                    label="Previsto"
-                    value={accExpected}
-                    tone={accExpected >= 0 ? "success" : "debit"}
+                    label="Balanço do mês"
+                    value={accMonthBalance}
+                    tone={accMonthBalance >= 0 ? "success" : "debit"}
                   />
                 </div>
                 {accInvested > 0 && (

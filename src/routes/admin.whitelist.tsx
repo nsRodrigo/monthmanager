@@ -1,7 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Trash2, Plus, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Trash2, Plus, ShieldCheck, UserX, Users } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useIsAdmin, useMyRoles, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
+import { listUsers, deleteUser, type AdminUser } from "@/server/admin-users.functions";
 
 export const Route = createFileRoute("/admin/whitelist")({
   head: () => ({ meta: [{ title: "Whitelist — Admin" }] }),
@@ -17,6 +20,25 @@ function WhitelistAdmin() {
   const removeMut = useRemoveFromWhitelist();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const listUsersFn = useServerFn(listUsers);
+  const deleteUserFn = useServerFn(deleteUser);
+  const qc = useQueryClient();
+
+  const usersQ = useQuery({
+    queryKey: ["admin-users"],
+    enabled: isAdmin,
+    queryFn: () => listUsersFn(),
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: (vars: { userId: string; alsoRemoveWhitelist: boolean }) =>
+      deleteUserFn({ data: vars }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["whitelist"] });
+    },
+  });
 
   useEffect(() => {
     if (!isLoading && !isAdmin) navigate({ to: "/" });
@@ -46,6 +68,15 @@ function WhitelistAdmin() {
     }
   };
 
+  const onRevoke = (u: AdminUser) => {
+    const alsoRemoveWhitelist = confirm(
+      `Revogar acesso de ${u.email}?\n\nIsso vai apagar a conta e todos os dados.\n\nClique OK para também remover o e-mail da whitelist (impede novo cadastro), ou Cancelar para apenas excluir o usuário.`,
+    );
+    // Segunda confirmação binária real (a primeira já serve de "também tirar da whitelist?")
+    if (!confirm(`Confirma exclusão de ${u.email}? Esta ação é irreversível.`)) return;
+    revokeMut.mutate({ userId: u.id, alsoRemoveWhitelist });
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-5 py-8 md:py-12">
       <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
@@ -57,51 +88,94 @@ function WhitelistAdmin() {
           <ShieldCheck className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Whitelist</h1>
-          <p className="text-sm text-muted-foreground">Apenas e-mails listados podem se cadastrar.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Administração</h1>
+          <p className="text-sm text-muted-foreground">Whitelist de cadastros e usuários ativos.</p>
         </div>
       </header>
 
-      <form onSubmit={onAdd} className="flex gap-2 rounded-2xl border border-border bg-card p-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="email@dominio.com"
-          className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-        />
-        <button
-          type="submit"
-          disabled={addMut.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow disabled:opacity-60"
-        >
-          <Plus className="h-4 w-4" /> Adicionar
-        </button>
-      </form>
-      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Whitelist</h2>
+        <form onSubmit={onAdd} className="flex gap-2 rounded-2xl border border-border bg-card p-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@dominio.com"
+            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            disabled={addMut.isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow disabled:opacity-60"
+          >
+            <Plus className="h-4 w-4" /> Adicionar
+          </button>
+        </form>
+        {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
 
-      <div className="mt-6 space-y-2">
-        {loadingList ? (
-          <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : list.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
-            Nenhum e-mail na whitelist ainda.
-          </p>
+        <div className="mt-4 space-y-2">
+          {loadingList ? (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          ) : list.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+              Nenhum e-mail na whitelist ainda.
+            </p>
+          ) : (
+            list.map((w) => (
+              <div key={w.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+                <span className="truncate text-sm">{w.email}</span>
+                <button
+                  onClick={() => removeMut.mutate(w.id)}
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label="Remover"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <Users className="h-4 w-4" /> Usuários cadastrados
+        </h2>
+
+        {usersQ.isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando usuários…</p>
+        ) : usersQ.error ? (
+          <p className="text-sm text-destructive">Erro: {(usersQ.error as Error).message}</p>
         ) : (
-          list.map((w) => (
-            <div key={w.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-              <span className="truncate text-sm">{w.email}</span>
-              <button
-                onClick={() => removeMut.mutate(w.id)}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                aria-label="Remover"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))
+          <div className="space-y-2">
+            {(usersQ.data ?? []).map((u) => (
+              <div key={u.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium">{u.email ?? "(sem email)"}</p>
+                    {u.is_admin && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                        Admin
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Último acesso: {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString("pt-BR") : "nunca"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onRevoke(u)}
+                  disabled={revokeMut.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  aria-label="Revogar acesso"
+                >
+                  <UserX className="h-4 w-4" /> Revogar
+                </button>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

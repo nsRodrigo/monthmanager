@@ -2075,3 +2075,187 @@ export function computeMonthlyAccountBalance(
   }
   return result;
 }
+
+// =======================
+// Update mutations for single Debit / Income / Investment
+// =======================
+export function useUpdateDebit() {
+  const inv = useInvalidate();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      id: string;
+      description?: string;
+      amount?: number;
+      date?: string;
+      paid?: boolean;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (args.description !== undefined) patch.description = args.description;
+      if (args.amount !== undefined) patch.amount = args.amount;
+      if (args.date !== undefined) patch.date = args.date;
+      if (args.paid !== undefined) patch.paid = args.paid;
+      const { error } = await supabase.from("debits").update(patch).eq("id", args.id);
+      if (error) throw error;
+    },
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["debits"] });
+      const prev = qc.getQueriesData<Debit[]>({ queryKey: ["debits"] });
+      qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
+        old
+          ? old.map((d) =>
+              d.id === args.id
+                ? {
+                    ...d,
+                    description: args.description ?? d.description,
+                    amount: args.amount ?? d.amount,
+                    date: args.date ?? d.date,
+                    paid: args.paid ?? d.paid,
+                  }
+                : d,
+            )
+          : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["debits"]),
+  });
+}
+
+export function useUpdateIncome() {
+  const inv = useInvalidate();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      id: string;
+      description?: string;
+      amount?: number;
+      date?: string;
+      received?: boolean;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (args.description !== undefined) patch.description = args.description;
+      if (args.amount !== undefined) patch.amount = args.amount;
+      if (args.date !== undefined) patch.date = args.date;
+      if (args.received !== undefined) patch.received = args.received;
+      const { error } = await supabase.from("incomes").update(patch).eq("id", args.id);
+      if (error) throw error;
+    },
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["incomes"] });
+      const prev = qc.getQueriesData<Income[]>({ queryKey: ["incomes"] });
+      qc.setQueriesData<Income[]>({ queryKey: ["incomes"] }, (old) =>
+        old
+          ? old.map((i) =>
+              i.id === args.id
+                ? {
+                    ...i,
+                    description: args.description ?? i.description,
+                    amount: args.amount ?? i.amount,
+                    date: args.date ?? i.date,
+                    received: args.received ?? i.received,
+                  }
+                : i,
+            )
+          : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["incomes"]),
+  });
+}
+
+export function useUpdateInvestment() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      id: string;
+      type?: string;
+      amount?: number;
+      percentage?: number;
+      date?: string;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (args.type !== undefined) patch.type = args.type;
+      if (args.amount !== undefined) patch.amount = args.amount;
+      if (args.percentage !== undefined) patch.percentage = args.percentage;
+      if (args.date !== undefined) patch.date = args.date;
+      const { error } = await supabase.from("investments").update(patch).eq("id", args.id);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["investments"]),
+  });
+}
+
+// =======================
+// Effective "current" month — Day-27 rule
+// =======================
+/**
+ * Returns the month/year considered "current" by the business rule:
+ *   - If today's day < 27: returns the actual current month.
+ *   - If today's day >= 27: rolls over to the NEXT month — meaning future
+ *     month data starts being included in "saldo atual" calculations.
+ */
+export function getEffectiveCurrentMonth(today: Date = new Date()): {
+  year: number;
+  month: number;
+} {
+  if (today.getDate() < 27) {
+    return { year: today.getFullYear(), month: today.getMonth() };
+  }
+  const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  return { year: next.getFullYear(), month: next.getMonth() };
+}
+
+/**
+ * Like computeAccountBalance but considers ONLY months up to (and including)
+ * the effective current month — so future months never inflate the balance.
+ * "saldo atual" = initialBalance + sum(rec - deb - fat - inv) for each past
+ * month (ignoring paid status).
+ */
+export function computeAccountBalanceUntilNow(
+  account: Account,
+  cards: Card[],
+  purchases: Purchase[],
+  installments: Installment[],
+  debits: Debit[],
+  incomes: Income[],
+  investments: Investment[],
+  today: Date = new Date(),
+): number {
+  const eff = getEffectiveCurrentMonth(today);
+  const monthly = computeMonthlyAccountBalance(
+    account,
+    cards,
+    purchases,
+    installments,
+    debits,
+    incomes,
+    investments,
+  );
+  // Find the latest key <= effective current month
+  let result = account.initialBalance;
+  const keys = Array.from(monthly.keys()).sort((a, b) => {
+    const [ay, am] = a.split("-").map(Number);
+    const [by, bm] = b.split("-").map(Number);
+    return ay !== by ? ay - by : am - bm;
+  });
+  for (const k of keys) {
+    const [y, m] = k.split("-").map(Number);
+    if (y > eff.year || (y === eff.year && m > eff.month)) break;
+    result = monthly.get(k)!.saldoEmConta;
+  }
+  return result;
+}
+
+/** Normalize -0 to 0 and clamp tiny float noise so no "-R$ 0,00" leaks out. */
+export function normalizeZero(n: number): number {
+  if (Math.abs(n) < 0.005) return 0;
+  return n;
+}

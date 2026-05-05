@@ -13,7 +13,7 @@ import { CurrencyInput } from "./CurrencyInput";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Trash2, FastForward } from "lucide-react";
 
-type SingleEditTarget =
+export type SingleEditTarget =
   | { kind: "debit"; id: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "income"; id: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "investment"; id: string; description: string; amount: number; date: string };

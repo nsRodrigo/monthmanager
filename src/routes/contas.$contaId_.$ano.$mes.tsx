@@ -22,6 +22,8 @@ import {
   getMonthIncomes,
   getMonthInvestments,
   isCardFullyPaid,
+  computeAccountBalanceUntilNow,
+  normalizeZero,
   type Installment,
   type Debit,
   type Income,
@@ -173,7 +175,7 @@ function AccountMonth() {
       </div>
 
       {/* Header */}
-      <header className="mb-6">
+      <header className="mb-4">
         <p className="text-sm font-medium" style={{ color: account.color }}>
           {account.name} · {year}
         </p>
@@ -182,65 +184,24 @@ function AccountMonth() {
         </h1>
       </header>
 
-      {/* Summary now lives inside each GroupedSection header — no duplicate cards */}
+      {/* Frame com saldo atual e gastos totais */}
+      <MonthSummaryFrame
+        saldoAtual={normalizeZero(
+          computeAccountBalanceUntilNow(
+            account,
+            cards,
+            purchases,
+            installments,
+            allDebits,
+            allIncomes,
+            allInvestments,
+          ),
+        )}
+        gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
+      />
 
-      {/* Stacked sections — order: Débito → Recebíveis → Investimentos → Cartões */}
-      <div className="space-y-4">
-        {/* DEBITS */}
-        <GroupedSection
-          icon={Building2}
-          title="DÉBITOS"
-          description="Gastos diretos da conta corrente"
-          tone="debit"
-          onAdd={() => setOpenDebit(true)}
-          addLabel="Novo débito"
-          total={totalDebits}
-          count={monthDebits.single.length + monthDebits.parcelled.length}
-          empty={
-            monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
-          }
-          emptyText="Nenhum débito neste mês."
-        >
-          {monthDebits.single.map((d) => (
-            <DebitRow
-              key={d.id}
-              debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
-                    kind: "debit",
-                    id: d.id,
-                    description: d.description,
-                    amount: d.amount,
-                    date: d.date,
-                    paid: d.paid,
-                  },
-                  onDeleteParent: () => removeDebit.mutate(d.id),
-                })
-              }
-              onRemove={() => removeDebit.mutate(d.id)}
-            />
-          ))}
-          {monthDebits.parcelled.map((p) => (
-            <ParcelledRow
-              key={p.installment.id}
-              kind="debit"
-              installment={p.installment}
-              parent={p.debit!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
-              onEdit={() =>
-                setEditing({
-                  inst: p.installment,
-                  label: p.debit!.description,
-                  subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
-                  onDeleteParent: () => removeDebit.mutate(p.debit!.id),
-                })
-              }
-            />
-          ))}
-        </GroupedSection>
-
+      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
+      <div className="mt-4 space-y-4">
         {/* INCOMES */}
         <GroupedSection
           icon={Download}
@@ -333,7 +294,62 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
-        {/* CARDS — somente cartões com movimento no mês */}
+        {/* DEBITS */}
+        <GroupedSection
+          icon={Building2}
+          title="DÉBITOS"
+          description="Gastos diretos da conta corrente"
+          tone="debit"
+          onAdd={() => setOpenDebit(true)}
+          addLabel="Novo débito"
+          total={totalDebits}
+          count={monthDebits.single.length + monthDebits.parcelled.length}
+          empty={
+            monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
+          }
+          emptyText="Nenhum débito neste mês."
+        >
+          {monthDebits.single.map((d) => (
+            <DebitRow
+              key={d.id}
+              debit={d}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "debit",
+                    id: d.id,
+                    description: d.description,
+                    amount: d.amount,
+                    date: d.date,
+                    paid: d.paid,
+                  },
+                  onDeleteParent: () => removeDebit.mutate(d.id),
+                })
+              }
+              onRemove={() => removeDebit.mutate(d.id)}
+            />
+          ))}
+          {monthDebits.parcelled.map((p) => (
+            <ParcelledRow
+              key={p.installment.id}
+              kind="debit"
+              installment={p.installment}
+              parent={p.debit!}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onEdit={() =>
+                setEditing({
+                  inst: p.installment,
+                  label: p.debit!.description,
+                  subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
+                  onDeleteParent: () => removeDebit.mutate(p.debit!.id),
+                })
+              }
+            />
+          ))}
+        </GroupedSection>
+
+        {/* CARDS — design da imagem 1: header simples + cartões soltos */}
         {(() => {
           const cardsWithMovement = accountCards
             .map((c) => {
@@ -347,22 +363,29 @@ function AccountMonth() {
             .filter(({ items }) => items.length > 0);
 
           return (
-            <GroupedSection
-              icon={CreditCard}
-              title="CARTÕES DE CRÉDITO"
-              description="Faturas e compras no crédito"
-              tone="credit"
-              totalTone="debit"
-              total={totalCards}
-              count={cardsWithMovement.length}
-              empty={accountCards.length === 0}
-              emptyText="Nenhum cartão vinculado a esta conta."
-              onAdd={accountCards.length > 0 ? () => setOpenPurchase(true) : undefined}
-              addLabel="Adicionar gasto a um cartão"
-            >
+            <section className="space-y-3 pt-2">
+              <div className="flex items-center justify-between gap-3 px-1">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">
+                    CARTÕES DE CRÉDITO
+                  </h2>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    Faturas e compras no crédito
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {cardsWithMovement.length} {cardsWithMovement.length === 1 ? "item" : "itens"}
+                  </p>
+                </div>
+              </div>
+
               {cardsWithMovement.length === 0 ? (
-                <p className="px-4 py-3 text-center text-xs text-muted-foreground">
-                  Nenhum cartão com lançamentos neste mês.
+                <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
+                  {accountCards.length === 0
+                    ? "Nenhum cartão vinculado a esta conta."
+                    : "Nenhum cartão com lançamentos neste mês."}
                 </p>
               ) : (
                 cardsWithMovement.map(({ card: c, items: cardInst }) => {
@@ -371,38 +394,52 @@ function AccountMonth() {
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
-                    <CardRow
-                      key={c.id}
-                      cardName={c.name}
-                      cardColor={c.color}
-                      total={total}
-                      paid={paid}
-                      count={cardInst.length}
-                      dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                      onTogglePaid={() =>
-                        setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
-                      }
-                      onAdd={() => setPurchaseFor(c.id)}
-                      items={cardInst}
-                      purchases={purchases}
-                      onToggleInst={(id, p) => toggleInst(id, p)}
-                      onEditInst={(inst) => {
-                        const pur = purchases.find((p) => p.id === inst.parentId);
-                        if (!pur) return;
-                        setEditing({
-                          inst,
-                          label: pur.description,
-                          subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
-                            pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
-                          }`,
-                          onDeleteParent: () => removePurchase.mutate(pur.id),
-                        });
-                      }}
-                    />
+                    <div key={c.id} className="rounded-2xl border border-border bg-card">
+                      <CardRow
+                        cardName={c.name}
+                        cardColor={c.color}
+                        total={total}
+                        paid={paid}
+                        count={cardInst.length}
+                        dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
+                        onTogglePaid={() =>
+                          setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
+                        }
+                        onAdd={() => setPurchaseFor(c.id)}
+                        items={cardInst}
+                        purchases={purchases}
+                        onToggleInst={(id, p) => toggleInst(id, p)}
+                        onEditInst={(inst) => {
+                          const pur = purchases.find((p) => p.id === inst.parentId);
+                          if (!pur) return;
+                          setEditing({
+                            inst,
+                            label: pur.description,
+                            subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
+                              pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
+                            }`,
+                            onDeleteParent: () => removePurchase.mutate(pur.id),
+                          });
+                        }}
+                        onRemoveInst={(inst) => {
+                          const pur = purchases.find((p) => p.id === inst.parentId);
+                          if (pur) removePurchase.mutate(pur.id);
+                        }}
+                      />
+                    </div>
                   );
                 })
               )}
-            </GroupedSection>
+
+              {accountCards.length > 0 && (
+                <button
+                  onClick={() => setOpenPurchase(true)}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar um cartão
+                </button>
+              )}
+            </section>
           );
         })()}
       </div>
@@ -456,7 +493,41 @@ function AccountMonth() {
   );
 }
 
-/* ───────── tone helpers ───────── */
+/* ───────── MONTH SUMMARY FRAME ───────── */
+
+function MonthSummaryFrame({
+  saldoAtual,
+  gastosTotais,
+}: {
+  saldoAtual: number;
+  gastosTotais: number;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+      <div className="rounded-xl bg-background/40 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Saldo atual
+        </p>
+        <p
+          className={`mt-1 text-base font-bold sm:text-lg ${
+            saldoAtual >= 0 ? "text-foreground" : "text-destructive"
+          }`}
+        >
+          {formatCurrency(saldoAtual)}
+        </p>
+      </div>
+      <div className="rounded-xl bg-background/40 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Gastos totais
+        </p>
+        <p className="mt-1 text-base font-bold text-debit sm:text-lg">
+          {formatCurrency(gastosTotais)}
+        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
+      </div>
+    </div>
+  );
+}
 
 type Tone = "debit" | "income" | "primary" | "credit";
 
@@ -583,6 +654,7 @@ function CardRow({
   purchases,
   onToggleInst,
   onEditInst,
+  onRemoveInst,
 }: {
   cardName: string;
   cardColor: string;
@@ -601,6 +673,7 @@ function CardRow({
     : never;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
+  onRemoveInst?: (inst: Installment) => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -697,6 +770,7 @@ function CardRow({
                       cardColor={cardColor}
                       onToggle={() => onToggleInst(inst.id, !inst.paid)}
                       onEdit={() => onEditInst(inst)}
+                      onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                     />
                   );
                 })}
@@ -730,12 +804,14 @@ function PurchaseInstRow({
   cardColor,
   onToggle,
   onEdit,
+  onRemove,
 }: {
   inst: Installment;
   purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
   cardColor: string;
   onToggle: () => void;
   onEdit: () => void;
+  onRemove?: () => void;
 }) {
   const isInstallment = inst.total > 1;
   return (
@@ -790,6 +866,18 @@ function PurchaseInstRow({
       >
         <Pencil className="h-3.5 w-3.5" />
       </button>
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm("Excluir esta compra (e todas as parcelas)?")) onRemove();
+          }}
+          className="text-muted-foreground hover:text-destructive"
+          title="Excluir compra"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

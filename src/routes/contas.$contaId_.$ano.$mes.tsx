@@ -431,6 +431,7 @@ function AccountMonth() {
         onClose={() => setOpenPurchase(false)}
         defaultYear={year}
         defaultMonth={month}
+        fixedAccountId={contaId}
       />
       <AddInvestmentDialog
         open={openInvest}

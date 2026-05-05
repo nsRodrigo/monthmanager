@@ -1,0 +1,2 @@
+ALTER TABLE public.access_requests ADD COLUMN IF NOT EXISTS notified_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_access_requests_pending_notify ON public.access_requests (status, notified_at) WHERE status = 'pending' AND notified_at IS NULL;

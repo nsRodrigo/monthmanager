@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useCards, useAddPurchase } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
@@ -22,9 +22,10 @@ export function AddPurchaseDialog({
 }) {
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
-  const selectableCards = fixedAccountId
-    ? cards.filter((card) => card.accountId === fixedAccountId)
-    : cards;
+  const selectableCards = useMemo(
+    () => (fixedAccountId ? cards.filter((card) => card.accountId === fixedAccountId) : cards),
+    [cards, fixedAccountId],
+  );
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");

@@ -699,30 +699,21 @@ export function useAddPurchase() {
         .single();
       if (error) throw error;
       const purchaseId = (data as { id: string }).id;
-      const anchor = Math.max(1, p.installmentNumber ?? 1);
-      let inst;
-      if (p.installmentsCount > 1 && anchor > 1) {
-        inst = buildInstallmentsAnchored(
-          purchaseId,
-          user!.id,
-          p.totalAmount,
-          p.installmentsCount,
-          anchor,
-          p.date,
-          "purchase",
-          true,
-        );
-      } else {
-        inst = buildInstallmentsForPurchase(
-          purchaseId,
-          user!.id,
-          p.totalAmount,
-          p.installmentsCount,
-          p.date,
-          (card as { closing_day: number; due_day: number }).closing_day,
-          (card as { closing_day: number; due_day: number }).due_day,
-        );
-      }
+      // Manual entry: anchor the installment at the chosen date so it
+      // appears in the month the user selected (no closing-day rollover).
+      const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
+      const inst = buildInstallmentsAnchored(
+        purchaseId,
+        user!.id,
+        p.totalAmount,
+        p.installmentsCount,
+        anchor,
+        p.date,
+        "purchase",
+        true,
+      );
+      // Suppress unused card var (kept fetch for future use)
+      void card;
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
     },

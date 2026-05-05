@@ -10,11 +10,13 @@ export function AddIncomeDialog({
   onClose,
   defaultYear,
   defaultMonth,
+  fixedAccountId,
 }: {
   open: boolean;
   onClose: () => void;
   defaultYear: number;
   defaultMonth: number;
+  fixedAccountId?: string;
 }) {
   const addIncome = useAddIncome();
   const { data: accounts = [] } = useAccounts();
@@ -32,7 +34,7 @@ export function AddIncomeDialog({
     if (open) {
       const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
       setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-      setAccountId(filterAccountId ?? accounts[0]?.id ?? "");
+      setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
       setDescription("");
       setAmount(0);
       setIsInstallment(false);
@@ -40,7 +42,7 @@ export function AddIncomeDialog({
       setInstallmentNumber("1");
       setMode("total");
     }
-  }, [open, defaultYear, defaultMonth, accounts, filterAccountId]);
+  }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
   const submit = async () => {
     if (!description.trim() || amount <= 0 || !accountId) return;
@@ -67,7 +69,9 @@ export function AddIncomeDialog({
   return (
     <Modal open={open} onClose={onClose} title="Novo recebimento">
       <div className="space-y-4">
-        <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
+        {!fixedAccountId && (
+          <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
+        )}
         <Field label="Descrição">
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Salário, freelance" />
         </Field>

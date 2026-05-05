@@ -372,18 +372,16 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
-        {/* CARDS — design da imagem 1: header simples + cartões soltos */}
+        {/* CARDS — mostra TODOS os cartões da conta, mesmo sem movimento no mês */}
         {(() => {
-          const cardsWithMovement = accountCards
-            .map((c) => {
-              const items = monthInst.filter((i) => {
-                if (i.parentType !== "purchase") return false;
-                const pur = purchases.find((p) => p.id === i.parentId);
-                return pur?.cardId === c.id;
-              });
-              return { card: c, items };
-            })
-            .filter(({ items }) => items.length > 0);
+          const cardsAll = accountCards.map((c) => {
+            const items = monthInst.filter((i) => {
+              if (i.parentType !== "purchase") return false;
+              const pur = purchases.find((p) => p.id === i.parentId);
+              return pur?.cardId === c.id;
+            });
+            return { card: c, items };
+          });
 
           return (
             <section className="space-y-3 pt-2">
@@ -399,19 +397,17 @@ function AccountMonth() {
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {cardsWithMovement.length} {cardsWithMovement.length === 1 ? "item" : "itens"}
+                    {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
                   </p>
                 </div>
               </div>
 
-              {cardsWithMovement.length === 0 ? (
+              {cardsAll.length === 0 ? (
                 <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
-                  {accountCards.length === 0
-                    ? "Nenhum cartão vinculado a esta conta."
-                    : "Nenhum cartão com lançamentos neste mês."}
+                  Nenhum cartão vinculado a esta conta.
                 </p>
               ) : (
-                cardsWithMovement.map(({ card: c, items: cardInst }) => {
+                cardsAll.map(({ card: c, items: cardInst }) => {
                   const total = cardInst.reduce((s, i) => s + i.amount, 0);
                   const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
@@ -475,12 +471,14 @@ function AccountMonth() {
         onClose={() => setOpenDebit(false)}
         defaultYear={year}
         defaultMonth={month}
+        fixedAccountId={contaId}
       />
       <AddIncomeDialog
         open={openIncome}
         onClose={() => setOpenIncome(false)}
         defaultYear={year}
         defaultMonth={month}
+        fixedAccountId={contaId}
       />
       <AddPurchaseDialog
         open={!!purchaseFor}

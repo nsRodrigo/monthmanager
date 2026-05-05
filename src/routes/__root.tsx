@@ -9,6 +9,8 @@ import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
+import { useIsAdmin } from "@/store/roles";
+import { ShieldCheck } from "lucide-react";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -102,6 +104,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { signOut, user } = useAuth();
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
+  const isAdmin = useIsAdmin();
   const [manageOpen, setManageOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -203,6 +206,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         >
           <Upload className="h-3.5 w-3.5" /> Importar CSV
         </Link>
+        {isAdmin && (
+          <Link
+            to="/admin/whitelist"
+            onClick={onNavigate}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+              loc.pathname === "/admin/whitelist"
+                ? "bg-secondary text-foreground"
+                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+            }`}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Whitelist
+          </Link>
+        )}
       </div>
 
       <div className="mt-4 border-t border-border pt-4">

@@ -15,6 +15,7 @@ import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
+import { Route as AdminWhitelistRouteImport } from './routes/admin.whitelist'
 import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaId_.$ano.$mes'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -47,6 +48,11 @@ const ContasContaIdRoute = ContasContaIdRouteImport.update({
   path: '/contas/$contaId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminWhitelistRoute = AdminWhitelistRouteImport.update({
+  id: '/admin/whitelist',
+  path: '/admin/whitelist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContasContaIdAnoMesRoute = ContasContaIdAnoMesRouteImport.update({
   id: '/contas/$contaId_/$ano/$mes',
   path: '/contas/$contaId/$ano/$mes',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/contas/$contaId_/$ano/$mes': typeof ContasContaIdAnoMesRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/importar-historico'
     | '/reset-password'
+    | '/admin/whitelist'
     | '/contas/$contaId'
     | '/contas/$contaId/$ano/$mes'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/importar-historico'
     | '/reset-password'
+    | '/admin/whitelist'
     | '/contas/$contaId'
     | '/contas/$contaId/$ano/$mes'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/importar-historico'
     | '/reset-password'
+    | '/admin/whitelist'
     | '/contas/$contaId'
     | '/contas/$contaId_/$ano/$mes'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   ImportarRoute: typeof ImportarRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  AdminWhitelistRoute: typeof AdminWhitelistRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
   ContasContaIdAnoMesRoute: typeof ContasContaIdAnoMesRoute
 }
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContasContaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/whitelist': {
+      id: '/admin/whitelist'
+      path: '/admin/whitelist'
+      fullPath: '/admin/whitelist'
+      preLoaderRoute: typeof AdminWhitelistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contas/$contaId_/$ano/$mes': {
       id: '/contas/$contaId_/$ano/$mes'
       path: '/contas/$contaId/$ano/$mes'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportarRoute: ImportarRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  AdminWhitelistRoute: AdminWhitelistRoute,
   ContasContaIdRoute: ContasContaIdRoute,
   ContasContaIdAnoMesRoute: ContasContaIdAnoMesRoute,
 }

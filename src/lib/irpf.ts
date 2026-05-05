@@ -174,11 +174,76 @@ export async function parseXlsxFile(file: File): Promise<ParsedRow[]> {
   return all;
 }
 
+export async function parsePdfFile(file: File): Promise<ParsedRow[]> {
+  // Carrega pdfjs sem worker (roda no main thread — extratos são pequenos)
+  const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  if (pdfjs.GlobalWorkerOptions) {
+    pdfjs.GlobalWorkerOptions.workerSrc = "";
+  }
+  const buf = await file.arrayBuffer();
+  const loadingTask = pdfjs.getDocument({
+    data: buf,
+    isEvalSupported: false,
+    useWorkerFetch: false,
+    disableWorker: true,
+  });
+  const doc = await loadingTask.promise;
+
+  const lines: string[] = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    // Agrupa items por linha (mesma coordenada Y aproximada)
+    const byY = new Map<number, { x: number; str: string }[]>();
+    for (const it of content.items as any[]) {
+      const str = (it.str ?? "").trim();
+      if (!str) continue;
+      const y = Math.round((it.transform?.[5] ?? 0) * 2) / 2;
+      const x = it.transform?.[4] ?? 0;
+      if (!byY.has(y)) byY.set(y, []);
+      byY.get(y)!.push({ x, str });
+    }
+    const ys = Array.from(byY.keys()).sort((a, b) => b - a);
+    for (const y of ys) {
+      const parts = byY.get(y)!.sort((a, b) => a.x - b.x).map((x) => x.str);
+      lines.push(parts.join("  "));
+    }
+  }
+
+  // Heurística: cada linha de extrato costuma ter data + descrição + valor
+  const dateRe = /(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)/;
+  const amountRe = /(-?\s*R?\$?\s*[\d.]+,\d{2})(?:\s*[CD]?)?\s*$/i;
+  const rows: ParsedRow[] = [];
+  const currentYear = new Date().getFullYear();
+
+  for (const line of lines) {
+    const dm = line.match(dateRe);
+    const am = line.match(amountRe);
+    if (!dm || !am) continue;
+    let dateStr = dm[1];
+    if (!/\d{2,4}$/.test(dateStr.split(/[/-]/)[2] ?? "")) {
+      dateStr = `${dateStr}/${currentYear}`;
+    }
+    const date = parseDateStr(dateStr);
+    let amount = parseAmount(am[1]);
+    // detecta indicador D/C no final
+    if (/D\s*$/i.test(line) && amount > 0) amount = -amount;
+    const description = line
+      .replace(dm[0], "")
+      .replace(am[0], "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (!description) continue;
+    rows.push({ date, description, amount, raw: { line } });
+  }
+  return rows;
+}
+
 export async function parseAnyFile(file: File): Promise<ParsedRow[]> {
   const ext = file.name.toLowerCase().split(".").pop() || "";
   if (ext === "csv" || file.type.includes("csv")) return parseCsvFile(file);
   if (ext === "xlsx" || ext === "xls" || file.type.includes("sheet")) return parseXlsxFile(file);
-  // PDF / outros: não processamos no MVP
+  if (ext === "pdf" || file.type.includes("pdf")) return parsePdfFile(file);
   return [];
 }
 

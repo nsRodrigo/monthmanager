@@ -153,7 +153,7 @@ function Consolidated() {
           />
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(accountBalance)}</span>
+          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>
 
@@ -162,13 +162,8 @@ function Consolidated() {
         <div className="grid gap-3 grid-cols-1">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-            const balance = computeAccountBalance(
-              a,
-              cards,
-              purchases,
-              installments,
-              debits,
-              incomes,
+            const balance = normalizeZero(
+              computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
             );
             const cardCount = cards.filter((c) => c.accountId === a.id).length;
 
@@ -199,8 +194,7 @@ function Consolidated() {
                 return pur ? accCardIds.has(pur.cardId) : false;
               })
               .reduce((s, i) => s + i.amount, 0);
-            const accExpected =
-              balance + accIncomesTotal - accDebitsTotal - accCardsTotal;
+            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal);
 
             return (
               <Link

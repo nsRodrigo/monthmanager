@@ -8,11 +8,13 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  computeAccountBalance,
+  computeAccountBalanceUntilNow,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
   getMonthInvestments,
+  getEffectiveCurrentMonth,
+  normalizeZero,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";

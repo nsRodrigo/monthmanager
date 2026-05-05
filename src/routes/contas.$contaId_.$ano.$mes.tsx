@@ -206,6 +206,19 @@ function AccountMonth() {
               key={d.id}
               debit={d}
               onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "debit",
+                    id: d.id,
+                    description: d.description,
+                    amount: d.amount,
+                    date: d.date,
+                    paid: d.paid,
+                  },
+                  onDeleteParent: () => removeDebit.mutate(d.id),
+                })
+              }
               onRemove={() => removeDebit.mutate(d.id)}
             />
           ))}
@@ -250,6 +263,19 @@ function AccountMonth() {
               onToggle={() =>
                 toggleIncome.mutate({ id: i.id, received: !i.received })
               }
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "income",
+                    id: i.id,
+                    description: i.description,
+                    amount: i.amount,
+                    date: i.date,
+                    paid: i.received,
+                  },
+                  onDeleteParent: () => removeIncome.mutate(i.id),
+                })
+              }
               onRemove={() => removeIncome.mutate(i.id)}
             />
           ))}
@@ -290,6 +316,18 @@ function AccountMonth() {
             <InvestmentRow
               key={inv.id}
               inv={inv}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "investment",
+                    id: inv.id,
+                    description: inv.type,
+                    amount: inv.amount,
+                    date: inv.date,
+                  },
+                  onDeleteParent: () => removeInvestment.mutate(inv.id),
+                })
+              }
               onRemove={() => removeInvestment.mutate(inv.id)}
             />
           ))}

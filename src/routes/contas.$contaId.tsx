@@ -129,6 +129,7 @@ function AccountHome() {
   }, [yearMonthMap, year]);
 
   const [openYear, setOpenYear] = useState(false);
+  const [openAddMonth, setOpenAddMonth] = useState(false);
 
   const monthlyBalances = useMemo(
     () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),

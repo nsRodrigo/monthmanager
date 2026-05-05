@@ -407,7 +407,7 @@ function AccountMonth() {
                   Nenhum cartão vinculado a esta conta.
                 </p>
               ) : (
-                cardsWithMovement.map(({ card: c, items: cardInst }) => {
+                cardsAll.map(({ card: c, items: cardInst }) => {
                   const total = cardInst.reduce((s, i) => s + i.amount, 0);
                   const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;

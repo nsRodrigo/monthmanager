@@ -444,7 +444,12 @@ function AccountMonth() {
                         }}
                         onRemoveInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
-                          if (pur) removePurchase.mutate(pur.id);
+                          if (!pur) return;
+                          if (pur.installmentsCount > 1) {
+                            askDeleteInst(inst, pur.description, "purchase", pur.id);
+                          } else {
+                            if (confirm(`Excluir "${pur.description}"?`)) removePurchase.mutate(pur.id);
+                          }
                         }}
                       />
                     </div>
@@ -452,14 +457,12 @@ function AccountMonth() {
                 })
               )}
 
-              {accountCards.length > 0 && (
-                <button
-                  onClick={() => setOpenPurchase(true)}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
-                >
-                  <Plus className="h-4 w-4" /> Adicionar um cartão
-                </button>
-              )}
+              <button
+                onClick={() => setOpenCard(true)}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+              >
+                <Plus className="h-4 w-4" /> Novo cartão
+              </button>
             </section>
           );
         })()}

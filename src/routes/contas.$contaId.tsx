@@ -312,7 +312,8 @@ function AccountHome() {
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
+              {/* Mobile: stacked. Desktop (sm+): name+balanço left, saldo em conta right */}
+              <div className="flex items-center gap-3 sm:gap-4">
                 <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-bold ${
                   isCurrent
                     ? "bg-gradient-primary text-primary-foreground"
@@ -322,16 +323,16 @@ function AccountHome() {
                 }`}>
                   {String(m + 1).padStart(2, "0")}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="truncate text-lg font-bold">{MONTHS[m]}</p>
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
-                  <p className={`mt-0.5 whitespace-nowrap text-xs font-semibold ${monthBal >= 0 ? "text-success" : "text-destructive"}`}>
-                    Balanço do mês: {formatCurrency(monthBal)}
+                  <p className={`mt-0.5 truncate text-xs font-semibold ${monthBal >= 0 ? "text-success" : "text-destructive"}`}>
+                    Balanço: {formatCurrency(monthBal)}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="hidden text-right sm:block">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
                   <p
                     className={`whitespace-nowrap text-lg font-bold ${
@@ -343,7 +344,19 @@ function AccountHome() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3">
+              {/* Saldo em conta — mobile only, in its own row */}
+              <div className="mt-3 flex items-baseline justify-between gap-2 border-t border-border/60 pt-3 sm:hidden">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
+                <p
+                  className={`whitespace-nowrap text-base font-bold ${
+                    saldoConta >= 0 ? "text-foreground" : "text-destructive"
+                  }`}
+                >
+                  {formatCurrency(saldoConta)}
+                </p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
                 <Mini label="Receb." value={sum.income} tone="success" />
                 <Mini label="Débitos" value={sum.debits} tone="debit" />
                 <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />

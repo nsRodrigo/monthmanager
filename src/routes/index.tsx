@@ -61,8 +61,9 @@ function Consolidated() {
   useEffect(() => setAccountId(null), [setAccountId]);
 
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const eff = getEffectiveCurrentMonth(today);
+  const year = eff.year;
+  const month = eff.month;
 
   const monthInst = getMonthInstallments(installments, year, month);
   const monthDebits = getMonthDebits(debits, installments, year, month);
@@ -80,10 +81,10 @@ function Consolidated() {
   const totalInvested = getMonthInvestments(investments, year, month).reduce((s, i) => s + i.amount, 0);
 
   const accountBalance = accounts.reduce(
-    (s, a) => s + computeAccountBalance(a, cards, purchases, installments, debits, incomes),
+    (s, a) => s + computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
     0,
   );
-  const expected = accountBalance + totalIncome - totalDebits - totalCredit;
+  const expected = normalizeZero(accountBalance + totalIncome - totalDebits - totalCredit);
 
   if (accounts.length === 0) {
     return (

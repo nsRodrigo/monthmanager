@@ -167,12 +167,17 @@ function AuthPage() {
     const { data: allowed } = await supabase.rpc("is_email_whitelisted", { _email: normalizedEmail });
     if (!allowed) {
       try {
-        await reportPendingSignup({ data: { email: normalizedEmail } });
+        const result = await reportPendingSignup({ data: { email: normalizedEmail } }) as {
+          ok: boolean;
+          notifiedCount?: number;
+        };
         setInfo(
-          "Solicitação enviada! O administrador foi notificado. Tente entrar novamente após a aprovação.",
+          result.notifiedCount && result.notifiedCount > 0
+            ? "Solicitação enviada! O administrador foi notificado. Tente entrar novamente após a aprovação."
+            : "Solicitação enviada para a whitelist do administrador. Tente entrar novamente após a aprovação.",
         );
       } catch (err: any) {
-        setError(err?.message ?? "Não foi possível enviar a solicitação.");
+        setError(err?.message ?? "Não foi possível criar a solicitação de whitelist.");
       } finally {
         setLoading(false);
       }

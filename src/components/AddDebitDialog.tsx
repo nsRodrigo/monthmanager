@@ -78,7 +78,7 @@ export function AddDebitDialog({
   return (
     <Modal open={open} onClose={onClose} title="Novo débito">
       <div className="space-y-4">
-        <AccountSelect value={accountId} onChange={setAccountId} />
+        {!fixedAccountId && <AccountSelect value={accountId} onChange={setAccountId} />}
         <Field label="Descrição">
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: IPVA, aluguel" />
         </Field>

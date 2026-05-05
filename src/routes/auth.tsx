@@ -79,6 +79,15 @@ function AuthPage() {
     }
     // limpa o hash da URL
     history.replaceState(null, "", window.location.pathname + window.location.search);
+    // Garante que admins recebam push para QUALQUER solicitação pendente sem notificação
+    // (ex.: signup via Google em que o callback não trouxe id_token com email)
+    flushPendingNotifications({}).catch(() => {});
+  }, []);
+
+  // No primeiro carregamento da tela de auth, sempre tenta esvaziar a fila de
+  // solicitações pendentes não notificadas — cobre o bug do callback do Google.
+  useEffect(() => {
+    flushPendingNotifications({}).catch(() => {});
   }, []);
 
   const submit = async (e: React.FormEvent) => {

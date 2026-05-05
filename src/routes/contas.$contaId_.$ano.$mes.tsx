@@ -471,12 +471,14 @@ function AccountMonth() {
         onClose={() => setOpenDebit(false)}
         defaultYear={year}
         defaultMonth={month}
+        fixedAccountId={contaId}
       />
       <AddIncomeDialog
         open={openIncome}
         onClose={() => setOpenIncome(false)}
         defaultYear={year}
         defaultMonth={month}
+        fixedAccountId={contaId}
       />
       <AddPurchaseDialog
         open={!!purchaseFor}

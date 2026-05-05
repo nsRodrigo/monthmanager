@@ -47,6 +47,55 @@ function WhitelistAdmin() {
     },
   });
 
+  // Pending requests
+  const listPendingFn = useServerFn(listPendingRequests);
+  const approveFn = useServerFn(approveRequest);
+  const rejectFn = useServerFn(rejectRequest);
+  const pendingQ = useQuery({
+    queryKey: ["access-requests-pending"],
+    enabled: isAdmin,
+    queryFn: () => listPendingFn(),
+    refetchInterval: 30000,
+  });
+  const approveMut = useMutation({
+    mutationFn: (id: string) => approveFn({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["access-requests-pending"] });
+      qc.invalidateQueries({ queryKey: ["whitelist"] });
+    },
+  });
+  const rejectMut = useMutation({
+    mutationFn: (id: string) => rejectFn({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["access-requests-pending"] }),
+  });
+
+  // Push notifications
+  const getVapidFn = useServerFn(getVapidPublicKey);
+  const saveSubFn = useServerFn(saveSubscription);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const enablePush = async () => {
+    setPushStatus(null);
+    setPushBusy(true);
+    try {
+      if (!isPushSupported()) throw new Error("Navegador não suporta notificações push.");
+      const { key } = await getVapidFn();
+      const sub = (await subscribeToPush(key)) as any;
+      await saveSubFn({
+        data: {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+          userAgent: navigator.userAgent,
+        },
+      });
+      setPushStatus("✓ Notificações ativadas neste dispositivo.");
+    } catch (e: any) {
+      setPushStatus(e?.message ?? "Erro ao ativar notificações.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!isLoading && !isAdmin) navigate({ to: "/" });
   }, [isLoading, isAdmin, navigate]);

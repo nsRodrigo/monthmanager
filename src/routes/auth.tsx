@@ -99,9 +99,6 @@ function AuthPage() {
           msg.includes("nao esta autorizado") ||
           msg.includes("database error saving new user"))
       ) {
-        try {
-          await reportPendingSignup({ data: { email } });
-        } catch (_) {}
         setInfo(
           "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente cadastrar novamente depois.",
         );

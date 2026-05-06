@@ -9,7 +9,8 @@ let configured = false;
 function ensureConfigured() {
   if (configured) return;
   const priv = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+  const rawSubject = process.env.VAPID_SUBJECT?.trim() || "mailto:admin@example.com";
+  const subject = rawSubject.includes(":") ? rawSubject : `mailto:${rawSubject}`;
   if (!priv) throw new Error("VAPID_PRIVATE_KEY não configurada.");
   webpush.setVapidDetails(subject, VAPID_PUBLIC_KEY, priv);
   configured = true;

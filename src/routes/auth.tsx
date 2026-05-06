@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/store/auth";
@@ -18,16 +18,19 @@ import { reportPendingSignup } from "@/server/access-requests.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/" });
-  },
   component: AuthPage,
 });
 
 function AuthPage() {
-  const { signIn, signUp, pendingMessage, clearPendingMessage } = useAuth();
+  const { signIn, signUp, user, loading: authLoading, pendingMessage, clearPendingMessage } = useAuth();
   const navigate = useNavigate();
+
+  // Após validação de whitelist OK, AuthProvider seta `user`. Aí sim navegamos.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate({ to: "/" });
+    }
+  }, [user, authLoading, navigate]);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -113,7 +116,7 @@ function AuthPage() {
       return;
     }
     if (mode === "signup") setInfo("Conta criada! Você já pode usar o app.");
-    navigate({ to: "/" });
+    // Não navega aqui: AuthProvider valida whitelist e o useEffect leva para "/" quando OK.
   };
 
   const signInGoogle = async () => {
@@ -135,9 +138,8 @@ function AuthPage() {
         return;
       }
       if (result.redirected) return;
-      // Login OAuth bem-sucedido — o AuthProvider valida whitelist.
-      // Se autorizado, navega; se não, será deslogado e a mensagem aparece via pendingMessage.
-      navigate({ to: "/" });
+      // Login OAuth concluído sem redirect — AuthProvider valida whitelist;
+      // useEffect navega para "/" quando user for setado.
     } catch (err: any) {
       setError(err?.message ?? "Erro ao entrar com Google");
       setLoading(false);

@@ -12,6 +12,7 @@ import {
 } from "@/server/access-requests.functions";
 import { getVapidPublicKey, saveSubscription } from "@/server/push.functions";
 import { subscribeToPush, isPushSupported } from "@/lib/push";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/whitelist")({
   head: () => ({ meta: [{ title: "Whitelist — Admin" }] }),
@@ -99,6 +100,24 @@ function WhitelistAdmin() {
   useEffect(() => {
     if (!isLoading && !isAdmin) navigate({ to: "/" });
   }, [isLoading, isAdmin, navigate]);
+
+  // Realtime: refetch pending requests when access_requests changes
+  useEffect(() => {
+    if (!isAdmin) return;
+    const channel = supabase
+      .channel("admin-access-requests")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "access_requests" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["access-requests-pending"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin, qc]);
 
   if (isLoading) {
     return (

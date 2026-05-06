@@ -93,8 +93,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   const signUp = async (email: string, password: string) => {
     setLoading(true);
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: allowed, error: whitelistError } = await supabase.rpc("is_email_whitelisted", {
+      _email: normalizedEmail,
+    });
+    if (whitelistError) {
+      setLoading(false);
+      return { error: "Não foi possível validar seu acesso. Tente novamente." };
+    }
+    if (!allowed) {
+      try {
+        await reportPendingSignup({ data: { email: normalizedEmail } });
+      } catch (_) {
+        setLoading(false);
+        return { error: "Não foi possível registrar sua solicitação agora. Tente novamente." };
+      }
+      setLoading(false);
+      return { error: "pending_approval" };
+    }
     const { error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: { emailRedirectTo: `${window.location.origin}/` },
     });

@@ -116,7 +116,7 @@ function AuthPage() {
       return;
     }
     if (mode === "signup") setInfo("Conta criada! Você já pode usar o app.");
-    navigate({ to: "/" });
+    // Não navega aqui: AuthProvider valida whitelist e o useEffect leva para "/" quando OK.
   };
 
   const signInGoogle = async () => {

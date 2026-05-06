@@ -101,6 +101,24 @@ function WhitelistAdmin() {
     if (!isLoading && !isAdmin) navigate({ to: "/" });
   }, [isLoading, isAdmin, navigate]);
 
+  // Realtime: refetch pending requests when access_requests changes
+  useEffect(() => {
+    if (!isAdmin) return;
+    const channel = supabase
+      .channel("admin-access-requests")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "access_requests" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["access-requests-pending"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin, qc]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">

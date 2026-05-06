@@ -54,9 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let message = "Sua solicitação de acesso foi registrada. Aguarde aprovação para acessar o aplicativo.";
       try {
         const result = await reportPendingSignup({ data: { email } });
-        if (result?.blacklisted) {
-          message = "Este e-mail está bloqueado. Entre em contato com o administrador.";
-        } else if ((result?.notifiedCount ?? 0) > 0) {
+        if ((result?.notifiedCount ?? 0) > 0) {
           message = "Sua solicitação de acesso foi enviada ao administrador. Aguarde aprovação para acessar o aplicativo.";
         }
       } catch (_) {

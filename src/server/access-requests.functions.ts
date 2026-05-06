@@ -118,7 +118,6 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
     if (existingError) throw new Error(existingError.message);
 
     let requestId = existing?.id;
-    let alreadyNotified = Boolean(existing?.notified_at);
     if (!requestId) {
       const { data: created, error: insertError } = await supabaseAdmin
         .from("access_requests")
@@ -127,24 +126,21 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
         .single();
       if (insertError) throw new Error(insertError.message);
       requestId = created.id;
-      alreadyNotified = Boolean(created.notified_at);
     }
 
     let notifiedCount = 0;
     try {
-      if (!alreadyNotified) {
-        const result = await notifyAdmins({
-          title: "Nova solicitação de acesso",
-          body: email,
-          url: "/admin/whitelist",
-        });
-        notifiedCount = result.sent;
-        if (notifiedCount > 0) {
-          await supabaseAdmin
-            .from("access_requests")
-            .update({ notified_at: new Date().toISOString() })
-            .eq("id", requestId);
-        }
+      const result = await notifyAdmins({
+        title: "Nova solicitação de acesso",
+        body: email,
+        url: "/admin/whitelist",
+      });
+      notifiedCount = result.sent;
+      if (notifiedCount > 0) {
+        await supabaseAdmin
+          .from("access_requests")
+          .update({ notified_at: new Date().toISOString() })
+          .eq("id", requestId);
       }
     } catch (err) {
       console.error("notifyAdmins failed", err);

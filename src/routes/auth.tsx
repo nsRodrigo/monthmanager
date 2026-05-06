@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/store/auth";
@@ -23,15 +23,14 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const { signIn, signUp, user, loading: authLoading, pendingMessage, clearPendingMessage } = useAuth();
+  const navigate = useNavigate();
 
   // Após validação de whitelist OK, AuthProvider seta `user`. Aí sim navegamos.
   useEffect(() => {
     if (!authLoading && user) {
       navigate({ to: "/" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading]);
-  const navigate = useNavigate();
+  }, [user, authLoading, navigate]);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

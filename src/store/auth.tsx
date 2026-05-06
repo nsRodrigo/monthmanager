@@ -21,58 +21,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
-  const checkingRef = useRef<string | null>(null);
+  const validationRunRef = useRef(0);
 
   // Validates the signed-in user's email against the whitelist. If not allowed,
   // registers a pending access request (notifying admins) and signs the user
   // out so no session is established for unauthorized accounts.
   const enforceWhitelist = async (s: Session | null) => {
+    const runId = ++validationRunRef.current;
     const email = s?.user?.email?.toLowerCase();
-    if (!s || !email) return;
-    if (checkingRef.current === email) return;
-    checkingRef.current = email;
+    setLoading(true);
+
+    if (!s || !email) {
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data: allowed } = await supabase.rpc("is_email_whitelisted", { _email: email });
-      if (allowed) return;
+      const { data: allowed, error } = await supabase.rpc("is_email_whitelisted", { _email: email });
+      if (validationRunRef.current !== runId) return;
+      if (error) throw error;
+
+      if (allowed) {
+        setSession(s);
+        setUser(s.user);
+        setLoading(false);
+        return;
+      }
+
       // Não autorizado — registra solicitação, notifica admin e desloga.
+      let message = "Sua solicitação de acesso foi registrada. Aguarde aprovação para acessar o aplicativo.";
       try {
-        await reportPendingSignup({ data: { email } });
-      } catch (_) {}
+        const result = await reportPendingSignup({ data: { email } });
+        if (result?.blacklisted) {
+          message = "Este e-mail está bloqueado. Entre em contato com o administrador.";
+        } else if ((result?.notifiedCount ?? 0) > 0) {
+          message = "Sua solicitação de acesso foi enviada ao administrador. Aguarde aprovação para acessar o aplicativo.";
+        }
+      } catch (_) {
+        message = "Não foi possível registrar sua solicitação agora. Tente novamente em instantes.";
+      }
+
+      if (validationRunRef.current !== runId) return;
+      setSession(null);
+      setUser(null);
+      setPendingMessage(message);
       await supabase.auth.signOut();
-      setPendingMessage(
-        "Sua solicitação de acesso foi enviada ao administrador. Aguarde aprovação para acessar o aplicativo.",
-      );
+    } catch (_) {
+      if (validationRunRef.current !== runId) return;
+      setSession(null);
+      setUser(null);
+      setPendingMessage("Não foi possível validar seu acesso. Tente entrar novamente.");
+      await supabase.auth.signOut();
     } finally {
-      checkingRef.current = null;
+      if (validationRunRef.current === runId) setLoading(false);
     }
   };
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      // valida em segundo plano
-      enforceWhitelist(s);
+      void enforceWhitelist(s);
     });
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-      await enforceWhitelist(data.session);
-    });
+    supabase.auth.getSession().then(({ data }) => void enforceWhitelist(data.session));
     return () => sub.subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setLoading(false);
     return { error: error?.message ?? null };
   };
   const signUp = async (email: string, password: string) => {
+    setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: `${window.location.origin}/` },
     });
+    if (error) setLoading(false);
     return { error: error?.message ?? null };
   };
   const signOut = async () => {

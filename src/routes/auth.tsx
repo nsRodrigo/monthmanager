@@ -18,15 +18,19 @@ import { reportPendingSignup } from "@/server/access-requests.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/" });
-  },
   component: AuthPage,
 });
 
 function AuthPage() {
-  const { signIn, signUp, pendingMessage, clearPendingMessage } = useAuth();
+  const { signIn, signUp, user, loading: authLoading, pendingMessage, clearPendingMessage } = useAuth();
+
+  // Após validação de whitelist OK, AuthProvider seta `user`. Aí sim navegamos.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate({ to: "/" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
   const [email, setEmail] = useState("");

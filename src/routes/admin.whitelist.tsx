@@ -12,6 +12,7 @@ import {
 } from "@/server/access-requests.functions";
 import { getVapidPublicKey, saveSubscription } from "@/server/push.functions";
 import { subscribeToPush, isPushSupported } from "@/lib/push";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/whitelist")({
   head: () => ({ meta: [{ title: "Whitelist — Admin" }] }),

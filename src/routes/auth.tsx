@@ -138,9 +138,8 @@ function AuthPage() {
         return;
       }
       if (result.redirected) return;
-      // Login OAuth bem-sucedido — o AuthProvider valida whitelist.
-      // Se autorizado, navega; se não, será deslogado e a mensagem aparece via pendingMessage.
-      navigate({ to: "/" });
+      // Login OAuth concluído sem redirect — AuthProvider valida whitelist;
+      // useEffect navega para "/" quando user for setado.
     } catch (err: any) {
       setError(err?.message ?? "Erro ao entrar com Google");
       setLoading(false);

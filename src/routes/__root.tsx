@@ -293,8 +293,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-5 text-center">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">Validando acesso</p>
+          <p className="mt-1 text-xs text-muted-foreground">Aguarde enquanto confirmamos sua whitelist.</p>
+        </div>
       </div>
     );
   }

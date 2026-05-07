@@ -293,30 +293,17 @@ function AuthPage() {
           )}
 
           {mode === "signin" && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup");
-                  setError(null);
-                  setInfo(null);
-                }}
-                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-              >
-                Não tem conta? Criar agora
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("request");
-                  setError(null);
-                  setInfo(null);
-                }}
-                className="w-full text-center text-xs text-primary hover:underline"
-              >
-                Solicitar acesso ao administrador
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setError(null);
+                setInfo(null);
+              }}
+              className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+            >
+              Não tem conta? Criar agora
+            </button>
           )}
           {mode === "signup" && (
             <button

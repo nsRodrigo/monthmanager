@@ -55,6 +55,7 @@ import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 import { AddCardDialog } from "@/components/AddCardDialog";
+import { EditCardDialog } from "@/components/EditCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
@@ -101,6 +102,7 @@ function AccountMonth() {
   const [openInvest, setOpenInvest] = useState(false);
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openCard, setOpenCard] = useState(false);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;

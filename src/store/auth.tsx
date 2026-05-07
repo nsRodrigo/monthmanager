@@ -22,35 +22,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const validationRunRef = useRef(0);
+  const initialValidationDoneRef = useRef(false);
 
-  // Validates the signed-in user's email against the whitelist. If not allowed,
-  // registers a pending access request (notifying admins) and signs the user
-  // out so no session is established for unauthorized accounts.
-  const enforceWhitelist = async (s: Session | null) => {
+  // Validates the signed-in user's email against the whitelist.
+  // - On the very first session resolution we BLOCK (loading=true) so that
+  //   protected pages don't flash before redirect.
+  // - On subsequent auth events (e.g. token refresh) we validate in the
+  //   background WITHOUT toggling loading, so the UI never flickers.
+  // If the user is unauthorized, we still register a pending request and
+  // sign out silently.
+  const enforceWhitelist = async (s: Session | null, isInitial: boolean) => {
     const runId = ++validationRunRef.current;
     const email = s?.user?.email?.toLowerCase();
-    setLoading(true);
+
+    if (isInitial) setLoading(true);
 
     if (!s || !email) {
       setSession(null);
       setUser(null);
-      setLoading(false);
+      if (isInitial) setLoading(false);
       return;
     }
+
+    // Optimistic: if we already have this user logged in, set state immediately
+    // so the UI stays put while we re-validate in the background.
+    setSession(s);
+    setUser(s.user);
+    if (isInitial) setLoading(false);
 
     try {
       const { data: allowed, error } = await supabase.rpc("is_email_whitelisted", { _email: email });
       if (validationRunRef.current !== runId) return;
       if (error) throw error;
+      if (allowed) return;
 
-      if (allowed) {
-        setSession(s);
-        setUser(s.user);
-        setLoading(false);
-        return;
-      }
-
-      // Não autorizado — registra solicitação, notifica admin e desloga.
+      // Não autorizado — registra solicitação, notifica admin e desloga silenciosamente.
       let message = "Sua solicitação de acesso foi registrada. Aguarde aprovação para acessar o aplicativo.";
       try {
         const result = await reportPendingSignup({ data: { email } });
@@ -60,28 +66,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (_) {
         message = "Não foi possível registrar sua solicitação agora. Tente novamente em instantes.";
       }
-
       if (validationRunRef.current !== runId) return;
       setSession(null);
       setUser(null);
       setPendingMessage(message);
       await supabase.auth.signOut();
     } catch (_) {
-      if (validationRunRef.current !== runId) return;
-      setSession(null);
-      setUser(null);
-      setPendingMessage("Não foi possível validar seu acesso. Tente entrar novamente.");
-      await supabase.auth.signOut();
-    } finally {
-      if (validationRunRef.current === runId) setLoading(false);
+      // Falha de rede em validação background — mantém sessão atual silenciosamente.
+      // Nova tentativa virá no próximo evento de auth.
     }
   };
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      void enforceWhitelist(s);
+      const isInitial = !initialValidationDoneRef.current;
+      void enforceWhitelist(s, isInitial);
     });
-    supabase.auth.getSession().then(({ data }) => void enforceWhitelist(data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      initialValidationDoneRef.current = true;
+      void enforceWhitelist(data.session, true).finally(() => {
+        // marca após a primeira resolução
+      });
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 

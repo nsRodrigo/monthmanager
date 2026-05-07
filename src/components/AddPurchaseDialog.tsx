@@ -33,6 +33,7 @@ export function AddPurchaseDialog({
   const [installments, setInstallments] = useState("1");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -44,11 +45,27 @@ export function AddPurchaseDialog({
       setInstallments("1");
       setInstallmentNumber("1");
       setIsInstallment(false);
+      setIsRecurring(false);
     }
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
   const submit = async () => {
     if (!description.trim() || amount <= 0 || !cardId) return;
+    // Recurring purchase: create one purchase with 24 monthly "installments"
+    // of the same amount, anchored at the chosen month. Each month is
+    // independent and can be edited / deleted later.
+    if (isRecurring && !isInstallment) {
+      await addPurchase.mutateAsync({
+        cardId,
+        description: description.trim(),
+        totalAmount: amount * 24,
+        date,
+        installmentsCount: 24,
+        installmentNumber: 1,
+      });
+      onClose();
+      return;
+    }
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     await addPurchase.mutateAsync({

@@ -33,6 +33,7 @@ export function AddPurchaseDialog({
   const [installments, setInstallments] = useState("1");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -44,11 +45,27 @@ export function AddPurchaseDialog({
       setInstallments("1");
       setInstallmentNumber("1");
       setIsInstallment(false);
+      setIsRecurring(false);
     }
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
   const submit = async () => {
     if (!description.trim() || amount <= 0 || !cardId) return;
+    // Recurring purchase: create one purchase with 24 monthly "installments"
+    // of the same amount, anchored at the chosen month. Each month is
+    // independent and can be edited / deleted later.
+    if (isRecurring && !isInstallment) {
+      await addPurchase.mutateAsync({
+        cardId,
+        description: description.trim(),
+        totalAmount: amount * 24,
+        date,
+        installmentsCount: 24,
+        installmentNumber: 1,
+      });
+      onClose();
+      return;
+    }
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     await addPurchase.mutateAsync({
@@ -95,10 +112,28 @@ export function AddPurchaseDialog({
           <input
             type="checkbox"
             checked={isInstallment}
-            onChange={(e) => setIsInstallment(e.target.checked)}
+            onChange={(e) => { setIsInstallment(e.target.checked); if (e.target.checked) setIsRecurring(false); }}
             className="h-4 w-4 accent-primary"
           />
           <span className="text-sm font-medium">É parcelado?</span>
+        </label>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input
+            type="checkbox"
+            checked={isRecurring}
+            onChange={(e) => setIsRecurring(e.target.checked)}
+            disabled={isInstallment}
+            className="mt-0.5 h-4 w-4 accent-primary"
+          />
+          <span className="text-sm">
+            <span className="font-medium">Compra recorrente</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {isInstallment
+                ? "Indisponível para parcelados."
+                : "Ideal para assinaturas (streaming etc). Será replicada nos próximos 24 meses, mantendo o dia. Cada mês é independente."}
+            </span>
+          </span>
         </label>
 
         {isInstallment && (

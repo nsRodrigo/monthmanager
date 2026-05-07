@@ -679,7 +679,7 @@ export function useUpdateCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (c: { id: string; name?: string; color?: string; closingDay?: number; dueDay?: number }) => {
-      const patch: Record<string, unknown> = {};
+      const patch: { name?: string; color?: string; closing_day?: number; due_day?: number } = {};
       if (c.name !== undefined) patch.name = c.name;
       if (c.color !== undefined) patch.color = c.color;
       if (c.closingDay !== undefined) patch.closing_day = c.closingDay;

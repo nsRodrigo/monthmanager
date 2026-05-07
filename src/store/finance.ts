@@ -667,8 +667,108 @@ export function useRemoveCard() {
         await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
         await supabase.from("purchases").delete().in("id", ids);
       }
+      await supabase.from("card_payments").delete().eq("card_id", id);
       const { error } = await supabase.from("cards").delete().eq("id", id);
       if (error) throw error;
+    },
+    onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
+  });
+}
+
+export function useUpdateCard() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (c: { id: string; name?: string; color?: string; closingDay?: number; dueDay?: number }) => {
+      const patch: Record<string, unknown> = {};
+      if (c.name !== undefined) patch.name = c.name;
+      if (c.color !== undefined) patch.color = c.color;
+      if (c.closingDay !== undefined) patch.closing_day = c.closingDay;
+      if (c.dueDay !== undefined) patch.due_day = c.dueDay;
+      const { error } = await supabase.from("cards").update(patch).eq("id", c.id);
+      if (error) throw error;
+    },
+    onSuccess: () => inv(["cards"]),
+  });
+}
+
+export function useDuplicateCard() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // 1) Fetch source card
+      const { data: src, error: e1 } = await supabase
+        .from("cards")
+        .select("name,color,closing_day,due_day,account_id")
+        .eq("id", id)
+        .single();
+      if (e1 || !src) throw new Error(e1?.message ?? "Cartão não encontrado");
+
+      // 2) Create clone
+      const { data: created, error: e2 } = await supabase
+        .from("cards")
+        .insert({
+          user_id: user!.id,
+          account_id: src.account_id,
+          name: `${src.name} (cópia)`,
+          color: src.color,
+          closing_day: src.closing_day,
+          due_day: src.due_day,
+        })
+        .select("id")
+        .single();
+      if (e2 || !created) throw new Error(e2?.message ?? "Falha ao duplicar cartão");
+      const newCardId = (created as { id: string }).id;
+
+      // 3) Fetch all purchases of source card + their installments
+      const { data: purs } = await supabase
+        .from("purchases")
+        .select("id,description,total_amount,purchase_date,installments_count")
+        .eq("card_id", id);
+      if (!purs || purs.length === 0) return;
+
+      // Map old purchase id -> new purchase id
+      const idMap = new Map<string, string>();
+      for (const p of purs) {
+        const { data: np, error: ep } = await supabase
+          .from("purchases")
+          .insert({
+            user_id: user!.id,
+            card_id: newCardId,
+            description: p.description,
+            total_amount: p.total_amount,
+            purchase_date: p.purchase_date,
+            installments_count: p.installments_count,
+          })
+          .select("id")
+          .single();
+        if (ep || !np) throw new Error(ep?.message ?? "Falha ao copiar compra");
+        idMap.set(p.id as string, (np as { id: string }).id);
+      }
+
+      const oldIds = Array.from(idMap.keys());
+      const { data: insts } = await supabase
+        .from("installments")
+        .select("parent_id,purchase_id,number,total,amount,due_date,year,month,paid,parent_type")
+        .in("parent_id", oldIds)
+        .eq("parent_type", "purchase");
+      if (insts && insts.length > 0) {
+        const rows = insts.map((i) => ({
+          user_id: user!.id,
+          parent_type: "purchase",
+          parent_id: idMap.get(i.parent_id as string)!,
+          purchase_id: idMap.get((i.purchase_id as string) ?? (i.parent_id as string)) ?? null,
+          number: i.number,
+          total: i.total,
+          amount: i.amount,
+          due_date: i.due_date,
+          year: i.year,
+          month: i.month,
+          paid: i.paid,
+        }));
+        const { error: e3 } = await supabase.from("installments").insert(rows);
+        if (e3) throw e3;
+      }
     },
     onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
   });

@@ -55,6 +55,7 @@ import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
 import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 import { AddCardDialog } from "@/components/AddCardDialog";
+import { EditCardDialog } from "@/components/EditCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
@@ -101,6 +102,7 @@ function AccountMonth() {
   const [openInvest, setOpenInvest] = useState(false);
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openCard, setOpenCard] = useState(false);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
@@ -425,6 +427,7 @@ function AccountMonth() {
                           setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
                         }
                         onAdd={() => setPurchaseFor(c.id)}
+                        onEditCard={() => setEditingCardId(c.id)}
                         items={cardInst}
                         purchases={purchases}
                         onToggleInst={(id, p) => toggleInst(id, p)}
@@ -514,6 +517,11 @@ function AccountMonth() {
         onDeleteParent={editingSingle?.onDeleteParent}
       />
       <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} />
+      <EditCardDialog
+        open={!!editingCardId}
+        onClose={() => setEditingCardId(null)}
+        card={accountCards.find((c) => c.id === editingCardId) ?? null}
+      />
       <DeleteParcelledDialog
         open={!!deletingParcelled}
         onClose={() => setDeletingParcelled(null)}
@@ -689,6 +697,7 @@ function CardRow({
   dueLabel,
   onTogglePaid,
   onAdd,
+  onEditCard,
   onHideMonth,
   items,
   purchases,
@@ -704,6 +713,7 @@ function CardRow({
   dueLabel: string;
   onTogglePaid: () => void;
   onAdd: () => void;
+  onEditCard?: () => void;
   onHideMonth?: () => void;
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T
@@ -735,7 +745,21 @@ function CardRow({
           style={{ backgroundColor: cardColor }}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{cardName}</p>
+          {onEditCard ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditCard();
+              }}
+              className="block w-full truncate text-left text-sm font-semibold hover:text-primary hover:underline"
+              aria-label={`Editar cartão ${cardName}`}
+            >
+              {cardName}
+            </button>
+          ) : (
+            <p className="truncate text-sm font-semibold">{cardName}</p>
+          )}
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {dueLabel}
           </p>

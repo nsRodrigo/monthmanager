@@ -14,6 +14,7 @@ import { ShieldCheck } from "lucide-react";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
 
 const queryClient = new QueryClient({
@@ -293,12 +294,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-5 text-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <div>
-          <p className="text-sm font-semibold text-foreground">Validando acesso</p>
-          <p className="mt-1 text-xs text-muted-foreground">Aguarde enquanto confirmamos sua whitelist.</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Carregando" />
       </div>
     );
   }
@@ -361,6 +358,7 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <AccountFilterProvider>
+            <NavigationLoader />
             <BiometricLock>
               <AuthGate>
                 <Outlet />

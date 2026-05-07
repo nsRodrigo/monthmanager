@@ -1,20 +1,9 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Wallet, Eye, EyeOff, Fingerprint } from "lucide-react";
-import {
-  isWebAuthnSupported,
-  isPlatformAuthenticatorAvailable,
-  browserStartAuthentication,
-} from "@/lib/passkeys";
-import {
-  startAuthentication as srvStartAuth,
-  finishAuthentication as srvFinishAuth,
-} from "@/server/webauthn";
-import { reportPendingSignup } from "@/server/access-requests.functions";
+import { Wallet, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -25,28 +14,18 @@ function AuthPage() {
   const { signIn, signUp, user, loading: authLoading, pendingMessage, clearPendingMessage } = useAuth();
   const navigate = useNavigate();
 
-  // Após validação de whitelist OK, AuthProvider seta `user`. Aí sim navegamos.
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate({ to: "/" });
-    }
+    if (!authLoading && user) navigate({ to: "/" });
   }, [user, authLoading, navigate]);
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "request">("signin");
+
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
-  const [bioAvailable, setBioAvailable] = useState(false);
 
-  useEffect(() => {
-    if (isWebAuthnSupported()) {
-      isPlatformAuthenticatorAvailable().then(setBioAvailable);
-    }
-  }, []);
-
-  // Mensagem global quando o AuthProvider desloga um usuário fora da whitelist.
   useEffect(() => {
     if (pendingMessage) {
       setInfo(pendingMessage);
@@ -60,19 +39,6 @@ function AuthPage() {
     setError(null);
     setInfo(null);
     setLoading(true);
-
-    if (mode === "request") {
-      try {
-        if (!email.includes("@")) throw new Error("Informe um e-mail válido.");
-        await reportPendingSignup({ data: { email } });
-        setInfo("Solicitação enviada! O administrador vai receber uma notificação.");
-      } catch (err: any) {
-        setError(err?.message ?? "Não foi possível enviar a solicitação.");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
 
     if (mode === "forgot") {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
@@ -100,7 +66,7 @@ function AuthPage() {
           msg.includes("database error saving new user"))
       ) {
         setInfo(
-          "Solicitação enviada para aprovação. Você será notificado quando o administrador aprovar — tente cadastrar novamente depois.",
+          "Solicitação enviada para o administrador. Você será notificado quando seu acesso for aprovado.",
         );
         setError(null);
         return;
@@ -113,7 +79,6 @@ function AuthPage() {
       return;
     }
     if (mode === "signup") setInfo("Conta criada! Você já pode usar o app.");
-    // Não navega aqui: AuthProvider valida whitelist e o useEffect leva para "/" quando OK.
   };
 
   const signInGoogle = async () => {
@@ -129,47 +94,13 @@ function AuthPage() {
           : {},
       });
       if (result.error) {
-        const rawMsg = (result.error as Error)?.message ?? "Erro ao entrar com Google";
-        setError(rawMsg);
+        setError((result.error as Error)?.message ?? "Erro ao entrar com Google");
         setLoading(false);
         return;
       }
       if (result.redirected) return;
-      // Login OAuth concluído sem redirect — AuthProvider valida whitelist;
-      // useEffect navega para "/" quando user for setado.
     } catch (err: any) {
       setError(err?.message ?? "Erro ao entrar com Google");
-      setLoading(false);
-    }
-  };
-
-  const startAuthFn = useServerFn(srvStartAuth);
-  const finishAuthFn = useServerFn(srvFinishAuth);
-
-  const signInBio = async () => {
-    if (!email) {
-      setError("Digite seu email primeiro");
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      if (!isWebAuthnSupported()) throw new Error("Seu navegador não suporta biometria");
-      const options = await startAuthFn({ data: { email } });
-      const response = await browserStartAuthentication({ optionsJSON: options as any });
-      const result = (await finishAuthFn({ data: { email, response } })) as {
-        success: boolean;
-        tokenHash: string;
-      };
-      const { error: vErr } = await supabase.auth.verifyOtp({
-        type: "magiclink",
-        token_hash: result.tokenHash,
-      });
-      if (vErr) throw vErr;
-      navigate({ to: "/" });
-    } catch (e: any) {
-      setError(e?.message ?? "Falha no login com biometria");
-    } finally {
       setLoading(false);
     }
   };
@@ -179,9 +110,7 @@ function AuthPage() {
       ? "Entre na sua conta"
       : mode === "signup"
         ? "Crie sua conta"
-        : mode === "request"
-          ? "Solicitar acesso"
-          : "Recuperar senha";
+        : "Recuperar senha";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5">
@@ -209,18 +138,14 @@ function AuthPage() {
             />
           </label>
 
-          {mode !== "forgot" && mode !== "request" && (
+          {mode !== "forgot" && (
             <label className="block">
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Senha</span>
                 {mode === "signin" && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode("forgot");
-                      setError(null);
-                      setInfo(null);
-                    }}
+                    onClick={() => { setMode("forgot"); setError(null); setInfo(null); }}
                     className="text-xs text-primary hover:underline"
                   >
                     Esqueci minha senha
@@ -257,18 +182,10 @@ function AuthPage() {
             disabled={loading}
             className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {loading
-              ? "Aguarde…"
-              : mode === "signin"
-                ? "Entrar"
-                : mode === "signup"
-                  ? "Criar conta"
-                  : mode === "request"
-                    ? "Enviar solicitação"
-                    : "Enviar link"}
+            {loading ? "Aguarde…" : mode === "signin" ? "Entrar" : mode === "signup" ? "Criar conta" : "Enviar link"}
           </button>
 
-          {mode !== "forgot" && mode !== "request" && (
+          {mode !== "forgot" && (
             <>
               <div className="relative my-1 flex items-center">
                 <div className="flex-1 border-t border-border" />
@@ -295,11 +212,7 @@ function AuthPage() {
           {mode === "signin" && (
             <button
               type="button"
-              onClick={() => {
-                setMode("signup");
-                setError(null);
-                setInfo(null);
-              }}
+              onClick={() => { setMode("signup"); setError(null); setInfo(null); }}
               className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
               Não tem conta? Criar agora
@@ -308,24 +221,16 @@ function AuthPage() {
           {mode === "signup" && (
             <button
               type="button"
-              onClick={() => {
-                setMode("signin");
-                setError(null);
-                setInfo(null);
-              }}
+              onClick={() => { setMode("signin"); setError(null); setInfo(null); }}
               className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
               Já tem conta? Entrar
             </button>
           )}
-          {(mode === "forgot" || mode === "request") && (
+          {mode === "forgot" && (
             <button
               type="button"
-              onClick={() => {
-                setMode("signin");
-                setError(null);
-                setInfo(null);
-              }}
+              onClick={() => { setMode("signin"); setError(null); setInfo(null); }}
               className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
               Voltar para entrar

@@ -230,17 +230,17 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex gap-2 pt-2">
           <button
             onClick={onClose}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
+            className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
           >
             Cancelar
           </button>
           <button
             onClick={save}
             disabled={update.isPending}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {update.isPending ? "Salvando…" : "Salvar"}
           </button>

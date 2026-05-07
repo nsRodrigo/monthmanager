@@ -427,6 +427,7 @@ function AccountMonth() {
                           setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
                         }
                         onAdd={() => setPurchaseFor(c.id)}
+                        onEditCard={() => setEditingCardId(c.id)}
                         items={cardInst}
                         purchases={purchases}
                         onToggleInst={(id, p) => toggleInst(id, p)}
@@ -696,6 +697,7 @@ function CardRow({
   dueLabel,
   onTogglePaid,
   onAdd,
+  onEditCard,
   onHideMonth,
   items,
   purchases,
@@ -711,6 +713,7 @@ function CardRow({
   dueLabel: string;
   onTogglePaid: () => void;
   onAdd: () => void;
+  onEditCard?: () => void;
   onHideMonth?: () => void;
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T
@@ -742,7 +745,21 @@ function CardRow({
           style={{ backgroundColor: cardColor }}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{cardName}</p>
+          {onEditCard ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditCard();
+              }}
+              className="block w-full truncate text-left text-sm font-semibold hover:text-primary hover:underline"
+              aria-label={`Editar cartão ${cardName}`}
+            >
+              {cardName}
+            </button>
+          ) : (
+            <p className="truncate text-sm font-semibold">{cardName}</p>
+          )}
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {dueLabel}
           </p>

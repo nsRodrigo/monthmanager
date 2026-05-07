@@ -516,6 +516,11 @@ function AccountMonth() {
         onDeleteParent={editingSingle?.onDeleteParent}
       />
       <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} />
+      <EditCardDialog
+        open={!!editingCardId}
+        onClose={() => setEditingCardId(null)}
+        card={accountCards.find((c) => c.id === editingCardId) ?? null}
+      />
       <DeleteParcelledDialog
         open={!!deletingParcelled}
         onClose={() => setDeletingParcelled(null)}

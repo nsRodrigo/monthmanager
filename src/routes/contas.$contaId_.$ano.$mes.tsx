@@ -132,8 +132,11 @@ function AccountMonth() {
   ) => setDeletingParcelled({ inst, label, parentType, parentId });
 
   const accountCards = useMemo(
-    () => cards.filter((c) => c.accountId === contaId),
-    [cards, contaId],
+    () =>
+      cards.filter(
+        (c) => c.accountId === contaId && isCardVisibleInMonth(c, year, month),
+      ),
+    [cards, contaId, year, month],
   );
 
   const accountCardIds = new Set(accountCards.map((c) => c.id));

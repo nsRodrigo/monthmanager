@@ -1,16 +1,28 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useUpdateCard, useRemoveCard, useDuplicateCard, type Card } from "@/store/finance";
+import {
+  useUpdateCard,
+  useRemoveCard,
+  useDuplicateCard,
+  type Card,
+  type CardScope,
+} from "@/store/finance";
 import { Copy, Trash2, AlertTriangle } from "lucide-react";
+import { CardScopePicker } from "./CardScopePicker";
+import { MONTHS } from "@/lib/format";
 
 export function EditCardDialog({
   open,
   onClose,
   card,
+  defaultYear,
+  defaultMonth,
 }: {
   open: boolean;
   onClose: () => void;
   card: Card | null;
+  defaultYear: number;
+  defaultMonth: number;
 }) {
   const update = useUpdateCard();
   const remove = useRemoveCard();
@@ -20,8 +32,9 @@ export function EditCardDialog({
   const [color, setColor] = useState("#8b5cf6");
   const [closingDay, setClosingDay] = useState("25");
   const [dueDay, setDueDay] = useState("5");
+  const [scope, setScope] = useState<CardScope>({ kind: "all" });
   const [confirmDel, setConfirmDel] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
+  const [delScope, setDelScope] = useState<CardScope>({ kind: "month", year: defaultYear, month: defaultMonth });
 
   useEffect(() => {
     if (open && card) {
@@ -29,10 +42,11 @@ export function EditCardDialog({
       setColor(card.color);
       setClosingDay(String(card.closingDay));
       setDueDay(String(card.dueDay));
+      setScope({ kind: "all" });
       setConfirmDel(false);
-      setConfirmText("");
+      setDelScope({ kind: "month", year: defaultYear, month: defaultMonth });
     }
-  }, [open, card]);
+  }, [open, card, defaultYear, defaultMonth]);
 
   if (!card) return null;
 
@@ -43,6 +57,7 @@ export function EditCardDialog({
       color,
       closingDay: Math.min(31, Math.max(1, parseInt(closingDay) || card.closingDay)),
       dueDay: Math.min(31, Math.max(1, parseInt(dueDay) || card.dueDay)),
+      scope,
     });
     onClose();
   };
@@ -53,10 +68,16 @@ export function EditCardDialog({
   };
 
   const del = async () => {
-    if (confirmText.trim().toUpperCase() !== "EXCLUIR") return;
-    await remove.mutateAsync(card.id);
+    await remove.mutateAsync({ id: card.id, scope: delScope });
     onClose();
   };
+
+  const delScopeLabel =
+    delScope.kind === "all"
+      ? "definitivamente, em toda a conta"
+      : delScope.kind === "month"
+        ? `apenas em ${MONTHS[delScope.month]}/${delScope.year}`
+        : `entre ${MONTHS[delScope.startMonth]}/${delScope.startYear} e ${MONTHS[delScope.endMonth]}/${delScope.endYear}`;
 
   return (
     <Modal open={open} onClose={onClose} title={`Editar · ${card.name}`}>
@@ -81,6 +102,16 @@ export function EditCardDialog({
               <input type="number" min={1} max={31} className={inputClass} value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
             </Field>
           </div>
+
+          <CardScopePicker
+            defaultYear={defaultYear}
+            defaultMonth={defaultMonth}
+            value={scope}
+            onChange={setScope}
+            labelAll="Alterar para toda a conta"
+            labelMonth="Alterar somente neste mês"
+            labelPeriod="Alterar para um período"
+          />
 
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button
@@ -118,19 +149,25 @@ export function EditCardDialog({
             <div className="text-xs text-foreground">
               <p className="font-semibold text-destructive">Esta ação é irreversível.</p>
               <p className="mt-1 text-muted-foreground">
-                Todas as compras, parcelas e registros de pagamento deste cartão serão excluídos permanentemente.
+                Compras, parcelas e pagamentos do cartão dentro do escopo escolhido serão removidos.
               </p>
             </div>
           </div>
-          <Field label='Digite "EXCLUIR" para confirmar'>
-            <input
-              autoFocus
-              className={inputClass}
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="EXCLUIR"
-            />
-          </Field>
+
+          <CardScopePicker
+            defaultYear={defaultYear}
+            defaultMonth={defaultMonth}
+            value={delScope}
+            onChange={setDelScope}
+            labelAll="Excluir definitivamente em toda a conta"
+            labelMonth="Excluir somente deste mês"
+            labelPeriod="Excluir em um período"
+          />
+
+          <p className="text-[11px] text-muted-foreground">
+            Você confirmará a exclusão {delScopeLabel}.
+          </p>
+
           <div className="flex gap-2 pt-2">
             <button
               onClick={() => setConfirmDel(false)}
@@ -140,10 +177,10 @@ export function EditCardDialog({
             </button>
             <button
               onClick={del}
-              disabled={remove.isPending || confirmText.trim().toUpperCase() !== "EXCLUIR"}
+              disabled={remove.isPending}
               className="flex-1 rounded-lg bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {remove.isPending ? "Excluindo…" : "Excluir tudo"}
+              {remove.isPending ? "Excluindo…" : "Confirmar exclusão"}
             </button>
           </div>
         </div>

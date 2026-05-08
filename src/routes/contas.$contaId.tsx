@@ -221,17 +221,7 @@ function AccountHome() {
 
       {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Meses de {year}</h2>
-          <button
-            type="button"
-            onClick={() => setOpenAddMonth(true)}
-            className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25"
-            aria-label="Adicionar mês"
-          >
-            <Plus className="h-3.5 w-3.5" /> Adicionar mês
-          </button>
-        </div>
+        <h2 className="text-lg font-semibold">Meses de {year}</h2>
         <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
             type="button"
@@ -389,6 +379,15 @@ function AccountHome() {
             </Link>
             );
           })
+        )}
+        {monthsForYear.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpenAddMonth(true)}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card/40 px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+          >
+            <Plus className="h-4 w-4" /> Adicionar mês
+          </button>
         )}
       </div>
 

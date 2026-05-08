@@ -1,18 +1,34 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useAccounts, useAddCard } from "@/store/finance";
+import { useAccounts, useAddCard, type CardScope } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
+import { CardScopePicker } from "./CardScopePicker";
 
-export function AddCardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AddCardDialog({
+  open,
+  onClose,
+  defaultYear,
+  defaultMonth,
+}: {
+  open: boolean;
+  onClose: () => void;
+  defaultYear?: number;
+  defaultMonth?: number;
+}) {
   const { data: accounts = [] } = useAccounts();
   const { accountId: filter } = useAccountFilter();
   const addCard = useAddCard();
+
+  const today = new Date();
+  const dY = defaultYear ?? today.getFullYear();
+  const dM = defaultMonth ?? today.getMonth();
 
   const [name, setName] = useState("");
   const [color, setColor] = useState("#8b5cf6");
   const [accountId, setAccountId] = useState("");
   const [closingDay, setClosingDay] = useState("25");
   const [dueDay, setDueDay] = useState("5");
+  const [scope, setScope] = useState<CardScope>({ kind: "all" });
 
   useEffect(() => {
     if (!open) return;
@@ -21,6 +37,7 @@ export function AddCardDialog({ open, onClose }: { open: boolean; onClose: () =>
     setAccountId(filter ?? accounts[0]?.id ?? "");
     setClosingDay("25");
     setDueDay("5");
+    setScope({ kind: "all" });
   }, [open, filter, accounts]);
 
   const submit = async () => {
@@ -31,6 +48,7 @@ export function AddCardDialog({ open, onClose }: { open: boolean; onClose: () =>
       color,
       closingDay: Math.min(31, Math.max(1, parseInt(closingDay) || 25)),
       dueDay: Math.min(31, Math.max(1, parseInt(dueDay) || 5)),
+      scope,
     });
     onClose();
   };
@@ -70,11 +88,22 @@ export function AddCardDialog({ open, onClose }: { open: boolean; onClose: () =>
               <input type="number" min={1} max={31} className={inputClass} value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
             </Field>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary">
+
+          <CardScopePicker
+            defaultYear={dY}
+            defaultMonth={dM}
+            value={scope}
+            onChange={setScope}
+            labelAll="Adicionar para toda a conta"
+            labelMonth="Adicionar somente neste mês"
+            labelPeriod="Adicionar para um período"
+          />
+
+          <div className="flex gap-2 pt-2">
+            <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
               Cancelar
             </button>
-            <button onClick={submit} disabled={!name.trim() || !accountId || addCard.isPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+            <button onClick={submit} disabled={!name.trim() || !accountId || addCard.isPending} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
               {addCard.isPending ? "Salvando…" : "Adicionar"}
             </button>
           </div>

@@ -26,6 +26,7 @@ export function AddIncomeDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [isInstallment, setIsInstallment] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
@@ -38,6 +39,7 @@ export function AddIncomeDialog({
       setDescription("");
       setAmount(0);
       setIsInstallment(false);
+      setIsRecurring(false);
       setInstallments("2");
       setInstallmentNumber("1");
       setMode("total");
@@ -46,6 +48,18 @@ export function AddIncomeDialog({
 
   const submit = async () => {
     if (!description.trim() || amount <= 0 || !accountId) return;
+    if (isRecurring && !isInstallment) {
+      await addIncome.mutateAsync({
+        accountId,
+        description: description.trim(),
+        amount: amount * 24,
+        date,
+        installmentsCount: 24,
+        installmentNumber: 1,
+      });
+      onClose();
+      return;
+    }
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = amount;
@@ -85,8 +99,18 @@ export function AddIncomeDialog({
         </div>
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input type="checkbox" checked={isInstallment} onChange={(e) => setIsInstallment(e.target.checked)} className="h-4 w-4 accent-primary" />
+          <input type="checkbox" checked={isInstallment} onChange={(e) => { setIsInstallment(e.target.checked); if (e.target.checked) setIsRecurring(false); }} className="h-4 w-4 accent-primary" />
           <span className="text-sm font-medium">É parcelado / recorrente?</span>
+        </label>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} disabled={isInstallment} className="mt-0.5 h-4 w-4 accent-primary" />
+          <span className="text-sm">
+            <span className="font-medium">Recebimento recorrente</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {isInstallment ? "Indisponível para parcelados." : "Replicado nos próximos 24 meses, mantendo o dia. Cada mês é independente."}
+            </span>
+          </span>
         </label>
 
         {isInstallment && (

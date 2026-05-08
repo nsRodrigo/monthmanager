@@ -14,8 +14,8 @@ import {
 } from "@/server/webauthn";
 import { supabase } from "@/integrations/supabase/client";
 
-const IDLE_MS = 2 * 60 * 1000; // 2 min de inatividade com app aberto
-const BG_MS = 60 * 1000; // 1 min em segundo plano
+const IDLE_MS = 10 * 60 * 1000; // 10 min de inatividade com app aberto
+const BG_MS = 5 * 60 * 1000; // 5 min em segundo plano antes de exigir biometria
 
 /**
  * Bloqueia a UI quando:

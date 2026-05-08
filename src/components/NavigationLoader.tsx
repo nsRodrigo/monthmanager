@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 
 /**
- * Mostra um overlay sutil quando uma navegação demora mais que 150ms.
- * Evita flash em transições instantâneas.
+ * Overlay sutil que aparece quando uma navegação demora mais que 150ms.
+ * Mostra um fundo fosco com spinner centralizado até a próxima tela renderizar.
  */
 export function NavigationLoader() {
   const isLoading = useRouterState({
@@ -23,11 +24,13 @@ export function NavigationLoader() {
   if (!show) return null;
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-0.5 overflow-hidden bg-transparent"
-      aria-hidden="true"
+      className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center bg-background/60 backdrop-blur-sm"
+      aria-live="polite"
+      aria-busy="true"
     >
-      <div className="h-full w-full origin-left animate-[nav-bar_1.2s_ease-in-out_infinite] bg-gradient-to-r from-primary via-primary/80 to-primary" />
-      <style>{`@keyframes nav-bar { 0% { transform: scaleX(0); } 50% { transform: scaleX(0.7); } 100% { transform: scaleX(1); } }`}</style>
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-card/90 shadow-lg ring-1 ring-border">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
+      </div>
     </div>
   );
 }

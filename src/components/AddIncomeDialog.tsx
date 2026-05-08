@@ -99,8 +99,18 @@ export function AddIncomeDialog({
         </div>
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input type="checkbox" checked={isInstallment} onChange={(e) => setIsInstallment(e.target.checked)} className="h-4 w-4 accent-primary" />
+          <input type="checkbox" checked={isInstallment} onChange={(e) => { setIsInstallment(e.target.checked); if (e.target.checked) setIsRecurring(false); }} className="h-4 w-4 accent-primary" />
           <span className="text-sm font-medium">É parcelado / recorrente?</span>
+        </label>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} disabled={isInstallment} className="mt-0.5 h-4 w-4 accent-primary" />
+          <span className="text-sm">
+            <span className="font-medium">Recebimento recorrente</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {isInstallment ? "Indisponível para parcelados." : "Replicado nos próximos 24 meses, mantendo o dia. Cada mês é independente."}
+            </span>
+          </span>
         </label>
 
         {isInstallment && (

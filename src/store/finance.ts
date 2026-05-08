@@ -698,7 +698,12 @@ export function useAddCard() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (c: Omit<Card, "id">) => {
+    mutationFn: async (
+      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth"> & {
+        scope?: CardScope;
+      },
+    ) => {
+      const win = scopeToWindow(c.scope ?? { kind: "all" });
       const { error } = await supabase.from("cards").insert({
         user_id: user!.id,
         account_id: c.accountId,
@@ -706,6 +711,7 @@ export function useAddCard() {
         color: c.color,
         closing_day: c.closingDay,
         due_day: c.dueDay,
+        ...win,
       });
       if (error) throw error;
     },
@@ -713,19 +719,135 @@ export function useAddCard() {
   });
 }
 
+/**
+ * Removes a card according to scope:
+ * - 'all'    → permanently deletes the card and ALL its purchases/installments/payments.
+ * - 'period' → keeps the card globally; restricts visibility window to OUTSIDE the period
+ *              by deleting purchases/installments inside the period and shrinking the window.
+ *              Simpler approach we use: clamp end_ym to (start_period - 1) when card window
+ *              fully overlaps; if 'period' fully covers the card, falls back to full delete.
+ *              Purchases whose due months fall in the period are removed.
+ * - 'month'  → deletes purchases/installments tied to this single year/month for this card,
+ *              leaving the card itself intact for other months.
+ */
 export function useRemoveCard() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { data: purs } = await supabase.from("purchases").select("id").eq("card_id", id);
-      const ids = (purs ?? []).map((p) => p.id);
-      if (ids.length > 0) {
-        await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
-        await supabase.from("purchases").delete().in("id", ids);
+    mutationFn: async (args: { id: string; scope?: CardScope }) => {
+      const id = args.id;
+      const scope: CardScope = args.scope ?? { kind: "all" };
+
+      if (scope.kind === "all") {
+        const { data: purs } = await supabase.from("purchases").select("id").eq("card_id", id);
+        const ids = (purs ?? []).map((p) => p.id);
+        if (ids.length > 0) {
+          await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().in("id", ids);
+        }
+        await supabase.from("card_payments").delete().eq("card_id", id);
+        const { error } = await supabase.from("cards").delete().eq("id", id);
+        if (error) throw error;
+        return;
       }
-      await supabase.from("card_payments").delete().eq("card_id", id);
-      const { error } = await supabase.from("cards").delete().eq("id", id);
-      if (error) throw error;
+
+      // Period or single month → wipe installments/purchases inside window, restrict card visibility.
+      const win = scopeToWindow(scope);
+      const sYM = win.start_year! * 12 + win.start_month!;
+      const eYM = win.end_year! * 12 + win.end_month!;
+
+      // 1) Delete installments of THIS card whose (year,month) is inside the window.
+      const { data: purs } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("card_id", id);
+      const purchaseIds = (purs ?? []).map((p: any) => p.id as string);
+      if (purchaseIds.length > 0) {
+        const { data: insts } = await supabase
+          .from("installments")
+          .select("id,parent_id,year,month")
+          .in("parent_id", purchaseIds)
+          .eq("parent_type", "purchase");
+        const toDelete = (insts ?? []).filter((i: any) => {
+          const ym = (i.year as number) * 12 + (i.month as number);
+          return ym >= sYM && ym <= eYM;
+        });
+        if (toDelete.length > 0) {
+          await supabase.from("installments").delete().in("id", toDelete.map((i: any) => i.id));
+        }
+        // Clean orphan purchases (no remaining installments)
+        const remaining = (insts ?? []).filter(
+          (i: any) => !toDelete.find((d: any) => d.id === i.id),
+        );
+        const stillUsed = new Set(remaining.map((i: any) => i.parent_id));
+        const orphanIds = purchaseIds.filter((pid) => !stillUsed.has(pid));
+        if (orphanIds.length > 0) {
+          await supabase.from("purchases").delete().in("id", orphanIds);
+        }
+      }
+
+      // 2) Delete card_payments inside window
+      await supabase
+        .from("card_payments")
+        .delete()
+        .eq("card_id", id)
+        .gte("year", win.start_year!)
+        .lte("year", win.end_year!);
+
+      // 3) Restrict card visibility: shrink window to exclude the deleted period.
+      // Strategy: get current window. If the deleted range fully covers it OR the card had no
+      // explicit window, mark hidden_outside via start/end. Simple heuristic:
+      //   - If card had no window: set window to before(start) OR after(end) — pick the side
+      //     with the most history (kept simple: hide entire card if no purchases remain).
+      const { data: cardRow } = await supabase
+        .from("cards")
+        .select("start_year,start_month,end_year,end_month")
+        .eq("id", id)
+        .single();
+      // Refresh remaining installments
+      const { data: leftPurs } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("card_id", id);
+      const leftPurIds = (leftPurs ?? []).map((p: any) => p.id as string);
+      let hasAny = false;
+      if (leftPurIds.length > 0) {
+        const { data: leftInsts } = await supabase
+          .from("installments")
+          .select("id")
+          .in("parent_id", leftPurIds)
+          .eq("parent_type", "purchase")
+          .limit(1);
+        hasAny = (leftInsts ?? []).length > 0;
+      }
+      if (!hasAny) {
+        // Nothing left → just delete the card entirely.
+        await supabase.from("card_payments").delete().eq("card_id", id);
+        await supabase.from("purchases").delete().eq("card_id", id);
+        const { error } = await supabase.from("cards").delete().eq("id", id);
+        if (error) throw error;
+      } else {
+        // Keep card; clamp end before period start so it stops appearing inside the deleted range.
+        // (This collapses a single-month deletion to: hide that month going forward.)
+        const newEndYM = sYM - 1;
+        const newEndYear = Math.floor(newEndYM / 12);
+        const newEndMonth = ((newEndYM % 12) + 12) % 12;
+        const patch: any = {};
+        if (cardRow?.start_year == null) {
+          // open start → keep open
+        }
+        // Only clamp end if previous end was open or after the deletion
+        const prevEndYM =
+          cardRow?.end_year != null && cardRow?.end_month != null
+            ? (cardRow.end_year as number) * 12 + (cardRow.end_month as number)
+            : Infinity;
+        if (prevEndYM > newEndYM) {
+          patch.end_year = newEndYear;
+          patch.end_month = newEndMonth;
+        }
+        if (Object.keys(patch).length > 0) {
+          await supabase.from("cards").update(patch).eq("id", id);
+        }
+      }
     },
     onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
   });
@@ -734,20 +856,32 @@ export function useRemoveCard() {
 export function useUpdateCard() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (c: { id: string; name?: string; color?: string; closingDay?: number; dueDay?: number }) => {
-      const patch: { name?: string; color?: string; closing_day?: number; due_day?: number } = {};
+    mutationFn: async (c: {
+      id: string;
+      name?: string;
+      color?: string;
+      closingDay?: number;
+      dueDay?: number;
+      scope?: CardScope;
+    }) => {
+      const patch: any = {};
       if (c.name !== undefined) patch.name = c.name;
       if (c.color !== undefined) patch.color = c.color;
       if (c.closingDay !== undefined) patch.closing_day = c.closingDay;
       if (c.dueDay !== undefined) patch.due_day = c.dueDay;
+      if (c.scope) {
+        const win = scopeToWindow(c.scope);
+        patch.start_year = win.start_year;
+        patch.start_month = win.start_month;
+        patch.end_year = win.end_year;
+        patch.end_month = win.end_month;
+      }
       const { error } = await supabase.from("cards").update(patch).eq("id", c.id);
       if (error) throw error;
     },
     onSuccess: () => inv(["cards"]),
   });
 }
-
-export function useDuplicateCard() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({

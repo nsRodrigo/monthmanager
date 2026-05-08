@@ -22,7 +22,59 @@ export type Card = {
   color: string;
   closingDay: number;
   dueDay: number;
+  startYear: number | null;
+  startMonth: number | null;
+  endYear: number | null;
+  endMonth: number | null;
 };
+
+/**
+ * Visibility scope for card mutations (add/edit/delete).
+ * - 'all'    → applies globally for the account (no time window)
+ * - 'period' → applies only between [startYM, endYM]
+ * - 'month'  → applies only to the single given year/month
+ */
+export type CardScope =
+  | { kind: "all" }
+  | { kind: "period"; startYear: number; startMonth: number; endYear: number; endMonth: number }
+  | { kind: "month"; year: number; month: number };
+
+/** Returns true when a card should be visible in the given year/month. */
+export function isCardVisibleInMonth(card: Card, year: number, month: number): boolean {
+  const ym = year * 12 + month;
+  if (card.startYear != null && card.startMonth != null) {
+    if (ym < card.startYear * 12 + card.startMonth) return false;
+  }
+  if (card.endYear != null && card.endMonth != null) {
+    if (ym > card.endYear * 12 + card.endMonth) return false;
+  }
+  return true;
+}
+
+function scopeToWindow(scope: CardScope): {
+  start_year: number | null;
+  start_month: number | null;
+  end_year: number | null;
+  end_month: number | null;
+} {
+  if (scope.kind === "all") {
+    return { start_year: null, start_month: null, end_year: null, end_month: null };
+  }
+  if (scope.kind === "month") {
+    return {
+      start_year: scope.year,
+      start_month: scope.month,
+      end_year: scope.year,
+      end_month: scope.month,
+    };
+  }
+  return {
+    start_year: scope.startYear,
+    start_month: scope.startMonth,
+    end_year: scope.endYear,
+    end_month: scope.endMonth,
+  };
+}
 
 export type Purchase = {
   id: string;

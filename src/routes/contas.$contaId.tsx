@@ -380,6 +380,15 @@ function AccountHome() {
             );
           })
         )}
+        {monthsForYear.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpenAddMonth(true)}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card/40 px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+          >
+            <Plus className="h-4 w-4" /> Adicionar mês
+          </button>
+        )}
       </div>
 
       <AddMonthDialog

@@ -26,6 +26,7 @@ export function AddIncomeDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [isInstallment, setIsInstallment] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
@@ -38,6 +39,7 @@ export function AddIncomeDialog({
       setDescription("");
       setAmount(0);
       setIsInstallment(false);
+      setIsRecurring(false);
       setInstallments("2");
       setInstallmentNumber("1");
       setMode("total");
@@ -46,6 +48,18 @@ export function AddIncomeDialog({
 
   const submit = async () => {
     if (!description.trim() || amount <= 0 || !accountId) return;
+    if (isRecurring && !isInstallment) {
+      await addIncome.mutateAsync({
+        accountId,
+        description: description.trim(),
+        amount: amount * 24,
+        date,
+        installmentsCount: 24,
+        installmentNumber: 1,
+      });
+      onClose();
+      return;
+    }
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = amount;

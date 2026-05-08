@@ -23,6 +23,7 @@ import {
   getMonthInvestments,
   isCardFullyPaid,
   computeAccountBalanceUntilNow,
+  isCardVisibleInMonth,
   normalizeZero,
   useDeleteSingleInstallment,
   useDeleteParentKeepingPaid,

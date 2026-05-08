@@ -393,16 +393,20 @@ export function useCards() {
     queryFn: async (): Promise<Card[]> => {
       const { data, error } = await supabase
         .from("cards")
-        .select("id,account_id,name,color,closing_day,due_day")
+        .select("id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month")
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((c) => ({
+      return (data ?? []).map((c: any) => ({
         id: c.id,
         accountId: c.account_id,
         name: c.name,
         color: c.color,
         closingDay: c.closing_day,
         dueDay: c.due_day,
+        startYear: c.start_year ?? null,
+        startMonth: c.start_month ?? null,
+        endYear: c.end_year ?? null,
+        endMonth: c.end_month ?? null,
       }));
     },
   });

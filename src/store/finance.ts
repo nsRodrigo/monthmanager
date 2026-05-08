@@ -882,6 +882,8 @@ export function useUpdateCard() {
     onSuccess: () => inv(["cards"]),
   });
 }
+
+export function useDuplicateCard() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({

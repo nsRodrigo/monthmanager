@@ -137,8 +137,12 @@ export type Database = {
           color: string
           created_at: string
           due_day: number
+          end_month: number | null
+          end_year: number | null
           id: string
           name: string
+          start_month: number | null
+          start_year: number | null
           user_id: string
         }
         Insert: {
@@ -147,8 +151,12 @@ export type Database = {
           color?: string
           created_at?: string
           due_day?: number
+          end_month?: number | null
+          end_year?: number | null
           id?: string
           name: string
+          start_month?: number | null
+          start_year?: number | null
           user_id: string
         }
         Update: {
@@ -157,8 +165,12 @@ export type Database = {
           color?: string
           created_at?: string
           due_day?: number
+          end_month?: number | null
+          end_year?: number | null
           id?: string
           name?: string
+          start_month?: number | null
+          start_year?: number | null
           user_id?: string
         }
         Relationships: [

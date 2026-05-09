@@ -371,6 +371,7 @@ function RootComponent() {
         <AuthProvider>
           <AccountFilterProvider>
             <NavigationLoader />
+            <RealtimeSync />
             <BiometricLock>
               <AuthGate>
                 <Outlet />

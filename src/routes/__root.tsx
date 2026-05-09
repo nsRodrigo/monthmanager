@@ -1,5 +1,6 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Upload, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User, Receipt } from "lucide-react";
+import { LogOut, Upload, Wallet, FileSpreadsheet, Plus, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User, Receipt, Cloud } from "lucide-react";
+import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 

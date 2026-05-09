@@ -74,6 +74,36 @@ export type Database = {
         }
         Relationships: []
       }
+      app_snapshots: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          kind: string
+          label: string
+          user_id: string
+          year_month: string | null
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          kind?: string
+          label?: string
+          user_id: string
+          year_month?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          kind?: string
+          label?: string
+          user_id?: string
+          year_month?: string | null
+        }
+        Relationships: []
+      }
       blacklist: {
         Row: {
           created_at: string

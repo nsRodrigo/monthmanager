@@ -13,6 +13,7 @@ import {
 import { getVapidPublicKey, saveSubscription } from "@/server/push.functions";
 import { subscribeToPush, isPushSupported } from "@/lib/push";
 import { supabase } from "@/integrations/supabase/client";
+import { useConfirm } from "@/store/confirm";
 
 export const Route = createFileRoute("/admin/whitelist")({
   head: () => ({ meta: [{ title: "Whitelist — Admin" }] }),
@@ -143,8 +144,14 @@ function WhitelistAdmin() {
     }
   };
 
-  const onRevoke = (u: AdminUser) => {
-    if (!confirm(`Revogar acesso de ${u.email}?\n\nIsso vai apagar a conta, todos os dados e remover o e-mail da whitelist. Ação irreversível.`)) return;
+  const onRevoke = async (u: AdminUser) => {
+    const ok = await confirmDialog({
+      title: "Revogar acesso",
+      description: `Revogar acesso de ${u.email}? Isso vai apagar a conta, todos os dados e remover o e-mail da whitelist.`,
+      variant: "destructive",
+      confirmLabel: "Revogar",
+    });
+    if (!ok) return;
     revokeMut.mutate({ userId: u.id, alsoRemoveWhitelist: true });
   };
 

@@ -12,6 +12,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/store/confirm";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -226,7 +227,13 @@ function DocumentsTab({ year }: { year: number }) {
               variant="ghost"
               size="icon"
               onClick={async () => {
-                if (!confirm(`Excluir ${d.originalName}?`)) return;
+                const ok = await confirmDialog({
+                  title: "Excluir documento",
+                  description: `Excluir ${d.originalName}?`,
+                  variant: "destructive",
+                  confirmLabel: "Excluir",
+                });
+                if (!ok) return;
                 await remove.mutateAsync(d);
                 toast.success("Documento excluído.");
               }}

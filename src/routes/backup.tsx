@@ -17,6 +17,7 @@ import {
   readBackupFile,
   restoreBackup,
 } from "@/lib/backup";
+import { useConfirm } from "@/store/confirm";
 import {
   ArrowLeft,
   Cloud,
@@ -145,7 +146,13 @@ function BackupPage() {
   }
 
   async function onDeleteSnapshot(id: string) {
-    if (!confirm("Excluir este snapshot? Esta ação não pode ser desfeita.")) return;
+    const ok = await confirmDialog({
+      title: "Excluir snapshot",
+      description: "Excluir este snapshot? Esta ação não pode ser desfeita.",
+      variant: "destructive",
+      confirmLabel: "Excluir",
+    });
+    if (!ok) return;
     setBusy(`del-${id}`);
     try {
       await deleteSnapshot(id);

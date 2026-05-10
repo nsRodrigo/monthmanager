@@ -44,14 +44,8 @@ export function DeleteParcelledDialog({
 
         <button
           onClick={() => {
-            if (
-              confirm(
-                "Excluir o item inteiro? Parcelas já pagas serão preservadas; somente as não pagas serão apagadas.",
-              )
-            ) {
-              onDeleteAllUnpaid();
-              onClose();
-            }
+            onDeleteAllUnpaid();
+            onClose();
           }}
           className="flex w-full flex-col items-start gap-1 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-left text-destructive hover:border-destructive"
         >

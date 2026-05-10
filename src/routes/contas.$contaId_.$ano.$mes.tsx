@@ -58,6 +58,7 @@ import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditI
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
+import { useConfirm } from "@/store/confirm";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({

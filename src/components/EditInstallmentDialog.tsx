@@ -44,6 +44,7 @@ export function EditInstallmentDialog({
   const updateDebit = useUpdateDebit();
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
+  const confirm = useConfirm();
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
@@ -141,8 +142,14 @@ export function EditInstallmentDialog({
           <div className="flex gap-2 pt-2">
             {onDeleteParent && (
               <button
-                onClick={() => {
-                  if (confirm("Excluir este lançamento?")) {
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Excluir lançamento",
+                    description: "Tem certeza que deseja excluir este lançamento?",
+                    variant: "destructive",
+                    confirmLabel: "Excluir",
+                  });
+                  if (ok) {
                     onDeleteParent();
                     onClose();
                   }
@@ -299,7 +306,12 @@ export function EditInstallmentDialog({
                 onClick={async () => {
                   const n = Math.min(remaining, Math.max(1, parseInt(advanceCount) || 0));
                   if (!n) return;
-                  if (!confirm(`Antecipar ${n} parcela(s)?`)) return;
+                  const ok = await confirm({
+                    title: "Antecipar parcelas",
+                    description: `Antecipar ${n} parcela(s)?`,
+                    confirmLabel: "Antecipar",
+                  });
+                  if (!ok) return;
                   await advance.mutateAsync({ installment: inst, count: n });
                   onClose();
                 }}

@@ -1177,3 +1177,25 @@ function Empty({ text }: { text: string }) {
     <div className="px-4 py-6 text-center text-xs text-muted-foreground">{text}</div>
   );
 }
+
+function RemoveInstButton({ onRemove }: { onRemove: () => void }) {
+  const confirmDialog = useConfirm();
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        const ok = await confirmDialog({
+          title: "Excluir compra",
+          description: "Excluir esta compra (e todas as parcelas)?",
+          variant: "destructive",
+          confirmLabel: "Excluir",
+        });
+        if (ok) onRemove();
+      }}
+      className="text-muted-foreground hover:text-destructive"
+      title="Excluir compra"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
+  );
+}

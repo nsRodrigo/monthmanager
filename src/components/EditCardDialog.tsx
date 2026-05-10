@@ -7,9 +7,10 @@ import {
   type Card,
   type CardScope,
 } from "@/store/finance";
-import { Copy, Trash2, AlertTriangle } from "lucide-react";
-import { CardScopePicker } from "./CardScopePicker";
-import { MONTHS } from "@/lib/format";
+import { Copy, Trash2 } from "lucide-react";
+import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
+
+type PendingAction = null | "save" | "delete" | "duplicate";
 
 export function EditCardDialog({
   open,
@@ -32,9 +33,7 @@ export function EditCardDialog({
   const [color, setColor] = useState("#8b5cf6");
   const [closingDay, setClosingDay] = useState("25");
   const [dueDay, setDueDay] = useState("5");
-  const [scope, setScope] = useState<CardScope>({ kind: "all" });
-  const [confirmDel, setConfirmDel] = useState(false);
-  const [delScope, setDelScope] = useState<CardScope>({ kind: "month", year: defaultYear, month: defaultMonth });
+  const [pending, setPending] = useState<PendingAction>(null);
 
   useEffect(() => {
     if (open && card) {
@@ -42,46 +41,60 @@ export function EditCardDialog({
       setColor(card.color);
       setClosingDay(String(card.closingDay));
       setDueDay(String(card.dueDay));
-      setScope({ kind: "all" });
-      setConfirmDel(false);
-      setDelScope({ kind: "month", year: defaultYear, month: defaultMonth });
+      setPending(null);
     }
-  }, [open, card, defaultYear, defaultMonth]);
+  }, [open, card]);
 
   if (!card) return null;
 
-  const save = async () => {
-    await update.mutateAsync({
-      id: card.id,
-      name: name.trim() || card.name,
-      color,
-      closingDay: Math.min(31, Math.max(1, parseInt(closingDay) || card.closingDay)),
-      dueDay: Math.min(31, Math.max(1, parseInt(dueDay) || card.dueDay)),
-      scope,
-    });
+  const apply = async (scope: CardScope) => {
+    if (pending === "save") {
+      await update.mutateAsync({
+        id: card.id,
+        name: name.trim() || card.name,
+        color,
+        closingDay: Math.min(31, Math.max(1, parseInt(closingDay) || card.closingDay)),
+        dueDay: Math.min(31, Math.max(1, parseInt(dueDay) || card.dueDay)),
+        scope,
+      });
+    } else if (pending === "delete") {
+      await remove.mutateAsync({ id: card.id, scope });
+    } else if (pending === "duplicate") {
+      await duplicate.mutateAsync(card.id);
+    }
+    setPending(null);
     onClose();
   };
 
-  const dup = async () => {
-    await duplicate.mutateAsync(card.id);
-    onClose();
+  const actionMeta: Record<Exclude<PendingAction, null>, {
+    title: string;
+    confirmLabel: string;
+    variant: "default" | "destructive";
+    description: React.ReactNode;
+  }> = {
+    save: {
+      title: `Salvar alterações · ${card.name}`,
+      confirmLabel: "Salvar",
+      variant: "default",
+      description: "Escolha em quais meses essas alterações vão valer.",
+    },
+    delete: {
+      title: `Excluir · ${card.name}`,
+      confirmLabel: "Excluir",
+      variant: "destructive",
+      description: "Compras, parcelas e pagamentos do cartão dentro do escopo escolhido serão removidos.",
+    },
+    duplicate: {
+      title: `Duplicar · ${card.name}`,
+      confirmLabel: "Duplicar",
+      variant: "default",
+      description: "Será criada uma cópia do cartão. (O escopo se aplica ao cartão duplicado.)",
+    },
   };
-
-  const del = async () => {
-    await remove.mutateAsync({ id: card.id, scope: delScope });
-    onClose();
-  };
-
-  const delScopeLabel =
-    delScope.kind === "all"
-      ? "definitivamente, em toda a conta"
-      : delScope.kind === "month"
-        ? `apenas em ${MONTHS[delScope.month]}/${delScope.year}`
-        : `entre ${MONTHS[delScope.startMonth]}/${delScope.startYear} e ${MONTHS[delScope.endMonth]}/${delScope.endYear}`;
 
   return (
-    <Modal open={open} onClose={onClose} title={`Editar · ${card.name}`}>
-      {!confirmDel ? (
+    <>
+      <Modal open={open && pending === null} onClose={onClose} title={`Editar · ${card.name}`}>
         <div className="space-y-3">
           <Field label="Nome do cartão">
             <input autoFocus className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
@@ -103,26 +116,15 @@ export function EditCardDialog({
             </Field>
           </div>
 
-          <CardScopePicker
-            defaultYear={defaultYear}
-            defaultMonth={defaultMonth}
-            value={scope}
-            onChange={setScope}
-            labelAll="Alterar para toda a conta"
-            labelMonth="Alterar somente neste mês"
-            labelPeriod="Alterar para um período"
-          />
-
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button
-              onClick={dup}
-              disabled={duplicate.isPending}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+              onClick={() => setPending("duplicate")}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-2 text-xs font-semibold text-foreground hover:bg-secondary"
             >
-              <Copy className="h-3.5 w-3.5" /> {duplicate.isPending ? "Duplicando…" : "Duplicar cartão"}
+              <Copy className="h-3.5 w-3.5" /> Duplicar cartão
             </button>
             <button
-              onClick={() => setConfirmDel(true)}
+              onClick={() => setPending("delete")}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 py-2 text-xs font-semibold text-destructive hover:bg-destructive/20"
             >
               <Trash2 className="h-3.5 w-3.5" /> Excluir cartão
@@ -134,57 +136,30 @@ export function EditCardDialog({
               Cancelar
             </button>
             <button
-              onClick={save}
-              disabled={update.isPending}
-              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              onClick={() => setPending("save")}
+              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
-              {update.isPending ? "Salvando…" : "Salvar"}
+              Salvar
             </button>
           </div>
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-            <div className="text-xs text-foreground">
-              <p className="font-semibold text-destructive">Esta ação é irreversível.</p>
-              <p className="mt-1 text-muted-foreground">
-                Compras, parcelas e pagamentos do cartão dentro do escopo escolhido serão removidos.
-              </p>
-            </div>
-          </div>
+      </Modal>
 
-          <CardScopePicker
-            defaultYear={defaultYear}
-            defaultMonth={defaultMonth}
-            value={delScope}
-            onChange={setDelScope}
-            labelAll="Excluir definitivamente em toda a conta"
-            labelMonth="Excluir somente deste mês"
-            labelPeriod="Excluir em um período"
-          />
-
-          <p className="text-[11px] text-muted-foreground">
-            Você confirmará a exclusão {delScopeLabel}.
-          </p>
-
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={() => setConfirmDel(false)}
-              className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
-            >
-              Voltar
-            </button>
-            <button
-              onClick={del}
-              disabled={remove.isPending}
-              className="flex-1 rounded-lg bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {remove.isPending ? "Excluindo…" : "Confirmar exclusão"}
-            </button>
-          </div>
-        </div>
+      {pending && (
+        <CardScopeConfirmDialog
+          open={pending !== null}
+          onClose={() => setPending(null)}
+          onConfirm={apply}
+          title={actionMeta[pending].title}
+          description={actionMeta[pending].description}
+          confirmLabel={actionMeta[pending].confirmLabel}
+          variant={actionMeta[pending].variant}
+          defaultYear={defaultYear}
+          defaultMonth={defaultMonth}
+          initialKind="month"
+          loading={update.isPending || remove.isPending || duplicate.isPending}
+        />
       )}
-    </Modal>
+    </>
   );
 }

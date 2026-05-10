@@ -17,6 +17,7 @@ import { ProfileDialog } from "@/components/ProfileDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
+import { ConfirmProvider } from "@/store/confirm";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -370,14 +371,16 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <AccountFilterProvider>
-            <NavigationLoader />
-            <RealtimeSync />
-            <BiometricLock>
-              <AuthGate>
-                <Outlet />
-              </AuthGate>
-            </BiometricLock>
-            <InstallPrompt />
+            <ConfirmProvider>
+              <NavigationLoader />
+              <RealtimeSync />
+              <BiometricLock>
+                <AuthGate>
+                  <Outlet />
+                </AuthGate>
+              </BiometricLock>
+              <InstallPrompt />
+            </ConfirmProvider>
           </AccountFilterProvider>
         </AuthProvider>
       </ThemeProvider>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useAccounts, useAddCard, type CardScope } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
-import { CardScopePicker } from "./CardScopePicker";
+import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 
 export function AddCardDialog({
   open,
@@ -28,7 +28,7 @@ export function AddCardDialog({
   const [accountId, setAccountId] = useState("");
   const [closingDay, setClosingDay] = useState("25");
   const [dueDay, setDueDay] = useState("5");
-  const [scope, setScope] = useState<CardScope>({ kind: "all" });
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -37,10 +37,10 @@ export function AddCardDialog({
     setAccountId(filter ?? accounts[0]?.id ?? "");
     setClosingDay("25");
     setDueDay("5");
-    setScope({ kind: "all" });
+    setConfirming(false);
   }, [open, filter, accounts]);
 
-  const submit = async () => {
+  const submit = async (scope: CardScope) => {
     if (!name.trim() || !accountId) return;
     await addCard.mutateAsync({
       accountId,
@@ -50,65 +50,75 @@ export function AddCardDialog({
       dueDay: Math.min(31, Math.max(1, parseInt(dueDay) || 5)),
       scope,
     });
+    setConfirming(false);
     onClose();
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Novo cartão de crédito">
-      {accounts.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-          Cadastre uma conta antes de criar cartões.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          <Field label="Nome do cartão">
-            <input
-              autoFocus
-              className={inputClass}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Nubank Roxinho"
-            />
-          </Field>
-          <Field label="Conta vinculada">
-            <select className={inputClass} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          </Field>
-          <div className="grid grid-cols-3 gap-2">
-            <Field label="Cor">
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-full rounded-lg border border-input bg-input" />
+    <>
+      <Modal open={open && !confirming} onClose={onClose} title="Novo cartão de crédito">
+        {accounts.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+            Cadastre uma conta antes de criar cartões.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <Field label="Nome do cartão">
+              <input
+                autoFocus
+                className={inputClass}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Nubank Roxinho"
+              />
             </Field>
-            <Field label="Fechamento">
-              <input type="number" min={1} max={31} className={inputClass} value={closingDay} onChange={(e) => setClosingDay(e.target.value)} />
+            <Field label="Conta vinculada">
+              <select className={inputClass} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
             </Field>
-            <Field label="Vencimento">
-              <input type="number" min={1} max={31} className={inputClass} value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
-            </Field>
-          </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Cor">
+                <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-full rounded-lg border border-input bg-input" />
+              </Field>
+              <Field label="Fechamento">
+                <input type="number" min={1} max={31} className={inputClass} value={closingDay} onChange={(e) => setClosingDay(e.target.value)} />
+              </Field>
+              <Field label="Vencimento">
+                <input type="number" min={1} max={31} className={inputClass} value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
+              </Field>
+            </div>
 
-          <CardScopePicker
-            defaultYear={dY}
-            defaultMonth={dM}
-            value={scope}
-            onChange={setScope}
-            labelAll="Adicionar para toda a conta"
-            labelMonth="Adicionar somente neste mês"
-            labelPeriod="Adicionar para um período"
-          />
-
-          <div className="flex gap-2 pt-2">
-            <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
-              Cancelar
-            </button>
-            <button onClick={submit} disabled={!name.trim() || !accountId || addCard.isPending} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-              {addCard.isPending ? "Salvando…" : "Adicionar"}
-            </button>
+            <div className="flex gap-2 pt-2">
+              <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
+                Cancelar
+              </button>
+              <button
+                onClick={() => setConfirming(true)}
+                disabled={!name.trim() || !accountId}
+                className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                Adicionar
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-    </Modal>
+        )}
+      </Modal>
+
+      <CardScopeConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={submit}
+        title="Adicionar cartão"
+        description="Em quais meses este cartão vai aparecer?"
+        confirmLabel="Adicionar"
+        defaultYear={dY}
+        defaultMonth={dM}
+        initialKind="month"
+        loading={addCard.isPending}
+      />
+    </>
   );
 }

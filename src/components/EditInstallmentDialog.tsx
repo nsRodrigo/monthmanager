@@ -327,8 +327,14 @@ export function EditInstallmentDialog({
         <div className="flex gap-2 pt-2">
           {onDeleteParent && (
             <button
-              onClick={() => {
-                if (confirm("Excluir o lançamento inteiro e todas as suas parcelas?")) {
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Excluir lançamento",
+                  description: "Excluir o lançamento inteiro e todas as suas parcelas?",
+                  variant: "destructive",
+                  confirmLabel: "Excluir tudo",
+                });
+                if (ok) {
                   onDeleteParent();
                   onClose();
                 }

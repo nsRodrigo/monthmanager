@@ -16,6 +16,7 @@ import { formatCurrency } from "@/lib/format";
 import { Modal, Field, inputClass } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
 import { Plus, Trash2, Pencil, Check, X, Wallet, Building2, Smartphone, TrendingUp } from "lucide-react";
+import { useConfirm } from "@/store/confirm";
 
 const TYPES: { value: AccountType; label: string; icon: typeof Wallet }[] = [
   { value: "corrente", label: "Conta corrente", icon: Building2 },
@@ -146,14 +147,14 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Excluir "${a.name}" e TODOS os cartões, débitos, recebimentos e investimentos vinculados?`,
-                            )
-                          ) {
-                            removeAccount.mutate(a.id);
-                          }
+                        onClick={async () => {
+                          const ok = await confirmDialog({
+                            title: "Excluir conta",
+                            description: `Excluir "${a.name}" e TODOS os cartões, débitos, recebimentos e investimentos vinculados?`,
+                            variant: "destructive",
+                            confirmLabel: "Excluir",
+                          });
+                          if (ok) removeAccount.mutate(a.id);
                         }}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       >

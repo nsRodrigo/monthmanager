@@ -15,6 +15,7 @@ import {
   deletePasskey as srvDelete,
 } from "@/server/webauthn";
 import { supabase } from "@/integrations/supabase/client";
+import { useConfirm } from "@/store/confirm";
 
 type Passkey = {
   id: string;
@@ -287,7 +288,13 @@ export function PasskeyManager() {
                   </div>
                   <button
                     onClick={async () => {
-                      if (!confirm("Remover este dispositivo?")) return;
+                      const ok = await confirmDialog({
+                        title: "Remover dispositivo",
+                        description: "Remover este dispositivo?",
+                        variant: "destructive",
+                        confirmLabel: "Remover",
+                      });
+                      if (!ok) return;
                       const accessToken = await getAccessToken();
                       await deleteFn({ data: { accessToken, id: p.id } });
                       await refresh();

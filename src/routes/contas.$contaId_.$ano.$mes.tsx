@@ -58,6 +58,7 @@ import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditI
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
+import { useConfirm } from "@/store/confirm";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
@@ -97,6 +98,7 @@ function AccountMonth() {
   const toggleIncome = useToggleIncomeReceived();
   const removeIncome = useRemoveIncome();
   const removeInvestment = useRemoveInvestment();
+  const confirmDialog = useConfirm();
 
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
@@ -447,13 +449,19 @@ function AccountMonth() {
                             onDeleteParent: () => removePurchase.mutate(pur.id),
                           });
                         }}
-                        onRemoveInst={(inst) => {
+                        onRemoveInst={async (inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
                           if (!pur) return;
                           if (pur.installmentsCount > 1) {
                             askDeleteInst(inst, pur.description, "purchase", pur.id);
                           } else {
-                            if (confirm(`Excluir "${pur.description}"?`)) removePurchase.mutate(pur.id);
+                            const ok = await confirmDialog({
+                              title: "Excluir compra",
+                              description: `Excluir "${pur.description}"?`,
+                              variant: "destructive",
+                              confirmLabel: "Excluir",
+                            });
+                            if (ok) removePurchase.mutate(pur.id);
                           }
                         }}
                       />
@@ -937,16 +945,7 @@ function PurchaseInstRow({
         <Pencil className="h-3.5 w-3.5" />
       </button>
       {onRemove && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (confirm("Excluir esta compra (e todas as parcelas)?")) onRemove();
-          }}
-          className="text-muted-foreground hover:text-destructive"
-          title="Excluir compra"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <RemoveInstButton onRemove={onRemove} />
       )}
     </div>
   );
@@ -1176,5 +1175,27 @@ function InvestmentRow({ inv, onEdit, onRemove }: { inv: Investment; onEdit: () 
 function Empty({ text }: { text: string }) {
   return (
     <div className="px-4 py-6 text-center text-xs text-muted-foreground">{text}</div>
+  );
+}
+
+function RemoveInstButton({ onRemove }: { onRemove: () => void }) {
+  const confirmDialog = useConfirm();
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        const ok = await confirmDialog({
+          title: "Excluir compra",
+          description: "Excluir esta compra (e todas as parcelas)?",
+          variant: "destructive",
+          confirmLabel: "Excluir",
+        });
+        if (ok) onRemove();
+      }}
+      className="text-muted-foreground hover:text-destructive"
+      title="Excluir compra"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
   );
 }

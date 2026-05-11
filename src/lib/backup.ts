@@ -177,20 +177,31 @@ export async function restoreBackup(
 
     // Sanitiza referências órfãs antes de inserir (evita FK violation)
     if (t === "installments") {
-      rows = rows.filter((r: any) => {
-        const pt = r.parent_type ?? "purchase";
-        if (pt === "purchase") {
-          if (!r.purchase_id) return false;
-          if (!purchaseIds.has(r.purchase_id)) return false;
-        } else if (pt === "debit") {
-          if (r.parent_id && !debitIds.has(r.parent_id)) return false;
-        } else if (pt === "income") {
-          if (r.parent_id && !incomeIds.has(r.parent_id)) return false;
-        } else if (pt === "investment") {
-          if (r.parent_id && !investmentIds.has(r.parent_id)) return false;
-        }
-        return true;
-      });
+      rows = rows
+        .map((r: any) => {
+          const pt = r.parent_type ?? "purchase";
+          // Para parents que não são purchase, garante purchase_id = null
+          // (a FK installments_purchase_id_fkey reclama mesmo se o valor
+          // antigo apontar para uma purchase deletada).
+          if (pt !== "purchase") {
+            return { ...r, purchase_id: null };
+          }
+          return r;
+        })
+        .filter((r: any) => {
+          const pt = r.parent_type ?? "purchase";
+          if (pt === "purchase") {
+            if (!r.purchase_id) return false;
+            if (!purchaseIds.has(r.purchase_id)) return false;
+          } else if (pt === "debit") {
+            if (r.parent_id && !debitIds.has(r.parent_id)) return false;
+          } else if (pt === "income") {
+            if (r.parent_id && !incomeIds.has(r.parent_id)) return false;
+          } else if (pt === "investment") {
+            if (r.parent_id && !investmentIds.has(r.parent_id)) return false;
+          }
+          return true;
+        });
     } else if (t === "purchases") {
       rows = rows.filter((r: any) => r.card_id && cardIds.has(r.card_id));
     } else if (t === "card_payments") {

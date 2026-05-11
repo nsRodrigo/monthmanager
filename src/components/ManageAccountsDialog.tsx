@@ -26,6 +26,7 @@ const TYPES: { value: AccountType; label: string; icon: typeof Wallet }[] = [
 ];
 
 export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const confirmDialog = useConfirm();
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();

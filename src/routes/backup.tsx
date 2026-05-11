@@ -77,6 +77,7 @@ function shouldRunAuto(freq: Freq, last: string | null): boolean {
 }
 
 function BackupPage() {
+  const confirmDialog = useConfirm();
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

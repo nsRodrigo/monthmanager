@@ -164,15 +164,53 @@ export async function restoreBackup(
     }
   }
 
+  // IDs válidos por tabela parent (para limpar referências órfãs)
+  const purchaseIds = new Set<string>((payload.data.purchases ?? []).map((p: any) => p.id));
+  const debitIds = new Set<string>((payload.data.debits ?? []).map((p: any) => p.id));
+  const incomeIds = new Set<string>((payload.data.incomes ?? []).map((p: any) => p.id));
+  const investmentIds = new Set<string>((payload.data.investments ?? []).map((p: any) => p.id));
+  const cardIds = new Set<string>((payload.data.cards ?? []).map((p: any) => p.id));
+
   for (const t of targets) {
-    const rows = (payload.data[t] ?? []).map((r) => ({ ...r, user_id: userId }));
+    let rows = (payload.data[t] ?? []).map((r) => ({ ...r, user_id: userId }));
     if (!rows.length) continue;
-    // Insere em lotes para evitar payloads gigantes.
-    const chunkSize = 500;
+
+    // Sanitiza referências órfãs antes de inserir (evita FK violation)
+    if (t === "installments") {
+      rows = rows.filter((r: any) => {
+        const pt = r.parent_type ?? "purchase";
+        if (pt === "purchase") {
+          if (!r.purchase_id) return false;
+          if (!purchaseIds.has(r.purchase_id)) return false;
+        } else if (pt === "debit") {
+          if (r.parent_id && !debitIds.has(r.parent_id)) return false;
+        } else if (pt === "income") {
+          if (r.parent_id && !incomeIds.has(r.parent_id)) return false;
+        } else if (pt === "investment") {
+          if (r.parent_id && !investmentIds.has(r.parent_id)) return false;
+        }
+        return true;
+      });
+    } else if (t === "purchases") {
+      rows = rows.filter((r: any) => r.card_id && cardIds.has(r.card_id));
+    } else if (t === "card_payments") {
+      rows = rows.filter((r: any) => r.card_id && cardIds.has(r.card_id));
+    }
+
+    if (!rows.length) continue;
+    // Lotes pequenos para evitar "Failed to fetch" (payload grande / timeout do PostgREST).
+    const chunkSize = 100;
     for (let i = 0; i < rows.length; i += chunkSize) {
       const chunk = rows.slice(i, i + chunkSize);
-      const { error } = await supabase.from(t).upsert(chunk, { onConflict: "id" });
-      if (error) throw new Error(`Falha ao restaurar ${t}: ${error.message}`);
+      let lastErr: string | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error } = await supabase.from(t).upsert(chunk, { onConflict: "id" });
+        if (!error) { lastErr = null; break; }
+        lastErr = error.message;
+        // backoff curto entre tentativas
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+      if (lastErr) throw new Error(`Falha ao restaurar ${t}: ${lastErr}`);
     }
   }
 }

@@ -149,6 +149,7 @@ function Disclaimer() {
 // ---------------- DOCUMENTS ----------------
 
 function DocumentsTab({ year }: { year: number }) {
+  const confirmDialog = useConfirm();
   const { data: docs = [] } = useIrpfDocuments(year);
   const upload = useUploadIrpfDoc(year);
   const remove = useDeleteIrpfDoc();

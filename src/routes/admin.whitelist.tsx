@@ -21,6 +21,7 @@ export const Route = createFileRoute("/admin/whitelist")({
 });
 
 function WhitelistAdmin() {
+  const confirmDialog = useConfirm();
   const { isLoading } = useMyRoles();
   const isAdmin = useIsAdmin();
   const navigate = useNavigate();

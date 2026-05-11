@@ -49,6 +49,7 @@ function detectPlatform() {
 }
 
 export function PasskeyManager() {
+  const confirmDialog = useConfirm();
   const startRegFn = useServerFn(srvStartReg);
   const finishRegFn = useServerFn(srvFinishReg);
   const listFn = useServerFn(srvList);

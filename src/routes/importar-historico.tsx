@@ -138,8 +138,17 @@ function HistoricalImportPage() {
         `✅ Importado: ${r.purchases} compras, ${r.debits} débitos, ${r.incomes} recebimentos, ${r.investments} investimentos. ${r.accounts} contas e ${r.cards} cartões criados/encontrados.`,
       );
       setResults([]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao gravar dados.");
+    } catch (e: any) {
+      console.error("[importar-historico] falha:", e);
+      const msg =
+        e?.message ||
+        e?.error_description ||
+        e?.error ||
+        e?.details ||
+        e?.hint ||
+        (typeof e === "string" ? e : null) ||
+        (e ? JSON.stringify(e) : "Erro ao gravar dados.");
+      setError(`Erro ao gravar dados: ${msg}`);
     }
   };
 

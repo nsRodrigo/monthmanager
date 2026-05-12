@@ -210,16 +210,19 @@ export async function restoreBackup(
 
     if (!rows.length) continue;
     // Lotes pequenos para evitar "Failed to fetch" (payload grande / timeout do PostgREST).
-    const chunkSize = 100;
+    const chunkSize = 50;
     for (let i = 0; i < rows.length; i += chunkSize) {
       const chunk = rows.slice(i, i + chunkSize);
       let lastErr: string | null = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { error } = await supabase.from(t).upsert(chunk, { onConflict: "id" });
-        if (!error) { lastErr = null; break; }
-        lastErr = error.message;
-        // backoff curto entre tentativas
-        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const { error } = await supabase.from(t).upsert(chunk, { onConflict: "id" });
+          if (!error) { lastErr = null; break; }
+          lastErr = error.message;
+        } catch (e: any) {
+          lastErr = e?.message || String(e);
+        }
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
       }
       if (lastErr) throw new Error(`Falha ao restaurar ${t}: ${lastErr}`);
     }

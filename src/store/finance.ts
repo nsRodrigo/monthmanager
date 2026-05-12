@@ -1821,6 +1821,7 @@ export function useImportHistorical() {
       // 3) Inserir entries em lote por tipo
       // 3a) Purchases (acumular para batch)
       const purchaseRows: Array<{
+        id: string;
         user_id: string;
         card_id: string;
         description: string;
@@ -1830,6 +1831,7 @@ export function useImportHistorical() {
         _entries: HistoricalImportEntry[];
         _useListedInstallments: boolean;
       }> = [];
+      const newId = () => crypto.randomUUID();
       const debitRows: Array<{
         user_id: string;
         account_id: string;
@@ -1910,6 +1912,7 @@ export function useImportHistorical() {
         const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
         if (!card) continue;
         purchaseRows.push({
+          id: newId(),
           user_id: user.id,
           card_id: card.id,
           description: e.description,
@@ -1984,6 +1987,7 @@ export function useImportHistorical() {
             listed[0].date;
 
           purchaseRows.push({
+            id: newId(),
             user_id: user.id,
             card_id: card.id,
             description: first.description,
@@ -2052,24 +2056,18 @@ export function useImportHistorical() {
       // serve de âncora (X cai naquele mês), e as demais parcelas são
       // distribuídas mês a mês a partir daí. Isso corrige planilhas onde
       // várias parcelas foram empilhadas no mesmo mês por engano.
-      const CHUNK = 50;
-      const INSTALL_CHUNK = 200;
+      const CHUNK = 120;
 
-      // Helper: insert com retry/backoff para tolerar "Failed to fetch"
-      // (timeout/flakiness do PostgREST em payloads grandes).
-      const insertWithRetry = async <T,>(
-        table: "purchases" | "debits" | "incomes" | "investments" | "installments",
-        rows: any[],
-        opts: { select?: string } = {},
-      ): Promise<T[]> => {
+      // Helper: grava no banco por RPC em lotes pequenos, sem depender de
+      // respostas grandes de insert/select no navegador móvel. Se um lote ainda
+      // cair com "Failed to fetch", divide ao meio e tenta novamente.
+      const saveChunk = async (payload: Record<string, any[]>, label: string): Promise<any> => {
+        const counts = Object.fromEntries(Object.entries(payload).map(([k, rows]) => [k, rows.length]));
         let lastErr: any = null;
         for (let attempt = 0; attempt < 4; attempt++) {
           try {
-            const q = supabase.from(table).insert(rows);
-            const { data, error } = opts.select
-              ? await q.select(opts.select)
-              : await q;
-            if (!error) return (data ?? []) as T[];
+            const { data, error } = await supabase.rpc("bulk_insert_finance", { _payload: payload });
+            if (!error) return data;
             lastErr = error;
           } catch (e) {
             lastErr = e;
@@ -2077,12 +2075,19 @@ export function useImportHistorical() {
           await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
         }
         const msg = lastErr?.message || String(lastErr) || "Erro de rede ao gravar";
-        throw new Error(`[${table}] ${msg}`);
+        throw new Error(`[${label}] ${msg} (${JSON.stringify(counts)})`);
+      };
+
+      const saveRows = async (table: "debits" | "incomes" | "investments", rows: any[]) => {
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          await saveChunk({ [table]: rows.slice(i, i + CHUNK) }, table);
+        }
       };
 
       for (let i = 0; i < purchaseRows.length; i += CHUNK) {
         const slice = purchaseRows.slice(i, i + CHUNK);
         const insertPayload = slice.map((p) => ({
+          id: p.id,
           user_id: p.user_id,
           card_id: p.card_id,
           description: p.description,
@@ -2090,12 +2095,11 @@ export function useImportHistorical() {
           purchase_date: p.purchase_date,
           installments_count: p.installments_count,
         }));
-        const inserted = await insertWithRetry<{ id: string }>("purchases", insertPayload, { select: "id" });
         const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
 
-        for (let j = 0; j < inserted.length; j++) {
+        for (let j = 0; j < slice.length; j++) {
           const p = slice[j];
-          const purchaseId = inserted[j].id;
+          const purchaseId = p.id;
           const total = Math.max(1, p.installments_count || 1);
 
           if (total === 1) {
@@ -2140,21 +2144,13 @@ export function useImportHistorical() {
           }
         }
 
-        for (let k = 0; k < allInstallments.length; k += INSTALL_CHUNK) {
-          await insertWithRetry("installments", allInstallments.slice(k, k + INSTALL_CHUNK));
-        }
+        await saveChunk({ purchases: insertPayload, installments: allInstallments }, "purchases/installments");
       }
 
       // 5) Insert debits / incomes / investments em lote
-      for (let i = 0; i < debitRows.length; i += CHUNK) {
-        await insertWithRetry("debits", debitRows.slice(i, i + CHUNK));
-      }
-      for (let i = 0; i < incomeRows.length; i += CHUNK) {
-        await insertWithRetry("incomes", incomeRows.slice(i, i + CHUNK));
-      }
-      for (let i = 0; i < investmentRows.length; i += CHUNK) {
-        await insertWithRetry("investments", investmentRows.slice(i, i + CHUNK));
-      }
+      await saveRows("debits", debitRows);
+      await saveRows("incomes", incomeRows);
+      await saveRows("investments", investmentRows);
 
       return {
         accounts: plan.accountsToCreate.length,

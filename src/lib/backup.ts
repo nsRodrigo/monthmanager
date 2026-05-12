@@ -142,91 +142,12 @@ export async function restoreBackup(
   const { data: u } = await supabase.auth.getUser();
   const userId = u.user?.id;
   if (!userId) throw new Error("Sessão expirada.");
-
-  // Ordem de restauração para respeitar dependências (parents antes de filhos).
-  const order: BackupTable[] = [
-    "accounts",
-    "cards",
-    "purchases",
-    "debits",
-    "incomes",
-    "investments",
-    "installments",
-    "card_payments",
-  ];
-  const targets = order.filter((t) => selectedTables.includes(t));
-
-  if (opts.wipeBeforeInsert) {
-    // Apaga em ordem reversa.
-    for (const t of [...targets].reverse()) {
-      const { error } = await supabase.from(t).delete().eq("user_id", userId);
-      if (error) throw new Error(`Falha ao limpar ${t}: ${error.message}`);
-    }
-  }
-
-  // IDs válidos por tabela parent (para limpar referências órfãs)
-  const purchaseIds = new Set<string>((payload.data.purchases ?? []).map((p: any) => p.id));
-  const debitIds = new Set<string>((payload.data.debits ?? []).map((p: any) => p.id));
-  const incomeIds = new Set<string>((payload.data.incomes ?? []).map((p: any) => p.id));
-  const investmentIds = new Set<string>((payload.data.investments ?? []).map((p: any) => p.id));
-  const cardIds = new Set<string>((payload.data.cards ?? []).map((p: any) => p.id));
-
-  for (const t of targets) {
-    let rows = (payload.data[t] ?? []).map((r) => ({ ...r, user_id: userId }));
-    if (!rows.length) continue;
-
-    // Sanitiza referências órfãs antes de inserir (evita FK violation)
-    if (t === "installments") {
-      rows = rows
-        .map((r: any) => {
-          const pt = r.parent_type ?? "purchase";
-          // Para parents que não são purchase, garante purchase_id = null
-          // (a FK installments_purchase_id_fkey reclama mesmo se o valor
-          // antigo apontar para uma purchase deletada).
-          if (pt !== "purchase") {
-            return { ...r, purchase_id: null };
-          }
-          return r;
-        })
-        .filter((r: any) => {
-          const pt = r.parent_type ?? "purchase";
-          if (pt === "purchase") {
-            if (!r.purchase_id) return false;
-            if (!purchaseIds.has(r.purchase_id)) return false;
-          } else if (pt === "debit") {
-            if (r.parent_id && !debitIds.has(r.parent_id)) return false;
-          } else if (pt === "income") {
-            if (r.parent_id && !incomeIds.has(r.parent_id)) return false;
-          } else if (pt === "investment") {
-            if (r.parent_id && !investmentIds.has(r.parent_id)) return false;
-          }
-          return true;
-        });
-    } else if (t === "purchases") {
-      rows = rows.filter((r: any) => r.card_id && cardIds.has(r.card_id));
-    } else if (t === "card_payments") {
-      rows = rows.filter((r: any) => r.card_id && cardIds.has(r.card_id));
-    }
-
-    if (!rows.length) continue;
-    // Lotes pequenos para evitar "Failed to fetch" (payload grande / timeout do PostgREST).
-    const chunkSize = 50;
-    for (let i = 0; i < rows.length; i += chunkSize) {
-      const chunk = rows.slice(i, i + chunkSize);
-      let lastErr: string | null = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          const { error } = await supabase.from(t).upsert(chunk, { onConflict: "id" });
-          if (!error) { lastErr = null; break; }
-          lastErr = error.message;
-        } catch (e: any) {
-          lastErr = e?.message || String(e);
-        }
-        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-      }
-      if (lastErr) throw new Error(`Falha ao restaurar ${t}: ${lastErr}`);
-    }
-  }
+  const { error } = await supabase.rpc("restore_finance_backup", {
+    _payload: payload as any,
+    _selected: selectedTables as string[],
+    _wipe_before_insert: opts.wipeBeforeInsert,
+  });
+  if (error) throw new Error(`Falha ao restaurar backup: ${error.message}`);
 }
 
 // ============== Snapshots ==============

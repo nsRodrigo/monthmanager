@@ -749,6 +749,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bulk_insert_finance: { Args: { _payload: Json }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -757,6 +758,14 @@ export type Database = {
         Returns: boolean
       }
       is_email_whitelisted: { Args: { _email: string }; Returns: boolean }
+      restore_finance_backup: {
+        Args: {
+          _payload: Json
+          _selected: string[]
+          _wipe_before_insert?: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "user"

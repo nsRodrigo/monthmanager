@@ -2052,7 +2052,34 @@ export function useImportHistorical() {
       // serve de âncora (X cai naquele mês), e as demais parcelas são
       // distribuídas mês a mês a partir daí. Isso corrige planilhas onde
       // várias parcelas foram empilhadas no mesmo mês por engano.
-      const CHUNK = 100;
+      const CHUNK = 50;
+      const INSTALL_CHUNK = 200;
+
+      // Helper: insert com retry/backoff para tolerar "Failed to fetch"
+      // (timeout/flakiness do PostgREST em payloads grandes).
+      const insertWithRetry = async <T,>(
+        table: "purchases" | "debits" | "incomes" | "investments" | "installments",
+        rows: any[],
+        opts: { select?: string } = {},
+      ): Promise<T[]> => {
+        let lastErr: any = null;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try {
+            const q = supabase.from(table).insert(rows);
+            const { data, error } = opts.select
+              ? await q.select(opts.select)
+              : await q;
+            if (!error) return (data ?? []) as T[];
+            lastErr = error;
+          } catch (e) {
+            lastErr = e;
+          }
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        }
+        const msg = lastErr?.message || String(lastErr) || "Erro de rede ao gravar";
+        throw new Error(`[${table}] ${msg}`);
+      };
+
       for (let i = 0; i < purchaseRows.length; i += CHUNK) {
         const slice = purchaseRows.slice(i, i + CHUNK);
         const insertPayload = slice.map((p) => ({
@@ -2063,12 +2090,7 @@ export function useImportHistorical() {
           purchase_date: p.purchase_date,
           installments_count: p.installments_count,
         }));
-        const { data: ins, error } = await supabase
-          .from("purchases")
-          .insert(insertPayload)
-          .select("id");
-        if (error) throw error;
-        const inserted = (ins ?? []) as Array<{ id: string }>;
+        const inserted = await insertWithRetry<{ id: string }>("purchases", insertPayload, { select: "id" });
         const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
 
         for (let j = 0; j < inserted.length; j++) {
@@ -2096,25 +2118,14 @@ export function useImportHistorical() {
             continue;
           }
 
-          // Parcelado: âncora = parcela com menor número listada (preferindo a 1ª se houver).
-          // O mês dessa parcela = mês onde ela apareceu na planilha.
-          const anchor = p._entries[0]; // já estão ordenadas por installmentNumber
-          const anchorNumber = Math.min(
-            Math.max(1, anchor.installmentNumber || 1),
-            total,
-          );
-          const anchorDate = anchor.date; // YYYY-MM-DD do slot da planilha
-
-          // paid status por número, vindo das linhas listadas
+          const anchor = p._entries[0];
+          const anchorNumber = Math.min(Math.max(1, anchor.installmentNumber || 1), total);
+          const anchorDate = anchor.date;
           const paidByNumber = new Map<number, boolean>();
           for (const e of p._entries) {
-            const n = Math.min(
-              Math.max(1, e.installmentNumber || 1),
-              total,
-            );
+            const n = Math.min(Math.max(1, e.installmentNumber || 1), total);
             paidByNumber.set(n, e.paid);
           }
-
           const computed = buildInstallmentsAnchored(
             purchaseId,
             user.id,
@@ -2123,39 +2134,26 @@ export function useImportHistorical() {
             anchorNumber,
             anchorDate,
           );
-
           for (const it of computed) {
-            // Sobrescreve paid se a planilha listou explicitamente esta parcela.
-            if (paidByNumber.has(it.number)) {
-              it.paid = paidByNumber.get(it.number)!;
-            }
+            if (paidByNumber.has(it.number)) it.paid = paidByNumber.get(it.number)!;
             allInstallments.push(it);
           }
         }
 
-        if (allInstallments.length > 0) {
-          for (let k = 0; k < allInstallments.length; k += 500) {
-            const sub = allInstallments.slice(k, k + 500);
-            const { error: e2 } = await supabase.from("installments").insert(sub);
-            if (e2) throw e2;
-          }
+        for (let k = 0; k < allInstallments.length; k += INSTALL_CHUNK) {
+          await insertWithRetry("installments", allInstallments.slice(k, k + INSTALL_CHUNK));
         }
       }
 
       // 5) Insert debits / incomes / investments em lote
       for (let i = 0; i < debitRows.length; i += CHUNK) {
-        const { error } = await supabase.from("debits").insert(debitRows.slice(i, i + CHUNK));
-        if (error) throw error;
+        await insertWithRetry("debits", debitRows.slice(i, i + CHUNK));
       }
       for (let i = 0; i < incomeRows.length; i += CHUNK) {
-        const { error } = await supabase.from("incomes").insert(incomeRows.slice(i, i + CHUNK));
-        if (error) throw error;
+        await insertWithRetry("incomes", incomeRows.slice(i, i + CHUNK));
       }
       for (let i = 0; i < investmentRows.length; i += CHUNK) {
-        const { error } = await supabase
-          .from("investments")
-          .insert(investmentRows.slice(i, i + CHUNK));
-        if (error) throw error;
+        await insertWithRetry("investments", investmentRows.slice(i, i + CHUNK));
       }
 
       return {

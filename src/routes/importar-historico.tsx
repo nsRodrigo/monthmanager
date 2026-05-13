@@ -385,6 +385,33 @@ function HistoricalImportPage() {
                   ? "Gravando no banco…"
                   : `Confirmar e gravar ${stats.count} lançamentos`}
               </button>
+              {importProgress && (
+                <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold">{importProgress.label}</span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                      {importProgress.current} de {importProgress.total}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300"
+                      style={{
+                        width: `${importProgress.total > 0 ? Math.min(100, Math.round((importProgress.current / importProgress.total) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                    {typeof importProgress.batch === "number" && importProgress.totalBatches ? (
+                      <span>
+                        Lote {importProgress.batch} de {importProgress.totalBatches}
+                      </span>
+                    ) : null}
+                    {importProgress.attempt ? <span>Tentativa {importProgress.attempt}</span> : null}
+                    {importProgress.message ? <span>{importProgress.message}</span> : null}
+                  </div>
+                </div>
+              )}
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Esta operação cria contas/cartões automaticamente e insere todas as
                 linhas. Pode levar alguns segundos.

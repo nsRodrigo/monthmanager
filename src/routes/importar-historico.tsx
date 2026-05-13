@@ -7,7 +7,12 @@ import {
   type ParseResult,
 } from "@/lib/xlsxParser";
 import { buildImportPlan } from "@/lib/xlsxImportPlan";
-import { useAccounts, useImportHistorical, usePurgeAllMovements } from "@/store/finance";
+import {
+  useAccounts,
+  useImportHistorical,
+  usePurgeAllMovements,
+  type HistoricalImportProgress,
+} from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
 import {
   Upload,
@@ -48,6 +53,7 @@ function HistoricalImportPage() {
   const [parsing, setParsing] = useState(false);
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const [confirmingPurge, setConfirmingPurge] = useState(false);
+  const [importProgress, setImportProgress] = useState<HistoricalImportProgress | null>(null);
 
   // Conta padrão para débitos/recebimentos/investimentos sem banco identificável
   // (CARTEIRA, RECEBIDOS, INVESTIMENTO). Pode ser uma conta existente ou nova.
@@ -132,12 +138,22 @@ function HistoricalImportPage() {
     if (!plan) return;
     setError(null);
     setSuccess(null);
+    setImportProgress({
+      stage: "preparing",
+      label: "Preparando importação",
+      current: 0,
+      total: stats.count,
+    });
     try {
-      const r = await importMut.mutateAsync(plan);
+      const r = await importMut.mutateAsync({
+        plan,
+        onProgress: (progress) => setImportProgress(progress),
+      });
       setSuccess(
         `✅ Importado: ${r.purchases} compras, ${r.debits} débitos, ${r.incomes} recebimentos, ${r.investments} investimentos. ${r.accounts} contas e ${r.cards} cartões criados/encontrados.`,
       );
       setResults([]);
+      setImportProgress(null);
     } catch (e: any) {
       console.error("[importar-historico] falha:", e);
       const msg =
@@ -149,6 +165,7 @@ function HistoricalImportPage() {
         (typeof e === "string" ? e : null) ||
         (e ? JSON.stringify(e) : "Erro ao gravar dados.");
       setError(`Erro ao gravar dados: ${msg}`);
+      setImportProgress(null);
     }
   };
 

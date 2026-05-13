@@ -7,7 +7,12 @@ import {
   type ParseResult,
 } from "@/lib/xlsxParser";
 import { buildImportPlan } from "@/lib/xlsxImportPlan";
-import { useAccounts, useImportHistorical, usePurgeAllMovements } from "@/store/finance";
+import {
+  useAccounts,
+  useImportHistorical,
+  usePurgeAllMovements,
+  type HistoricalImportProgress,
+} from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
 import {
   Upload,
@@ -48,6 +53,7 @@ function HistoricalImportPage() {
   const [parsing, setParsing] = useState(false);
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const [confirmingPurge, setConfirmingPurge] = useState(false);
+  const [importProgress, setImportProgress] = useState<HistoricalImportProgress | null>(null);
 
   // Conta padrão para débitos/recebimentos/investimentos sem banco identificável
   // (CARTEIRA, RECEBIDOS, INVESTIMENTO). Pode ser uma conta existente ou nova.
@@ -58,10 +64,7 @@ function HistoricalImportPage() {
   const importMut = useImportHistorical();
   const purgeMut = usePurgeAllMovements();
 
-  const allEntries = useMemo<ParsedEntry[]>(
-    () => results.flatMap((r) => r.entries),
-    [results],
-  );
+  const allEntries = useMemo<ParsedEntry[]>(() => results.flatMap((r) => r.entries), [results]);
 
   const stats = useMemo(() => {
     const byKind = { purchase: 0, debit: 0, income: 0, investment: 0 };
@@ -132,12 +135,22 @@ function HistoricalImportPage() {
     if (!plan) return;
     setError(null);
     setSuccess(null);
+    setImportProgress({
+      stage: "preparing",
+      label: "Preparando importação",
+      current: 0,
+      total: stats.count,
+    });
     try {
-      const r = await importMut.mutateAsync(plan);
+      const r = await importMut.mutateAsync({
+        plan,
+        onProgress: (progress) => setImportProgress(progress),
+      });
       setSuccess(
         `✅ Importado: ${r.purchases} compras, ${r.debits} débitos, ${r.incomes} recebimentos, ${r.investments} investimentos. ${r.accounts} contas e ${r.cards} cartões criados/encontrados.`,
       );
       setResults([]);
+      setImportProgress(null);
     } catch (e: any) {
       console.error("[importar-historico] falha:", e);
       const msg =
@@ -149,6 +162,7 @@ function HistoricalImportPage() {
         (typeof e === "string" ? e : null) ||
         (e ? JSON.stringify(e) : "Erro ao gravar dados.");
       setError(`Erro ao gravar dados: ${msg}`);
+      setImportProgress(null);
     }
   };
 
@@ -178,9 +192,8 @@ function HistoricalImportPage() {
           Importar planilha histórica
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Carregue sua planilha XLSX completa (todos os anos). O sistema detecta
-          automaticamente contas, cartões, parcelas e seções, e mostra um preview
-          antes de gravar.
+          Carregue sua planilha XLSX completa (todos os anos). O sistema detecta automaticamente
+          contas, cartões, parcelas e seções, e mostra um preview antes de gravar.
         </p>
       </header>
 
@@ -191,9 +204,9 @@ function HistoricalImportPage() {
           <div className="flex-1">
             <h2 className="font-semibold text-destructive">Antes de importar: limpe o banco</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Apaga TODAS as compras, parcelas, débitos, recebimentos e investimentos.
-              Mantém suas contas e cartões cadastrados. Use isso se você importou dados
-              de teste e quer começar do zero.
+              Apaga TODAS as compras, parcelas, débitos, recebimentos e investimentos. Mantém suas
+              contas e cartões cadastrados. Use isso se você importou dados de teste e quer começar
+              do zero.
             </p>
             <div className="mt-3 flex gap-2">
               {!confirmingPurge ? (
@@ -246,9 +259,9 @@ function HistoricalImportPage() {
               ))}
             </select>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              TODOS os lançamentos da planilha (débitos, recebimentos, investimentos)
-              e TODOS os cartões serão associados a esta conta. Para separar por banco,
-              cadastre as contas manualmente em <strong>Contas</strong> e re-importe.
+              TODOS os lançamentos da planilha (débitos, recebimentos, investimentos) e TODOS os
+              cartões serão associados a esta conta. Para separar por banco, cadastre as contas
+              manualmente em <strong>Contas</strong> e re-importe.
             </p>
           </div>
           {defaultAccountChoice === "__new__" && (
@@ -351,8 +364,7 @@ function HistoricalImportPage() {
                         className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
                         title={`Conta: ${c.accountName}`}
                       >
-                        {c.name}{" "}
-                        <span className="text-muted-foreground">· {c.accountName}</span>
+                        {c.name} <span className="text-muted-foreground">· {c.accountName}</span>
                       </span>
                     ))}
                   </div>
@@ -368,9 +380,38 @@ function HistoricalImportPage() {
                   ? "Gravando no banco…"
                   : `Confirmar e gravar ${stats.count} lançamentos`}
               </button>
+              {importProgress && (
+                <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold">{importProgress.label}</span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                      {importProgress.current} de {importProgress.total}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300"
+                      style={{
+                        width: `${importProgress.total > 0 ? Math.min(100, Math.round((importProgress.current / importProgress.total) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                    {typeof importProgress.batch === "number" && importProgress.totalBatches ? (
+                      <span>
+                        Lote {importProgress.batch} de {importProgress.totalBatches}
+                      </span>
+                    ) : null}
+                    {importProgress.attempt ? (
+                      <span>Tentativa {importProgress.attempt}</span>
+                    ) : null}
+                    {importProgress.message ? <span>{importProgress.message}</span> : null}
+                  </div>
+                </div>
+              )}
               <p className="mt-2 text-[11px] text-muted-foreground">
-                Esta operação cria contas/cartões automaticamente e insere todas as
-                linhas. Pode levar alguns segundos.
+                Esta operação cria contas/cartões automaticamente e insere todas as linhas. Pode
+                levar alguns segundos.
               </p>
             </div>
           )}
@@ -434,10 +475,7 @@ function YearBreakdown({ entries }: { entries: ParsedEntry[] }) {
           const sections = summarizeSections(ents);
           const total = ents.reduce((s, e) => s + e.amount, 0);
           return (
-            <div
-              key={month}
-              className="rounded-lg border border-border bg-card p-3"
-            >
+            <div key={month} className="rounded-lg border border-border bg-card p-3">
               <div className="mb-2 flex items-baseline justify-between">
                 <p className="text-sm font-semibold">{MONTH_NAMES[month]}</p>
                 <p className="text-[11px] text-muted-foreground">
@@ -446,10 +484,7 @@ function YearBreakdown({ entries }: { entries: ParsedEntry[] }) {
               </div>
               <ul className="space-y-1">
                 {sections.slice(0, 6).map((s) => (
-                  <li
-                    key={s.key}
-                    className="flex items-center justify-between gap-2 text-[11px]"
-                  >
+                  <li key={s.key} className="flex items-center justify-between gap-2 text-[11px]">
                     <span className="truncate text-muted-foreground" title={s.label}>
                       {s.label}
                     </span>

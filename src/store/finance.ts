@@ -315,7 +315,10 @@ export function buildInstallmentsAnchored(
   const count = Math.max(1, installmentsCount);
   const anchor = Math.min(Math.max(1, anchorNumber), count);
   const base = round2(totalAmount / count);
-  const [ay, am, ad] = anchorDate.slice(0, 10).split("-").map((n) => parseInt(n, 10));
+  const [ay, am, ad] = anchorDate
+    .slice(0, 10)
+    .split("-")
+    .map((n) => parseInt(n, 10));
   const anchorYear = ay;
   const anchorMonth = (am || 1) - 1;
   const anchorDay = ad || 1;
@@ -393,7 +396,9 @@ export function useCards() {
     queryFn: async (): Promise<Card[]> => {
       const { data, error } = await supabase
         .from("cards")
-        .select("id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month")
+        .select(
+          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month",
+        )
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((c: any) => ({
@@ -463,7 +468,9 @@ export function useInstallments() {
       }>(() =>
         supabase
           .from("installments")
-          .select("id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid")
+          .select(
+            "id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid",
+          )
           .order("year", { ascending: true })
           .order("month", { ascending: true })
           .order("number", { ascending: true }),
@@ -506,7 +513,9 @@ export function useDebits() {
       }>(() =>
         supabase
           .from("debits")
-          .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
+          .select(
+            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent",
+          )
           .order("date", { ascending: true }),
       );
       return data.map((d) => ({
@@ -648,25 +657,46 @@ export function useRemoveAccount() {
         const { data: purs } = await supabase.from("purchases").select("id").in("card_id", cardIds);
         const purIds = (purs ?? []).map((p) => p.id);
         if (purIds.length > 0) {
-          await supabase.from("installments").delete().in("parent_id", purIds).eq("parent_type", "purchase");
+          await supabase
+            .from("installments")
+            .delete()
+            .in("parent_id", purIds)
+            .eq("parent_type", "purchase");
         }
       }
       // Debits + Incomes also have child installments
       const { data: debs } = await supabase.from("debits").select("id").eq("account_id", id);
       const debIds = (debs ?? []).map((d) => d.id);
       if (debIds.length > 0) {
-        await supabase.from("installments").delete().in("parent_id", debIds).eq("parent_type", "debit");
+        await supabase
+          .from("installments")
+          .delete()
+          .in("parent_id", debIds)
+          .eq("parent_type", "debit");
       }
       const { data: incs } = await supabase.from("incomes").select("id").eq("account_id", id);
       const incIds = (incs ?? []).map((i) => i.id);
       if (incIds.length > 0) {
-        await supabase.from("installments").delete().in("parent_id", incIds).eq("parent_type", "income");
+        await supabase
+          .from("installments")
+          .delete()
+          .in("parent_id", incIds)
+          .eq("parent_type", "income");
       }
       const { error } = await supabase.from("accounts").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () =>
-      inv(["accounts", "cards", "purchases", "installments", "debits", "incomes", "investments", "card_payments"]),
+      inv([
+        "accounts",
+        "cards",
+        "purchases",
+        "installments",
+        "debits",
+        "incomes",
+        "investments",
+        "card_payments",
+      ]),
   });
 }
 
@@ -741,7 +771,11 @@ export function useRemoveCard() {
         const { data: purs } = await supabase.from("purchases").select("id").eq("card_id", id);
         const ids = (purs ?? []).map((p) => p.id);
         if (ids.length > 0) {
-          await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
+          await supabase
+            .from("installments")
+            .delete()
+            .in("parent_id", ids)
+            .eq("parent_type", "purchase");
           await supabase.from("purchases").delete().in("id", ids);
         }
         await supabase.from("card_payments").delete().eq("card_id", id);
@@ -756,10 +790,7 @@ export function useRemoveCard() {
       const eYM = win.end_year! * 12 + win.end_month!;
 
       // 1) Delete installments of THIS card whose (year,month) is inside the window.
-      const { data: purs } = await supabase
-        .from("purchases")
-        .select("id")
-        .eq("card_id", id);
+      const { data: purs } = await supabase.from("purchases").select("id").eq("card_id", id);
       const purchaseIds = (purs ?? []).map((p: any) => p.id as string);
       if (purchaseIds.length > 0) {
         const { data: insts } = await supabase
@@ -772,7 +803,13 @@ export function useRemoveCard() {
           return ym >= sYM && ym <= eYM;
         });
         if (toDelete.length > 0) {
-          await supabase.from("installments").delete().in("id", toDelete.map((i: any) => i.id));
+          await supabase
+            .from("installments")
+            .delete()
+            .in(
+              "id",
+              toDelete.map((i: any) => i.id),
+            );
         }
         // Clean orphan purchases (no remaining installments)
         const remaining = (insts ?? []).filter(
@@ -804,10 +841,7 @@ export function useRemoveCard() {
         .eq("id", id)
         .single();
       // Refresh remaining installments
-      const { data: leftPurs } = await supabase
-        .from("purchases")
-        .select("id")
-        .eq("card_id", id);
+      const { data: leftPurs } = await supabase.from("purchases").select("id").eq("card_id", id);
       const leftPurIds = (leftPurs ?? []).map((p: any) => p.id as string);
       let hasAny = false;
       if (leftPurIds.length > 0) {
@@ -1009,7 +1043,11 @@ export function useRemovePurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "purchase");
+      await supabase
+        .from("installments")
+        .delete()
+        .eq("parent_id", id)
+        .eq("parent_type", "purchase");
       const { error } = await supabase.from("purchases").delete().eq("id", id);
       if (error) throw error;
     },
@@ -1039,7 +1077,13 @@ export function useUpdateInstallment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; amount?: number; dueDate?: string; paid?: boolean }) => {
-      const patch: { amount?: number; due_date?: string; year?: number; month?: number; paid?: boolean } = {};
+      const patch: {
+        amount?: number;
+        due_date?: string;
+        year?: number;
+        month?: number;
+        paid?: boolean;
+      } = {};
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.dueDate !== undefined) {
         const { y, m } = parseLocalDate(args.dueDate);
@@ -1082,7 +1126,11 @@ export function useUpdateInstallment() {
 export function useShiftInstallmentDate() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: { installment: Installment; newDate: string; applyToFuture: boolean }) => {
+    mutationFn: async (args: {
+      installment: Installment;
+      newDate: string;
+      applyToFuture: boolean;
+    }) => {
       const { y: ny, m: nm, d: nd } = parseLocalDate(args.newDate);
       const { error: eCur } = await supabase
         .from("installments")
@@ -1227,8 +1275,7 @@ export function useDeleteParentKeepingPaid() {
         if (error) throw error;
       }
     },
-    onSettled: () =>
-      inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
+    onSettled: () => inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
   });
 }
 
@@ -1254,18 +1301,16 @@ export function useSetCardPaid() {
           .eq("month", args.month);
         if (e2) throw e2;
       }
-      const { error: e3 } = await supabase
-        .from("card_payments")
-        .upsert(
-          {
-            user_id: user!.id,
-            card_id: args.cardId,
-            year: args.year,
-            month: args.month,
-            paid: args.paid,
-          },
-          { onConflict: "card_id,year,month" },
-        );
+      const { error: e3 } = await supabase.from("card_payments").upsert(
+        {
+          user_id: user!.id,
+          card_id: args.cardId,
+          year: args.year,
+          month: args.month,
+          paid: args.paid,
+        },
+        { onConflict: "card_id,year,month" },
+      );
       if (e3) throw e3;
     },
     onMutate: async (args) => {
@@ -1344,25 +1389,26 @@ export function useAddDebit() {
         .single();
       if (error) throw error;
       if (count > 1) {
-        const inst = anchor > 1
-          ? buildInstallmentsAnchored(
-              (ins as { id: string }).id,
-              user!.id,
-              d.amount,
-              count,
-              anchor,
-              d.date,
-              "debit",
-              true,
-            )
-          : buildInstallments(
-              (ins as { id: string }).id,
-              "debit",
-              user!.id,
-              d.amount,
-              count,
-              d.date,
-            );
+        const inst =
+          anchor > 1
+            ? buildInstallmentsAnchored(
+                (ins as { id: string }).id,
+                user!.id,
+                d.amount,
+                count,
+                anchor,
+                d.date,
+                "debit",
+                true,
+              )
+            : buildInstallments(
+                (ins as { id: string }).id,
+                "debit",
+                user!.id,
+                d.amount,
+                count,
+                d.date,
+              );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (d.required) {
@@ -1485,25 +1531,26 @@ export function useAddIncome() {
         .single();
       if (error) throw error;
       if (count > 1) {
-        const inst = anchor > 1
-          ? buildInstallmentsAnchored(
-              (ins as { id: string }).id,
-              user!.id,
-              i.amount,
-              count,
-              anchor,
-              i.date,
-              "income",
-              true,
-            )
-          : buildInstallments(
-              (ins as { id: string }).id,
-              "income",
-              user!.id,
-              i.amount,
-              count,
-              i.date,
-            );
+        const inst =
+          anchor > 1
+            ? buildInstallmentsAnchored(
+                (ins as { id: string }).id,
+                user!.id,
+                i.amount,
+                count,
+                anchor,
+                i.date,
+                "income",
+                true,
+              )
+            : buildInstallments(
+                (ins as { id: string }).id,
+                "income",
+                user!.id,
+                i.amount,
+                count,
+                i.date,
+              );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       }
@@ -1776,7 +1823,10 @@ const HISTORICAL_IMPORT_BATCH = {
 
 function isHistoricalImportMutationInput(
   input: HistoricalImportMutationInput,
-): input is { plan: HistoricalImportPlan; onProgress?: (progress: HistoricalImportProgress) => void } {
+): input is {
+  plan: HistoricalImportPlan;
+  onProgress?: (progress: HistoricalImportProgress) => void;
+} {
   return typeof input === "object" && input !== null && "plan" in input;
 }
 
@@ -1804,7 +1854,9 @@ function takeNaturalId(queues: NaturalIdQueues, key: string): string | null {
 
 async function deterministicUuid(seed: string): Promise<string> {
   if (!crypto.subtle) return crypto.randomUUID();
-  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed)));
+  const bytes = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed)),
+  );
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes.slice(0, 16), (b) => b.toString(16).padStart(2, "0"));
@@ -1826,11 +1878,21 @@ export function useImportHistorical() {
         else console.info(`[importar-historico] ${message}`, meta);
       };
 
-      emit({ stage: "preparing", label: "Preparando importação", current: 0, total: plan.entries.length });
+      emit({
+        stage: "preparing",
+        label: "Preparando importação",
+        current: 0,
+        total: plan.entries.length,
+      });
       log(`Preparando importação histórica com ${plan.entries.length} lançamentos`);
 
       // 1) Criar contas que ainda não existem
-      emit({ stage: "accounts", label: "Conferindo contas", current: 0, total: plan.accountsToCreate.length });
+      emit({
+        stage: "accounts",
+        label: "Conferindo contas",
+        current: 0,
+        total: plan.accountsToCreate.length,
+      });
       const { data: existingAccs, error: accReadError } = await supabase
         .from("accounts")
         .select("id,name")
@@ -1843,7 +1905,12 @@ export function useImportHistorical() {
       }
       for (let i = 0; i < plan.accountsToCreate.length; i++) {
         const a = plan.accountsToCreate[i];
-        emit({ stage: "accounts", label: "Conferindo contas", current: i + 1, total: plan.accountsToCreate.length });
+        emit({
+          stage: "accounts",
+          label: "Conferindo contas",
+          current: i + 1,
+          total: plan.accountsToCreate.length,
+        });
         if (accByName.has(a.name.toLowerCase())) continue;
         const { data, error } = await supabase
           .from("accounts")
@@ -1861,7 +1928,12 @@ export function useImportHistorical() {
       }
 
       // 2) Criar cartões que ainda não existem
-      emit({ stage: "cards", label: "Conferindo cartões", current: 0, total: plan.cardsToCreate.length });
+      emit({
+        stage: "cards",
+        label: "Conferindo cartões",
+        current: 0,
+        total: plan.cardsToCreate.length,
+      });
       const { data: existingCards, error: cardReadError } = await supabase
         .from("cards")
         .select("id,name,account_id,closing_day,due_day")
@@ -1883,7 +1955,12 @@ export function useImportHistorical() {
       }
       for (let i = 0; i < plan.cardsToCreate.length; i++) {
         const c = plan.cardsToCreate[i];
-        emit({ stage: "cards", label: "Conferindo cartões", current: i + 1, total: plan.cardsToCreate.length });
+        emit({
+          stage: "cards",
+          label: "Conferindo cartões",
+          current: i + 1,
+          total: plan.cardsToCreate.length,
+        });
         if (cardByName.has(c.name.toLowerCase())) continue;
         const accId = accByName.get(c.accountName.toLowerCase());
         if (!accId) continue;
@@ -1964,7 +2041,15 @@ export function useImportHistorical() {
       for (const e of singlePurchaseEntries) {
         const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
         if (!card) continue;
-        const seed = importNaturalKey("purchase", user.id, card.id, e.description, e.date, 1, e.amount);
+        const seed = importNaturalKey(
+          "purchase",
+          user.id,
+          card.id,
+          e.description,
+          e.date,
+          1,
+          e.amount,
+        );
         purchaseRows.push({
           id: await deterministicUuid(seed),
           user_id: user.id,
@@ -1980,8 +2065,7 @@ export function useImportHistorical() {
       for (const entries of parcelGroups.values()) {
         const sorted = [...entries].sort(
           (a, b) =>
-            a.date.localeCompare(b.date) ||
-            (a.installmentNumber || 0) - (b.installmentNumber || 0),
+            a.date.localeCompare(b.date) || (a.installmentNumber || 0) - (b.installmentNumber || 0),
         );
 
         const cycles: HistoricalImportEntry[][] = [];
@@ -2059,7 +2143,9 @@ export function useImportHistorical() {
       for (const e of plan.entries) {
         if (e.kind === "purchase") continue;
         if (e.kind === "debit") {
-          const accId = e.accountName ? accByName.get(e.accountName.toLowerCase()) : defaultAccountId;
+          const accId = e.accountName
+            ? accByName.get(e.accountName.toLowerCase())
+            : defaultAccountId;
           if (!accId) continue;
           debitRows.push({
             user_id: user.id,
@@ -2075,7 +2161,9 @@ export function useImportHistorical() {
             is_parent: false,
           });
         } else if (e.kind === "income") {
-          const accId = e.accountName ? accByName.get(e.accountName.toLowerCase()) : defaultAccountId;
+          const accId = e.accountName
+            ? accByName.get(e.accountName.toLowerCase())
+            : defaultAccountId;
           if (!accId) continue;
           incomeRows.push({
             user_id: user.id,
@@ -2088,7 +2176,9 @@ export function useImportHistorical() {
             is_parent: false,
           });
         } else if (e.kind === "investment") {
-          const accId = e.accountName ? accByName.get(e.accountName.toLowerCase()) : defaultAccountId;
+          const accId = e.accountName
+            ? accByName.get(e.accountName.toLowerCase())
+            : defaultAccountId;
           if (!accId) continue;
           investmentRows.push({
             user_id: user.id,
@@ -2103,7 +2193,13 @@ export function useImportHistorical() {
 
       // 4) Reusar IDs já existentes para evitar duplicidade mesmo em dados importados antes da correção.
       emit({ stage: "preparing", label: "Verificando duplicidades", current: 0, total: 1 });
-      const [existingPurchases, existingInstallments, existingDebits, existingIncomes, existingInvestments] = await Promise.all([
+      const [
+        existingPurchases,
+        existingInstallments,
+        existingDebits,
+        existingIncomes,
+        existingInvestments,
+      ] = await Promise.all([
         fetchAllRows<any>(() =>
           supabase
             .from("purchases")
@@ -2120,7 +2216,9 @@ export function useImportHistorical() {
         fetchAllRows<any>(() =>
           supabase
             .from("debits")
-            .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
+            .select(
+              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent",
+            )
             .eq("user_id", user.id),
         ),
         fetchAllRows<any>(() =>
@@ -2141,7 +2239,13 @@ export function useImportHistorical() {
       for (const p of existingPurchases) {
         queueNaturalId(
           purchaseIdsByNaturalKey,
-          importNaturalKey(p.card_id, p.description, p.purchase_date, p.installments_count, p.total_amount),
+          importNaturalKey(
+            p.card_id,
+            p.description,
+            p.purchase_date,
+            p.installments_count,
+            p.total_amount,
+          ),
           p.id,
         );
       }
@@ -2156,11 +2260,10 @@ export function useImportHistorical() {
         );
         const occurrence = newPurchaseOccurrences.get(key) ?? 0;
         newPurchaseOccurrences.set(key, occurrence + 1);
-        const existingId = takeNaturalId(
-          purchaseIdsByNaturalKey,
-          key,
-        );
-        p.id = existingId ?? (await deterministicUuid(importNaturalKey("purchase", user.id, key, occurrence)));
+        const existingId = takeNaturalId(purchaseIdsByNaturalKey, key);
+        p.id =
+          existingId ??
+          (await deterministicUuid(importNaturalKey("purchase", user.id, key, occurrence)));
       }
 
       const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
@@ -2196,12 +2299,22 @@ export function useImportHistorical() {
           amountByNumber.set(n, e.amount);
           dateByNumber.set(n, e.date);
         }
-        const computed = buildInstallmentsAnchored(p.id, user.id, p.total_amount, total, anchorNumber, anchor.date);
+        const computed = buildInstallmentsAnchored(
+          p.id,
+          user.id,
+          p.total_amount,
+          total,
+          anchorNumber,
+          anchor.date,
+        );
         for (const it of computed) {
           if (paidByNumber.has(it.number)) it.paid = paidByNumber.get(it.number)!;
           if (amountByNumber.has(it.number)) it.amount = amountByNumber.get(it.number)!;
           if (dateByNumber.has(it.number)) {
-            const [year, month, day] = dateByNumber.get(it.number)!.split("-").map((n) => parseInt(n, 10));
+            const [year, month, day] = dateByNumber
+              .get(it.number)!
+              .split("-")
+              .map((n) => parseInt(n, 10));
             it.due_date = `${year}-${String(month).padStart(2, "0")}-${String(day || 1).padStart(2, "0")}`;
             it.year = year;
             it.month = month - 1;
@@ -2218,11 +2331,15 @@ export function useImportHistorical() {
           it.id,
         );
       }
-      const installmentsWithIds = [] as Array<ReturnType<typeof buildInstallmentsAnchored>[number] & { id: string }>;
+      const installmentsWithIds = [] as Array<
+        ReturnType<typeof buildInstallmentsAnchored>[number] & { id: string }
+      >;
       for (let i = 0; i < allInstallments.length; i++) {
         const it = allInstallments[i];
         const key = importNaturalKey(it.purchase_id, it.number, it.total, it.due_date, it.amount);
-        const id = takeNaturalId(installmentIdsByNaturalKey, key) ?? (await deterministicUuid(importNaturalKey("installment", user.id, key, i)));
+        const id =
+          takeNaturalId(installmentIdsByNaturalKey, key) ??
+          (await deterministicUuid(importNaturalKey("installment", user.id, key, i)));
         installmentsWithIds.push({ ...it, id });
       }
 
@@ -2231,24 +2348,57 @@ export function useImportHistorical() {
         incomes: new Map() as NaturalIdQueues,
         investments: new Map() as NaturalIdQueues,
       };
-      for (const row of existingDebits) queueNaturalId(movementIds.debits, importNaturalKey(row.account_id, row.description, row.amount, row.date, row.paid), row.id);
-      for (const row of existingIncomes) queueNaturalId(movementIds.incomes, importNaturalKey(row.account_id, row.description, row.amount, row.date, row.received), row.id);
-      for (const row of existingInvestments) queueNaturalId(movementIds.investments, importNaturalKey(row.account_id, row.type, row.amount, row.date), row.id);
+      for (const row of existingDebits)
+        queueNaturalId(
+          movementIds.debits,
+          importNaturalKey(row.account_id, row.description, row.amount, row.date, row.paid),
+          row.id,
+        );
+      for (const row of existingIncomes)
+        queueNaturalId(
+          movementIds.incomes,
+          importNaturalKey(row.account_id, row.description, row.amount, row.date, row.received),
+          row.id,
+        );
+      for (const row of existingInvestments)
+        queueNaturalId(
+          movementIds.investments,
+          importNaturalKey(row.account_id, row.type, row.amount, row.date),
+          row.id,
+        );
 
       for (let i = 0; i < debitRows.length; i++) {
         const row = debitRows[i];
-        const key = importNaturalKey(row.account_id, row.description, row.amount, row.date, row.paid);
-        row.id = takeNaturalId(movementIds.debits, key) ?? (await deterministicUuid(importNaturalKey("debit", user.id, key, i)));
+        const key = importNaturalKey(
+          row.account_id,
+          row.description,
+          row.amount,
+          row.date,
+          row.paid,
+        );
+        row.id =
+          takeNaturalId(movementIds.debits, key) ??
+          (await deterministicUuid(importNaturalKey("debit", user.id, key, i)));
       }
       for (let i = 0; i < incomeRows.length; i++) {
         const row = incomeRows[i];
-        const key = importNaturalKey(row.account_id, row.description, row.amount, row.date, row.received);
-        row.id = takeNaturalId(movementIds.incomes, key) ?? (await deterministicUuid(importNaturalKey("income", user.id, key, i)));
+        const key = importNaturalKey(
+          row.account_id,
+          row.description,
+          row.amount,
+          row.date,
+          row.received,
+        );
+        row.id =
+          takeNaturalId(movementIds.incomes, key) ??
+          (await deterministicUuid(importNaturalKey("income", user.id, key, i)));
       }
       for (let i = 0; i < investmentRows.length; i++) {
         const row = investmentRows[i];
         const key = importNaturalKey(row.account_id, row.type, row.amount, row.date);
-        row.id = takeNaturalId(movementIds.investments, key) ?? (await deterministicUuid(importNaturalKey("investment", user.id, key, i)));
+        row.id =
+          takeNaturalId(movementIds.investments, key) ??
+          (await deterministicUuid(importNaturalKey("investment", user.id, key, i)));
       }
 
       const saveBatch = async (
@@ -2260,13 +2410,17 @@ export function useImportHistorical() {
         batch: number,
         totalBatches: number,
       ): Promise<any> => {
-        const counts = Object.fromEntries(Object.entries(payload).map(([k, rows]) => [k, rows.length]));
+        const counts = Object.fromEntries(
+          Object.entries(payload).map(([k, rows]) => [k, rows.length]),
+        );
         let lastErr: any = null;
         for (let attempt = 1; attempt <= HISTORICAL_IMPORT_BATCH.retries; attempt++) {
           try {
             emit({ stage, label, current, total, batch, totalBatches, attempt });
             log(`${label}: lote ${batch}/${totalBatches}, tentativa ${attempt}`, counts);
-            const { data, error } = await supabase.rpc("bulk_insert_finance", { _payload: payload });
+            const { data, error } = await supabase.rpc("bulk_insert_finance", {
+              _payload: payload,
+            });
             if (!error) return data;
             lastErr = error;
             console.error(`[importar-historico] Erro no lote ${batch}`, error);
@@ -2276,7 +2430,16 @@ export function useImportHistorical() {
           }
           if (attempt < HISTORICAL_IMPORT_BATCH.retries) {
             log(`Retry automático iniciado para lote ${batch}`);
-            emit({ stage, label, current, total, batch, totalBatches, attempt, message: `Retry automático do lote ${batch}` });
+            emit({
+              stage,
+              label,
+              current,
+              total,
+              batch,
+              totalBatches,
+              attempt,
+              message: `Retry automático do lote ${batch}`,
+            });
             await new Promise((r) => setTimeout(r, 500 * attempt));
           }
         }
@@ -2284,7 +2447,12 @@ export function useImportHistorical() {
         throw new Error(`[${label}] ${msg} (${JSON.stringify(counts)})`);
       };
 
-      const runQueue = async (stage: HistoricalImportProgressStage, label: string, rows: any[], batchSize: number) => {
+      const runQueue = async (
+        stage: HistoricalImportProgressStage,
+        label: string,
+        rows: any[],
+        batchSize: number,
+      ) => {
         const total = rows.length;
         const totalBatches = Math.max(1, Math.ceil(total / batchSize));
         const itemLabel: Record<string, string> = {
@@ -2301,8 +2469,18 @@ export function useImportHistorical() {
         for (let i = 0; i < rows.length; i += batchSize) {
           const batchRows = rows.slice(i, i + batchSize);
           const batch = Math.floor(i / batchSize) + 1;
-          batchRows.forEach((_, idx) => log(`Importando ${itemLabel[stage] ?? stage} ${i + idx + 1}/${total}`));
-          await saveBatch({ [stage]: batchRows }, label, stage, Math.min(i + batchRows.length, total), total, batch, totalBatches);
+          batchRows.forEach((_, idx) =>
+            log(`Importando ${itemLabel[stage] ?? stage} ${i + idx + 1}/${total}`),
+          );
+          await saveBatch(
+            { [stage]: batchRows },
+            label,
+            stage,
+            Math.min(i + batchRows.length, total),
+            total,
+            batch,
+            totalBatches,
+          );
         }
       };
 
@@ -2316,14 +2494,41 @@ export function useImportHistorical() {
         installments_count: p.installments_count,
       }));
 
-      log(`Fila criada: ${purchasePayload.length} purchases, ${installmentsWithIds.length} installments`);
-      await runQueue("purchases", "Importando compras", purchasePayload, HISTORICAL_IMPORT_BATCH.purchases);
-      await runQueue("installments", "Importando parcelas", installmentsWithIds, HISTORICAL_IMPORT_BATCH.installments);
+      log(
+        `Fila criada: ${purchasePayload.length} purchases, ${installmentsWithIds.length} installments`,
+      );
+      await runQueue(
+        "purchases",
+        "Importando compras",
+        purchasePayload,
+        HISTORICAL_IMPORT_BATCH.purchases,
+      );
+      await runQueue(
+        "installments",
+        "Importando parcelas",
+        installmentsWithIds,
+        HISTORICAL_IMPORT_BATCH.installments,
+      );
       await runQueue("debits", "Importando débitos", debitRows, HISTORICAL_IMPORT_BATCH.movements);
-      await runQueue("incomes", "Importando recebimentos", incomeRows, HISTORICAL_IMPORT_BATCH.movements);
-      await runQueue("investments", "Importando investimentos", investmentRows, HISTORICAL_IMPORT_BATCH.movements);
+      await runQueue(
+        "incomes",
+        "Importando recebimentos",
+        incomeRows,
+        HISTORICAL_IMPORT_BATCH.movements,
+      );
+      await runQueue(
+        "investments",
+        "Importando investimentos",
+        investmentRows,
+        HISTORICAL_IMPORT_BATCH.movements,
+      );
 
-      emit({ stage: "done", label: "Importação concluída", current: plan.entries.length, total: plan.entries.length });
+      emit({
+        stage: "done",
+        label: "Importação concluída",
+        current: plan.entries.length,
+        total: plan.entries.length,
+      });
       log("Importação histórica concluída", {
         purchases: purchaseRows.length,
         installments: installmentsWithIds.length,
@@ -2466,7 +2671,9 @@ export function computeAccountBalance(
 ): number {
   let bal = account.initialBalance;
   // Incomes received
-  for (const inc of incomes.filter((i) => i.accountId === account.id && !i.isParent && i.received)) {
+  for (const inc of incomes.filter(
+    (i) => i.accountId === account.id && !i.isParent && i.received,
+  )) {
     bal += inc.amount;
   }
   // Income installments paid (paid==true used as "received" for parcelled)
@@ -2519,9 +2726,7 @@ export function computeMonthlyAccountBalance(
   incomes: Income[],
   investments: Investment[],
 ): Map<string, MonthlyBalance> {
-  const accountCardIds = new Set(
-    cards.filter((c) => c.accountId === account.id).map((c) => c.id),
-  );
+  const accountCardIds = new Set(cards.filter((c) => c.accountId === account.id).map((c) => c.id));
   const accPurchaseIds = new Set(
     purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
   );
@@ -2656,7 +2861,8 @@ export function useUpdateIncome() {
       date?: string;
       received?: boolean;
     }) => {
-      const patch: { description?: string; amount?: number; date?: string; received?: boolean } = {};
+      const patch: { description?: string; amount?: number; date?: string; received?: boolean } =
+        {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.date !== undefined) patch.date = args.date;

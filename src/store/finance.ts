@@ -2145,12 +2145,22 @@ export function useImportHistorical() {
           p.id,
         );
       }
+      const newPurchaseOccurrences = new Map<string, number>();
       for (const p of purchaseRows) {
+        const key = importNaturalKey(
+          p.card_id,
+          p.description,
+          p.purchase_date,
+          p.installments_count,
+          p.total_amount,
+        );
+        const occurrence = newPurchaseOccurrences.get(key) ?? 0;
+        newPurchaseOccurrences.set(key, occurrence + 1);
         const existingId = takeNaturalId(
           purchaseIdsByNaturalKey,
-          importNaturalKey(p.card_id, p.description, p.purchase_date, p.installments_count, p.total_amount),
+          key,
         );
-        if (existingId) p.id = existingId;
+        p.id = existingId ?? (await deterministicUuid(importNaturalKey("purchase", user.id, key, occurrence)));
       }
 
       const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];

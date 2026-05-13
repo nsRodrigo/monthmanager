@@ -1736,6 +1736,81 @@ export type HistoricalImportEntry = {
   accountName?: string;
 };
 
+export type HistoricalImportProgressStage =
+  | "preparing"
+  | "accounts"
+  | "cards"
+  | "purchases"
+  | "installments"
+  | "debits"
+  | "incomes"
+  | "investments"
+  | "done";
+
+export type HistoricalImportProgress = {
+  stage: HistoricalImportProgressStage;
+  label: string;
+  current: number;
+  total: number;
+  batch?: number;
+  totalBatches?: number;
+  attempt?: number;
+  message?: string;
+};
+
+type HistoricalImportMutationInput =
+  | HistoricalImportPlan
+  | {
+      plan: HistoricalImportPlan;
+      onProgress?: (progress: HistoricalImportProgress) => void;
+    };
+
+type NaturalIdQueues = Map<string, string[]>;
+
+const HISTORICAL_IMPORT_BATCH = {
+  purchases: 20,
+  installments: 50,
+  movements: 100,
+  retries: 3,
+} as const;
+
+function isHistoricalImportMutationInput(
+  input: HistoricalImportMutationInput,
+): input is { plan: HistoricalImportPlan; onProgress?: (progress: HistoricalImportProgress) => void } {
+  return typeof input === "object" && input !== null && "plan" in input;
+}
+
+function importKeyPart(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return round2(value).toFixed(2);
+  return String(value).trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function importNaturalKey(...parts: unknown[]): string {
+  return parts.map(importKeyPart).join("|");
+}
+
+function queueNaturalId(queues: NaturalIdQueues, key: string, id: string) {
+  const list = queues.get(key) ?? [];
+  list.push(id);
+  queues.set(key, list);
+}
+
+function takeNaturalId(queues: NaturalIdQueues, key: string): string | null {
+  const list = queues.get(key);
+  if (!list || list.length === 0) return null;
+  return list.shift() ?? null;
+}
+
+async function deterministicUuid(seed: string): Promise<string> {
+  if (!crypto.subtle) return crypto.randomUUID();
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed)));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes.slice(0, 16), (b) => b.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
+}
+
 export function useImportHistorical() {
   const { user } = useAuth();
   const inv = useInvalidate();

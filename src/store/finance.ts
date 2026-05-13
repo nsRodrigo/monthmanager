@@ -2287,6 +2287,13 @@ export function useImportHistorical() {
       const runQueue = async (stage: HistoricalImportProgressStage, label: string, rows: any[], batchSize: number) => {
         const total = rows.length;
         const totalBatches = Math.max(1, Math.ceil(total / batchSize));
+        const itemLabel: Record<string, string> = {
+          purchases: "purchase",
+          installments: "installment",
+          debits: "debit",
+          incomes: "income",
+          investments: "investment",
+        };
         if (total === 0) {
           emit({ stage, label, current: 0, total: 0, batch: 0, totalBatches: 0 });
           return;
@@ -2294,7 +2301,7 @@ export function useImportHistorical() {
         for (let i = 0; i < rows.length; i += batchSize) {
           const batchRows = rows.slice(i, i + batchSize);
           const batch = Math.floor(i / batchSize) + 1;
-          batchRows.forEach((_, idx) => log(`Importando ${stage.slice(0, -1)} ${i + idx + 1}/${total}`));
+          batchRows.forEach((_, idx) => log(`Importando ${itemLabel[stage] ?? stage} ${i + idx + 1}/${total}`));
           await saveBatch({ [stage]: batchRows }, label, stage, Math.min(i + batchRows.length, total), total, batch, totalBatches);
         }
       };

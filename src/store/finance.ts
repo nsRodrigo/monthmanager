@@ -1815,22 +1815,35 @@ export function useImportHistorical() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (
-      plan: HistoricalImportPlan,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ) => {
+    mutationFn: async (input: HistoricalImportMutationInput) => {
       if (!user) throw new Error("Não autenticado.");
 
+      const plan = isHistoricalImportMutationInput(input) ? input.plan : input;
+      const onProgress = isHistoricalImportMutationInput(input) ? input.onProgress : undefined;
+      const emit = (progress: HistoricalImportProgress) => onProgress?.(progress);
+      const log = (message: string, meta?: unknown) => {
+        if (meta === undefined) console.info(`[importar-historico] ${message}`);
+        else console.info(`[importar-historico] ${message}`, meta);
+      };
+
+      emit({ stage: "preparing", label: "Preparando importação", current: 0, total: plan.entries.length });
+      log(`Preparando importação histórica com ${plan.entries.length} lançamentos`);
+
       // 1) Criar contas que ainda não existem
-      const { data: existingAccs } = await supabase
+      emit({ stage: "accounts", label: "Conferindo contas", current: 0, total: plan.accountsToCreate.length });
+      const { data: existingAccs, error: accReadError } = await supabase
         .from("accounts")
         .select("id,name")
         .eq("user_id", user.id);
+      if (accReadError) throw accReadError;
+
       const accByName = new Map<string, string>();
       for (const a of (existingAccs ?? []) as Array<{ id: string; name: string }>) {
         accByName.set(a.name.toLowerCase(), a.id);
       }
-      for (const a of plan.accountsToCreate) {
+      for (let i = 0; i < plan.accountsToCreate.length; i++) {
+        const a = plan.accountsToCreate[i];
+        emit({ stage: "accounts", label: "Conferindo contas", current: i + 1, total: plan.accountsToCreate.length });
         if (accByName.has(a.name.toLowerCase())) continue;
         const { data, error } = await supabase
           .from("accounts")
@@ -1848,14 +1861,14 @@ export function useImportHistorical() {
       }
 
       // 2) Criar cartões que ainda não existem
-      const { data: existingCards } = await supabase
+      emit({ stage: "cards", label: "Conferindo cartões", current: 0, total: plan.cardsToCreate.length });
+      const { data: existingCards, error: cardReadError } = await supabase
         .from("cards")
         .select("id,name,account_id,closing_day,due_day")
         .eq("user_id", user.id);
-      const cardByName = new Map<
-        string,
-        { id: string; closing_day: number; due_day: number }
-      >();
+      if (cardReadError) throw cardReadError;
+
+      const cardByName = new Map<string, { id: string; closing_day: number; due_day: number }>();
       for (const c of (existingCards ?? []) as Array<{
         id: string;
         name: string;
@@ -1868,7 +1881,9 @@ export function useImportHistorical() {
           due_day: c.due_day,
         });
       }
-      for (const c of plan.cardsToCreate) {
+      for (let i = 0; i < plan.cardsToCreate.length; i++) {
+        const c = plan.cardsToCreate[i];
+        emit({ stage: "cards", label: "Conferindo cartões", current: i + 1, total: plan.cardsToCreate.length });
         if (cardByName.has(c.name.toLowerCase())) continue;
         const accId = accByName.get(c.accountName.toLowerCase());
         if (!accId) continue;
@@ -1893,8 +1908,7 @@ export function useImportHistorical() {
         });
       }
 
-      // 3) Inserir entries em lote por tipo
-      // 3a) Purchases (acumular para batch)
+      // 3) Montar registros preservando a competência da planilha.
       const purchaseRows: Array<{
         id: string;
         user_id: string;
@@ -1904,45 +1918,13 @@ export function useImportHistorical() {
         purchase_date: string;
         installments_count: number;
         _entries: HistoricalImportEntry[];
-        _useListedInstallments: boolean;
       }> = [];
-      const newId = () => crypto.randomUUID();
-      const debitRows: Array<{
-        user_id: string;
-        account_id: string;
-        description: string;
-        amount: number;
-        date: string;
-        required: boolean;
-        paid: boolean;
-        auto_debit: boolean;
-        auto_debit_day: number | null;
-        installments_count: number;
-        is_parent: boolean;
-      }> = [];
-      const incomeRows: Array<{
-        user_id: string;
-        account_id: string;
-        description: string;
-        amount: number;
-        date: string;
-        received: boolean;
-        installments_count: number;
-        is_parent: boolean;
-      }> = [];
-      const investmentRows: Array<{
-        user_id: string;
-        account_id: string;
-        type: string;
-        amount: number;
-        percentage: number;
-        date: string;
-      }> = [];
+      const debitRows: any[] = [];
+      const incomeRows: any[] = [];
+      const investmentRows: any[] = [];
 
-      // Conta padrão para entries sem accountName
       let defaultAccountId = accByName.values().next().value;
       if (!defaultAccountId) {
-        // criar uma conta "Importado"
         const { data, error } = await supabase
           .from("accounts")
           .insert({
@@ -1958,10 +1940,6 @@ export function useImportHistorical() {
         defaultAccountId = (data as { id: string }).id;
       }
 
-      // Na planilha histórica, cada linha parcelada já representa UMA parcela
-      // no mês da coluna (ex.: 05/21 = 5ª parcela de 21). Portanto não podemos
-      // gerar 21 parcelas para cada linha. Agrupamos as linhas da mesma compra
-      // e gravamos exatamente as parcelas listadas na planilha.
       const parcelGroups = new Map<string, HistoricalImportEntry[]>();
       const singlePurchaseEntries: HistoricalImportEntry[] = [];
 
@@ -1986,8 +1964,9 @@ export function useImportHistorical() {
       for (const e of singlePurchaseEntries) {
         const card = e.cardName ? cardByName.get(e.cardName.toLowerCase()) : undefined;
         if (!card) continue;
+        const seed = importNaturalKey("purchase", user.id, card.id, e.description, e.date, 1, e.amount);
         purchaseRows.push({
-          id: newId(),
+          id: await deterministicUuid(seed),
           user_id: user.id,
           card_id: card.id,
           description: e.description,
@@ -1995,7 +1974,6 @@ export function useImportHistorical() {
           purchase_date: e.date,
           installments_count: 1,
           _entries: [e],
-          _useListedInstallments: true,
         });
       }
 
@@ -2006,10 +1984,6 @@ export function useImportHistorical() {
             (a.installmentNumber || 0) - (b.installmentNumber || 0),
         );
 
-        // Detecta ciclos: a mesma parcela N só "fecha" um ciclo quando aparece
-        // novamente com valor POSITIVO (compra real repetida). Linhas negativas
-        // com o mesmo número são ajustes/estornos parciais e devem somar
-        // dentro do mesmo ciclo.
         const cycles: HistoricalImportEntry[][] = [];
         let current: HistoricalImportEntry[] = [];
         let seenPositive = new Set<number>();
@@ -2025,9 +1999,8 @@ export function useImportHistorical() {
         }
         if (current.length > 0) cycles.push(current);
 
-        for (const cycle of cycles) {
-          // Soma todas as linhas com o mesmo número de parcela (parcela base +
-          // estornos/reembolsos parciais = valor LÍQUIDO daquele mês).
+        for (let cycleIndex = 0; cycleIndex < cycles.length; cycleIndex++) {
+          const cycle = cycles[cycleIndex];
           const byNumber = new Map<number, HistoricalImportEntry>();
           for (const e of cycle) {
             const n = Math.max(1, e.installmentNumber || 1);
@@ -2036,7 +2009,6 @@ export function useImportHistorical() {
               byNumber.set(n, {
                 ...existing,
                 amount: round2(existing.amount + e.amount),
-                // Se qualquer ajuste vier marcado como pago, mantém pago.
                 paid: existing.paid || e.paid,
               });
             } else {
@@ -2053,16 +2025,26 @@ export function useImportHistorical() {
           const knownTotal = round2(listed.reduce((sum, e) => sum + e.amount, 0));
           const projectedTotal = round2((knownTotal / listed.length) * totalParcelas);
           const totalAmount = listed.length >= totalParcelas ? knownTotal : projectedTotal;
-
-          // purchase_date = data ORIGINAL da compra (célula DATA da planilha),
-          // tipicamente igual em todas as parcelas. Fallback: data da 1ª parcela.
           const purchaseDate =
             listed.find((e) => e.purchaseDate)?.purchaseDate ??
             listed.find((e) => e.installmentNumber === 1)?.date ??
             listed[0].date;
+          const firstAnchor = listed[0];
+          const seed = importNaturalKey(
+            "purchase",
+            user.id,
+            card.id,
+            first.description,
+            purchaseDate,
+            totalParcelas,
+            totalAmount,
+            firstAnchor.installmentNumber,
+            firstAnchor.date,
+            cycleIndex,
+          );
 
           purchaseRows.push({
-            id: newId(),
+            id: await deterministicUuid(seed),
             user_id: user.id,
             card_id: card.id,
             description: first.description,
@@ -2070,17 +2052,14 @@ export function useImportHistorical() {
             purchase_date: purchaseDate,
             installments_count: totalParcelas,
             _entries: listed,
-            _useListedInstallments: true,
           });
         }
       }
 
       for (const e of plan.entries) {
-        if (e.kind === "purchase") continue; // já tratados acima
+        if (e.kind === "purchase") continue;
         if (e.kind === "debit") {
-          const accId = e.accountName
-            ? accByName.get(e.accountName.toLowerCase())
-            : defaultAccountId;
+          const accId = e.accountName ? accByName.get(e.accountName.toLowerCase()) : defaultAccountId;
           if (!accId) continue;
           debitRows.push({
             user_id: user.id,
@@ -2096,9 +2075,7 @@ export function useImportHistorical() {
             is_parent: false,
           });
         } else if (e.kind === "income") {
-          const accId = e.accountName
-            ? accByName.get(e.accountName.toLowerCase())
-            : defaultAccountId;
+          const accId = e.accountName ? accByName.get(e.accountName.toLowerCase()) : defaultAccountId;
           if (!accId) continue;
           incomeRows.push({
             user_id: user.id,
@@ -2111,9 +2088,7 @@ export function useImportHistorical() {
             is_parent: false,
           });
         } else if (e.kind === "investment") {
-          const accId = e.accountName
-            ? accByName.get(e.accountName.toLowerCase())
-            : defaultAccountId;
+          const accId = e.accountName ? accByName.get(e.accountName.toLowerCase()) : defaultAccountId;
           if (!accId) continue;
           investmentRows.push({
             user_id: user.id,
@@ -2126,111 +2101,225 @@ export function useImportHistorical() {
         }
       }
 
-      // 4) Inserir purchases em chunks. Para parceladas usamos
-      // buildInstallmentsAnchored: o mês da coluna onde a parcela X apareceu
-      // serve de âncora (X cai naquele mês), e as demais parcelas são
-      // distribuídas mês a mês a partir daí. Isso corrige planilhas onde
-      // várias parcelas foram empilhadas no mesmo mês por engano.
-      const CHUNK = 120;
+      // 4) Reusar IDs já existentes para evitar duplicidade mesmo em dados importados antes da correção.
+      emit({ stage: "preparing", label: "Verificando duplicidades", current: 0, total: 1 });
+      const [existingPurchases, existingInstallments, existingDebits, existingIncomes, existingInvestments] = await Promise.all([
+        fetchAllRows<any>(() =>
+          supabase
+            .from("purchases")
+            .select("id,card_id,description,total_amount,purchase_date,installments_count")
+            .eq("user_id", user.id),
+        ),
+        fetchAllRows<any>(() =>
+          supabase
+            .from("installments")
+            .select("id,purchase_id,number,total,amount,due_date")
+            .eq("user_id", user.id)
+            .eq("parent_type", "purchase"),
+        ),
+        fetchAllRows<any>(() =>
+          supabase
+            .from("debits")
+            .select("id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent")
+            .eq("user_id", user.id),
+        ),
+        fetchAllRows<any>(() =>
+          supabase
+            .from("incomes")
+            .select("id,account_id,description,amount,date,received,installments_count,is_parent")
+            .eq("user_id", user.id),
+        ),
+        fetchAllRows<any>(() =>
+          supabase
+            .from("investments")
+            .select("id,account_id,type,amount,percentage,date")
+            .eq("user_id", user.id),
+        ),
+      ]);
 
-      // Helper: grava no banco por RPC em lotes pequenos, sem depender de
-      // respostas grandes de insert/select no navegador móvel. Se um lote ainda
-      // cair com "Failed to fetch", divide ao meio e tenta novamente.
-      const saveChunk = async (payload: Record<string, any[]>, label: string): Promise<any> => {
+      const purchaseIdsByNaturalKey: NaturalIdQueues = new Map();
+      for (const p of existingPurchases) {
+        queueNaturalId(
+          purchaseIdsByNaturalKey,
+          importNaturalKey(p.card_id, p.description, p.purchase_date, p.installments_count, p.total_amount),
+          p.id,
+        );
+      }
+      for (const p of purchaseRows) {
+        const existingId = takeNaturalId(
+          purchaseIdsByNaturalKey,
+          importNaturalKey(p.card_id, p.description, p.purchase_date, p.installments_count, p.total_amount),
+        );
+        if (existingId) p.id = existingId;
+      }
+
+      const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
+      for (const p of purchaseRows) {
+        const total = Math.max(1, p.installments_count || 1);
+        if (total === 1) {
+          const e = p._entries[0];
+          const [year, month, day] = e.date.split("-").map((n) => parseInt(n, 10));
+          allInstallments.push({
+            user_id: user.id,
+            parent_id: p.id,
+            parent_type: "purchase",
+            purchase_id: p.id,
+            number: 1,
+            total: 1,
+            amount: e.amount,
+            due_date: `${year}-${String(month).padStart(2, "0")}-${String(day || 1).padStart(2, "0")}`,
+            year,
+            month: month - 1,
+            paid: e.paid,
+          });
+          continue;
+        }
+
+        const anchor = p._entries[0];
+        const anchorNumber = Math.min(Math.max(1, anchor.installmentNumber || 1), total);
+        const paidByNumber = new Map<number, boolean>();
+        const amountByNumber = new Map<number, number>();
+        const dateByNumber = new Map<number, string>();
+        for (const e of p._entries) {
+          const n = Math.min(Math.max(1, e.installmentNumber || 1), total);
+          paidByNumber.set(n, e.paid);
+          amountByNumber.set(n, e.amount);
+          dateByNumber.set(n, e.date);
+        }
+        const computed = buildInstallmentsAnchored(p.id, user.id, p.total_amount, total, anchorNumber, anchor.date);
+        for (const it of computed) {
+          if (paidByNumber.has(it.number)) it.paid = paidByNumber.get(it.number)!;
+          if (amountByNumber.has(it.number)) it.amount = amountByNumber.get(it.number)!;
+          if (dateByNumber.has(it.number)) {
+            const [year, month, day] = dateByNumber.get(it.number)!.split("-").map((n) => parseInt(n, 10));
+            it.due_date = `${year}-${String(month).padStart(2, "0")}-${String(day || 1).padStart(2, "0")}`;
+            it.year = year;
+            it.month = month - 1;
+          }
+          allInstallments.push(it);
+        }
+      }
+
+      const installmentIdsByNaturalKey: NaturalIdQueues = new Map();
+      for (const it of existingInstallments) {
+        queueNaturalId(
+          installmentIdsByNaturalKey,
+          importNaturalKey(it.purchase_id, it.number, it.total, it.due_date, it.amount),
+          it.id,
+        );
+      }
+      const installmentsWithIds = [] as Array<ReturnType<typeof buildInstallmentsAnchored>[number] & { id: string }>;
+      for (let i = 0; i < allInstallments.length; i++) {
+        const it = allInstallments[i];
+        const key = importNaturalKey(it.purchase_id, it.number, it.total, it.due_date, it.amount);
+        const id = takeNaturalId(installmentIdsByNaturalKey, key) ?? (await deterministicUuid(importNaturalKey("installment", user.id, key, i)));
+        installmentsWithIds.push({ ...it, id });
+      }
+
+      const movementIds = {
+        debits: new Map() as NaturalIdQueues,
+        incomes: new Map() as NaturalIdQueues,
+        investments: new Map() as NaturalIdQueues,
+      };
+      for (const row of existingDebits) queueNaturalId(movementIds.debits, importNaturalKey(row.account_id, row.description, row.amount, row.date, row.paid), row.id);
+      for (const row of existingIncomes) queueNaturalId(movementIds.incomes, importNaturalKey(row.account_id, row.description, row.amount, row.date, row.received), row.id);
+      for (const row of existingInvestments) queueNaturalId(movementIds.investments, importNaturalKey(row.account_id, row.type, row.amount, row.date), row.id);
+
+      for (let i = 0; i < debitRows.length; i++) {
+        const row = debitRows[i];
+        const key = importNaturalKey(row.account_id, row.description, row.amount, row.date, row.paid);
+        row.id = takeNaturalId(movementIds.debits, key) ?? (await deterministicUuid(importNaturalKey("debit", user.id, key, i)));
+      }
+      for (let i = 0; i < incomeRows.length; i++) {
+        const row = incomeRows[i];
+        const key = importNaturalKey(row.account_id, row.description, row.amount, row.date, row.received);
+        row.id = takeNaturalId(movementIds.incomes, key) ?? (await deterministicUuid(importNaturalKey("income", user.id, key, i)));
+      }
+      for (let i = 0; i < investmentRows.length; i++) {
+        const row = investmentRows[i];
+        const key = importNaturalKey(row.account_id, row.type, row.amount, row.date);
+        row.id = takeNaturalId(movementIds.investments, key) ?? (await deterministicUuid(importNaturalKey("investment", user.id, key, i)));
+      }
+
+      const saveBatch = async (
+        payload: Record<string, any[]>,
+        label: string,
+        stage: HistoricalImportProgressStage,
+        current: number,
+        total: number,
+        batch: number,
+        totalBatches: number,
+      ): Promise<any> => {
         const counts = Object.fromEntries(Object.entries(payload).map(([k, rows]) => [k, rows.length]));
         let lastErr: any = null;
-        for (let attempt = 0; attempt < 4; attempt++) {
+        for (let attempt = 1; attempt <= HISTORICAL_IMPORT_BATCH.retries; attempt++) {
           try {
+            emit({ stage, label, current, total, batch, totalBatches, attempt });
+            log(`${label}: lote ${batch}/${totalBatches}, tentativa ${attempt}`, counts);
             const { data, error } = await supabase.rpc("bulk_insert_finance", { _payload: payload });
             if (!error) return data;
             lastErr = error;
+            console.error(`[importar-historico] Erro no lote ${batch}`, error);
           } catch (e) {
             lastErr = e;
+            console.error(`[importar-historico] Erro no lote ${batch}`, e);
           }
-          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+          if (attempt < HISTORICAL_IMPORT_BATCH.retries) {
+            log(`Retry automático iniciado para lote ${batch}`);
+            emit({ stage, label, current, total, batch, totalBatches, attempt, message: `Retry automático do lote ${batch}` });
+            await new Promise((r) => setTimeout(r, 500 * attempt));
+          }
         }
         const msg = lastErr?.message || String(lastErr) || "Erro de rede ao gravar";
         throw new Error(`[${label}] ${msg} (${JSON.stringify(counts)})`);
       };
 
-      const saveRows = async (table: "debits" | "incomes" | "investments", rows: any[]) => {
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          await saveChunk({ [table]: rows.slice(i, i + CHUNK) }, table);
+      const runQueue = async (stage: HistoricalImportProgressStage, label: string, rows: any[], batchSize: number) => {
+        const total = rows.length;
+        const totalBatches = Math.max(1, Math.ceil(total / batchSize));
+        if (total === 0) {
+          emit({ stage, label, current: 0, total: 0, batch: 0, totalBatches: 0 });
+          return;
+        }
+        for (let i = 0; i < rows.length; i += batchSize) {
+          const batchRows = rows.slice(i, i + batchSize);
+          const batch = Math.floor(i / batchSize) + 1;
+          batchRows.forEach((_, idx) => log(`Importando ${stage.slice(0, -1)} ${i + idx + 1}/${total}`));
+          await saveBatch({ [stage]: batchRows }, label, stage, Math.min(i + batchRows.length, total), total, batch, totalBatches);
         }
       };
 
-      for (let i = 0; i < purchaseRows.length; i += CHUNK) {
-        const slice = purchaseRows.slice(i, i + CHUNK);
-        const insertPayload = slice.map((p) => ({
-          id: p.id,
-          user_id: p.user_id,
-          card_id: p.card_id,
-          description: p.description,
-          total_amount: p.total_amount,
-          purchase_date: p.purchase_date,
-          installments_count: p.installments_count,
-        }));
-        const allInstallments: ReturnType<typeof buildInstallmentsAnchored>[number][] = [];
+      const purchasePayload = purchaseRows.map((p) => ({
+        id: p.id,
+        user_id: p.user_id,
+        card_id: p.card_id,
+        description: p.description,
+        total_amount: p.total_amount,
+        purchase_date: p.purchase_date,
+        installments_count: p.installments_count,
+      }));
 
-        for (let j = 0; j < slice.length; j++) {
-          const p = slice[j];
-          const purchaseId = p.id;
-          const total = Math.max(1, p.installments_count || 1);
+      log(`Fila criada: ${purchasePayload.length} purchases, ${installmentsWithIds.length} installments`);
+      await runQueue("purchases", "Importando compras", purchasePayload, HISTORICAL_IMPORT_BATCH.purchases);
+      await runQueue("installments", "Importando parcelas", installmentsWithIds, HISTORICAL_IMPORT_BATCH.installments);
+      await runQueue("debits", "Importando débitos", debitRows, HISTORICAL_IMPORT_BATCH.movements);
+      await runQueue("incomes", "Importando recebimentos", incomeRows, HISTORICAL_IMPORT_BATCH.movements);
+      await runQueue("investments", "Importando investimentos", investmentRows, HISTORICAL_IMPORT_BATCH.movements);
 
-          if (total === 1) {
-            // À vista: 1 parcela única, vencendo na data da própria linha.
-            const e = p._entries[0];
-            const [year, month, day] = e.date.split("-").map((n) => parseInt(n, 10));
-            allInstallments.push({
-              user_id: user.id,
-              parent_id: purchaseId,
-              parent_type: "purchase",
-              purchase_id: purchaseId,
-              number: 1,
-              total: 1,
-              amount: e.amount,
-              due_date: `${year}-${String(month).padStart(2, "0")}-${String(day || 1).padStart(2, "0")}`,
-              year,
-              month: month - 1,
-              paid: e.paid,
-            });
-            continue;
-          }
-
-          const anchor = p._entries[0];
-          const anchorNumber = Math.min(Math.max(1, anchor.installmentNumber || 1), total);
-          const anchorDate = anchor.date;
-          const paidByNumber = new Map<number, boolean>();
-          for (const e of p._entries) {
-            const n = Math.min(Math.max(1, e.installmentNumber || 1), total);
-            paidByNumber.set(n, e.paid);
-          }
-          const computed = buildInstallmentsAnchored(
-            purchaseId,
-            user.id,
-            p.total_amount,
-            total,
-            anchorNumber,
-            anchorDate,
-          );
-          for (const it of computed) {
-            if (paidByNumber.has(it.number)) it.paid = paidByNumber.get(it.number)!;
-            allInstallments.push(it);
-          }
-        }
-
-        await saveChunk({ purchases: insertPayload, installments: allInstallments }, "purchases/installments");
-      }
-
-      // 5) Insert debits / incomes / investments em lote
-      await saveRows("debits", debitRows);
-      await saveRows("incomes", incomeRows);
-      await saveRows("investments", investmentRows);
+      emit({ stage: "done", label: "Importação concluída", current: plan.entries.length, total: plan.entries.length });
+      log("Importação histórica concluída", {
+        purchases: purchaseRows.length,
+        installments: installmentsWithIds.length,
+        debits: debitRows.length,
+        incomes: incomeRows.length,
+        investments: investmentRows.length,
+      });
 
       return {
         accounts: plan.accountsToCreate.length,
         cards: plan.cardsToCreate.length,
         purchases: purchaseRows.length,
+        installments: installmentsWithIds.length,
         debits: debitRows.length,
         incomes: incomeRows.length,
         investments: investmentRows.length,

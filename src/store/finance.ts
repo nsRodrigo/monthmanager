@@ -1380,6 +1380,8 @@ export function useAddDebit() {
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
+      const isRecurring = d.required && count === 1;
+      const groupId = isRecurring ? crypto.randomUUID() : null;
       const { data: ins, error } = await supabase
         .from("debits")
         .insert({
@@ -1394,6 +1396,7 @@ export function useAddDebit() {
           auto_debit_day: d.autoDebitDay ?? null,
           installments_count: count,
           is_parent: count > 1,
+          recurrence_group_id: groupId,
         })
         .select("id")
         .single();
@@ -1421,34 +1424,19 @@ export function useAddDebit() {
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
-      } else if (d.required) {
-        // Replicar débito obrigatório nos próximos 24 meses (mesmo dia,
-        // ajustando para meses mais curtos). Cada mês é um registro
-        // independente — o usuário pode editar/excluir um mês específico
-        // sem afetar os demais.
+      } else if (isRecurring) {
+        // Replicar como série recorrente: 24 meses à frente, cada mês é um
+        // registro independente compartilhando recurrence_group_id. Sem
+        // installments — recorrência NÃO é parcelamento.
         const RECUR_MONTHS = 24;
         const start = new Date(d.date);
         const day = start.getDate();
-        const rows: Array<{
-          user_id: string;
-          account_id: string;
-          description: string;
-          amount: number;
-          date: string;
-          required: boolean;
-          paid: boolean;
-          auto_debit: boolean;
-          auto_debit_day: number | null;
-          installments_count: number;
-          is_parent: boolean;
-        }> = [];
+        const rows: Array<Record<string, unknown>> = [];
         for (let i = 1; i <= RECUR_MONTHS; i++) {
           const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
           const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
           const dd = Math.min(day, lastDay);
-          const dateStr = new Date(target.getFullYear(), target.getMonth(), dd)
-            .toISOString()
-            .slice(0, 10);
+          const dateStr = fmtLocalDate(target.getFullYear(), target.getMonth(), dd);
           rows.push({
             user_id: user!.id,
             account_id: d.accountId,
@@ -1461,6 +1449,7 @@ export function useAddDebit() {
             auto_debit_day: d.autoDebitDay ?? null,
             installments_count: 1,
             is_parent: false,
+            recurrence_group_id: groupId,
           });
         }
         if (rows.length) {

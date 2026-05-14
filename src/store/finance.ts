@@ -113,6 +113,8 @@ export type Debit = {
   autoDebitDay: number | null;
   installmentsCount: number;
   isParent: boolean;
+  /** Group id linking all monthly occurrences of a recurring series. */
+  recurrenceGroupId: string | null;
 };
 
 export type Income = {
@@ -124,6 +126,8 @@ export type Income = {
   received: boolean;
   installmentsCount: number;
   isParent: boolean;
+  /** Group id linking all monthly occurrences of a recurring series. */
+  recurrenceGroupId: string | null;
 };
 
 export type Investment = {

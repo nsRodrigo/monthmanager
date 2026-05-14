@@ -1,76 +1,93 @@
-# Plano em 3 fases
+# P0.1 — Separar Recorrência de Parcelamento
 
-A entrega vai em fases porque os itens 4 e 5 são grandes e arriscados — não dá para misturar com refactors de UI sem comprometer estabilidade.
+## Problema
 
----
+Hoje, "recorrente" reusa o motor de `installments` (cria N filhos com `installmentsCount`/`isParent`), por isso:
+- aparece como "x/y"
+- abre modal de parcelas na edição
+- cai em regras de installment (excluir uma parcela, anchor, etc.)
 
-## Fase 1 — UX dos modais (itens 1, 2 e 3)
+Recorrência e parcelamento são coisas diferentes e devem ter caminhos separados no store, na UI e nas regras de exclusão/edição.
 
-**Item 1 — Visibilidade do confirm**
-- Substituir todos os `window.confirm(...)` por um `ConfirmDialog` reutilizável usando o `Modal` do projeto (mesmo padrão visual dos outros, com ações destacadas e fundo do tema).
-- Locais hoje usando `confirm()`: exclusão de compra, exclusão de parcelas (DeleteParcelledDialog), exclusão de débito/receita/investimento, exclusão de cartão, exclusão de conta, restauração de backup.
+## Modelo de dados (sem migração de schema)
 
-**Item 2 — "Aplicar em" como modal pós-ação**
-- Remover o `CardScopePicker` de dentro de `AddCardDialog` e `EditCardDialog`.
-- Criar `CardScopeConfirmDialog`: abre **depois** que o usuário clica em **Salvar / Excluir / Duplicar** no cartão.
-- Default selecionado: **"Só este mês"**.
-- Opções: "Só este mês" · "Período" · "Toda a conta".
-- Confirmar aplica a ação no escopo escolhido. Cancelar não aplica nada.
-- Mesmo modal serve para excluir/editar **compras parceladas** (substitui o `DeleteParcelledDialog` atual, mas mantendo a lógica de "preservar parcelas pagas").
+Reaproveitar as tabelas atuais sem mudar SQL:
 
-**Item 3 — Date pickers no período**
-- No modo "Período", trocar os 4 selects (mês/ano início + mês/ano fim) por **dois date pickers** (Data inicial / Data final), igual ao usado em `AddPurchaseDialog`.
-- Internamente continua salvando ano+mês (a granularidade do escopo é mensal), só a UI muda.
+- **Parcelado** (`installment`): igual hoje — `installments_count > 1`, registros filhos em `installments`, parent com `is_parent=true`.
+- **Recorrente** (`recurring`): cada mês é um registro **independente** em `debits`/`incomes` com:
+  - `installments_count = 1`
+  - `is_parent = false`
+  - **Sem** linhas em `installments`
+  - Marcado por convenção de descrição interna? Não — usamos um campo já existente: nenhum. Em vez disso, adicionamos uma coluna leve `recurrence_group_id uuid null` em `debits` e `incomes` (migração mínima) para agrupar a série e suportar "este e os próximos".
+- **À vista** (`single`): `installments_count = 1`, sem `recurrence_group_id`.
 
----
+A migração apenas adiciona a coluna `recurrence_group_id` em `debits` e `incomes` (nullable, indexada). Nada quebra para dados existentes.
 
-## Fase 2 — Backup no Google Drive (item 4)
+## Mudanças no backend
 
-**Pré-requisitos do usuário (uma vez):**
-1. Criar projeto no Google Cloud Console.
-2. Habilitar Google Drive API.
-3. Criar OAuth Client ID (tipo Web), com redirect autorizado: `https://monthmanager.lovable.app/auth/google-drive/callback` (e equivalente preview).
-4. Configurar tela de consentimento com escopo `https://www.googleapis.com/auth/drive.file` (acesso só aos arquivos criados pelo app — mais seguro que `drive` total).
-5. Me passar o **Client ID** e **Client Secret** (vou pedir via secrets seguros).
+1. Migração: `ALTER TABLE debits ADD COLUMN recurrence_group_id uuid;` + idem em `incomes` + index.
+2. Atualizar `bulk_insert_finance` para aceitar/persistir `recurrence_group_id` (passthrough, opcional).
 
-**O que vou implementar:**
-- Tabela `user_drive_tokens` (refresh_token criptografado, expiry).
-- Server functions: `getDriveAuthUrl`, `exchangeDriveCode`, `refreshDriveToken`, `uploadBackupToDrive`.
-- Rota `/auth/google-drive/callback` para receber o code do OAuth.
-- Botão "Conectar Google Drive" na tela de Backup.
-- Ao clicar em "Gerar backup":
-  - Se Drive não conectado: salva local (fluxo atual).
-  - Se conectado: abre dialog "Onde salvar?" com opções **Local** · **Google Drive** · **Ambos**.
-  - No iPhone/iPad/desktop sem Drive: usa o **Web Share API nativo** quando disponível (Files/iCloud/AirDrop), com fallback para download.
+## Mudanças no store (`src/store/finance.ts`)
 
----
+1. Tipos `Debit`/`Income` ganham `recurrenceGroupId?: string | null`.
+2. Selects passam a incluir `recurrence_group_id`.
+3. **Novo helper** `addRecurringSeries(kind, payload, monthsAhead)`:
+   - Gera um `groupId = uuid()`.
+   - Para cada mês de `[startMonth, lastOpenMonth]` (e default 24 meses), insere **um registro independente** em `debits`/`incomes` com `installments_count=1`, `is_parent=false`, `recurrence_group_id=groupId`. Sem tocar em `installments`.
+4. `useAddDebit`/`useAddIncome`: separar branches:
+   - se `recurring=true` → `addRecurringSeries`
+   - se `installmentsCount>1` → fluxo atual de parcelado
+   - senão → insert simples
+   - Remover o atalho atual em `AddIncomeDialog` que faz `amount * 24` com `installmentsCount=24` (gambiarra que cria filhos de parcela).
+5. **Novos hooks**:
+   - `useUpdateRecurring({ id, scope: 'one'|'forward', patch })`
+   - `useDeleteRecurring({ id, scope: 'one'|'forward' })`
+   `forward` opera por `recurrence_group_id` + `date >= alvo.date`.
+6. Geração ao **abrir novo mês**: localizar onde `addMonth` cria meses; após criar, chamar `replicateRecurringInto(year, month)` que faz `SELECT DISTINCT ON (recurrence_group_id) ... ORDER BY date DESC` para cada série ativa e insere uma cópia naquele mês (se ainda não existir naquele competence).
 
-## Fase 3 — Offline-first com fila de sync (item 5)
+## Mudanças na UI
 
-Esta é a fase mais pesada. Vai mexer em `src/store/finance.ts` inteiro.
+1. `AddDebitDialog` / `AddIncomeDialog`:
+   - Checkbox "Recorrente" e "É parcelado" são **mutuamente exclusivos** (já são, manter).
+   - Quando "Recorrente" marcado: ocultar todos os campos de parcela e o textinho "Parcela x/y". Modal mostra apenas Nome / Valor / Data / Recorrente / (Auto-débito p/ débito).
+   - Submit recorrente NÃO envia `installmentsCount`/`installmentNumber`.
+2. `EditInstallmentDialog`:
+   - No abrir, detectar `recurrenceGroupId`. Se for recorrente → renderizar a variante simples "Editar lançamento" com campos básicos + radio "Apenas este / Este e próximos".
+   - Caso contrário, comportamento atual de parcela.
+3. Diálogo de exclusão:
+   - Se recorrente, abrir um novo `DeleteRecurringDialog` com "Apenas este / Este e próximos / Cancelar".
+   - Se parcelado, manter `DeleteParcelledDialog` atual.
+   - Se à vista, confirm simples.
+4. Renderização nas linhas de débito/recebimento: se `recurrenceGroupId` presente, **nunca** mostrar "x/y", nunca chamar regra de installment.
 
-- **Cache persistente**: persistir o React Query cache em IndexedDB (`@tanstack/query-sync-storage-persister` + `idb-keyval`). App abre offline com últimos dados.
-- **Fila de mutações offline**:
-  - Toda mutação (criar/editar/excluir compra, débito, etc.) passa por uma fila local.
-  - Online → executa direto no Supabase.
-  - Offline → enfileira em IndexedDB com timestamp + tipo + payload, marca a entidade como "pendente" (badge na UI).
-  - Ao reconectar: drena a fila em ordem, com retry exponencial.
-- **Conflitos**: estratégia simples "last-write-wins" baseada em `updated_at` (vou adicionar essa coluna nas tabelas que faltam). Quando detectar conflito, mostra modal "A versão do servidor é mais nova. Manter local ou servidor?".
-- **Indicador de status**: ícone fixo (online/offline/syncando/N pendentes) no topo do app.
-- **Service Worker**: ajustar `sw.js` para cachear shell do app + assets (já tem PWA básico).
+## Áreas que NÃO mudam
 
----
+- Importação de planilha, backup, biometria, whitelist, dashboard, cartões/parcelados de crédito, investimentos não-recorrentes.
+- Schema das tabelas (apenas adição de coluna nullable).
 
-## Como prefere prosseguir?
+## Arquivos afetados
 
-Sugiro ir **fase por fase**, com aprovação ao final de cada uma. Se concordar, começo agora pela **Fase 1** (que é onde está a dor visível dos itens 1-3) e, quando terminar, abrimos a Fase 2.
+- `supabase/migrations/<novo>.sql` + atualização da função `bulk_insert_finance`
+- `src/store/finance.ts` (tipos, selects, hooks novos, replicação ao criar mês)
+- `src/components/AddDebitDialog.tsx`
+- `src/components/AddIncomeDialog.tsx`
+- `src/components/EditInstallmentDialog.tsx` (branch recorrente) **ou** novo `EditRecurringDialog.tsx`
+- novo `src/components/DeleteRecurringDialog.tsx`
+- `src/routes/contas.$contaId_.$ano.$mes.tsx` (chamadas dos diálogos + render sem x/y para recorrentes)
+- `src/integrations/supabase/types.ts` (auto-regenerado pela migração)
 
-Se quiser que eu comece direto pela Fase 2 ou 3, me diz.
+## Validações que farei
 
-## Detalhes técnicos
+- Criar débito recorrente → não há linhas em `installments`; aparece em todos os meses abertos a partir da data.
+- Editar "Apenas este" muda só o registro da competência.
+- Editar "Este e próximos" muda do registro escolhido para a frente, dentro do mesmo `recurrence_group_id`.
+- Excluir "Apenas este" / "Este e próximos" idem.
+- Abrir novo mês → série recorrente aparece automaticamente naquele mês.
+- Parcelado de débito/recebimento e parcelado de cartão continuam idênticos (modal de parcelas, x/y, anchor).
 
-- **ConfirmDialog**: novo componente em `src/components/ConfirmDialog.tsx` com props `{ open, title, description, confirmLabel, variant: 'default'|'destructive', onConfirm, onClose }`.
-- **CardScopeConfirmDialog**: novo componente em `src/components/CardScopeConfirmDialog.tsx` que substitui o uso atual do `CardScopePicker` inline. O `CardScopePicker` antigo será removido.
-- **DatePicker**: vou reutilizar o mesmo `<input type="date">` que `AddPurchaseDialog` já usa, derivando `year`/`month` no submit.
-- **Drive tokens**: `pgcrypto` para criptografar refresh_token em repouso; chave em `secret('DRIVE_TOKEN_ENCRYPTION_KEY')`.
-- **Offline queue**: lib `idb-keyval` (~600B) para fila; `online`/`offline` events do browser para drenar.
+## Risco / observação
+
+Dados antigos onde "recorrente" foi salvo como `installments_count=24, is_parent=true` continuam tratados como parcelados (não há como adivinhar a intenção sem heurística). Para esses casos podemos oferecer no futuro um botão "converter em recorrente"; **fora do escopo desta tarefa**.
+
+Confirma que posso seguir com esse plano? Em particular: (a) ok adicionar a coluna `recurrence_group_id` em `debits`/`incomes`? (b) ok manter os dados antigos como parcelados (sem migração automática)?

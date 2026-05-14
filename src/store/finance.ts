@@ -556,10 +556,13 @@ export function useIncomes() {
         received: boolean;
         installments_count: number;
         is_parent: boolean;
+        recurrence_group_id: string | null;
       }>(() =>
         supabase
           .from("incomes")
-          .select("id,account_id,description,amount,date,received,installments_count,is_parent")
+          .select(
+            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id",
+          )
           .order("date", { ascending: true }),
       );
       return data.map((d) => ({
@@ -571,6 +574,7 @@ export function useIncomes() {
         received: d.received,
         installmentsCount: d.installments_count,
         isParent: d.is_parent,
+        recurrenceGroupId: d.recurrence_group_id ?? null,
       }));
     },
   });

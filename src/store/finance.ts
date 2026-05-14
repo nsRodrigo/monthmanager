@@ -1431,7 +1431,7 @@ export function useAddDebit() {
         const RECUR_MONTHS = 24;
         const start = new Date(d.date);
         const day = start.getDate();
-        const rows: Array<Record<string, unknown>> = [];
+        const rows = [];
         for (let i = 1; i <= RECUR_MONTHS; i++) {
           const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
           const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();

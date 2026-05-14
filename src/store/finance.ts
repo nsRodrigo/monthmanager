@@ -1511,9 +1511,12 @@ export function useAddIncome() {
       date: string;
       installmentsCount?: number;
       installmentNumber?: number;
+      recurring?: boolean;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
+      const isRecurring = !!i.recurring && count === 1;
+      const groupId = isRecurring ? crypto.randomUUID() : null;
       const { data: ins, error } = await supabase
         .from("incomes")
         .insert({
@@ -1525,6 +1528,7 @@ export function useAddIncome() {
           received: false,
           installments_count: count,
           is_parent: count > 1,
+          recurrence_group_id: groupId,
         })
         .select("id")
         .single();
@@ -1552,6 +1556,33 @@ export function useAddIncome() {
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
+      } else if (isRecurring) {
+        // Série recorrente: 24 meses à frente, registros independentes
+        // compartilhando recurrence_group_id. Sem installments.
+        const RECUR_MONTHS = 24;
+        const start = new Date(i.date);
+        const day = start.getDate();
+        const rows = [];
+        for (let k = 1; k <= RECUR_MONTHS; k++) {
+          const target = new Date(start.getFullYear(), start.getMonth() + k, 1);
+          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+          const dd = Math.min(day, lastDay);
+          rows.push({
+            user_id: user!.id,
+            account_id: i.accountId,
+            description: i.description,
+            amount: i.amount,
+            date: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
+            received: false,
+            installments_count: 1,
+            is_parent: false,
+            recurrence_group_id: groupId,
+          });
+        }
+        if (rows.length) {
+          const { error: e3 } = await supabase.from("incomes").insert(rows);
+          if (e3) throw e3;
+        }
       }
     },
     onSettled: () => inv(["incomes", "installments"]),

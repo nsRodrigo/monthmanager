@@ -514,11 +514,12 @@ export function useDebits() {
         auto_debit_day: number | null;
         installments_count: number;
         is_parent: boolean;
+        recurrence_group_id: string | null;
       }>(() =>
         supabase
           .from("debits")
           .select(
-            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent",
+            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
           )
           .order("date", { ascending: true }),
       );
@@ -534,6 +535,7 @@ export function useDebits() {
         autoDebitDay: d.auto_debit_day,
         installmentsCount: d.installments_count,
         isParent: d.is_parent,
+        recurrenceGroupId: d.recurrence_group_id ?? null,
       }));
     },
   });

@@ -52,10 +52,9 @@ export function AddIncomeDialog({
       await addIncome.mutateAsync({
         accountId,
         description: description.trim(),
-        amount: amount * 24,
+        amount,
         date,
-        installmentsCount: 24,
-        installmentNumber: 1,
+        recurring: true,
       });
       onClose();
       return;

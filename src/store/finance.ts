@@ -113,6 +113,8 @@ export type Debit = {
   autoDebitDay: number | null;
   installmentsCount: number;
   isParent: boolean;
+  /** Group id linking all monthly occurrences of a recurring series. */
+  recurrenceGroupId: string | null;
 };
 
 export type Income = {
@@ -124,6 +126,8 @@ export type Income = {
   received: boolean;
   installmentsCount: number;
   isParent: boolean;
+  /** Group id linking all monthly occurrences of a recurring series. */
+  recurrenceGroupId: string | null;
 };
 
 export type Investment = {
@@ -510,11 +514,12 @@ export function useDebits() {
         auto_debit_day: number | null;
         installments_count: number;
         is_parent: boolean;
+        recurrence_group_id: string | null;
       }>(() =>
         supabase
           .from("debits")
           .select(
-            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent",
+            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
           )
           .order("date", { ascending: true }),
       );
@@ -530,6 +535,7 @@ export function useDebits() {
         autoDebitDay: d.auto_debit_day,
         installmentsCount: d.installments_count,
         isParent: d.is_parent,
+        recurrenceGroupId: d.recurrence_group_id ?? null,
       }));
     },
   });
@@ -550,10 +556,13 @@ export function useIncomes() {
         received: boolean;
         installments_count: number;
         is_parent: boolean;
+        recurrence_group_id: string | null;
       }>(() =>
         supabase
           .from("incomes")
-          .select("id,account_id,description,amount,date,received,installments_count,is_parent")
+          .select(
+            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id",
+          )
           .order("date", { ascending: true }),
       );
       return data.map((d) => ({
@@ -565,6 +574,7 @@ export function useIncomes() {
         received: d.received,
         installmentsCount: d.installments_count,
         isParent: d.is_parent,
+        recurrenceGroupId: d.recurrence_group_id ?? null,
       }));
     },
   });
@@ -1370,6 +1380,8 @@ export function useAddDebit() {
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
+      const isRecurring = d.required && count === 1;
+      const groupId = isRecurring ? crypto.randomUUID() : null;
       const { data: ins, error } = await supabase
         .from("debits")
         .insert({
@@ -1384,6 +1396,7 @@ export function useAddDebit() {
           auto_debit_day: d.autoDebitDay ?? null,
           installments_count: count,
           is_parent: count > 1,
+          recurrence_group_id: groupId,
         })
         .select("id")
         .single();
@@ -1411,34 +1424,19 @@ export function useAddDebit() {
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
-      } else if (d.required) {
-        // Replicar débito obrigatório nos próximos 24 meses (mesmo dia,
-        // ajustando para meses mais curtos). Cada mês é um registro
-        // independente — o usuário pode editar/excluir um mês específico
-        // sem afetar os demais.
+      } else if (isRecurring) {
+        // Replicar como série recorrente: 24 meses à frente, cada mês é um
+        // registro independente compartilhando recurrence_group_id. Sem
+        // installments — recorrência NÃO é parcelamento.
         const RECUR_MONTHS = 24;
         const start = new Date(d.date);
         const day = start.getDate();
-        const rows: Array<{
-          user_id: string;
-          account_id: string;
-          description: string;
-          amount: number;
-          date: string;
-          required: boolean;
-          paid: boolean;
-          auto_debit: boolean;
-          auto_debit_day: number | null;
-          installments_count: number;
-          is_parent: boolean;
-        }> = [];
+        const rows = [];
         for (let i = 1; i <= RECUR_MONTHS; i++) {
           const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
           const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
           const dd = Math.min(day, lastDay);
-          const dateStr = new Date(target.getFullYear(), target.getMonth(), dd)
-            .toISOString()
-            .slice(0, 10);
+          const dateStr = fmtLocalDate(target.getFullYear(), target.getMonth(), dd);
           rows.push({
             user_id: user!.id,
             account_id: d.accountId,
@@ -1451,6 +1449,7 @@ export function useAddDebit() {
             auto_debit_day: d.autoDebitDay ?? null,
             installments_count: 1,
             is_parent: false,
+            recurrence_group_id: groupId,
           });
         }
         if (rows.length) {
@@ -1512,9 +1511,12 @@ export function useAddIncome() {
       date: string;
       installmentsCount?: number;
       installmentNumber?: number;
+      recurring?: boolean;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
+      const isRecurring = !!i.recurring && count === 1;
+      const groupId = isRecurring ? crypto.randomUUID() : null;
       const { data: ins, error } = await supabase
         .from("incomes")
         .insert({
@@ -1526,6 +1528,7 @@ export function useAddIncome() {
           received: false,
           installments_count: count,
           is_parent: count > 1,
+          recurrence_group_id: groupId,
         })
         .select("id")
         .single();
@@ -1553,6 +1556,33 @@ export function useAddIncome() {
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
+      } else if (isRecurring) {
+        // Série recorrente: 24 meses à frente, registros independentes
+        // compartilhando recurrence_group_id. Sem installments.
+        const RECUR_MONTHS = 24;
+        const start = new Date(i.date);
+        const day = start.getDate();
+        const rows = [];
+        for (let k = 1; k <= RECUR_MONTHS; k++) {
+          const target = new Date(start.getFullYear(), start.getMonth() + k, 1);
+          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+          const dd = Math.min(day, lastDay);
+          rows.push({
+            user_id: user!.id,
+            account_id: i.accountId,
+            description: i.description,
+            amount: i.amount,
+            date: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
+            received: false,
+            installments_count: 1,
+            is_parent: false,
+            recurrence_group_id: groupId,
+          });
+        }
+        if (rows.length) {
+          const { error: e3 } = await supabase.from("incomes").insert(rows);
+          if (e3) throw e3;
+        }
       }
     },
     onSettled: () => inv(["incomes", "installments"]),

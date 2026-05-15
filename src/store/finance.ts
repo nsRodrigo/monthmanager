@@ -3051,7 +3051,7 @@ export function useUpdateRecurringSeries() {
       if (args.scope === "one") {
         const update: any = { ...baseUpdate };
         if (args.patch.date !== undefined) (update as any).date = args.patch.date;
-        const { error } = await supabase.from(table).update(update).eq("id", args.id);
+        const { error } = await (supabase.from(table) as any).update(update).eq("id", args.id);
         if (error) throw error;
         return;
       }

@@ -115,7 +115,7 @@ export function EditInstallmentDialog({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Valor">
-              <CurrencyInput value={amount} onValueChange={setAmount} />
+              <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
             <Field label="Data">
               <input

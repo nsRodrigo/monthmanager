@@ -167,7 +167,7 @@ export function EditInstallmentDialog({
             </button>
             <button
               onClick={handleSave}
-              disabled={pending || !description.trim() || !amount}
+              disabled={pending || !description.trim() || amount === 0}
               className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {pending ? "Salvando…" : "Salvar"}

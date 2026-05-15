@@ -267,20 +267,43 @@ function AccountMonth() {
               onToggle={() =>
                 toggleIncome.mutate({ id: i.id, received: !i.received })
               }
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
+              onEdit={() => {
+                if (i.recurrenceGroupId) {
+                  setEditingRecurring({
                     kind: "income",
                     id: i.id,
+                    groupId: i.recurrenceGroupId,
                     description: i.description,
                     amount: i.amount,
                     date: i.date,
-                    paid: i.received,
-                  },
-                  onDeleteParent: () => removeIncome.mutate(i.id),
-                })
-              }
-              onRemove={() => removeIncome.mutate(i.id)}
+                  });
+                } else {
+                  setEditingSingle({
+                    item: {
+                      kind: "income",
+                      id: i.id,
+                      description: i.description,
+                      amount: i.amount,
+                      date: i.date,
+                      paid: i.received,
+                    },
+                    onDeleteParent: () => removeIncome.mutate(i.id),
+                  });
+                }
+              }}
+              onRemove={() => {
+                if (i.recurrenceGroupId) {
+                  setDeletingRecurring({
+                    kind: "income",
+                    id: i.id,
+                    groupId: i.recurrenceGroupId,
+                    date: i.date,
+                    label: i.description,
+                  });
+                } else {
+                  removeIncome.mutate(i.id);
+                }
+              }}
             />
           ))}
           {monthIncomes.parcelled.map((p) => (

@@ -381,20 +381,43 @@ function AccountMonth() {
               key={d.id}
               debit={d}
               onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
+              onEdit={() => {
+                if (d.recurrenceGroupId) {
+                  setEditingRecurring({
                     kind: "debit",
                     id: d.id,
+                    groupId: d.recurrenceGroupId,
                     description: d.description,
                     amount: d.amount,
                     date: d.date,
-                    paid: d.paid,
-                  },
-                  onDeleteParent: () => removeDebit.mutate(d.id),
-                })
-              }
-              onRemove={() => removeDebit.mutate(d.id)}
+                  });
+                } else {
+                  setEditingSingle({
+                    item: {
+                      kind: "debit",
+                      id: d.id,
+                      description: d.description,
+                      amount: d.amount,
+                      date: d.date,
+                      paid: d.paid,
+                    },
+                    onDeleteParent: () => removeDebit.mutate(d.id),
+                  });
+                }
+              }}
+              onRemove={() => {
+                if (d.recurrenceGroupId) {
+                  setDeletingRecurring({
+                    kind: "debit",
+                    id: d.id,
+                    groupId: d.recurrenceGroupId,
+                    date: d.date,
+                    label: d.description,
+                  });
+                } else {
+                  removeDebit.mutate(d.id);
+                }
+              }}
             />
           ))}
           {monthDebits.parcelled.map((p) => (

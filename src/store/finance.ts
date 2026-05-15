@@ -3187,7 +3187,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
           } else {
             row.received = false;
           }
-          const { error: ie } = await supabase.from(table).insert(row);
+          const { error: ie } = await (supabase.from(table) as any).insert(row);
           if (ie) continue;
           inserted = true;
         }

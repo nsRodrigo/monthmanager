@@ -3016,3 +3016,188 @@ export function normalizeZero(n: number): number {
   if (Math.abs(n) < 0.005) return 0;
   return n;
 }
+
+// =======================
+// Recurring series (debits / incomes)
+// =======================
+//
+// A "recurring" debit/income is materialized as N independent monthly rows,
+// each sharing the same `recurrence_group_id`. There are NO `installments`
+// rows for recurring series — recurrence is NOT installment.
+//
+// Scope semantics for edit/delete on a recurring row:
+//   - "one":     touch only the clicked row
+//   - "forward": touch the clicked row AND every future row in the same
+//                group (date >= the clicked row's date)
+//
+type RecurringKind = "debit" | "income";
+
+export function useUpdateRecurringSeries() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      kind: RecurringKind;
+      id: string;
+      groupId: string;
+      anchorDate: string;
+      scope: "one" | "forward";
+      patch: { description?: string; amount?: number; date?: string };
+    }) => {
+      const table = args.kind === "debit" ? "debits" : "incomes";
+      const baseUpdate: Record<string, unknown> = {};
+      if (args.patch.description !== undefined) baseUpdate.description = args.patch.description;
+      if (args.patch.amount !== undefined) baseUpdate.amount = args.patch.amount;
+
+      if (args.scope === "one") {
+        const update = { ...baseUpdate };
+        if (args.patch.date !== undefined) (update as any).date = args.patch.date;
+        const { error } = await supabase.from(table).update(update).eq("id", args.id);
+        if (error) throw error;
+        return;
+      }
+
+      // forward: this row + all rows in the group with date >= anchorDate
+      if (Object.keys(baseUpdate).length > 0) {
+        const { error } = await supabase
+          .from(table)
+          .update(baseUpdate)
+          .eq("recurrence_group_id", args.groupId)
+          .gte("date", args.anchorDate);
+        if (error) throw error;
+      }
+
+      // Date change with forward scope = shift each future row to use the
+      // NEW day-of-month (clamped to that month's last day).
+      if (args.patch.date !== undefined) {
+        const newDay = parseInt(args.patch.date.slice(8, 10), 10);
+        const { data, error } = await supabase
+          .from(table)
+          .select("id,date")
+          .eq("recurrence_group_id", args.groupId)
+          .gte("date", args.anchorDate);
+        if (error) throw error;
+        for (const row of (data ?? []) as { id: string; date: string }[]) {
+          const [y, m] = row.date.slice(0, 10).split("-").map(Number);
+          const last = new Date(y, m, 0).getDate();
+          const day = Math.min(newDay, last);
+          const newDate = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const { error: ue } = await supabase.from(table).update({ date: newDate }).eq("id", row.id);
+          if (ue) throw ue;
+        }
+      }
+    },
+    onSettled: () => inv(["debits", "incomes"]),
+  });
+}
+
+export function useDeleteRecurringSeries() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      kind: RecurringKind;
+      id: string;
+      groupId: string;
+      anchorDate: string;
+      scope: "one" | "forward";
+    }) => {
+      const table = args.kind === "debit" ? "debits" : "incomes";
+      if (args.scope === "one") {
+        const { error } = await supabase.from(table).delete().eq("id", args.id);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq("recurrence_group_id", args.groupId)
+        .gte("date", args.anchorDate);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["debits", "incomes"]),
+  });
+}
+
+/**
+ * On mount, ensure every recurrence group has a row in the given target
+ * (year, month). For each group missing the target month, clones the
+ * latest row with the same day-of-month (clamped). Runs once per
+ * (user, year, month).
+ */
+export function useEnsureRecurringForMonth(year: number, month: number) {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const monthStr = String(month + 1).padStart(2, "0");
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const startStr = `${year}-${monthStr}-01`;
+      const endStr = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+      let inserted = false;
+
+      for (const table of ["debits", "incomes"] as const) {
+        const { data: groupRows, error } = await supabase
+          .from(table)
+          .select("recurrence_group_id")
+          .not("recurrence_group_id", "is", null);
+        if (error || cancelled) return;
+
+        const groupIds = Array.from(
+          new Set((groupRows ?? []).map((g: any) => g.recurrence_group_id as string)),
+        ).filter(Boolean);
+
+        for (const gid of groupIds) {
+          if (cancelled) return;
+          const { data: existing } = await supabase
+            .from(table)
+            .select("id")
+            .eq("recurrence_group_id", gid)
+            .gte("date", startStr)
+            .lte("date", endStr)
+            .limit(1);
+          if (existing && existing.length > 0) continue;
+
+          const { data: latest } = await supabase
+            .from(table)
+            .select("*")
+            .eq("recurrence_group_id", gid)
+            .order("date", { ascending: false })
+            .limit(1);
+          if (!latest || latest.length === 0) continue;
+          const t = latest[0] as any;
+          const day = parseInt(String(t.date).slice(8, 10), 10);
+          const dd = Math.min(day, lastDay);
+          const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
+
+          const row: Record<string, unknown> = {
+            user_id: user.id,
+            account_id: t.account_id,
+            description: t.description,
+            amount: t.amount,
+            date: newDate,
+            installments_count: 1,
+            is_parent: false,
+            recurrence_group_id: gid,
+          };
+          if (table === "debits") {
+            row.required = true;
+            row.paid = false;
+            row.auto_debit = t.auto_debit ?? false;
+            row.auto_debit_day = t.auto_debit_day ?? null;
+          } else {
+            row.received = false;
+          }
+          const { error: ie } = await supabase.from(table).insert(row);
+          if (ie) continue;
+          inserted = true;
+        }
+      }
+      if (!cancelled && inserted) inv(["debits", "incomes"]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, year, month]);
+}

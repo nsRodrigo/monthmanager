@@ -47,7 +47,7 @@ export function AddIncomeDialog({
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
   const submit = async () => {
-    if (!description.trim() || amount <= 0 || !accountId) return;
+    if (!description.trim() || amount === 0 || !accountId) return;
     if (isRecurring && !isInstallment) {
       await addIncome.mutateAsync({
         accountId,
@@ -90,7 +90,7 @@ export function AddIncomeDialog({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
-            <CurrencyInput value={amount} onValueChange={setAmount} />
+            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
           <Field label={isInstallment ? "Data da 1ª parcela" : "Data"}>
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />

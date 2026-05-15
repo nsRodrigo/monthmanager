@@ -27,6 +27,8 @@ import {
   normalizeZero,
   useDeleteSingleInstallment,
   useDeleteParentKeepingPaid,
+  useEnsureRecurringForMonth,
+  useDeleteRecurringSeries,
   type Installment,
   type Debit,
   type Income,
@@ -58,6 +60,8 @@ import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditI
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
+import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
+import { DeleteRecurringDialog } from "@/components/DeleteRecurringDialog";
 import { useConfirm } from "@/store/confirm";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
@@ -123,9 +127,19 @@ function AccountMonth() {
     parentType: "purchase" | "debit" | "income";
     parentId: string;
   } | null>(null);
+  const [editingRecurring, setEditingRecurring] = useState<RecurringEditTarget | null>(null);
+  const [deletingRecurring, setDeletingRecurring] = useState<{
+    kind: "debit" | "income";
+    id: string;
+    groupId: string;
+    date: string;
+    label: string;
+  } | null>(null);
 
   const deleteSingleInst = useDeleteSingleInstallment();
   const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
+  const deleteRecurring = useDeleteRecurringSeries();
+  useEnsureRecurringForMonth(year, month);
 
   const askDeleteInst = (
     inst: Installment,
@@ -253,20 +267,43 @@ function AccountMonth() {
               onToggle={() =>
                 toggleIncome.mutate({ id: i.id, received: !i.received })
               }
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
+              onEdit={() => {
+                if (i.recurrenceGroupId) {
+                  setEditingRecurring({
                     kind: "income",
                     id: i.id,
+                    groupId: i.recurrenceGroupId,
                     description: i.description,
                     amount: i.amount,
                     date: i.date,
-                    paid: i.received,
-                  },
-                  onDeleteParent: () => removeIncome.mutate(i.id),
-                })
-              }
-              onRemove={() => removeIncome.mutate(i.id)}
+                  });
+                } else {
+                  setEditingSingle({
+                    item: {
+                      kind: "income",
+                      id: i.id,
+                      description: i.description,
+                      amount: i.amount,
+                      date: i.date,
+                      paid: i.received,
+                    },
+                    onDeleteParent: () => removeIncome.mutate(i.id),
+                  });
+                }
+              }}
+              onRemove={() => {
+                if (i.recurrenceGroupId) {
+                  setDeletingRecurring({
+                    kind: "income",
+                    id: i.id,
+                    groupId: i.recurrenceGroupId,
+                    date: i.date,
+                    label: i.description,
+                  });
+                } else {
+                  removeIncome.mutate(i.id);
+                }
+              }}
             />
           ))}
           {monthIncomes.parcelled.map((p) => (
@@ -344,20 +381,43 @@ function AccountMonth() {
               key={d.id}
               debit={d}
               onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
+              onEdit={() => {
+                if (d.recurrenceGroupId) {
+                  setEditingRecurring({
                     kind: "debit",
                     id: d.id,
+                    groupId: d.recurrenceGroupId,
                     description: d.description,
                     amount: d.amount,
                     date: d.date,
-                    paid: d.paid,
-                  },
-                  onDeleteParent: () => removeDebit.mutate(d.id),
-                })
-              }
-              onRemove={() => removeDebit.mutate(d.id)}
+                  });
+                } else {
+                  setEditingSingle({
+                    item: {
+                      kind: "debit",
+                      id: d.id,
+                      description: d.description,
+                      amount: d.amount,
+                      date: d.date,
+                      paid: d.paid,
+                    },
+                    onDeleteParent: () => removeDebit.mutate(d.id),
+                  });
+                }
+              }}
+              onRemove={() => {
+                if (d.recurrenceGroupId) {
+                  setDeletingRecurring({
+                    kind: "debit",
+                    id: d.id,
+                    groupId: d.recurrenceGroupId,
+                    date: d.date,
+                    label: d.description,
+                  });
+                } else {
+                  removeDebit.mutate(d.id);
+                }
+              }}
             />
           ))}
           {monthDebits.parcelled.map((p) => (
@@ -548,6 +608,36 @@ function AccountMonth() {
             deleteParentKeepingPaid.mutate({
               parentId: deletingParcelled.parentId,
               parentType: deletingParcelled.parentType,
+            });
+        }}
+      />
+      <EditRecurringDialog
+        open={!!editingRecurring}
+        onClose={() => setEditingRecurring(null)}
+        target={editingRecurring}
+      />
+      <DeleteRecurringDialog
+        open={!!deletingRecurring}
+        onClose={() => setDeletingRecurring(null)}
+        itemLabel={deletingRecurring?.label}
+        onDeleteOnlyThis={() => {
+          if (deletingRecurring)
+            deleteRecurring.mutate({
+              kind: deletingRecurring.kind,
+              id: deletingRecurring.id,
+              groupId: deletingRecurring.groupId,
+              anchorDate: deletingRecurring.date,
+              scope: "one",
+            });
+        }}
+        onDeleteThisAndFuture={() => {
+          if (deletingRecurring)
+            deleteRecurring.mutate({
+              kind: deletingRecurring.kind,
+              id: deletingRecurring.id,
+              groupId: deletingRecurring.groupId,
+              anchorDate: deletingRecurring.date,
+              scope: "forward",
             });
         }}
       />

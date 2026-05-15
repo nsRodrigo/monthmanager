@@ -115,7 +115,7 @@ export function EditInstallmentDialog({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Valor">
-              <CurrencyInput value={amount} onValueChange={setAmount} />
+              <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
             <Field label="Data">
               <input
@@ -167,7 +167,7 @@ export function EditInstallmentDialog({
             </button>
             <button
               onClick={handleSave}
-              disabled={pending || !description.trim() || !amount}
+              disabled={pending || !description.trim() || amount === 0}
               className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {pending ? "Salvando…" : "Salvar"}
@@ -258,7 +258,7 @@ export function EditInstallmentDialog({
         )}
 
         <Field label="Valor">
-          <CurrencyInput value={amount} onValueChange={setAmount} />
+          <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           <p className="mt-1 text-[11px] text-muted-foreground">
             Valor atual: {formatCurrency(inst.amount)}.
           </p>

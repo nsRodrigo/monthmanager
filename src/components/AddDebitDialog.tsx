@@ -51,7 +51,7 @@ export function AddDebitDialog({
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
   const submit = async () => {
-    if (!description.trim() || amount <= 0 || !accountId) return;
+    if (!description.trim() || amount === 0 || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = amount;
@@ -84,7 +84,7 @@ export function AddDebitDialog({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
-            <CurrencyInput value={amount} onValueChange={setAmount} />
+            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
           <Field label={isInstallment ? "Data da 1ª parcela" : "Data"}>
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
@@ -92,13 +92,22 @@ export function AddDebitDialog({
         </div>
 
         <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" disabled={isInstallment} />
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={(e) => {
+              setRequired(e.target.checked);
+              if (e.target.checked) setIsInstallment(false);
+            }}
+            className="mt-0.5 h-4 w-4 accent-primary"
+            disabled={isInstallment}
+          />
           <span className="text-sm">
-            <span className="font-medium">Compra recorrente</span>
+            <span className="font-medium">Débito recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
               {isInstallment
                 ? "Indisponível para parcelados — o parcelamento já cria as próximas faturas."
-                : "Será replicada automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído."}
+                : "Replicado automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento."}
             </span>
           </span>
         </label>
@@ -113,10 +122,20 @@ export function AddDebitDialog({
           </Field>
         )}
 
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input type="checkbox" checked={isInstallment} onChange={(e) => setIsInstallment(e.target.checked)} className="h-4 w-4 accent-primary" />
-          <span className="text-sm font-medium">É parcelado?</span>
-        </label>
+        {!required && (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+            <input
+              type="checkbox"
+              checked={isInstallment}
+              onChange={(e) => {
+                setIsInstallment(e.target.checked);
+                if (e.target.checked) setRequired(false);
+              }}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">É parcelado?</span>
+          </label>
+        )}
 
         {isInstallment && (
           <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">

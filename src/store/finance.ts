@@ -3044,12 +3044,12 @@ export function useUpdateRecurringSeries() {
       patch: { description?: string; amount?: number; date?: string };
     }) => {
       const table = args.kind === "debit" ? "debits" : "incomes";
-      const baseUpdate: Record<string, unknown> = {};
+      const baseUpdate: any = {};
       if (args.patch.description !== undefined) baseUpdate.description = args.patch.description;
       if (args.patch.amount !== undefined) baseUpdate.amount = args.patch.amount;
 
       if (args.scope === "one") {
-        const update = { ...baseUpdate };
+        const update: any = { ...baseUpdate };
         if (args.patch.date !== undefined) (update as any).date = args.patch.date;
         const { error } = await supabase.from(table).update(update).eq("id", args.id);
         if (error) throw error;
@@ -3170,7 +3170,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
           const dd = Math.min(day, lastDay);
           const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
 
-          const row: Record<string, unknown> = {
+          const row: any = {
             user_id: user.id,
             account_id: t.account_id,
             description: t.description,

@@ -51,7 +51,7 @@ export function AddDebitDialog({
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
   const submit = async () => {
-    if (!description.trim() || amount <= 0 || !accountId) return;
+    if (!description.trim() || amount === 0 || !accountId) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = amount;

@@ -611,6 +611,36 @@ function AccountMonth() {
             });
         }}
       />
+      <EditRecurringDialog
+        open={!!editingRecurring}
+        onClose={() => setEditingRecurring(null)}
+        target={editingRecurring}
+      />
+      <DeleteRecurringDialog
+        open={!!deletingRecurring}
+        onClose={() => setDeletingRecurring(null)}
+        itemLabel={deletingRecurring?.label}
+        onDeleteOnlyThis={() => {
+          if (deletingRecurring)
+            deleteRecurring.mutate({
+              kind: deletingRecurring.kind,
+              id: deletingRecurring.id,
+              groupId: deletingRecurring.groupId,
+              anchorDate: deletingRecurring.date,
+              scope: "one",
+            });
+        }}
+        onDeleteThisAndFuture={() => {
+          if (deletingRecurring)
+            deleteRecurring.mutate({
+              kind: deletingRecurring.kind,
+              id: deletingRecurring.id,
+              groupId: deletingRecurring.groupId,
+              anchorDate: deletingRecurring.date,
+              scope: "forward",
+            });
+        }}
+      />
     </div>
   );
 }

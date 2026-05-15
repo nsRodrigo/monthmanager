@@ -127,9 +127,19 @@ function AccountMonth() {
     parentType: "purchase" | "debit" | "income";
     parentId: string;
   } | null>(null);
+  const [editingRecurring, setEditingRecurring] = useState<RecurringEditTarget | null>(null);
+  const [deletingRecurring, setDeletingRecurring] = useState<{
+    kind: "debit" | "income";
+    id: string;
+    groupId: string;
+    date: string;
+    label: string;
+  } | null>(null);
 
   const deleteSingleInst = useDeleteSingleInstallment();
   const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
+  const deleteRecurring = useDeleteRecurringSeries();
+  useEnsureRecurringForMonth(year, month);
 
   const askDeleteInst = (
     inst: Installment,

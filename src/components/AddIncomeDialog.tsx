@@ -47,7 +47,7 @@ export function AddIncomeDialog({
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
   const submit = async () => {
-    if (!description.trim() || amount <= 0 || !accountId) return;
+    if (!description.trim() || amount === 0 || !accountId) return;
     if (isRecurring && !isInstallment) {
       await addIncome.mutateAsync({
         accountId,

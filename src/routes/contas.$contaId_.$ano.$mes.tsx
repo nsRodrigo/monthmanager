@@ -27,6 +27,8 @@ import {
   normalizeZero,
   useDeleteSingleInstallment,
   useDeleteParentKeepingPaid,
+  useEnsureRecurringForMonth,
+  useDeleteRecurringSeries,
   type Installment,
   type Debit,
   type Income,

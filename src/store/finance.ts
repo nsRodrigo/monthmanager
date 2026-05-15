@@ -3080,7 +3080,7 @@ export function useUpdateRecurringSeries() {
           const last = new Date(y, m, 0).getDate();
           const day = Math.min(newDay, last);
           const newDate = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const { error: ue } = await supabase.from(table).update({ date: newDate }).eq("id", row.id);
+          const { error: ue } = await (supabase.from(table) as any).update({ date: newDate }).eq("id", row.id);
           if (ue) throw ue;
         }
       }

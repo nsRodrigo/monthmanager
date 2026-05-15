@@ -60,6 +60,8 @@ import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditI
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
+import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
+import { DeleteRecurringDialog } from "@/components/DeleteRecurringDialog";
 import { useConfirm } from "@/store/confirm";
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({

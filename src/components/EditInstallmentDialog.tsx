@@ -258,7 +258,7 @@ export function EditInstallmentDialog({
         )}
 
         <Field label="Valor">
-          <CurrencyInput value={amount} onValueChange={setAmount} />
+          <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           <p className="mt-1 text-[11px] text-muted-foreground">
             Valor atual: {formatCurrency(inst.amount)}.
           </p>

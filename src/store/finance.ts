@@ -3058,8 +3058,7 @@ export function useUpdateRecurringSeries() {
 
       // forward: this row + all rows in the group with date >= anchorDate
       if (Object.keys(baseUpdate).length > 0) {
-        const { error } = await supabase
-          .from(table)
+        const { error } = await (supabase.from(table) as any)
           .update(baseUpdate)
           .eq("recurrence_group_id", args.groupId)
           .gte("date", args.anchorDate);

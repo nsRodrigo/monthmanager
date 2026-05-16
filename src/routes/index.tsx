@@ -193,7 +193,7 @@ function Consolidated() {
                 return pur ? accCardIds.has(pur.cardId) : false;
               })
               .reduce((s, i) => s + i.amount, 0);
-            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal);
+            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal - accInvested);
 
             return (
               <Link

@@ -2752,7 +2752,7 @@ export type MonthlyBalance = {
   debitos: number;
   faturas: number;
   investido: number;
-  balanco: number; // recebimentos - despesas (sem investimento)
+  balanco: number; // recebimentos - débitos - faturas - investimentos
   saldoEmConta: number; // saldo acumulado real ao fim do mês
 };
 

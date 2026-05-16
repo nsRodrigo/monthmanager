@@ -166,7 +166,7 @@ function AccountHome() {
     installments,
   );
 
-  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal);
+  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal - monthInvested);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">

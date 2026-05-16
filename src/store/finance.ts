@@ -174,12 +174,19 @@ export function getInvoiceMonth(
   closingDay: number,
   dueDay: number,
 ): { year: number; month: number; dueDate: string } {
-  const d = typeof purchaseDate === "string" ? new Date(purchaseDate) : purchaseDate;
-  const purchaseDay = d.getDate();
+  // Parse "YYYY-MM-DD" como data local (sem shift de fuso UTC).
+  const parsed =
+    typeof purchaseDate === "string"
+      ? (() => {
+          const [yy, mm, dd] = purchaseDate.slice(0, 10).split("-").map(Number);
+          return { y: yy, m: (mm || 1) - 1, d: dd || 1 };
+        })()
+      : { y: purchaseDate.getFullYear(), m: purchaseDate.getMonth(), d: purchaseDate.getDate() };
+  const purchaseDay = parsed.d;
   // If purchase happens AFTER the closing day, the invoice closes next month
   // and is due the month after. Otherwise it closes this month and is due next.
   const monthsAhead = purchaseDay > closingDay ? 2 : 1;
-  const target = new Date(d.getFullYear(), d.getMonth() + monthsAhead, 1);
+  const target = new Date(parsed.y, parsed.m + monthsAhead, 1);
   const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
   const day = Math.min(dueDay, lastDay);
   const due = new Date(target.getFullYear(), target.getMonth(), day);
@@ -201,7 +208,9 @@ export function buildInstallments(
 ) {
   const count = Math.max(1, installmentsCount);
   const base = round2(totalAmount / count);
-  const start = new Date(startDate);
+  // Parse "YYYY-MM-DD" como data local (sem shift de fuso UTC).
+  const [sY, sM, sD] = startDate.slice(0, 10).split("-").map(Number);
+  const start = new Date(sY, (sM || 1) - 1, sD || 1);
   const dayOfMonth = start.getDate();
   let accum = 0;
   const items: Array<{
@@ -1430,7 +1439,9 @@ export function useAddDebit() {
         // registro independente compartilhando recurrence_group_id. Sem
         // installments — recorrência NÃO é parcelamento.
         const RECUR_MONTHS = 24;
-        const start = new Date(d.date);
+        // Parse local — evita shift de fuso ao replicar a série.
+        const [_sy, _sm, _sd] = d.date.slice(0, 10).split("-").map(Number);
+        const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
         const day = start.getDate();
         const rows = [];
         for (let i = 1; i <= RECUR_MONTHS; i++) {
@@ -1561,7 +1572,9 @@ export function useAddIncome() {
         // Série recorrente: 24 meses à frente, registros independentes
         // compartilhando recurrence_group_id. Sem installments.
         const RECUR_MONTHS = 24;
-        const start = new Date(i.date);
+        // Parse local — evita shift de fuso ao replicar a série.
+        const [_sy, _sm, _sd] = i.date.slice(0, 10).split("-").map(Number);
+        const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
         const day = start.getDate();
         const rows = [];
         for (let k = 1; k <= RECUR_MONTHS; k++) {

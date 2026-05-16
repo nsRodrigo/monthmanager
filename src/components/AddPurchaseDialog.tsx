@@ -94,7 +94,7 @@ export function AddPurchaseDialog({
           <Field label="Valor total">
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </Field>
-          <Field label="Data da compra">
+          <Field label="Data">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>

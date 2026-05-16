@@ -2752,7 +2752,7 @@ export type MonthlyBalance = {
   debitos: number;
   faturas: number;
   investido: number;
-  balanco: number; // recebimentos - despesas (sem investimento)
+  balanco: number; // recebimentos - débitos - faturas - investimentos
   saldoEmConta: number; // saldo acumulado real ao fim do mês
 };
 
@@ -2829,7 +2829,7 @@ export function computeMonthlyAccountBalance(
   for (const k of sortedKeys) {
     const b = buckets.get(k)!;
     const [y, m] = k.split("-").map(Number);
-    const balanco = b.rec - b.deb - b.fat;
+    const balanco = b.rec - b.deb - b.fat - b.inv;
     running = running + b.rec - b.deb - b.fat - b.inv;
     result.set(k, {
       year: y,

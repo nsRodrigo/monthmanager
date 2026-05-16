@@ -166,7 +166,7 @@ function AccountHome() {
     installments,
   );
 
-  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal);
+  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal - monthInvested);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
@@ -313,7 +313,8 @@ function AccountHome() {
             purchases,
             installments,
           );
-            const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal);
+            const monthInv = getMonthInvestments(accountInvestments, year, m).reduce((s, i) => s + i.amount, 0);
+            const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal - monthInv);
             const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);

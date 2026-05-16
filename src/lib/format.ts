@@ -1,8 +1,11 @@
-export const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", {
+export const formatCurrency = (value: number) => {
+  // Clamp tiny float noise and normalize -0 → 0 so "-R$ 0,00" never leaks.
+  const v = Math.abs(value) < 0.005 ? 0 : value;
+  return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format(value);
+  }).format(v);
+};
 
 export const MONTHS = [
   "Janeiro",

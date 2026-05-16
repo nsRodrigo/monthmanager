@@ -154,9 +154,6 @@ function Consolidated() {
             tone="primary"
           />
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
-        </p>
       </section>
 
       <section className="mt-8">

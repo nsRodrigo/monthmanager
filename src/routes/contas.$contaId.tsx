@@ -9,6 +9,7 @@ import {
   useIncomes,
   useInvestments,
   computeAccountBalanceUntilNow,
+  computeMonthFinance,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,

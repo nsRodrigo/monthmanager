@@ -258,7 +258,7 @@ function Consolidated() {
                 </div>
                 {accInvested > 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    Investido: <span className="font-semibold text-primary">{formatCurrency(accInvested)}</span>
+                    Investimentos + Carteira: <span className="font-semibold text-primary">{formatCurrency(accInvested)}</span>
                   </p>
                 )}
               </Link>

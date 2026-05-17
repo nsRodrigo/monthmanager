@@ -2752,33 +2752,14 @@ export type MonthlyBalance = {
   debitos: number;
   faturas: number;
   investido: number;
-  /** Débitos + Faturas + Investimentos+Carteira (saída total do mês). */
-  gastosTotais: number;
-  /** Sobra acumulada do mês anterior (= sobraMes do mês anterior). */
-  sobraMesAnterior: number;
-  /** Saldo Disponível = sobraMesAnterior + recebimentos do mês. */
-  saldoDisponivel: number;
-  /** Sobra do Mês = saldoDisponivel - gastosTotais (= novo running). */
-  sobraMes: number;
-  /**
-   * @deprecated Mantido por compatibilidade — equivale a `sobraMes`.
-   * O conceito de "Saldo em Conta" foi removido em favor de
-   * "Saldo Disponível" + "Sobra do Mês".
-   */
-  saldoEmConta: number;
-  /** @deprecated Use `sobraMes` (regra antiga: rec - deb - fat - inv). */
-  balanco: number;
+  balanco: number; // recebimentos - débitos - faturas - investimentos
+  saldoEmConta: number; // saldo acumulado real ao fim do mês
 };
 
 /**
  * Compute month-by-month running balance for an account, starting from
  * initialBalance. Includes ALL movements (regardless of paid status), since
  * the metric represents the projected end-of-month balance.
- *
- * Regras oficiais:
- *   gastosTotais       = débitos + faturas + investimentos+carteira
- *   saldoDisponivel    = sobraMesAnterior + recebimentos
- *   sobraMes           = saldoDisponivel - gastosTotais
  */
 export function computeMonthlyAccountBalance(
   account: Account,
@@ -2805,16 +2786,19 @@ export function computeMonthlyAccountBalance(
     return b;
   };
 
+  // single incomes
   for (const inc of incomes) {
     if (inc.accountId !== account.id || inc.isParent || !inc.date) continue;
     const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
     if (y && m) ensure(y, m - 1).rec += inc.amount;
   }
+  // single debits
   for (const d of debits) {
     if (d.accountId !== account.id || d.isParent || !d.date) continue;
     const [y, m] = d.date.slice(0, 10).split("-").map(Number);
     if (y && m) ensure(y, m - 1).deb += d.amount;
   }
+  // installments
   for (const i of installments) {
     if (i.parentType === "income") {
       const parent = incomes.find((x) => x.id === i.parentId);
@@ -2826,12 +2810,14 @@ export function computeMonthlyAccountBalance(
       if (i.parentId && accPurchaseIds.has(i.parentId)) ensure(i.year, i.month).fat += i.amount;
     }
   }
+  // investments
   for (const inv of investments) {
     if (inv.accountId !== account.id || !inv.date) continue;
     const [y, m] = inv.date.slice(0, 10).split("-").map(Number);
     if (y && m) ensure(y, m - 1).inv += inv.amount;
   }
 
+  // Sort chronologically and accumulate
   const sortedKeys = Array.from(buckets.keys()).sort((a, b) => {
     const [ay, am] = a.split("-").map(Number);
     const [by, bm] = b.split("-").map(Number);
@@ -2843,11 +2829,8 @@ export function computeMonthlyAccountBalance(
   for (const k of sortedKeys) {
     const b = buckets.get(k)!;
     const [y, m] = k.split("-").map(Number);
-    const gastosTotais = b.deb + b.fat + b.inv;
-    const sobraMesAnterior = running;
-    const saldoDisponivel = sobraMesAnterior + b.rec;
-    const sobraMes = saldoDisponivel - gastosTotais;
-    running = sobraMes;
+    const balanco = b.rec - b.deb - b.fat - b.inv;
+    running = running + b.rec - b.deb - b.fat - b.inv;
     result.set(k, {
       year: y,
       month: m,
@@ -2855,71 +2838,11 @@ export function computeMonthlyAccountBalance(
       debitos: b.deb,
       faturas: b.fat,
       investido: b.inv,
-      gastosTotais: round2(gastosTotais),
-      sobraMesAnterior: round2(sobraMesAnterior),
-      saldoDisponivel: round2(saldoDisponivel),
-      sobraMes: round2(sobraMes),
-      // legacy aliases
-      balanco: round2(b.rec - b.deb - b.fat - b.inv),
-      saldoEmConta: round2(sobraMes),
+      balanco,
+      saldoEmConta: round2(running),
     });
   }
   return result;
-}
-
-/**
- * Resolve as métricas oficiais de um mês específico para uma conta:
- *   - sobraMesAnterior  (sobra acumulada até o fim do mês anterior)
- *   - recebimentos      (somente do mês)
- *   - gastosTotais      (débitos + faturas + investimentos+carteira do mês)
- *   - saldoDisponivel   = sobraMesAnterior + recebimentos
- *   - sobraMes          = saldoDisponivel - gastosTotais
- *
- * Funciona mesmo quando o mês alvo não tem movimentação (buckets ausentes).
- */
-export function computeMonthFinance(
-  account: Account,
-  cards: Card[],
-  purchases: Purchase[],
-  installments: Installment[],
-  debits: Debit[],
-  incomes: Income[],
-  investments: Investment[],
-  year: number,
-  month: number,
-): {
-  sobraMesAnterior: number;
-  recebimentos: number;
-  gastosTotais: number;
-  saldoDisponivel: number;
-  sobraMes: number;
-} {
-  const monthly = computeMonthlyAccountBalance(
-    account, cards, purchases, installments, debits, incomes, investments,
-  );
-  const keys = Array.from(monthly.keys()).sort((a, b) => {
-    const [ay, am] = a.split("-").map(Number);
-    const [by, bm] = b.split("-").map(Number);
-    return ay !== by ? ay - by : am - bm;
-  });
-  let sobraPrev = account.initialBalance;
-  for (const k of keys) {
-    const [y, m] = k.split("-").map(Number);
-    if (y > year || (y === year && m >= month)) break;
-    sobraPrev = monthly.get(k)!.sobraMes;
-  }
-  const cur = monthly.get(`${year}-${month}`);
-  const rec = cur?.recebimentos ?? 0;
-  const gastos = (cur?.debitos ?? 0) + (cur?.faturas ?? 0) + (cur?.investido ?? 0);
-  const saldoDisp = sobraPrev + rec;
-  const sobra = saldoDisp - gastos;
-  return {
-    sobraMesAnterior: round2(sobraPrev),
-    recebimentos: round2(rec),
-    gastosTotais: round2(gastos),
-    saldoDisponivel: round2(saldoDisp),
-    sobraMes: round2(sobra),
-  };
 }
 
 // =======================

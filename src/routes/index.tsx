@@ -8,7 +8,7 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  computeMonthFinance,
+  computeAccountBalanceUntilNow,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
@@ -80,22 +80,13 @@ function Consolidated() {
     monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
   const totalInvested = getMonthInvestments(investments, year, month).reduce((s, i) => s + i.amount, 0);
 
-  // Saldo Disponível consolidado = Σ (sobraMesAnterior + recebimentosMesAtual) por conta
-  const totalSaldoDisponivel = accounts.reduce(
-    (s, a) =>
-      s +
-      computeMonthFinance(a, cards, purchases, installments, debits, incomes, investments, year, month).saldoDisponivel,
+  // accountBalance já é o saldo projetado ao fim do mês corrente
+  // (inclui rec - deb - fat - inv do mês), portanto NÃO somar de novo.
+  const accountBalance = accounts.reduce(
+    (s, a) => s + computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
     0,
   );
-  const totalSobraMes = accounts.reduce(
-    (s, a) =>
-      s +
-      computeMonthFinance(a, cards, purchases, installments, debits, incomes, investments, year, month).sobraMes,
-    0,
-  );
-  const totalGastosTotais = totalDebits + totalCredit + totalInvested;
-  const expected = normalizeZero(totalSaldoDisponivel);
-  const sobraMesConsolidada = normalizeZero(totalSobraMes);
+  const expected = normalizeZero(accountBalance);
 
   if (accounts.length === 0) {
     return (
@@ -129,7 +120,7 @@ function Consolidated() {
       </header>
 
       <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
-        <p className="text-sm text-muted-foreground">Saldo Disponível</p>
+        <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
         <p
           className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
             expected >= 0 ? "text-foreground" : "text-destructive"
@@ -137,22 +128,15 @@ function Consolidated() {
         >
           {formatCurrency(expected)}
         </p>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Sobra do mês anterior + Recebimentos do mês ·{" "}
-          <span className={sobraMesConsolidada >= 0 ? "text-success" : "text-destructive"}>
-            Sobra do mês: {formatCurrency(sobraMesConsolidada)}
-          </span>{" "}
-          · Gastos totais: {formatCurrency(normalizeZero(totalGastosTotais))}
-        </p>
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
           <Stat
-            label="Recebimentos"
+            label="A receber"
             value={formatCurrency(totalIncome)}
             icon={ArrowUpRight}
             tone="success"
           />
           <Stat
-            label="Débitos"
+            label="A pagar (débito)"
             value={formatCurrency(totalDebits)}
             icon={ArrowDownRight}
             tone="debit"
@@ -164,7 +148,7 @@ function Consolidated() {
             tone="credit"
           />
           <Stat
-            label="Investimentos + Carteira"
+            label="Investido"
             value={formatCurrency(totalInvested)}
             icon={TrendingUp}
             tone="primary"
@@ -177,10 +161,9 @@ function Consolidated() {
         <div className="grid gap-3 grid-cols-1">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-            const accFin = computeMonthFinance(
-              a, cards, purchases, installments, debits, incomes, investments, year, month,
+            const balance = normalizeZero(
+              computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
             );
-            const balance = normalizeZero(accFin.saldoDisponivel);
             const cardCount = cards.filter((c) => c.accountId === a.id).length;
 
             // Stats do mês corrente filtrados por conta
@@ -210,7 +193,7 @@ function Consolidated() {
                 return pur ? accCardIds.has(pur.cardId) : false;
               })
               .reduce((s, i) => s + i.amount, 0);
-            const accSobraMes = normalizeZero(accFin.sobraMes);
+            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal - accInvested);
 
             return (
               <Link
@@ -240,24 +223,24 @@ function Consolidated() {
                     >
                       {formatCurrency(balance)}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">Saldo Disponível</p>
+                    <p className="text-[10px] text-muted-foreground">saldo atual</p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 lg:grid-cols-4">
-                  <MiniStat label="Recebimentos" value={accIncomesTotal} tone="success" />
-                  <MiniStat label="Débitos" value={accDebitsTotal} tone="debit" />
+                  <MiniStat label="A receber" value={accIncomesTotal} tone="success" />
+                  <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
                   <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
                   <MiniStat
-                    label="Sobra do mês"
-                    value={accSobraMes}
-                    tone={accSobraMes >= 0 ? "success" : "debit"}
+                    label="Balanço do mês"
+                    value={accMonthBalance}
+                    tone={accMonthBalance >= 0 ? "success" : "debit"}
                   />
                 </div>
                 {accInvested > 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    Investimentos + Carteira: <span className="font-semibold text-primary">{formatCurrency(accInvested)}</span>
+                    Investido: <span className="font-semibold text-primary">{formatCurrency(accInvested)}</span>
                   </p>
                 )}
               </Link>

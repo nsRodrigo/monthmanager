@@ -22,7 +22,7 @@ import {
   getMonthIncomes,
   getMonthInvestments,
   isCardFullyPaid,
-  computeMonthFinance,
+  computeAccountBalanceUntilNow,
   isCardVisibleInMonth,
   normalizeZero,
   useDeleteSingleInstallment,
@@ -227,21 +227,21 @@ function AccountMonth() {
         </h1>
       </header>
 
-      {/* Frame com Saldo Disponível, Gastos Totais e Sobra do Mês */}
-      {(() => {
-        const fin = computeMonthFinance(
-          account, cards, purchases, installments, allDebits, allIncomes, allInvestments, year, month,
-        );
-        return (
-          <MonthSummaryFrame
-            saldoDisponivel={normalizeZero(fin.saldoDisponivel)}
-            gastosTotais={normalizeZero(fin.gastosTotais)}
-            sobraMes={normalizeZero(fin.sobraMes)}
-            sobraMesAnterior={normalizeZero(fin.sobraMesAnterior)}
-            recebimentos={normalizeZero(fin.recebimentos)}
-          />
-        );
-      })()}
+      {/* Frame com saldo atual e gastos totais */}
+      <MonthSummaryFrame
+        saldoAtual={normalizeZero(
+          computeAccountBalanceUntilNow(
+            account,
+            cards,
+            purchases,
+            installments,
+            allDebits,
+            allIncomes,
+            allInvestments,
+          ),
+        )}
+        gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
+      />
 
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
       <div className="mt-4 space-y-4">
@@ -648,52 +648,34 @@ function AccountMonth() {
 /* ───────── MONTH SUMMARY FRAME ───────── */
 
 function MonthSummaryFrame({
-  saldoDisponivel,
+  saldoAtual,
   gastosTotais,
-  sobraMes,
-  sobraMesAnterior,
-  recebimentos,
 }: {
-  saldoDisponivel: number;
+  saldoAtual: number;
   gastosTotais: number;
-  sobraMes: number;
-  sobraMesAnterior: number;
-  recebimentos: number;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Saldo Disponível
+          Saldo atual
         </p>
         <p
           className={`mt-1 text-base font-bold sm:text-lg ${
-            saldoDisponivel >= 0 ? "text-foreground" : "text-destructive"
+            saldoAtual >= 0 ? "text-foreground" : "text-destructive"
           }`}
         >
-          {formatCurrency(saldoDisponivel)}
-        </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">
-          Sobra anterior {formatCurrency(sobraMesAnterior)} + Recebimentos {formatCurrency(recebimentos)}
+          {formatCurrency(saldoAtual)}
         </p>
       </div>
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Gastos Totais
+          Gastos totais
         </p>
         <p className="mt-1 text-base font-bold text-debit sm:text-lg">
           {formatCurrency(gastosTotais)}
         </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">
-          débitos + faturas + investimentos+carteira
-        </p>
-        <p
-          className={`mt-1.5 text-[11px] font-semibold ${
-            sobraMes >= 0 ? "text-success" : "text-destructive"
-          }`}
-        >
-          Sobra do mês: {formatCurrency(sobraMes)}
-        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
       </div>
     </div>
   );

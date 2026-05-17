@@ -8,7 +8,7 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  computeMonthFinance,
+  computeAccountBalanceUntilNow,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
@@ -148,10 +148,9 @@ function AccountHome() {
   }
 
 
-  const accFin = computeMonthFinance(
-    account, cards, purchases, installments, debits, incomes, investments, eff.year, currentMonth,
+  const balance = normalizeZero(
+    computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
-  const balance = normalizeZero(accFin.saldoDisponivel);
   const monthInvested = getMonthInvestments(accountInvestments, eff.year, currentMonth)
     .reduce((s, i) => s + i.amount, 0);
 
@@ -167,7 +166,7 @@ function AccountHome() {
     installments,
   );
 
-  const monthBalance = normalizeZero(accFin.sobraMes);
+  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal - monthInvested);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
@@ -203,19 +202,19 @@ function AccountHome() {
             >
               {formatCurrency(balance)}
             </p>
-            <p className="text-[10px] text-muted-foreground">Saldo Disponível</p>
+            <p className="text-[10px] text-muted-foreground">saldo atual</p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border/60 pt-4 lg:grid-cols-4">
-          <MiniStat label="Recebimentos" value={cm.income} tone="success" />
-          <MiniStat label="Débitos" value={cm.debits} tone="debit" />
+          <MiniStat label="A receber" value={cm.income} tone="success" />
+          <MiniStat label="A pagar" value={cm.debits} tone="debit" />
           <MiniStat label="Faturas" value={cm.cardsTotal} tone="credit" />
-          <MiniStat label="Sobra do mês" value={monthBalance} tone={monthBalance >= 0 ? "success" : "debit"} />
+          <MiniStat label="Balanço do mês" value={monthBalance} tone={monthBalance >= 0 ? "success" : "debit"} />
         </div>
         {monthInvested > 0 && (
           <p className="mt-3 text-[11px] text-muted-foreground">
-            Investimentos + Carteira: <span className="font-semibold text-primary">{formatCurrency(monthInvested)}</span>
+            Investido: <span className="font-semibold text-primary">{formatCurrency(monthInvested)}</span>
           </p>
         )}
       </header>
@@ -315,11 +314,8 @@ function AccountHome() {
             installments,
           );
             const monthInv = getMonthInvestments(accountInvestments, year, m).reduce((s, i) => s + i.amount, 0);
-            const mb = monthlyBalances.get(`${year}-${m}`);
-            const sobraMes = normalizeZero(mb?.sobraMes ?? 0);
-            const saldoDisp = normalizeZero(mb?.saldoDisponivel ?? 0);
-            const monthBal = sobraMes;
-            const saldoConta = saldoDisp;
+            const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal - monthInv);
+            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
 
@@ -349,11 +345,11 @@ function AccountHome() {
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
                   <p className={`mt-0.5 truncate text-xs font-semibold ${monthBal >= 0 ? "text-success" : "text-destructive"}`}>
-                    Sobra do mês: {formatCurrency(monthBal)}
+                    Balanço: {formatCurrency(monthBal)}
                   </p>
                 </div>
                 <div className="hidden text-right sm:block">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo Disponível</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
                   <p
                     className={`whitespace-nowrap text-lg font-bold ${
                       saldoConta >= 0 ? "text-foreground" : "text-destructive"
@@ -362,6 +358,24 @@ function AccountHome() {
                     {formatCurrency(saldoConta)}
                   </p>
                 </div>
+              </div>
+
+              {/* Saldo em conta — mobile only, in its own row */}
+              <div className="mt-3 flex items-baseline justify-between gap-2 border-t border-border/60 pt-3 sm:hidden">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
+                <p
+                  className={`whitespace-nowrap text-base font-bold ${
+                    saldoConta >= 0 ? "text-foreground" : "text-destructive"
+                  }`}
+                >
+                  {formatCurrency(saldoConta)}
+                </p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
+                <Mini label="Receb." value={sum.income} tone="success" />
+                <Mini label="Débitos" value={sum.debits} tone="debit" />
+                <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
               </div>
             </Link>
             );

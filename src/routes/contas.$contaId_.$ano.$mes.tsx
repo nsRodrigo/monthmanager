@@ -227,21 +227,21 @@ function AccountMonth() {
         </h1>
       </header>
 
-      {/* Frame com saldo atual e gastos totais */}
-      <MonthSummaryFrame
-        saldoAtual={normalizeZero(
-          computeAccountBalanceUntilNow(
-            account,
-            cards,
-            purchases,
-            installments,
-            allDebits,
-            allIncomes,
-            allInvestments,
-          ),
-        )}
-        gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
-      />
+      {/* Frame com Saldo Disponível, Gastos Totais e Sobra do Mês */}
+      {(() => {
+        const fin = computeMonthFinance(
+          account, cards, purchases, installments, allDebits, allIncomes, allInvestments, year, month,
+        );
+        return (
+          <MonthSummaryFrame
+            saldoDisponivel={normalizeZero(fin.saldoDisponivel)}
+            gastosTotais={normalizeZero(fin.gastosTotais)}
+            sobraMes={normalizeZero(fin.sobraMes)}
+            sobraMesAnterior={normalizeZero(fin.sobraMesAnterior)}
+            recebimentos={normalizeZero(fin.recebimentos)}
+          />
+        );
+      })()}
 
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
       <div className="mt-4 space-y-4">

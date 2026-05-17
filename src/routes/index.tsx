@@ -130,7 +130,7 @@ function Consolidated() {
       </header>
 
       <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
-        <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
+        <p className="text-sm text-muted-foreground">Saldo Disponível</p>
         <p
           className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
             expected >= 0 ? "text-foreground" : "text-destructive"
@@ -138,9 +138,16 @@ function Consolidated() {
         >
           {formatCurrency(expected)}
         </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Sobra do mês anterior + Recebimentos do mês ·{" "}
+          <span className={sobraMesConsolidada >= 0 ? "text-success" : "text-destructive"}>
+            Sobra do mês: {formatCurrency(sobraMesConsolidada)}
+          </span>{" "}
+          · Gastos totais: {formatCurrency(normalizeZero(totalGastosTotais))}
+        </p>
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
           <Stat
-            label="A receber"
+            label="Recebimentos"
             value={formatCurrency(totalIncome)}
             icon={ArrowUpRight}
             tone="success"

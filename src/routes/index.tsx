@@ -80,13 +80,11 @@ function Consolidated() {
     monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
   const totalInvested = getMonthInvestments(investments, year, month).reduce((s, i) => s + i.amount, 0);
 
-  // accountBalance já é o saldo projetado ao fim do mês corrente
-  // (inclui rec - deb - fat - inv do mês), portanto NÃO somar de novo.
   const accountBalance = accounts.reduce(
     (s, a) => s + computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
     0,
   );
-  const expected = normalizeZero(accountBalance);
+  const expected = normalizeZero(accountBalance + totalIncome - totalDebits - totalCredit);
 
   if (accounts.length === 0) {
     return (
@@ -154,6 +152,9 @@ function Consolidated() {
             tone="primary"
           />
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
+        </p>
       </section>
 
       <section className="mt-8">
@@ -193,7 +194,7 @@ function Consolidated() {
                 return pur ? accCardIds.has(pur.cardId) : false;
               })
               .reduce((s, i) => s + i.amount, 0);
-            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal - accInvested);
+            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal);
 
             return (
               <Link

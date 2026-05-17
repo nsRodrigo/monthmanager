@@ -648,34 +648,52 @@ function AccountMonth() {
 /* ───────── MONTH SUMMARY FRAME ───────── */
 
 function MonthSummaryFrame({
-  saldoAtual,
+  saldoDisponivel,
   gastosTotais,
+  sobraMes,
+  sobraMesAnterior,
+  recebimentos,
 }: {
-  saldoAtual: number;
+  saldoDisponivel: number;
   gastosTotais: number;
+  sobraMes: number;
+  sobraMesAnterior: number;
+  recebimentos: number;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Saldo atual
+          Saldo Disponível
         </p>
         <p
           className={`mt-1 text-base font-bold sm:text-lg ${
-            saldoAtual >= 0 ? "text-foreground" : "text-destructive"
+            saldoDisponivel >= 0 ? "text-foreground" : "text-destructive"
           }`}
         >
-          {formatCurrency(saldoAtual)}
+          {formatCurrency(saldoDisponivel)}
+        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">
+          Sobra anterior {formatCurrency(sobraMesAnterior)} + Recebimentos {formatCurrency(recebimentos)}
         </p>
       </div>
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Gastos totais
+          Gastos Totais
         </p>
         <p className="mt-1 text-base font-bold text-debit sm:text-lg">
           {formatCurrency(gastosTotais)}
         </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">
+          débitos + faturas + investimentos+carteira
+        </p>
+        <p
+          className={`mt-1.5 text-[11px] font-semibold ${
+            sobraMes >= 0 ? "text-success" : "text-destructive"
+          }`}
+        >
+          Sobra do mês: {formatCurrency(sobraMes)}
+        </p>
       </div>
     </div>
   );

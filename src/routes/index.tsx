@@ -178,9 +178,10 @@ function Consolidated() {
         <div className="grid gap-3 grid-cols-1">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-            const balance = normalizeZero(
-              computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
+            const accFin = computeMonthFinance(
+              a, cards, purchases, installments, debits, incomes, investments, year, month,
             );
+            const balance = normalizeZero(accFin.saldoDisponivel);
             const cardCount = cards.filter((c) => c.accountId === a.id).length;
 
             // Stats do mês corrente filtrados por conta
@@ -210,7 +211,7 @@ function Consolidated() {
                 return pur ? accCardIds.has(pur.cardId) : false;
               })
               .reduce((s, i) => s + i.amount, 0);
-            const accMonthBalance = normalizeZero(accIncomesTotal - accDebitsTotal - accCardsTotal - accInvested);
+            const accSobraMes = normalizeZero(accFin.sobraMes);
 
             return (
               <Link

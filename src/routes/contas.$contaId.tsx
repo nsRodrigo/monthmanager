@@ -363,6 +363,8 @@ function AccountHome() {
                     {formatCurrency(saldoConta)}
                   </p>
                 </div>
+              </div>
+            </Link>
             );
           })
         )}

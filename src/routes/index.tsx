@@ -8,7 +8,6 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  computeAccountBalanceUntilNow,
   computeMonthFinance,
   getMonthInstallments,
   getMonthDebits,

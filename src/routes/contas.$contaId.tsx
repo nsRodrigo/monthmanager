@@ -149,9 +149,10 @@ function AccountHome() {
   }
 
 
-  const balance = normalizeZero(
-    computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
+  const accFin = computeMonthFinance(
+    account, cards, purchases, installments, debits, incomes, investments, eff.year, currentMonth,
   );
+  const balance = normalizeZero(accFin.saldoDisponivel);
   const monthInvested = getMonthInvestments(accountInvestments, eff.year, currentMonth)
     .reduce((s, i) => s + i.amount, 0);
 
@@ -167,7 +168,7 @@ function AccountHome() {
     installments,
   );
 
-  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal - monthInvested);
+  const monthBalance = normalizeZero(accFin.sobraMes);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">

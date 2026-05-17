@@ -241,19 +241,19 @@ function Consolidated() {
                     >
                       {formatCurrency(balance)}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">saldo atual</p>
+                    <p className="text-[10px] text-muted-foreground">Saldo Disponível</p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 lg:grid-cols-4">
-                  <MiniStat label="A receber" value={accIncomesTotal} tone="success" />
-                  <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
+                  <MiniStat label="Recebimentos" value={accIncomesTotal} tone="success" />
+                  <MiniStat label="Débitos" value={accDebitsTotal} tone="debit" />
                   <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
                   <MiniStat
-                    label="Balanço do mês"
-                    value={accMonthBalance}
-                    tone={accMonthBalance >= 0 ? "success" : "debit"}
+                    label="Sobra do mês"
+                    value={accSobraMes}
+                    tone={accSobraMes >= 0 ? "success" : "debit"}
                   />
                 </div>
                 {accInvested > 0 && (

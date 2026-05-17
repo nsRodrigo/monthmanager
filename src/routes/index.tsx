@@ -153,7 +153,7 @@ function Consolidated() {
             tone="success"
           />
           <Stat
-            label="A pagar (débito)"
+            label="Débitos"
             value={formatCurrency(totalDebits)}
             icon={ArrowDownRight}
             tone="debit"
@@ -165,7 +165,7 @@ function Consolidated() {
             tone="credit"
           />
           <Stat
-            label="Investido"
+            label="Investimentos + Carteira"
             value={formatCurrency(totalInvested)}
             icon={TrendingUp}
             tone="primary"

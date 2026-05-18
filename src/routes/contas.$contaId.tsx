@@ -16,7 +16,6 @@ import {
   getEffectiveCurrentMonth,
   normalizeZero,
   isCardVisibleInMonth,
-  getMonthInvestments,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";

@@ -342,7 +342,7 @@ function AccountHome() {
             installments,
           );
             const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal);
-            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0);
+            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
 

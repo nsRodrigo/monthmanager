@@ -13,9 +13,9 @@ import {
   getMonthDebits,
   getMonthIncomes,
   getMonthInvestments,
-  computeMonthlyAccountBalance,
   getEffectiveCurrentMonth,
   normalizeZero,
+  isCardVisibleInMonth,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -131,10 +131,38 @@ function AccountHome() {
   const [openYear, setOpenYear] = useState(false);
   const [openAddMonth, setOpenAddMonth] = useState(false);
 
-  const monthlyBalances = useMemo(
-    () => account ? computeMonthlyAccountBalance(account, cards, purchases, installments, debits, incomes, investments) : new Map(),
-    [account, cards, purchases, installments, debits, incomes, investments],
-  );
+  const monthlyBalances = useMemo(() => {
+    if (!account) return new Map<string, number>();
+    const allMonths = Array.from(yearMonthMap.entries())
+      .flatMap(([y, months]) => Array.from(months).map((m) => ({ y, m })))
+      .sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
+
+    const map = new Map<string, number>();
+    let running = account.initialBalance;
+    for (const { y, m } of allMonths) {
+      const cardIds = new Set(
+        cards
+          .filter((c) => c.accountId === account.id && isCardVisibleInMonth(c, y, m))
+          .map((c) => c.id)
+      );
+      const sum = currentMonthSummary(
+        y, m,
+        cardIds,
+        cards.filter((c) => cardIds.has(c.id)),
+        debits.filter((d) => d.accountId === account.id),
+        incomes.filter((i) => i.accountId === account.id),
+        purchases,
+        installments,
+      );
+      const monthInv = getMonthInvestments(
+        investments.filter((i) => i.accountId === account.id),
+        y, m,
+      ).reduce((s, i) => s + i.amount, 0);
+      running = running + sum.income - sum.debits - sum.cardsTotal - monthInv;
+      map.set(`${y}-${m}`, Math.round(running * 100) / 100);
+    }
+    return map;
+  }, [account, cards, purchases, installments, debits, incomes, investments, yearMonthMap]);
 
   if (!account) {
     return (
@@ -314,7 +342,7 @@ function AccountHome() {
             installments,
           );
             const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal);
-            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`)?.saldoEmConta ?? 0);
+            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
 

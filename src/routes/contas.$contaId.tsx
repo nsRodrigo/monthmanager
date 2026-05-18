@@ -137,28 +137,22 @@ function AccountHome() {
       .flatMap(([y, months]) => Array.from(months).map((m) => ({ y, m })))
       .sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
 
+    const accDebits = debits.filter((d) => d.accountId === account.id);
+    const accIncomes = incomes.filter((i) => i.accountId === account.id);
+    const accInvestments = investments.filter((i) => i.accountId === account.id);
+
     const map = new Map<string, number>();
     let running = account.initialBalance;
     for (const { y, m } of allMonths) {
-      const cardIds = new Set(
-        cards
-          .filter((c) => c.accountId === account.id && isCardVisibleInMonth(c, y, m))
-          .map((c) => c.id)
-      );
-      const sum = currentMonthSummary(
-        y, m,
-        cardIds,
-        cards.filter((c) => cardIds.has(c.id)),
-        debits.filter((d) => d.accountId === account.id),
-        incomes.filter((i) => i.accountId === account.id),
-        purchases,
-        installments,
-      );
-      const monthInv = getMonthInvestments(
-        investments.filter((i) => i.accountId === account.id),
-        y, m,
-      ).reduce((s, i) => s + i.amount, 0);
-      running = running + sum.income - sum.debits - sum.cardsTotal - monthInv;
+      const vCards = cards.filter((c) => c.accountId === account.id && isCardVisibleInMonth(c, y, m));
+      const vCardIds = new Set(vCards.map((c) => c.id));
+      const s = currentMonthSummary(y, m, vCardIds, vCards, accDebits, accIncomes, purchases, installments);
+      const mDebits = getMonthDebits(accDebits, installments, y, m);
+      const tDebits =
+        mDebits.single.reduce((acc, d) => acc + d.amount, 0) +
+        mDebits.parcelled.reduce((acc, p) => acc + p.installment.amount, 0);
+      const inv = getMonthInvestments(accInvestments, y, m).reduce((acc, i) => acc + i.amount, 0);
+      running = running + s.income - tDebits - s.cardsTotal - inv;
       map.set(`${y}-${m}`, Math.round(running * 100) / 100);
     }
     return map;

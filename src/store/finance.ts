@@ -3170,6 +3170,20 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
             .limit(1);
           if (existing && existing.length > 0) continue;
 
+          // Busca o registro mais antigo do grupo para saber quando a série começou.
+          // Só cria o mês alvo se ele for >= ao mês de início da série.
+          const { data: earliest } = await supabase
+            .from(table)
+            .select("date")
+            .eq("recurrence_group_id", gid)
+            .order("date", { ascending: true })
+            .limit(1);
+          if (!earliest || earliest.length === 0) continue;
+          const seriesStartDate = earliest[0].date as string;
+          const seriesYear = parseInt(seriesStartDate.slice(0, 4), 10);
+          const seriesMonth = parseInt(seriesStartDate.slice(5, 7), 10) - 1;
+          if (year < seriesYear || (year === seriesYear && month < seriesMonth)) continue;
+
           const { data: latest } = await supabase
             .from(table)
             .select("*")

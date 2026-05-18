@@ -325,20 +325,35 @@ function AccountHome() {
           </div>
         ) : (
           monthsForYear.map((m) => {
+            const visibleCards = cards.filter(
+              (c) => c.accountId === contaId && isCardVisibleInMonth(c, year, m)
+            );
+            const visibleCardIds = new Set(visibleCards.map((c) => c.id));
             const sum = currentMonthSummary(
-            year,
-            m,
-            accountCardIds,
-            accountCards,
-            accountDebits,
-            accountIncomes,
-            purchases,
-            installments,
-          );
-            const monthBal = normalizeZero(sum.income - sum.debits - sum.cardsTotal);
+              year, m,
+              visibleCardIds,
+              visibleCards,
+              accountDebits,
+              accountIncomes,
+              purchases,
+              installments,
+            );
+            const mDebits = getMonthDebits(accountDebits, installments, year, m);
+            const totalDebits =
+              mDebits.single.reduce((s, d) => s + d.amount, 0) +
+              mDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+            const mIncomes = getMonthIncomes(accountIncomes, installments, year, m);
+            const totalIncome =
+              mIncomes.single.reduce((s, i) => s + i.amount, 0) +
+              mIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
+            const totalInvested = getMonthInvestments(accountInvestments, year, m)
+              .reduce((s, i) => s + i.amount, 0);
+            const gastosTotais = totalDebits + totalInvested + sum.cardsTotal;
+            const monthBal = normalizeZero(totalIncome - gastosTotais);
             const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
+
 
             return (
             <Link

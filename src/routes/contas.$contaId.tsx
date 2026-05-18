@@ -408,10 +408,9 @@ function AccountHome() {
                 </p>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
-                <Mini label="Receb." value={sum.income} tone="success" />
-                <Mini label="Débitos" value={sum.debits} tone="debit" />
-                <Mini label="Faturas" value={sum.cardsTotal} tone="credit" />
+              <div className="mt-3 grid grid-cols-2 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
+                <Mini label="Receb." value={totalIncome} tone="success" />
+                <Mini label="Gastos Totais" value={gastosTotais} tone="debit" />
               </div>
             </Link>
             );

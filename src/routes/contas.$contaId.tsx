@@ -338,18 +338,11 @@ function AccountHome() {
               purchases,
               installments,
             );
-            const mDebits = getMonthDebits(accountDebits, installments, year, m);
-            const totalDebits =
-              mDebits.single.reduce((s, d) => s + d.amount, 0) +
-              mDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-            const mIncomes = getMonthIncomes(accountIncomes, installments, year, m);
-            const totalIncome =
-              mIncomes.single.reduce((s, i) => s + i.amount, 0) +
-              mIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-            const totalInvested = getMonthInvestments(accountInvestments, year, m)
-              .reduce((s, i) => s + i.amount, 0);
-            const gastosTotais = totalDebits + totalInvested + sum.cardsTotal;
-            const monthBal = normalizeZero(totalIncome - gastosTotais);
+            const monthInv = getMonthInvestments(accountInvestments, year, m).reduce((s, i) => s + i.amount, 0);
+            const md = getMonthDebits(accountDebits, installments, year, m);
+            const totalDebits = normalizeZero(md.single.reduce((s, d) => s + d.amount, 0) + md.parcelled.reduce((s, p) => s + p.installment.amount, 0));
+            const totalIncome = normalizeZero(sum.income);
+            const totalFaturas = normalizeZero(sum.cardsTotal);
             const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
@@ -380,8 +373,8 @@ function AccountHome() {
                     <p className="truncate text-lg font-bold">{MONTHS[m]}</p>
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
-                  <p className={`mt-0.5 truncate text-xs font-semibold ${monthBal >= 0 ? "text-success" : "text-destructive"}`}>
-                    Balanço: {formatCurrency(monthBal)}
+                  <p className={`mt-0.5 truncate text-xs font-semibold ${totalIncome >= 0 ? "text-success" : "text-destructive"}`}>
+                    Recebíveis: {formatCurrency(totalIncome)}
                   </p>
                 </div>
                 <div className="hidden text-right sm:block">
@@ -408,9 +401,10 @@ function AccountHome() {
                 </p>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
-                <Mini label="Receb." value={totalIncome} tone="success" />
-                <Mini label="Gastos Totais" value={gastosTotais} tone="debit" />
+              <div className="mt-3 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
+                <Mini label="Débitos" value={totalDebits} tone="debit" />
+                <Mini label="Faturas" value={totalFaturas} tone="credit" />
+                <Mini label="Investimentos" value={monthInv} tone="debit" />
               </div>
             </Link>
             );

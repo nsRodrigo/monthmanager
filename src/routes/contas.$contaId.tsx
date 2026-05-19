@@ -348,8 +348,11 @@ function AccountHome() {
               mIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
             const totalInvested = getMonthInvestments(accountInvestments, year, m)
               .reduce((s, i) => s + i.amount, 0);
-            const gastosTotais = totalDebits + totalInvested + sum.cardsTotal;
-            const monthBal = normalizeZero(totalIncome - gastosTotais);
+            const monthInv = getMonthInvestments(accountInvestments, year, m).reduce((s, i) => s + i.amount, 0);
+            const md = getMonthDebits(accountDebits, installments, year, m);
+            const totalDebits = normalizeZero(md.single.reduce((s, d) => s + d.amount, 0) + md.parcelled.reduce((s, p) => s + p.installment.amount, 0));
+            const totalIncome = normalizeZero(sum.income);
+            const totalFaturas = normalizeZero(sum.cardsTotal);
             const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0);
             const isCurrent = year === eff.year && m === currentMonth;
             const isFuture = year > eff.year || (year === eff.year && m > currentMonth);

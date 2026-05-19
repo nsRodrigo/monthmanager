@@ -22,7 +22,7 @@ import {
   getMonthIncomes,
   getMonthInvestments,
   isCardFullyPaid,
-  computeAccountBalanceUntilNow,
+  computeMonthlyAccountBalance,
   isCardVisibleInMonth,
   normalizeZero,
   useDeleteSingleInstallment,
@@ -186,6 +186,23 @@ function AccountMonth() {
     .reduce((s, i) => s + i.amount, 0);
   const totalInvested = investments.reduce((s, i) => s + i.amount, 0);
 
+  // Saldo Atual = saldo final do mês anterior + recebíveis do mês atual
+  const saldoAtual = (() => {
+    if (!account) return 0;
+    const monthly = computeMonthlyAccountBalance(
+      account,
+      cards,
+      purchases,
+      installments,
+      allDebits,
+      allIncomes,
+      allInvestments,
+    );
+    const prevKey = month === 0 ? `${year - 1}-11` : `${year}-${month - 1}`;
+    const saldoAnterior = monthly.get(prevKey)?.saldoEmConta ?? account.initialBalance;
+    return normalizeZero(saldoAnterior + totalIncome);
+  })();
+
   if (!account) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center text-muted-foreground">
@@ -229,17 +246,7 @@ function AccountMonth() {
 
       {/* Frame com saldo atual e gastos totais */}
       <MonthSummaryFrame
-        saldoAtual={normalizeZero(
-          computeAccountBalanceUntilNow(
-            account,
-            cards,
-            purchases,
-            installments,
-            allDebits,
-            allIncomes,
-            allInvestments,
-          ),
-        )}
+        saldoAtual={normalizeZero(saldoAtual)}
         gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
       />
 

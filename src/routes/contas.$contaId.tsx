@@ -373,8 +373,8 @@ function AccountHome() {
                     <p className="truncate text-lg font-bold">{MONTHS[m]}</p>
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
-                  <p className={`mt-0.5 truncate text-xs font-semibold ${monthBal >= 0 ? "text-success" : "text-destructive"}`}>
-                    Balanço: {formatCurrency(monthBal)}
+                  <p className={`mt-0.5 truncate text-xs font-semibold ${totalIncome >= 0 ? "text-success" : "text-destructive"}`}>
+                    Recebíveis: {formatCurrency(totalIncome)}
                   </p>
                 </div>
                 <div className="hidden text-right sm:block">

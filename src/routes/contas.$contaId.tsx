@@ -338,16 +338,6 @@ function AccountHome() {
               purchases,
               installments,
             );
-            const mDebits = getMonthDebits(accountDebits, installments, year, m);
-            const totalDebits =
-              mDebits.single.reduce((s, d) => s + d.amount, 0) +
-              mDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-            const mIncomes = getMonthIncomes(accountIncomes, installments, year, m);
-            const totalIncome =
-              mIncomes.single.reduce((s, i) => s + i.amount, 0) +
-              mIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-            const totalInvested = getMonthInvestments(accountInvestments, year, m)
-              .reduce((s, i) => s + i.amount, 0);
             const monthInv = getMonthInvestments(accountInvestments, year, m).reduce((s, i) => s + i.amount, 0);
             const md = getMonthDebits(accountDebits, installments, year, m);
             const totalDebits = normalizeZero(md.single.reduce((s, d) => s + d.amount, 0) + md.parcelled.reduce((s, p) => s + p.installment.amount, 0));

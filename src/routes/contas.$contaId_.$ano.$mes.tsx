@@ -247,17 +247,7 @@ function AccountMonth() {
 
       {/* Frame com saldo atual e gastos totais */}
       <MonthSummaryFrame
-        saldoAtual={normalizeZero(
-          computeAccountBalanceUntilNow(
-            account,
-            cards,
-            purchases,
-            installments,
-            allDebits,
-            allIncomes,
-            allInvestments,
-          ),
-        )}
+        saldoAtual={normalizeZero(saldoAtual)}
         gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
       />
 

@@ -22,7 +22,6 @@ import {
   getMonthIncomes,
   getMonthInvestments,
   isCardFullyPaid,
-  computeAccountBalanceUntilNow,
   computeMonthlyAccountBalance,
   isCardVisibleInMonth,
   normalizeZero,

@@ -55,7 +55,12 @@ function AccountHome() {
 
   const today = new Date();
   const eff = getEffectiveCurrentMonth(today);
-  const [year, setYear] = useState(eff.year);
+  const yearStorageKey = `selected-year-${contaId}`;
+  const [year, setYear] = useState<number>(() => {
+    if (typeof window === "undefined") return eff.year;
+    const stored = sessionStorage.getItem(yearStorageKey);
+    return stored ? parseInt(stored, 10) : eff.year;
+  });
   const currentMonth = eff.month;
 
   const accountCardIds = useMemo(

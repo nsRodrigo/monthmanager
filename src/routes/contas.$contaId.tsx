@@ -55,15 +55,16 @@ function AccountHome() {
 
   const today = new Date();
   const eff = getEffectiveCurrentMonth(today);
-  const [year, setYear] = useState(eff.year);
+  const yearStorageKey = `selected-year-${contaId}`;
+  const [year, setYear] = useState<number>(() => {
+    if (typeof window === "undefined") return eff.year;
+    const stored = sessionStorage.getItem(yearStorageKey);
+    return stored ? parseInt(stored, 10) : eff.year;
+  });
   const currentMonth = eff.month;
 
   const accountCardIds = useMemo(
     () => new Set(cards.filter((c) => c.accountId === contaId).map((c) => c.id)),
-    [cards, contaId],
-  );
-  const accountCards = useMemo(
-    () => cards.filter((c) => c.accountId === contaId),
     [cards, contaId],
   );
   const accountDebits = useMemo(
@@ -173,22 +174,6 @@ function AccountHome() {
   const balance = normalizeZero(
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
-  const monthInvested = getMonthInvestments(accountInvestments, eff.year, currentMonth)
-    .reduce((s, i) => s + i.amount, 0);
-
-  // current (effective) month numbers (for the top dashboard)
-  const cm = currentMonthSummary(
-    eff.year,
-    currentMonth,
-    accountCardIds,
-    accountCards,
-    accountDebits,
-    accountIncomes,
-    purchases,
-    installments,
-  );
-
-  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
@@ -228,29 +213,20 @@ function AccountHome() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border/60 pt-4 lg:grid-cols-4">
-          <MiniStat label="A receber" value={cm.income} tone="success" />
-          <MiniStat label="A pagar" value={cm.debits} tone="debit" />
-          <MiniStat label="Faturas" value={cm.cardsTotal} tone="credit" />
-          <MiniStat label="Balanço do mês" value={monthBalance} tone={monthBalance >= 0 ? "success" : "debit"} />
-        </div>
-        {monthInvested > 0 && (
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Investido: <span className="font-semibold text-primary">{formatCurrency(monthInvested)}</span>
-          </p>
-        )}
       </header>
 
       {/* YEAR PICKER */}
+      {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Meses de {year}</h2>
-        <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Meses de</h2>
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
             type="button"
             onClick={() => {
               const idx = yearList.indexOf(year);
-              if (idx > 0) setYear(yearList[idx - 1]);
-              else setYear(yearList[0] - 1);
+              if (idx > 0) { setYear(yearList[idx - 1]); sessionStorage.setItem(yearStorageKey, String(yearList[idx - 1])); }
+              else { setYear(yearList[0] - 1); sessionStorage.setItem(yearStorageKey, String(yearList[0] - 1)); }
             }}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Ano anterior"
@@ -274,7 +250,7 @@ function AccountHome() {
                     <button
                       type="button"
                       onClick={() => {
-                        setYear(y);
+                        setYear(y); sessionStorage.setItem(yearStorageKey, String(y));
                         setOpenYear(false);
                       }}
                       className={cn(
@@ -293,16 +269,18 @@ function AccountHome() {
             type="button"
             onClick={() => {
               const idx = yearList.indexOf(year);
-              if (idx >= 0 && idx < yearList.length - 1) setYear(yearList[idx + 1]);
-              else setYear(yearList[yearList.length - 1] + 1);
+              if (idx >= 0 && idx < yearList.length - 1) { setYear(yearList[idx + 1]); sessionStorage.setItem(yearStorageKey, String(yearList[idx + 1])); }
+              else { setYear(yearList[yearList.length - 1] + 1); sessionStorage.setItem(yearStorageKey, String(yearList[yearList.length - 1] + 1)); }
             }}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Próximo ano"
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
+          </div>
         </div>
       </div>
+
 
 
       {/* MONTHS LIST — only months that have any value */}
@@ -374,7 +352,7 @@ function AccountHome() {
                     {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
                   </div>
                   <p className={`mt-0.5 truncate text-xs font-semibold ${totalIncome >= 0 ? "text-success" : "text-destructive"}`}>
-                    Recebíveis: {formatCurrency(totalIncome)}
+                    RECEBÍVEIS: {formatCurrency(totalIncome)}
                   </p>
                 </div>
                 <div className="hidden text-right sm:block">
@@ -463,50 +441,7 @@ function currentMonthSummary(
   return { cardsTotal, debits, income, cardsCount: accountCards.length };
 }
 
-function MiniStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "success" | "debit" | "credit";
-}) {
-  const c = tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
-  return (
-    <div className="min-w-0 rounded-xl bg-background/40 px-3 py-2">
-      <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`truncate text-sm font-bold ${c}`}>{formatCurrency(value)}</p>
-    </div>
-  );
-}
 
-function Stat({
-  label,
-  value,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  tone: "success" | "debit" | "credit" | "primary";
-  icon: typeof Wallet;
-}) {
-  const colors = {
-    success: "text-success",
-    debit: "text-debit",
-    credit: "text-credit",
-    primary: "text-primary",
-  } as const;
-  return (
-    <div className="rounded-xl border border-border bg-background/40 p-3">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Icon className="h-3 w-3" /> {label}
-      </div>
-      <p className={`mt-1 text-base font-bold ${colors[tone]}`}>{value}</p>
-    </div>
-  );
-}
 
 function Mini({ label, value, tone }: { label: string; value: number; tone: "success" | "debit" | "credit" }) {
   const c = tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";

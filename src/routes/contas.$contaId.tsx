@@ -173,22 +173,6 @@ function AccountHome() {
   const balance = normalizeZero(
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
-  const monthInvested = getMonthInvestments(accountInvestments, eff.year, currentMonth)
-    .reduce((s, i) => s + i.amount, 0);
-
-  // current (effective) month numbers (for the top dashboard)
-  const cm = currentMonthSummary(
-    eff.year,
-    currentMonth,
-    accountCardIds,
-    accountCards,
-    accountDebits,
-    accountIncomes,
-    purchases,
-    installments,
-  );
-
-  const monthBalance = normalizeZero(cm.income - cm.debits - cm.cardsTotal);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">

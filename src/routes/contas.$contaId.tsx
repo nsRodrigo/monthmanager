@@ -442,32 +442,6 @@ function currentMonthSummary(
 }
 
 
-function Stat({
-  label,
-  value,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  tone: "success" | "debit" | "credit" | "primary";
-  icon: typeof Wallet;
-}) {
-  const colors = {
-    success: "text-success",
-    debit: "text-debit",
-    credit: "text-credit",
-    primary: "text-primary",
-  } as const;
-  return (
-    <div className="rounded-xl border border-border bg-background/40 p-3">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Icon className="h-3 w-3" /> {label}
-      </div>
-      <p className={`mt-1 text-base font-bold ${colors[tone]}`}>{value}</p>
-    </div>
-  );
-}
 
 function Mini({ label, value, tone }: { label: string; value: number; tone: "success" | "debit" | "credit" }) {
   const c = tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";

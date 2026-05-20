@@ -228,17 +228,6 @@ function AccountHome() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border/60 pt-4 lg:grid-cols-4">
-          <MiniStat label="A receber" value={cm.income} tone="success" />
-          <MiniStat label="A pagar" value={cm.debits} tone="debit" />
-          <MiniStat label="Faturas" value={cm.cardsTotal} tone="credit" />
-          <MiniStat label="Balanço do mês" value={monthBalance} tone={monthBalance >= 0 ? "success" : "debit"} />
-        </div>
-        {monthInvested > 0 && (
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Investido: <span className="font-semibold text-primary">{formatCurrency(monthInvested)}</span>
-          </p>
-        )}
       </header>
 
       {/* YEAR PICKER */}

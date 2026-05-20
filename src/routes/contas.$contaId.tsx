@@ -436,23 +436,6 @@ function currentMonthSummary(
   return { cardsTotal, debits, income, cardsCount: accountCards.length };
 }
 
-function MiniStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "success" | "debit" | "credit";
-}) {
-  const c = tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
-  return (
-    <div className="min-w-0 rounded-xl bg-background/40 px-3 py-2">
-      <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`truncate text-sm font-bold ${c}`}>{formatCurrency(value)}</p>
-    </div>
-  );
-}
 
 function Stat({
   label,

@@ -62,10 +62,6 @@ function AccountHome() {
     () => new Set(cards.filter((c) => c.accountId === contaId).map((c) => c.id)),
     [cards, contaId],
   );
-  const accountCards = useMemo(
-    () => cards.filter((c) => c.accountId === contaId),
-    [cards, contaId],
-  );
   const accountDebits = useMemo(
     () => debits.filter((d) => d.accountId === contaId),
     [debits, contaId],

@@ -216,15 +216,17 @@ function AccountHome() {
       </header>
 
       {/* YEAR PICKER */}
+      {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Meses de {year}</h2>
-        <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Meses de</h2>
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
           <button
             type="button"
             onClick={() => {
               const idx = yearList.indexOf(year);
-              if (idx > 0) setYear(yearList[idx - 1]);
-              else setYear(yearList[0] - 1);
+              if (idx > 0) { setYear(yearList[idx - 1]); sessionStorage.setItem(yearStorageKey, String(yearList[idx - 1])); }
+              else { setYear(yearList[0] - 1); sessionStorage.setItem(yearStorageKey, String(yearList[0] - 1)); }
             }}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Ano anterior"
@@ -248,7 +250,7 @@ function AccountHome() {
                     <button
                       type="button"
                       onClick={() => {
-                        setYear(y);
+                        setYear(y); sessionStorage.setItem(yearStorageKey, String(y));
                         setOpenYear(false);
                       }}
                       className={cn(
@@ -267,16 +269,18 @@ function AccountHome() {
             type="button"
             onClick={() => {
               const idx = yearList.indexOf(year);
-              if (idx >= 0 && idx < yearList.length - 1) setYear(yearList[idx + 1]);
-              else setYear(yearList[yearList.length - 1] + 1);
+              if (idx >= 0 && idx < yearList.length - 1) { setYear(yearList[idx + 1]); sessionStorage.setItem(yearStorageKey, String(yearList[idx + 1])); }
+              else { setYear(yearList[yearList.length - 1] + 1); sessionStorage.setItem(yearStorageKey, String(yearList[yearList.length - 1] + 1)); }
             }}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Próximo ano"
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
+          </div>
         </div>
       </div>
+
 
 
       {/* MONTHS LIST — only months that have any value */}

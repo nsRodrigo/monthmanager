@@ -250,22 +250,6 @@ function AccountMonth() {
         gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
       />
 
-      {/* CONTA CORRENTE header */}
-      <div className="mt-4 flex items-center justify-between gap-3 px-1">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-            CONTA CORRENTE
-          </h2>
-          <p className="truncate text-[11px] text-muted-foreground">
-            Recebimentos − débitos − investimentos
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className={`text-sm font-bold ${(totalIncome - totalDebits - totalInvested) >= 0 ? "text-success" : "text-debit"}`}>
-            {formatCurrency(totalIncome - totalDebits - totalInvested)}
-          </p>
-        </div>
-      </div>
 
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
       <div className="mt-4 space-y-4">

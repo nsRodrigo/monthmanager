@@ -386,26 +386,8 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
-        {/* CONTA CORRENTE header */}
-        <div className="flex items-center justify-between gap-3 px-1 pt-2">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-              CONTA CORRENTE
-            </h2>
-            <p className="truncate text-[11px] text-muted-foreground">
-              Débitos, PIX e transferências
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-bold text-debit">{formatCurrency(totalDebits)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {monthDebits.single.length + monthDebits.parcelled.length}{" "}
-              {monthDebits.single.length + monthDebits.parcelled.length === 1 ? "item" : "itens"}
-            </p>
-          </div>
-        </div>
-
         {/* DEBITS */}
+
         <GroupedSection
           icon={Building2}
           title="DÉBITOS"

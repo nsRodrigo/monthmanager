@@ -681,7 +681,7 @@ function MonthSummaryFrame({
   gastosTotais: number;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Inicial
@@ -699,7 +699,7 @@ function MonthSummaryFrame({
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
       </div>
-      <div className="rounded-xl bg-background/40 p-3">
+      <div className="col-span-2 rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Final
         </p>
@@ -711,6 +711,7 @@ function MonthSummaryFrame({
     </div>
   );
 }
+
 
 type Tone = "debit" | "income" | "primary" | "credit";
 

@@ -250,6 +250,23 @@ function AccountMonth() {
         gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
       />
 
+      {/* CONTA CORRENTE header */}
+      <div className="mt-4 flex items-center justify-between gap-3 px-1">
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-bold uppercase tracking-wider">
+            CONTA CORRENTE
+          </h2>
+          <p className="truncate text-[11px] text-muted-foreground">
+            Recebimentos − débitos − investimentos
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={`text-sm font-bold ${(totalIncome - totalDebits - totalInvested) >= 0 ? "text-success" : "text-debit"}`}>
+            {formatCurrency(totalIncome - totalDebits - totalInvested)}
+          </p>
+        </div>
+      </div>
+
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
       <div className="mt-4 space-y-4">
         {/* INCOMES */}
@@ -265,6 +282,7 @@ function AccountMonth() {
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
           }
+
           emptyText="Nenhum recebimento neste mês."
         >
           {monthIncomes.single.map((i) => (
@@ -368,26 +386,8 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
-        {/* CONTA CORRENTE header */}
-        <div className="flex items-center justify-between gap-3 px-1 pt-2">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-              CONTA CORRENTE
-            </h2>
-            <p className="truncate text-[11px] text-muted-foreground">
-              Débitos, PIX e transferências
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-bold text-debit">{formatCurrency(totalDebits)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {monthDebits.single.length + monthDebits.parcelled.length}{" "}
-              {monthDebits.single.length + monthDebits.parcelled.length === 1 ? "item" : "itens"}
-            </p>
-          </div>
-        </div>
-
         {/* DEBITS */}
+
         <GroupedSection
           icon={Building2}
           title="DÉBITOS"
@@ -681,7 +681,7 @@ function MonthSummaryFrame({
   gastosTotais: number;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Inicial
@@ -699,7 +699,7 @@ function MonthSummaryFrame({
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
       </div>
-      <div className="rounded-xl bg-background/40 p-3">
+      <div className="col-span-2 rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Final
         </p>
@@ -711,6 +711,7 @@ function MonthSummaryFrame({
     </div>
   );
 }
+
 
 type Tone = "debit" | "income" | "primary" | "credit";
 

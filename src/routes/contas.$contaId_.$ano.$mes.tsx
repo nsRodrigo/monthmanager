@@ -335,6 +335,24 @@ function AccountMonth() {
           ))}
         </GroupedSection>
 
+        {/* CONTA CORRENTE header */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
+              CONTA CORRENTE
+            </h2>
+            <p className="truncate text-[11px] text-muted-foreground">
+              Débitos + investimentos
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-debit"}`}>
+              {formatCurrency(totalDebits + totalInvested)}
+            </p>
+          </div>
+        </div>
+
+
         {/* INVESTMENTS */}
         <GroupedSection
           icon={TrendingUp}

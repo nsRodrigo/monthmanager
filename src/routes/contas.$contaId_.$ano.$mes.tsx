@@ -250,22 +250,6 @@ function AccountMonth() {
         gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
       />
 
-      {/* CONTA CORRENTE header */}
-      <div className="mt-4 flex items-center justify-between gap-3 px-1">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-            CONTA CORRENTE
-          </h2>
-          <p className="truncate text-[11px] text-muted-foreground">
-            Recebimentos − débitos − investimentos
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className={`text-sm font-bold ${(totalIncome - totalDebits - totalInvested) >= 0 ? "text-success" : "text-debit"}`}>
-            {formatCurrency(totalIncome - totalDebits - totalInvested)}
-          </p>
-        </div>
-      </div>
 
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
       <div className="mt-4 space-y-4">
@@ -350,6 +334,24 @@ function AccountMonth() {
             />
           ))}
         </GroupedSection>
+
+        {/* CONTA CORRENTE header */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
+              CONTA CORRENTE
+            </h2>
+            <p className="truncate text-[11px] text-muted-foreground">
+              Débitos + investimentos
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-debit"}`}>
+              {formatCurrency(totalDebits + totalInvested)}
+            </p>
+          </div>
+        </div>
+
 
         {/* INVESTMENTS */}
         <GroupedSection
@@ -692,15 +694,6 @@ function MonthSummaryFrame({
       </div>
       <div className="rounded-xl bg-background/40 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Gastos Totais
-        </p>
-        <p className="mt-1 text-base font-bold text-debit sm:text-lg">
-          {formatCurrency(gastosTotais)}
-        </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
-      </div>
-      <div className="col-span-2 rounded-xl bg-background/40 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Final
         </p>
         <p className={`mt-1 text-base font-bold sm:text-lg ${(saldoAtual - gastosTotais) >= 0 ? "text-foreground" : "text-destructive"}`}>
@@ -708,7 +701,17 @@ function MonthSummaryFrame({
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
       </div>
+      <div className="col-span-2 rounded-xl bg-background/40 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Gastos Totais
+        </p>
+        <p className="mt-1 text-base font-bold text-debit sm:text-lg">
+          {formatCurrency(gastosTotais)}
+        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
+      </div>
     </div>
+
   );
 }
 

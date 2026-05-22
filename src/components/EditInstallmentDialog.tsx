@@ -13,7 +13,7 @@ import {
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Trash2, FastForward } from "lucide-react";
+import { Trash2, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 
 export type SingleEditTarget =
@@ -58,6 +58,7 @@ export function EditInstallmentDialog({
   const [advanceCount, setAdvanceCount] = useState("");
   const [newInstCount, setNewInstCount] = useState("");
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
+  const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +77,7 @@ export function EditInstallmentDialog({
     }
     setAskDateScope(false);
     setAdvanceCount("");
+    setManageView("none");
   }, [open, installment, single, parentLabel]);
 
   if (!installment && !single) return null;
@@ -261,55 +263,181 @@ export function EditInstallmentDialog({
     );
   }
 
-  return (
-    <Modal open={open} onClose={onClose} title="Editar lançamento">
-      <div className="space-y-4">
-        <Field label="Descrição">
-          <input
-            className={inputClass}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </Field>
+  const canManage = remaining > 0 || inst.parentType === "purchase";
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Valor">
-            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
-          </Field>
-          <Field label="Data de vencimento">
+  return (
+    <>
+      <Modal open={open} onClose={onClose} title="Editar lançamento">
+        <div className="space-y-4">
+          <Field label="Descrição">
             <input
-              type="date"
               className={inputClass}
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Valor">
+              <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+            </Field>
+            <Field label="Data de vencimento">
+              <input
+                type="date"
+                className={inputClass}
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </Field>
+          </div>
+          <p className="-mt-2 text-[11px] text-muted-foreground">
+            Valor atual da parcela: {formatCurrency(inst.amount)}.
+          </p>
+
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+            <input
+              type="checkbox"
+              checked={paid}
+              onChange={(e) => setPaid(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">Marcada como paga</span>
+          </label>
+
+          {(inst.total > 1 || parentSubtitle) && (
+            canManage ? (
+              <button
+                type="button"
+                onClick={() => setManageView("menu")}
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5 text-left transition hover:border-primary/50 hover:bg-background"
+              >
+                <Settings2 className="h-4 w-4 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {inst.total > 1 && (
+                    <p className="text-[12px] font-semibold text-foreground">
+                      Parcela {inst.number} de {inst.total}
+                    </p>
+                  )}
+                  {parentSubtitle && (
+                    <p className="text-[11px] text-muted-foreground truncate">{parentSubtitle}</p>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+            ) : (
+              <div className="rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
+                {inst.total > 1 && (
+                  <p>
+                    <span className="font-semibold text-foreground">Parcela {inst.number} de {inst.total}</span>
+                  </p>
+                )}
+                {parentSubtitle && <p className={inst.total > 1 ? "mt-0.5" : ""}>{parentSubtitle}</p>}
+              </div>
+            )
+          )}
+
+          <div className="flex gap-2 pt-2">
+            {onDeleteParent && (
+              <button
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Excluir lançamento",
+                    description: "Excluir o lançamento inteiro e todas as suas parcelas?",
+                    variant: "destructive",
+                    confirmLabel: "Excluir tudo",
+                  });
+                  if (ok) {
+                    onDeleteParent();
+                    onClose();
+                  }
+                }}
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={update.isPending || shift.isPending}
+              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {update.isPending || shift.isPending ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
         </div>
-        <p className="-mt-2 text-[11px] text-muted-foreground">
-          Valor atual da parcela: {formatCurrency(inst.amount)}.
-        </p>
+      </Modal>
 
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input
-            type="checkbox"
-            checked={paid}
-            onChange={(e) => setPaid(e.target.checked)}
-            className="h-4 w-4 accent-primary"
-          />
-          <span className="text-sm font-medium">Marcada como paga</span>
-        </label>
+      <Modal
+        open={manageView !== "none"}
+        onClose={() => setManageView("none")}
+        title={
+          manageView === "advance"
+            ? "Antecipar parcelas"
+            : manageView === "change"
+            ? "Alterar parcelamento"
+            : "Gerenciar parcelamento"
+        }
+      >
+        {manageView === "menu" && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-muted-foreground">
+              Parcela {inst.number} de {inst.total}
+              {parentSubtitle ? ` · ${parentSubtitle}` : ""}
+            </p>
+            {remaining > 0 && (
+              <button
+                onClick={() => setManageView("advance")}
+                className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
+              >
+                <FastForward className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold">Antecipar parcelas</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Marcar N parcelas futuras como pagas. Restam {remaining}.
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              </button>
+            )}
+            {inst.parentType === "purchase" && (
+              <button
+                onClick={() => setManageView("change")}
+                className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
+              >
+                <RefreshCw className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold">Alterar parcelamento</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Recriar todas as parcelas com novo nº ou valor total.
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+              </button>
+            )}
+            <button
+              onClick={() => setManageView("none")}
+              className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
 
-
-        {remaining > 0 && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-            <div className="flex items-center gap-2">
-              <FastForward className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold">Antecipar parcelas</p>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+        {manageView === "advance" && (
+          <div className="space-y-3">
+            <button
+              onClick={() => setManageView("menu")}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar
+            </button>
+            <p className="text-[11px] text-muted-foreground">
               Quantas parcelas futuras você antecipou? Restam {remaining}.
             </p>
-            <div className="mt-2 flex gap-2">
+            <div className="flex gap-2">
               <input
                 type="number"
                 min={1}
@@ -318,6 +446,7 @@ export function EditInstallmentDialog({
                 className={inputClass}
                 value={advanceCount}
                 onChange={(e) => setAdvanceCount(e.target.value)}
+                autoFocus
               />
               <button
                 onClick={async () => {
@@ -330,6 +459,7 @@ export function EditInstallmentDialog({
                   });
                   if (!ok) return;
                   await advance.mutateAsync({ installment: inst, count: n });
+                  setManageView("none");
                   onClose();
                 }}
                 disabled={advance.isPending || !advanceCount}
@@ -341,13 +471,18 @@ export function EditInstallmentDialog({
           </div>
         )}
 
-        {inst.parentType === "purchase" && (
-          <div className="rounded-xl border border-border bg-background/50 p-3">
-            <p className="text-sm font-semibold">Alterar parcelamento</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+        {manageView === "change" && (
+          <div className="space-y-3">
+            <button
+              onClick={() => setManageView("menu")}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar
+            </button>
+            <p className="text-[11px] text-muted-foreground">
               Recria todas as parcelas mantendo a data da 1ª. Status de pagamento será resetado.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Field label="Nº parcelas">
                 <input
                   type="number"
@@ -378,60 +513,17 @@ export function EditInstallmentDialog({
                   newCount: n,
                   totalAmount: newTotalAmount,
                 });
+                setManageView("none");
                 onClose();
               }}
               disabled={changeInstCount.isPending}
-              className="mt-2 w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {changeInstCount.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
             </button>
           </div>
         )}
-
-        {(inst.total > 1 || parentSubtitle) && (
-          <div className="rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
-            {inst.total > 1 && (
-              <p>
-                <span className="font-semibold text-foreground">Parcela {inst.number} de {inst.total}</span>
-              </p>
-            )}
-            {parentSubtitle && <p className={inst.total > 1 ? "mt-0.5" : ""}>{parentSubtitle}</p>}
-          </div>
-        )}
-
-
-        <div className="flex gap-2 pt-2">
-          {onDeleteParent && (
-            <button
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Excluir lançamento",
-                  description: "Excluir o lançamento inteiro e todas as suas parcelas?",
-                  variant: "destructive",
-                  confirmLabel: "Excluir tudo",
-                });
-                if (ok) {
-                  onDeleteParent();
-                  onClose();
-                }
-              }}
-              className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-          <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={update.isPending || shift.isPending}
-            className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {update.isPending || shift.isPending ? "Salvando…" : "Salvar"}
-          </button>
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   );
 }

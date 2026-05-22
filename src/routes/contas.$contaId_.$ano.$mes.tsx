@@ -47,7 +47,7 @@ import {
   TrendingUp,
   Trash2,
   Check,
-  Pencil,
+  
   Zap,
   Building2,
   Download,

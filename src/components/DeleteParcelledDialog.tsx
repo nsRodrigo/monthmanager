@@ -36,9 +36,9 @@ export function DeleteParcelledDialog({
           }}
           className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
         >
-          <span className="font-semibold">Somente esta parcela</span>
+          <span className="font-semibold">Excluir somente esta parcela</span>
           <span className="text-xs text-muted-foreground">
-            Apaga apenas o lançamento deste mês. As demais parcelas seguem normalmente.
+            Apaga apenas o lançamento deste mês. As demais parcelas continuam normalmente.
           </span>
         </button>
 
@@ -50,12 +50,13 @@ export function DeleteParcelledDialog({
           className="flex w-full flex-col items-start gap-1 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-left text-destructive hover:border-destructive"
         >
           <span className="flex items-center gap-2 font-semibold">
-            <Trash2 className="h-4 w-4" /> Excluir o item inteiro
+            <Trash2 className="h-4 w-4" /> Excluir todas as parcelas
           </span>
           <span className="text-xs text-destructive/80">
             Remove todas as parcelas não pagas. Parcelas já marcadas como pagas serão preservadas.
           </span>
         </button>
+
 
         <button
           onClick={onClose}

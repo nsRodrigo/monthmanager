@@ -1784,9 +1784,23 @@ export function usePurgeAllMovements() {
       await supabase.from("debits").delete().eq("user_id", user.id);
       await supabase.from("incomes").delete().eq("user_id", user.id);
       await supabase.from("investments").delete().eq("user_id", user.id);
+      // Zera saldo inicial das contas — evita que apareça saldo residual
+      // depois que todas as movimentações são apagadas.
+      await supabase
+        .from("accounts")
+        .update({ initial_balance: 0 })
+        .eq("user_id", user.id);
     },
     onSuccess: () =>
-      inv(["purchases", "installments", "debits", "incomes", "investments", "card_payments"]),
+      inv([
+        "accounts",
+        "purchases",
+        "installments",
+        "debits",
+        "incomes",
+        "investments",
+        "card_payments",
+      ]),
   });
 }
 

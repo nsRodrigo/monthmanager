@@ -341,6 +341,53 @@ export function EditInstallmentDialog({
           </div>
         )}
 
+        {inst.parentType === "purchase" && (
+          <div className="rounded-xl border border-border bg-background/50 p-3">
+            <p className="text-sm font-semibold">Alterar parcelamento</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Recria todas as parcelas mantendo a data da 1ª. Status de pagamento será resetado.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Field label="Nº parcelas">
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  className={inputClass}
+                  value={newInstCount}
+                  onChange={(e) => setNewInstCount(e.target.value)}
+                />
+              </Field>
+              <Field label="Valor total">
+                <CurrencyInput value={newTotalAmount} onValueChange={setNewTotalAmount} />
+              </Field>
+            </div>
+            <button
+              onClick={async () => {
+                const n = Math.max(1, parseInt(newInstCount) || 0);
+                if (!n || newTotalAmount <= 0) return;
+                if (n === inst.total && newTotalAmount === inst.amount * inst.total) return;
+                const ok = await confirm({
+                  title: "Alterar parcelamento",
+                  description: `Recriar como ${n}x de ${formatCurrency(newTotalAmount / n)}?`,
+                  confirmLabel: "Alterar",
+                });
+                if (!ok) return;
+                await changeInstCount.mutateAsync({
+                  purchaseId: inst.parentId,
+                  newCount: n,
+                  newTotalAmount,
+                });
+                onClose();
+              }}
+              disabled={changeInstCount.isPending}
+              className="mt-2 w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {changeInstCount.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
+            </button>
+          </div>
+        )}
+
         {(inst.total > 1 || parentSubtitle) && (
           <div className="rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
             {inst.total > 1 && (

@@ -94,7 +94,7 @@ export function AddPurchaseDialog({
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Tênis novo" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Valor total">
+          <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </Field>
           <Field label="Data">

@@ -110,24 +110,6 @@ export function AddIncomeDialog({
           <span className="text-sm font-medium">É Parcelado?</span>
         </label>
 
-        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input
-            type="checkbox"
-            checked={isRecurring}
-            onChange={(e) => setIsRecurring(e.target.checked)}
-            disabled={isInstallment}
-            className="mt-0.5 h-4 w-4 accent-primary"
-          />
-          <span className="text-sm">
-            <span className="font-medium">Recorrente</span>
-            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              {isInstallment
-                ? "Indisponível para parcelados."
-                : "Replicado automaticamente nos próximos 24 meses, mantendo o dia."}
-            </span>
-          </span>
-        </label>
-
         {isInstallment && (
           <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
             <div className="flex gap-1 rounded-full bg-secondary p-1">
@@ -158,6 +140,24 @@ export function AddIncomeDialog({
             })()}
           </div>
         )}
+
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input
+            type="checkbox"
+            checked={isRecurring}
+            onChange={(e) => setIsRecurring(e.target.checked)}
+            disabled={isInstallment}
+            className="mt-0.5 h-4 w-4 accent-primary"
+          />
+          <span className="text-sm">
+            <span className="font-medium">Recorrente</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {isInstallment
+                ? "Indisponível para parcelados."
+                : "Replicado automaticamente nos próximos 24 meses, mantendo o dia."}
+            </span>
+          </span>
+        </label>
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>

@@ -30,10 +30,11 @@ export function AddPurchaseDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [cardId, setCardId] = useState("");
-  const [installments, setInstallments] = useState("1");
+  const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [mode, setMode] = useState<"total" | "perInstallment">("total");
 
   useEffect(() => {
     if (open) {
@@ -42,10 +43,11 @@ export function AddPurchaseDialog({
       setCardId(fixedCardId ?? selectableCards[0]?.id ?? "");
       setDescription("");
       setAmount(0);
-      setInstallments("1");
+      setInstallments("2");
       setInstallmentNumber("1");
       setIsInstallment(false);
       setIsRecurring(false);
+      setMode("total");
     }
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
@@ -68,10 +70,11 @@ export function AddPurchaseDialog({
     }
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
+    const totalAmount = mode === "perInstallment" && n > 1 ? amount * n : amount;
     await addPurchase.mutateAsync({
       cardId,
       description: description.trim(),
-      totalAmount: amount,
+      totalAmount,
       date,
       installmentsCount: n,
       installmentNumber: cur,
@@ -79,8 +82,8 @@ export function AddPurchaseDialog({
     onClose();
   };
 
-  const total = amount || 0;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
+  const total = mode === "perInstallment" && n > 1 ? (amount || 0) * n : (amount || 0);
   const perInstallment = n > 0 ? total / n : 0;
   const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
 
@@ -91,7 +94,7 @@ export function AddPurchaseDialog({
           <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Tênis novo" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Valor total">
+          <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
             <CurrencyInput value={amount} onValueChange={setAmount} />
           </Field>
           <Field label="Data">
@@ -118,6 +121,34 @@ export function AddPurchaseDialog({
           <span className="text-sm font-medium">É parcelado?</span>
         </label>
 
+        {isInstallment && (
+          <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
+            <div className="flex gap-1 rounded-full bg-secondary p-1">
+              <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                Valor total
+              </button>
+              <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                Valor por parcela
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Total de parcelas">
+                <input type="number" min="2" max="48" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
+              </Field>
+              <Field label="Parcela atual">
+                <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
+              </Field>
+            </div>
+            {total > 0 && n > 1 && (
+              <p className="text-xs text-muted-foreground">
+                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
+                <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas e ${n - cur} futura(s) serão criadas nos próximos meses.`}
+              </p>
+            )}
+          </div>
+        )}
+
         <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input
             type="checkbox"
@@ -135,38 +166,6 @@ export function AddPurchaseDialog({
             </span>
           </span>
         </label>
-
-        {isInstallment && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Total de parcelas">
-              <input
-                type="number"
-                min="2"
-                max="48"
-                className={inputClass}
-                value={installments}
-                onChange={(e) => setInstallments(e.target.value)}
-              />
-            </Field>
-            <Field label="Parcela atual">
-              <input
-                type="number"
-                min="1"
-                max={n}
-                className={inputClass}
-                value={installmentNumber}
-                onChange={(e) => setInstallmentNumber(e.target.value)}
-              />
-            </Field>
-            {total > 0 && n > 1 && (
-              <p className="col-span-2 text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span>.
-                Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
-                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas e ${n - cur} futura(s) serão criadas nos próximos meses.`}
-              </p>
-            )}
-          </div>
-        )}
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">

@@ -1119,13 +1119,6 @@ function DebitRow({
       </button>
       <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
       <button
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-primary"
-        title="Editar débito"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
-      <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"
       >
@@ -1171,13 +1164,6 @@ function IncomeRow({
         </p>
       </button>
       <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
-      <button
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-primary"
-        title="Editar recebimento"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"
@@ -1242,13 +1228,6 @@ function ParcelledRow({
         </p>
       </button>
       <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
-      <button
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-primary"
-        title="Editar parcela"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
       {onRemove && (
         <button
           onClick={onRemove}
@@ -1273,13 +1252,6 @@ function InvestmentRow({ inv, onEdit, onRemove }: { inv: Investment; onEdit: () 
         <p className="mt-0.5 text-[11px] text-muted-foreground">{inv.percentage}% rendimento</p>
       </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
-      <button
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-primary"
-        title="Editar investimento"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"

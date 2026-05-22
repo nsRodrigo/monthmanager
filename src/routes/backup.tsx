@@ -200,22 +200,22 @@ function BackupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 pb-20 md:p-8">
-      <div className="flex items-center gap-2">
-        <Link
-          to="/"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary"
-          aria-label="Voltar"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
+      <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Home
+      </Link>
+      <header className="mb-6 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <Cloud className="h-6 w-6" />
+        </div>
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Backup e Sincronização</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">Backup e Sincronização</h1>
+          <p className="text-sm text-muted-foreground">
             Exporte, restaure e mantenha versões dos seus dados financeiros.
           </p>
         </div>
-      </div>
+      </header>
+      <div className="space-y-6 pb-20">
 
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">

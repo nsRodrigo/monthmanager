@@ -70,16 +70,16 @@ export function AddMonthDialog({
             </select>
           </Field>
         </div>
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex gap-2 pt-2">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
+            className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
           >
             Cancelar
           </button>
           <button
             onClick={submit}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
             Abrir mês
           </button>

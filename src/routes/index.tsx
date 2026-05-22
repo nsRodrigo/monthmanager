@@ -112,8 +112,7 @@ function Consolidated() {
         </p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Home</h1>
         <p className="mt-1 text-muted-foreground">
-          Visão geral de todas as suas {accounts.length}{" "}
-          {accounts.length === 1 ? "conta" : "contas"}.
+          Visão geral de todas as suas contas.
         </p>
       </header>
 

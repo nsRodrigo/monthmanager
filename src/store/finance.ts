@@ -2973,10 +2973,10 @@ export function useUpdatePurchase() {
       totalAmount?: number;
       date?: string;
     }) => {
-      const patch: { description?: string; total_amount?: number; date?: string } = {};
+      const patch: { description?: string; total_amount?: number; purchase_date?: string } = {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.totalAmount !== undefined) patch.total_amount = args.totalAmount;
-      if (args.date !== undefined) patch.date = args.date;
+      if (args.date !== undefined) patch.purchase_date = args.date;
       const { error } = await supabase.from("purchases").update(patch).eq("id", args.id);
       if (error) throw error;
     },

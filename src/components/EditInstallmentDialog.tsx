@@ -58,6 +58,7 @@ export function EditInstallmentDialog({
   const [advanceCount, setAdvanceCount] = useState("");
   const [newInstCount, setNewInstCount] = useState("");
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
+  const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
 
   useEffect(() => {
     if (!open) return;

@@ -30,10 +30,11 @@ export function AddPurchaseDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [cardId, setCardId] = useState("");
-  const [installments, setInstallments] = useState("1");
+  const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [mode, setMode] = useState<"total" | "perInstallment">("total");
 
   useEffect(() => {
     if (open) {
@@ -42,10 +43,11 @@ export function AddPurchaseDialog({
       setCardId(fixedCardId ?? selectableCards[0]?.id ?? "");
       setDescription("");
       setAmount(0);
-      setInstallments("1");
+      setInstallments("2");
       setInstallmentNumber("1");
       setIsInstallment(false);
       setIsRecurring(false);
+      setMode("total");
     }
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 

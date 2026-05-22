@@ -191,6 +191,17 @@ export function BiometricLock({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
+      {checking && !locked && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background"
+          role="status"
+          aria-label="Verificando sessão"
+        >
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-primary shadow-glow">
+            <Fingerprint className="h-10 w-10 text-primary-foreground" aria-hidden="true" />
+          </div>
+        </div>
+      )}
       {locked && (
         <div
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/98 backdrop-blur-md p-5"

@@ -199,6 +199,17 @@ export function EditInstallmentDialog({
         paid: paidChanged ? paid : undefined,
       });
     }
+    // Atualiza descrição do parent (purchase / debit / income) se mudou
+    if (description.trim() && description.trim() !== (parentLabel ?? "")) {
+      const newDesc = description.trim();
+      if (inst.parentType === "purchase") {
+        await updatePurchase.mutateAsync({ id: inst.parentId, description: newDesc });
+      } else if (inst.parentType === "debit") {
+        await updateDebit.mutateAsync({ id: inst.parentId, description: newDesc });
+      } else if (inst.parentType === "income") {
+        await updateIncome.mutateAsync({ id: inst.parentId, description: newDesc });
+      }
+    }
     onClose();
   }
 

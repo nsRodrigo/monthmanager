@@ -19,7 +19,7 @@ import {
 } from "@/lib/backup";
 import { useConfirm } from "@/store/confirm";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Cloud,
   Download,
   HardDriveDownload,

@@ -335,6 +335,18 @@ export function EditInstallmentDialog({
           </div>
         )}
 
+        {(inst.total > 1 || parentSubtitle) && (
+          <div className="rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
+            {inst.total > 1 && (
+              <p>
+                <span className="font-semibold text-foreground">Parcela {inst.number} de {inst.total}</span>
+              </p>
+            )}
+            {parentSubtitle && <p className={inst.total > 1 ? "mt-0.5" : ""}>{parentSubtitle}</p>}
+          </div>
+        )}
+
+
         <div className="flex gap-2 pt-2">
           {onDeleteParent && (
             <button

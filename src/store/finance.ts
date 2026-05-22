@@ -877,58 +877,11 @@ export function useRemoveCard() {
         .gte("year", win.start_year!)
         .lte("year", win.end_year!);
 
-      // 3) Restrict card visibility: shrink window to exclude the deleted period.
-      // Strategy: get current window. If the deleted range fully covers it OR the card had no
-      // explicit window, mark hidden_outside via start/end. Simple heuristic:
-      //   - If card had no window: set window to before(start) OR after(end) — pick the side
-      //     with the most history (kept simple: hide entire card if no purchases remain).
-      const { data: cardRow } = await supabase
-        .from("cards")
-        .select("start_year,start_month,end_year,end_month")
-        .eq("id", id)
-        .single();
-      // Refresh remaining installments
-      const { data: leftPurs } = await supabase.from("purchases").select("id").eq("card_id", id);
-      const leftPurIds = (leftPurs ?? []).map((p: any) => p.id as string);
-      let hasAny = false;
-      if (leftPurIds.length > 0) {
-        const { data: leftInsts } = await supabase
-          .from("installments")
-          .select("id")
-          .in("parent_id", leftPurIds)
-          .eq("parent_type", "purchase")
-          .limit(1);
-        hasAny = (leftInsts ?? []).length > 0;
-      }
-      if (!hasAny) {
-        // Nothing left → just delete the card entirely.
-        await supabase.from("card_payments").delete().eq("card_id", id);
-        await supabase.from("purchases").delete().eq("card_id", id);
-        const { error } = await supabase.from("cards").delete().eq("id", id);
-        if (error) throw error;
-      } else {
-        // Keep card; clamp end before period start so it stops appearing inside the deleted range.
-        // (This collapses a single-month deletion to: hide that month going forward.)
-        const newEndYM = sYM - 1;
-        const newEndYear = Math.floor(newEndYM / 12);
-        const newEndMonth = ((newEndYM % 12) + 12) % 12;
-        const patch: any = {};
-        if (cardRow?.start_year == null) {
-          // open start → keep open
-        }
-        // Only clamp end if previous end was open or after the deletion
-        const prevEndYM =
-          cardRow?.end_year != null && cardRow?.end_month != null
-            ? (cardRow.end_year as number) * 12 + (cardRow.end_month as number)
-            : Infinity;
-        if (prevEndYM > newEndYM) {
-          patch.end_year = newEndYear;
-          patch.end_month = newEndMonth;
-        }
-        if (Object.keys(patch).length > 0) {
-          await supabase.from("cards").update(patch).eq("id", id);
-        }
-      }
+      // 3) IMPORTANTE: NÃO apaga o cartão e NÃO altera a janela start/end.
+      //    Para escopo "period" / "month", o usuário quer remover apenas
+      //    as movimentações daquele intervalo — o cartão deve continuar
+      //    visível nos demais meses, mesmo que fique vazio dentro do
+      //    período (ele pode adicionar novas compras lá depois).
     },
     onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
   });

@@ -77,6 +77,7 @@ export function EditInstallmentDialog({
     }
     setAskDateScope(false);
     setAdvanceCount("");
+    setManageView("none");
   }, [open, installment, single, parentLabel]);
 
   if (!installment && !single) return null;

@@ -1143,16 +1143,6 @@ function IncomeRow({
 }) {
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button
-        onClick={onToggle}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-          income.received
-            ? "border-success bg-success text-success-foreground"
-            : "border-border hover:border-primary"
-        }`}
-      >
-        {income.received && <Check className="h-3.5 w-3.5" />}
-      </button>
       <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${
@@ -1165,7 +1155,22 @@ function IncomeRow({
           {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>
       </button>
-      <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            income.received
+              ? "bg-success/15 text-success hover:bg-success/25"
+              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+          }`}
+        >
+          {income.received ? <><Check className="h-3 w-3" /> Recebido</> : "Marcar recebido"}
+        </button>
+      </div>
       <button
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"

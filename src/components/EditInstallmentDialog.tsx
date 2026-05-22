@@ -7,6 +7,7 @@ import {
   useUpdateDebit,
   useUpdateIncome,
   useUpdateInvestment,
+  useUpdatePurchase,
   type Installment,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";

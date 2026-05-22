@@ -91,37 +91,6 @@ export function AddDebitDialog({
           </Field>
         </div>
 
-        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input
-            type="checkbox"
-            checked={required}
-            onChange={(e) => {
-              setRequired(e.target.checked);
-              if (e.target.checked) setIsInstallment(false);
-            }}
-            className="mt-0.5 h-4 w-4 accent-primary"
-            disabled={isInstallment}
-          />
-          <span className="text-sm">
-            <span className="font-medium">Débito recorrente</span>
-            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              {isInstallment
-                ? "Indisponível para parcelados — o parcelamento já cria as próximas faturas."
-                : "Replicado automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento."}
-            </span>
-          </span>
-        </label>
-
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input type="checkbox" checked={autoDebit} onChange={(e) => setAutoDebit(e.target.checked)} className="h-4 w-4 accent-primary" />
-          <span className="text-sm font-medium">Débito automático</span>
-        </label>
-        {autoDebit && (
-          <Field label="Dia do débito (1-31)">
-            <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
-          </Field>
-        )}
-
         {!required && (
           <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
             <input
@@ -166,6 +135,37 @@ export function AddDebitDialog({
               );
             })()}
           </div>
+        )}
+
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={(e) => {
+              setRequired(e.target.checked);
+              if (e.target.checked) setIsInstallment(false);
+            }}
+            className="mt-0.5 h-4 w-4 accent-primary"
+            disabled={isInstallment}
+          />
+          <span className="text-sm">
+            <span className="font-medium">Débito recorrente</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              {isInstallment
+                ? "Indisponível para parcelados — o parcelamento já cria as próximas faturas."
+                : "Replicado automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento."}
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+          <input type="checkbox" checked={autoDebit} onChange={(e) => setAutoDebit(e.target.checked)} className="h-4 w-4 accent-primary" />
+          <span className="text-sm font-medium">Débito automático</span>
+        </label>
+        {autoDebit && (
+          <Field label="Dia do débito (1-31)">
+            <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
+          </Field>
         )}
 
         <div className="flex gap-2 pt-2">

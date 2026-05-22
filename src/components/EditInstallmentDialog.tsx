@@ -7,6 +7,7 @@ import {
   useUpdateDebit,
   useUpdateIncome,
   useUpdateInvestment,
+  useUpdatePurchase,
   type Installment,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
@@ -44,6 +45,7 @@ export function EditInstallmentDialog({
   const updateDebit = useUpdateDebit();
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
+  const updatePurchase = useUpdatePurchase();
   const confirm = useConfirm();
 
   const [description, setDescription] = useState("");
@@ -197,6 +199,17 @@ export function EditInstallmentDialog({
         paid: paidChanged ? paid : undefined,
       });
     }
+    // Atualiza descrição do parent (purchase / debit / income) se mudou
+    if (description.trim() && description.trim() !== (parentLabel ?? "")) {
+      const newDesc = description.trim();
+      if (inst.parentType === "purchase") {
+        await updatePurchase.mutateAsync({ id: inst.parentId, description: newDesc });
+      } else if (inst.parentType === "debit") {
+        await updateDebit.mutateAsync({ id: inst.parentId, description: newDesc });
+      } else if (inst.parentType === "income") {
+        await updateIncome.mutateAsync({ id: inst.parentId, description: newDesc });
+      }
+    }
     onClose();
   }
 
@@ -243,35 +256,32 @@ export function EditInstallmentDialog({
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={inst.total > 1 ? `Parcela ${inst.number}/${inst.total}` : "Editar lançamento"}
-    >
+    <Modal open={open} onClose={onClose} title="Editar lançamento">
       <div className="space-y-4">
-        {parentLabel && (
-          <div className="rounded-xl border border-border bg-background/50 p-3">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Item</p>
-            <p className="mt-1 font-semibold">{parentLabel}</p>
-            {parentSubtitle && <p className="mt-1 text-xs text-muted-foreground">{parentSubtitle}</p>}
-          </div>
-        )}
-
-        <Field label="Valor">
-          <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Valor atual: {formatCurrency(inst.amount)}.
-          </p>
-        </Field>
-
-        <Field label="Data de vencimento">
+        <Field label="Descrição">
           <input
-            type="date"
             className={inputClass}
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Valor">
+            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+          </Field>
+          <Field label="Data de vencimento">
+            <input
+              type="date"
+              className={inputClass}
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </Field>
+        </div>
+        <p className="-mt-2 text-[11px] text-muted-foreground">
+          Valor atual da parcela: {formatCurrency(inst.amount)}.
+        </p>
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input
@@ -282,6 +292,7 @@ export function EditInstallmentDialog({
           />
           <span className="text-sm font-medium">Marcada como paga</span>
         </label>
+
 
         {remaining > 0 && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
@@ -323,6 +334,18 @@ export function EditInstallmentDialog({
             </div>
           </div>
         )}
+
+        {(inst.total > 1 || parentSubtitle) && (
+          <div className="rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
+            {inst.total > 1 && (
+              <p>
+                <span className="font-semibold text-foreground">Parcela {inst.number} de {inst.total}</span>
+              </p>
+            )}
+            {parentSubtitle && <p className={inst.total > 1 ? "mt-0.5" : ""}>{parentSubtitle}</p>}
+          </div>
+        )}
+
 
         <div className="flex gap-2 pt-2">
           {onDeleteParent && (

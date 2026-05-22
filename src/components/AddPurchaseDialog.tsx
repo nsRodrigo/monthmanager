@@ -70,10 +70,11 @@ export function AddPurchaseDialog({
     }
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
+    const totalAmount = mode === "perInstallment" && n > 1 ? amount * n : amount;
     await addPurchase.mutateAsync({
       cardId,
       description: description.trim(),
-      totalAmount: amount,
+      totalAmount,
       date,
       installmentsCount: n,
       installmentNumber: cur,
@@ -81,8 +82,8 @@ export function AddPurchaseDialog({
     onClose();
   };
 
-  const total = amount || 0;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
+  const total = mode === "perInstallment" && n > 1 ? (amount || 0) * n : (amount || 0);
   const perInstallment = n > 0 ? total / n : 0;
   const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
 

@@ -376,7 +376,7 @@ export function EditInstallmentDialog({
                 await changeInstCount.mutateAsync({
                   purchaseId: inst.parentId,
                   newCount: n,
-                  newTotalAmount,
+                  totalAmount: newTotalAmount,
                 });
                 onClose();
               }}

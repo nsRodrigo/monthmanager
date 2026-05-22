@@ -8,6 +8,7 @@ import {
   useUpdateIncome,
   useUpdateInvestment,
   useUpdatePurchase,
+  useChangePurchaseInstallments,
   type Installment,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
@@ -46,6 +47,7 @@ export function EditInstallmentDialog({
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
+  const changeInstCount = useChangePurchaseInstallments();
   const confirm = useConfirm();
 
   const [description, setDescription] = useState("");
@@ -54,6 +56,8 @@ export function EditInstallmentDialog({
   const [paid, setPaid] = useState(false);
   const [askDateScope, setAskDateScope] = useState(false);
   const [advanceCount, setAdvanceCount] = useState("");
+  const [newInstCount, setNewInstCount] = useState("");
+  const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
 
   useEffect(() => {
     if (!open) return;

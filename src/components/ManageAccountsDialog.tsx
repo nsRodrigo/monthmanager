@@ -61,7 +61,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Gerenciar contas">
+    <Modal open={open} onClose={onClose} title="Gerenciar conta">
       <div className="space-y-3">
         {accounts.length === 0 && (
           <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">

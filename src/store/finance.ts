@@ -668,13 +668,21 @@ export function useRemoveAccount() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      // Cascading FKs handle cards/debits/incomes/investments removal.
-      // Installments are linked to purchases (via parent_id) — wipe them
-      // explicitly before purchases vanish through cards cascade.
-      const { data: cardRows } = await supabase.from("cards").select("id").eq("account_id", id);
+      // Não há FK de cascade no schema. Precisamos remover EXPLICITAMENTE
+      // todos os dependentes (cartões, compras, parcelas, débitos, recebimentos,
+      // investimentos, pagamentos de fatura) antes de apagar a conta.
+
+      // 1) Cartões da conta → compras → parcelas → card_payments
+      const { data: cardRows } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("account_id", id);
       const cardIds = (cardRows ?? []).map((c) => c.id);
       if (cardIds.length > 0) {
-        const { data: purs } = await supabase.from("purchases").select("id").in("card_id", cardIds);
+        const { data: purs } = await supabase
+          .from("purchases")
+          .select("id")
+          .in("card_id", cardIds);
         const purIds = (purs ?? []).map((p) => p.id);
         if (purIds.length > 0) {
           await supabase
@@ -682,10 +690,17 @@ export function useRemoveAccount() {
             .delete()
             .in("parent_id", purIds)
             .eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().in("id", purIds);
         }
+        await supabase.from("card_payments").delete().in("card_id", cardIds);
+        await supabase.from("cards").delete().in("id", cardIds);
       }
-      // Debits + Incomes also have child installments
-      const { data: debs } = await supabase.from("debits").select("id").eq("account_id", id);
+
+      // 2) Débitos da conta + suas parcelas
+      const { data: debs } = await supabase
+        .from("debits")
+        .select("id")
+        .eq("account_id", id);
       const debIds = (debs ?? []).map((d) => d.id);
       if (debIds.length > 0) {
         await supabase
@@ -693,8 +708,14 @@ export function useRemoveAccount() {
           .delete()
           .in("parent_id", debIds)
           .eq("parent_type", "debit");
+        await supabase.from("debits").delete().in("id", debIds);
       }
-      const { data: incs } = await supabase.from("incomes").select("id").eq("account_id", id);
+
+      // 3) Recebimentos da conta + suas parcelas
+      const { data: incs } = await supabase
+        .from("incomes")
+        .select("id")
+        .eq("account_id", id);
       const incIds = (incs ?? []).map((i) => i.id);
       if (incIds.length > 0) {
         await supabase
@@ -702,7 +723,13 @@ export function useRemoveAccount() {
           .delete()
           .in("parent_id", incIds)
           .eq("parent_type", "income");
+        await supabase.from("incomes").delete().in("id", incIds);
       }
+
+      // 4) Investimentos da conta
+      await supabase.from("investments").delete().eq("account_id", id);
+
+      // 5) Finalmente a conta
       const { error } = await supabase.from("accounts").delete().eq("id", id);
       if (error) throw error;
     },
@@ -850,58 +877,11 @@ export function useRemoveCard() {
         .gte("year", win.start_year!)
         .lte("year", win.end_year!);
 
-      // 3) Restrict card visibility: shrink window to exclude the deleted period.
-      // Strategy: get current window. If the deleted range fully covers it OR the card had no
-      // explicit window, mark hidden_outside via start/end. Simple heuristic:
-      //   - If card had no window: set window to before(start) OR after(end) — pick the side
-      //     with the most history (kept simple: hide entire card if no purchases remain).
-      const { data: cardRow } = await supabase
-        .from("cards")
-        .select("start_year,start_month,end_year,end_month")
-        .eq("id", id)
-        .single();
-      // Refresh remaining installments
-      const { data: leftPurs } = await supabase.from("purchases").select("id").eq("card_id", id);
-      const leftPurIds = (leftPurs ?? []).map((p: any) => p.id as string);
-      let hasAny = false;
-      if (leftPurIds.length > 0) {
-        const { data: leftInsts } = await supabase
-          .from("installments")
-          .select("id")
-          .in("parent_id", leftPurIds)
-          .eq("parent_type", "purchase")
-          .limit(1);
-        hasAny = (leftInsts ?? []).length > 0;
-      }
-      if (!hasAny) {
-        // Nothing left → just delete the card entirely.
-        await supabase.from("card_payments").delete().eq("card_id", id);
-        await supabase.from("purchases").delete().eq("card_id", id);
-        const { error } = await supabase.from("cards").delete().eq("id", id);
-        if (error) throw error;
-      } else {
-        // Keep card; clamp end before period start so it stops appearing inside the deleted range.
-        // (This collapses a single-month deletion to: hide that month going forward.)
-        const newEndYM = sYM - 1;
-        const newEndYear = Math.floor(newEndYM / 12);
-        const newEndMonth = ((newEndYM % 12) + 12) % 12;
-        const patch: any = {};
-        if (cardRow?.start_year == null) {
-          // open start → keep open
-        }
-        // Only clamp end if previous end was open or after the deletion
-        const prevEndYM =
-          cardRow?.end_year != null && cardRow?.end_month != null
-            ? (cardRow.end_year as number) * 12 + (cardRow.end_month as number)
-            : Infinity;
-        if (prevEndYM > newEndYM) {
-          patch.end_year = newEndYear;
-          patch.end_month = newEndMonth;
-        }
-        if (Object.keys(patch).length > 0) {
-          await supabase.from("cards").update(patch).eq("id", id);
-        }
-      }
+      // 3) IMPORTANTE: NÃO apaga o cartão e NÃO altera a janela start/end.
+      //    Para escopo "period" / "month", o usuário quer remover apenas
+      //    as movimentações daquele intervalo — o cartão deve continuar
+      //    visível nos demais meses, mesmo que fique vazio dentro do
+      //    período (ele pode adicionar novas compras lá depois).
     },
     onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
   });
@@ -1784,9 +1764,23 @@ export function usePurgeAllMovements() {
       await supabase.from("debits").delete().eq("user_id", user.id);
       await supabase.from("incomes").delete().eq("user_id", user.id);
       await supabase.from("investments").delete().eq("user_id", user.id);
+      // Zera saldo inicial das contas — evita que apareça saldo residual
+      // depois que todas as movimentações são apagadas.
+      await supabase
+        .from("accounts")
+        .update({ initial_balance: 0 })
+        .eq("user_id", user.id);
     },
     onSuccess: () =>
-      inv(["purchases", "installments", "debits", "incomes", "investments", "card_payments"]),
+      inv([
+        "accounts",
+        "purchases",
+        "installments",
+        "debits",
+        "incomes",
+        "investments",
+        "card_payments",
+      ]),
   });
 }
 
@@ -3001,6 +2995,72 @@ export function useUpdatePurchase() {
     },
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["purchases", "installments"]),
+  });
+}
+
+/**
+ * Recria as parcelas de uma compra (parcelada) mudando o número de parcelas.
+ * Mantém o mês da PRIMEIRA parcela igual à atual (ou ao anchor informado) e
+ * redistribui o valor total proporcionalmente nas N novas parcelas.
+ */
+export function useChangePurchaseInstallments() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      purchaseId: string;
+      newCount: number;
+      totalAmount: number;
+    }) => {
+      if (!user) throw new Error("Não autenticado.");
+      const newCount = Math.max(1, Math.floor(args.newCount));
+
+      // 1) Descobre a data da primeira parcela atual (para ancorar a nova série)
+      const { data: existing } = await supabase
+        .from("installments")
+        .select("number,due_date")
+        .eq("parent_id", args.purchaseId)
+        .eq("parent_type", "purchase")
+        .order("number", { ascending: true })
+        .limit(1);
+      const firstDue =
+        existing && existing.length > 0
+          ? (existing[0] as { due_date: string }).due_date
+          : new Date().toISOString().slice(0, 10);
+
+      // 2) Apaga todas as parcelas antigas dessa compra
+      await supabase
+        .from("installments")
+        .delete()
+        .eq("parent_id", args.purchaseId)
+        .eq("parent_type", "purchase");
+
+      // 3) Atualiza o número de parcelas e o total no purchase
+      await supabase
+        .from("purchases")
+        .update({
+          installments_count: newCount,
+          total_amount: args.totalAmount,
+        })
+        .eq("id", args.purchaseId);
+
+      // 4) Cria as novas parcelas ancoradas na data da primeira
+      const items = buildInstallmentsAnchored(
+        args.purchaseId,
+        user.id,
+        args.totalAmount,
+        newCount,
+        1,
+        firstDue,
+        "purchase",
+        false,
+      );
+      if (items.length > 0) {
+        const { error } = await supabase.from("installments").insert(items);
+        if (error) throw error;
+      }
     },
     onSettled: () => inv(["purchases", "installments"]),
   });

@@ -3000,6 +3000,72 @@ export function useUpdatePurchase() {
   });
 }
 
+/**
+ * Recria as parcelas de uma compra (parcelada) mudando o número de parcelas.
+ * Mantém o mês da PRIMEIRA parcela igual à atual (ou ao anchor informado) e
+ * redistribui o valor total proporcionalmente nas N novas parcelas.
+ */
+export function useChangePurchaseInstallments() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      purchaseId: string;
+      newCount: number;
+      totalAmount: number;
+    }) => {
+      if (!user) throw new Error("Não autenticado.");
+      const newCount = Math.max(1, Math.floor(args.newCount));
+
+      // 1) Descobre a data da primeira parcela atual (para ancorar a nova série)
+      const { data: existing } = await supabase
+        .from("installments")
+        .select("number,due_date")
+        .eq("parent_id", args.purchaseId)
+        .eq("parent_type", "purchase")
+        .order("number", { ascending: true })
+        .limit(1);
+      const firstDue =
+        existing && existing.length > 0
+          ? (existing[0] as { due_date: string }).due_date
+          : new Date().toISOString().slice(0, 10);
+
+      // 2) Apaga todas as parcelas antigas dessa compra
+      await supabase
+        .from("installments")
+        .delete()
+        .eq("parent_id", args.purchaseId)
+        .eq("parent_type", "purchase");
+
+      // 3) Atualiza o número de parcelas e o total no purchase
+      await supabase
+        .from("purchases")
+        .update({
+          installments_count: newCount,
+          total_amount: args.totalAmount,
+        })
+        .eq("id", args.purchaseId);
+
+      // 4) Cria as novas parcelas ancoradas na data da primeira
+      const items = buildInstallmentsAnchored(
+        args.purchaseId,
+        user.id,
+        args.totalAmount,
+        newCount,
+        1,
+        firstDue,
+        "purchase",
+        false,
+      );
+      if (items.length > 0) {
+        const { error } = await supabase.from("installments").insert(items);
+        if (error) throw error;
+      }
+    },
+    onSettled: () => inv(["purchases", "installments"]),
+  });
+}
+
 // =======================
 // Effective "current" month — Day-27 rule
 // =======================

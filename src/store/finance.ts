@@ -2963,6 +2963,49 @@ export function useUpdateInvestment() {
   });
 }
 
+export function useUpdatePurchase() {
+  const inv = useInvalidate();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      id: string;
+      description?: string;
+      totalAmount?: number;
+      date?: string;
+    }) => {
+      const patch: { description?: string; total_amount?: number; date?: string } = {};
+      if (args.description !== undefined) patch.description = args.description;
+      if (args.totalAmount !== undefined) patch.total_amount = args.totalAmount;
+      if (args.date !== undefined) patch.date = args.date;
+      const { error } = await supabase.from("purchases").update(patch).eq("id", args.id);
+      if (error) throw error;
+    },
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["purchases"] });
+      const prev = qc.getQueriesData<Purchase[]>({ queryKey: ["purchases"] });
+      qc.setQueriesData<Purchase[]>({ queryKey: ["purchases"] }, (old) =>
+        old
+          ? old.map((p) =>
+              p.id === args.id
+                ? {
+                    ...p,
+                    description: args.description ?? p.description,
+                    totalAmount: args.totalAmount ?? p.totalAmount,
+                    date: args.date ?? p.date,
+                  }
+                : p,
+            )
+          : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSettled: () => inv(["purchases", "installments"]),
+  });
+}
+
 // =======================
 // Effective "current" month — Day-27 rule
 // =======================

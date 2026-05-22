@@ -47,6 +47,7 @@ export function EditInstallmentDialog({
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
+  const changeInstCount = useChangePurchaseInstallments();
   const confirm = useConfirm();
 
   const [description, setDescription] = useState("");

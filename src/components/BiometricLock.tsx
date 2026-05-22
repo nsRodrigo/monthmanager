@@ -40,6 +40,9 @@ export function BiometricLock({ children }: { children: ReactNode }) {
   const [locked, setLocked] = useState(false);
   const [authing, setAuthing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // While we don't know yet whether the user has passkeys, render a splash
+  // so the home screen never flashes before the biometric prompt appears.
+  const [checking, setChecking] = useState(false);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hiddenAt = useRef<number | null>(null);
@@ -51,16 +54,26 @@ export function BiometricLock({ children }: { children: ReactNode }) {
     if (!user) {
       setEnabled(false);
       setLocked(false);
+      setChecking(false);
       initialLockDone.current = false;
       return;
     }
     if (typeof window === "undefined") return;
-    if (isInIframe() || !isWebAuthnSupported()) return;
+    if (isInIframe() || !isWebAuthnSupported()) {
+      setChecking(false);
+      return;
+    }
+    if (!initialLockDone.current) {
+      setChecking(true);
+    }
     (async () => {
       try {
         const { data: sess } = await supabase.auth.getSession();
         const token = sess.session?.access_token;
-        if (!token) return;
+        if (!token) {
+          setChecking(false);
+          return;
+        }
         const list = (await listFn({ data: { accessToken: token } })) as Array<unknown>;
         if (Array.isArray(list) && list.length > 0) {
           setEnabled(true);
@@ -71,6 +84,8 @@ export function BiometricLock({ children }: { children: ReactNode }) {
         }
       } catch {
         // silently disabled
+      } finally {
+        setChecking(false);
       }
     })();
   }, [user, listFn]);

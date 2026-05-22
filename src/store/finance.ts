@@ -668,13 +668,21 @@ export function useRemoveAccount() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      // Cascading FKs handle cards/debits/incomes/investments removal.
-      // Installments are linked to purchases (via parent_id) — wipe them
-      // explicitly before purchases vanish through cards cascade.
-      const { data: cardRows } = await supabase.from("cards").select("id").eq("account_id", id);
+      // Não há FK de cascade no schema. Precisamos remover EXPLICITAMENTE
+      // todos os dependentes (cartões, compras, parcelas, débitos, recebimentos,
+      // investimentos, pagamentos de fatura) antes de apagar a conta.
+
+      // 1) Cartões da conta → compras → parcelas → card_payments
+      const { data: cardRows } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("account_id", id);
       const cardIds = (cardRows ?? []).map((c) => c.id);
       if (cardIds.length > 0) {
-        const { data: purs } = await supabase.from("purchases").select("id").in("card_id", cardIds);
+        const { data: purs } = await supabase
+          .from("purchases")
+          .select("id")
+          .in("card_id", cardIds);
         const purIds = (purs ?? []).map((p) => p.id);
         if (purIds.length > 0) {
           await supabase
@@ -682,10 +690,17 @@ export function useRemoveAccount() {
             .delete()
             .in("parent_id", purIds)
             .eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().in("id", purIds);
         }
+        await supabase.from("card_payments").delete().in("card_id", cardIds);
+        await supabase.from("cards").delete().in("id", cardIds);
       }
-      // Debits + Incomes also have child installments
-      const { data: debs } = await supabase.from("debits").select("id").eq("account_id", id);
+
+      // 2) Débitos da conta + suas parcelas
+      const { data: debs } = await supabase
+        .from("debits")
+        .select("id")
+        .eq("account_id", id);
       const debIds = (debs ?? []).map((d) => d.id);
       if (debIds.length > 0) {
         await supabase
@@ -693,8 +708,14 @@ export function useRemoveAccount() {
           .delete()
           .in("parent_id", debIds)
           .eq("parent_type", "debit");
+        await supabase.from("debits").delete().in("id", debIds);
       }
-      const { data: incs } = await supabase.from("incomes").select("id").eq("account_id", id);
+
+      // 3) Recebimentos da conta + suas parcelas
+      const { data: incs } = await supabase
+        .from("incomes")
+        .select("id")
+        .eq("account_id", id);
       const incIds = (incs ?? []).map((i) => i.id);
       if (incIds.length > 0) {
         await supabase
@@ -702,7 +723,13 @@ export function useRemoveAccount() {
           .delete()
           .in("parent_id", incIds)
           .eq("parent_type", "income");
+        await supabase.from("incomes").delete().in("id", incIds);
       }
+
+      // 4) Investimentos da conta
+      await supabase.from("investments").delete().eq("account_id", id);
+
+      // 5) Finalmente a conta
       const { error } = await supabase.from("accounts").delete().eq("id", id);
       if (error) throw error;
     },

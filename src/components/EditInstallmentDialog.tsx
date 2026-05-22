@@ -56,6 +56,8 @@ export function EditInstallmentDialog({
   const [paid, setPaid] = useState(false);
   const [askDateScope, setAskDateScope] = useState(false);
   const [advanceCount, setAdvanceCount] = useState("");
+  const [newInstCount, setNewInstCount] = useState("");
+  const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
 
   useEffect(() => {
     if (!open) return;

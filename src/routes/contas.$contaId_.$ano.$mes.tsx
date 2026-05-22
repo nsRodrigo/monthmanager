@@ -1062,13 +1062,6 @@ function PurchaseInstRow({
           </span>
         )}
       </div>
-      <button
-        onClick={onEdit}
-        className="text-muted-foreground hover:text-primary"
-        title="Editar parcela"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
       {onRemove && (
         <RemoveInstButton onRemove={onRemove} />
       )}

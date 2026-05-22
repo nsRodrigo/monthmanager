@@ -236,11 +236,8 @@ function AccountMonth() {
 
       {/* Header */}
       <header className="mb-4">
-        <p className="text-sm font-medium" style={{ color: account.color }}>
-          {account.name} · {year}
-        </p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl capitalize">
-          {MONTHS[month]}
+          Lançamentos de {MONTHS[month]}
         </h1>
       </header>
 

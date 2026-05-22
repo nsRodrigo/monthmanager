@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import Papa from "papaparse";
 import { useAccounts, useCards, useImportPurchases, type ImportedRow } from "@/store/finance";
-import { Upload, FileText, Check, AlertCircle, Download } from "lucide-react";
+import { Upload, FileText, Check, AlertCircle, Download, ChevronLeft } from "lucide-react";
 
 export const Route = createFileRoute("/importar")({
   head: () => ({ meta: [{ title: "Importar CSV — Finanças" }] }),
@@ -192,11 +192,19 @@ Mercado;2024-04-02;320,50;1;;;;nao;Cartão Principal`;
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-8 md:py-12">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Importar histórico</h1>
-        <p className="mt-2 text-muted-foreground">
-          Importe compras antigas (parceladas ou à vista) via CSV. Detectamos automaticamente se o arquivo traz parcelas detalhadas.
-        </p>
+      <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Home
+      </Link>
+      <header className="mb-6 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <Upload className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Importar histórico</h1>
+          <p className="text-sm text-muted-foreground">
+            Importe compras antigas (parceladas ou à vista) via CSV.
+          </p>
+        </div>
       </header>
 
       <div className="rounded-2xl border border-border bg-card p-6">

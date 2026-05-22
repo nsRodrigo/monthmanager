@@ -20,6 +20,7 @@ import {
   Check,
   AlertCircle,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   Trash2,
   Database,
@@ -180,21 +181,19 @@ function HistoricalImportPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
-      <header className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link to="/importar" className="hover:text-foreground">
-            Importar CSV
-          </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span>Planilha histórica</span>
+      <Link to="/importar" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Importar CSV
+      </Link>
+      <header className="mb-6 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <Database className="h-6 w-6" />
         </div>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
-          Importar planilha histórica
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Carregue sua planilha XLSX completa (todos os anos). O sistema detecta automaticamente
-          contas, cartões, parcelas e seções, e mostra um preview antes de gravar.
-        </p>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Importar planilha histórica</h1>
+          <p className="text-sm text-muted-foreground">
+            Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções.
+          </p>
+        </div>
       </header>
 
       {/* Zona perigosa */}

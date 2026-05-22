@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ChevronLeft,
   CheckCircle2,
   ClipboardCopy,
   Download,
@@ -72,18 +73,20 @@ function IrpfPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10">
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Imposto de Renda
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
-            Análise do IRPF {year}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Importe extratos e informes para gerar uma pré-análise. Esta ferramenta não
-            substitui um contador e não envia dados à Receita.
-          </p>
+      <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Home
+      </Link>
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+            <FileText className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Análise do IRPF {year}</h1>
+            <p className="text-sm text-muted-foreground">
+              Pré-análise a partir das movimentações do app e documentos importados.
+            </p>
+          </div>
         </div>
         <div className="w-full sm:w-44">
           <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>

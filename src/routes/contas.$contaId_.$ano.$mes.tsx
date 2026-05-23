@@ -1276,21 +1276,14 @@ function Empty({ text }: { text: string }) {
 }
 
 function RemoveInstButton({ onRemove }: { onRemove: () => void }) {
-  const confirmDialog = useConfirm();
   return (
     <button
-      onClick={async (e) => {
+      onClick={(e) => {
         e.stopPropagation();
-        const ok = await confirmDialog({
-          title: "Excluir compra",
-          description: "Excluir esta compra (e todas as parcelas)?",
-          variant: "destructive",
-          confirmLabel: "Excluir",
-        });
-        if (ok) onRemove();
+        onRemove();
       }}
       className="text-muted-foreground hover:text-destructive"
-      title="Excluir compra"
+      title="Excluir"
     >
       <Trash2 className="h-3.5 w-3.5" />
     </button>

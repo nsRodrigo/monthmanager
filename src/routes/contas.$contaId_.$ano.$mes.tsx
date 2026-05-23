@@ -356,6 +356,15 @@ function AccountMonth() {
           }
 
           emptyText="Nenhum recebimento neste mês."
+          headerBar={
+            isSelMode("incomes") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("incomes")}
+              />
+            ) : null
+          }
         >
           {/* 1) recorrentes */}
           {incomesRecurring.map((i) => (

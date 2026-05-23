@@ -1171,7 +1171,9 @@ function CardRow({
                     onToggle={() => onToggleInst(inst.id, !inst.paid)}
                     onEdit={() => onEditInst(inst)}
                     onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
+                    {...itemSelProps(inst, inst.parentId)}
                   />
+
                 ))}
             </div>
           )}

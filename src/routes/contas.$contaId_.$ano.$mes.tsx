@@ -308,7 +308,7 @@ function AccountMonth() {
               key={i.id}
               income={i}
               onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: !i.received })
+                toggleIncome.mutate({ id: i.id, received: true })
               }
               onEdit={() => {
                 setEditingRecurring({
@@ -1255,11 +1255,12 @@ function IncomeRow({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggle();
+            if (!income.received) onToggle();
           }}
+          disabled={income.received}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             income.received
-              ? "bg-success/15 text-success hover:bg-success/25"
+              ? "bg-success/15 text-success"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
@@ -1296,7 +1297,10 @@ function ParcelledRow({
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
-        onClick={onToggle}
+        onClick={() => {
+          if (!installment.paid) onToggle();
+        }}
+        disabled={installment.paid}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
           installment.paid
             ? "border-success bg-success text-success-foreground"

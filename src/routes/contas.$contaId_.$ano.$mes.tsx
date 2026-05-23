@@ -1251,12 +1251,11 @@ function IncomeRow({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (!income.received) onToggle();
+            onToggle();
           }}
-          disabled={income.received}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             income.received
-              ? "bg-success/15 text-success"
+              ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >

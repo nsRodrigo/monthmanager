@@ -175,6 +175,41 @@ function AccountMonth() {
   const monthDebits = getMonthDebits(debits, installments, year, month);
   const monthIncomes = getMonthIncomes(incomes, installments, year, month);
 
+  // Ordem desejada para todas as listas: recorrentes → parcelados → à vista.
+  // Dentro de cada grupo, ordenar por data (asc) com desempate estável por id.
+  const byDateAsc = <T extends { date: string; id: string }>(a: T, b: T) =>
+    a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
+  const byInstDueAsc = <T extends { installment: { dueDate: string; parentId: string; number: number; id: string } }>(
+    a: T,
+    b: T,
+  ) =>
+    a.installment.dueDate.localeCompare(b.installment.dueDate) ||
+    a.installment.parentId.localeCompare(b.installment.parentId) ||
+    a.installment.number - b.installment.number ||
+    a.installment.id.localeCompare(b.installment.id);
+
+  const debitsRecurring = monthDebits.single
+    .filter((d) => !!d.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const debitsCash = monthDebits.single
+    .filter((d) => !d.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const debitsParcelled = monthDebits.parcelled.slice().sort(byInstDueAsc);
+
+  const incomesRecurring = monthIncomes.single
+    .filter((i) => !!i.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const incomesCash = monthIncomes.single
+    .filter((i) => !i.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const incomesParcelled = monthIncomes.parcelled.slice().sort(byInstDueAsc);
+
+  const investmentsSorted = investments.slice().sort(byDateAsc);
+
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
     monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);

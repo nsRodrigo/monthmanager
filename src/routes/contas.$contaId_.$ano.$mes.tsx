@@ -162,6 +162,13 @@ function AccountMonth() {
     });
   const clearSelection = () => setSelection(null);
 
+  const selProps = (key: SelectionKey, id: string) => ({
+    selectionMode: isSelMode(key),
+    selected: isSelected(key, id),
+    onSelectToggle: () => toggleSelect(key, id),
+    onLongPress: () => startSelection(key, id),
+  });
+
   const bulkDelete = async (key: SelectionKey) => {
     if (!selection || selection.key !== key) return;
     const ids = Array.from(selection.ids);

@@ -461,57 +461,35 @@ function AccountMonth() {
           }
           emptyText="Nenhum débito neste mês."
         >
-          {monthDebits.single.map((d) => (
+          {/* 1) recorrentes */}
+          {debitsRecurring.map((d) => (
             <DebitRow
               key={d.id}
               debit={d}
               onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() => {
-                if (d.recurrenceGroupId) {
-                  setEditingRecurring({
-                    kind: "debit",
-                    id: d.id,
-                    groupId: d.recurrenceGroupId,
-                    description: d.description,
-                    amount: d.amount,
-                    date: d.date,
-                  });
-                } else {
-                  setEditingSingle({
-                    item: {
-                      kind: "debit",
-                      id: d.id,
-                      description: d.description,
-                      amount: d.amount,
-                      date: d.date,
-                      paid: d.paid,
-                    },
-                    onDeleteParent: () => removeDebit.mutate(d.id),
-                  });
-                }
-              }}
-              onRemove={async () => {
-                if (d.recurrenceGroupId) {
-                  setDeletingRecurring({
-                    kind: "debit",
-                    id: d.id,
-                    groupId: d.recurrenceGroupId,
-                    date: d.date,
-                    label: d.description,
-                  });
-                } else {
-                  const ok = await confirmDialog({
-                    title: "Excluir débito",
-                    description: `Excluir "${d.description}"?`,
-                    variant: "destructive",
-                    confirmLabel: "Excluir",
-                  });
-                  if (ok) removeDebit.mutate(d.id);
-                }
-              }}
+              onEdit={() =>
+                setEditingRecurring({
+                  kind: "debit",
+                  id: d.id,
+                  groupId: d.recurrenceGroupId!,
+                  description: d.description,
+                  amount: d.amount,
+                  date: d.date,
+                })
+              }
+              onRemove={async () =>
+                setDeletingRecurring({
+                  kind: "debit",
+                  id: d.id,
+                  groupId: d.recurrenceGroupId!,
+                  date: d.date,
+                  label: d.description,
+                })
+              }
             />
           ))}
-          {monthDebits.parcelled.map((p) => (
+          {/* 2) parcelados */}
+          {debitsParcelled.map((p) => (
             <ParcelledRow
               key={p.installment.id}
               kind="debit"
@@ -527,6 +505,36 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+            />
+          ))}
+          {/* 3) à vista */}
+          {debitsCash.map((d) => (
+            <DebitRow
+              key={d.id}
+              debit={d}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "debit",
+                    id: d.id,
+                    description: d.description,
+                    amount: d.amount,
+                    date: d.date,
+                    paid: d.paid,
+                  },
+                  onDeleteParent: () => removeDebit.mutate(d.id),
+                })
+              }
+              onRemove={async () => {
+                const ok = await confirmDialog({
+                  title: "Excluir débito",
+                  description: `Excluir "${d.description}"?`,
+                  variant: "destructive",
+                  confirmLabel: "Excluir",
+                });
+                if (ok) removeDebit.mutate(d.id);
+              }}
             />
           ))}
         </GroupedSection>

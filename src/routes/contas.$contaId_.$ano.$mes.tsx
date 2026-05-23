@@ -216,14 +216,15 @@ function AccountMonth() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
-      {/* Top nav */}
-      <div className="mb-5 flex items-center justify-between">
+      {/* Top nav — sticky so the year picker stays accessible while scrolling */}
+      <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6">
         <Link
           to="/contas/$contaId"
           params={{ contaId }}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex min-w-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ChevronLeft className="h-4 w-4" /> {account.name}
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate">{account.name}</span>
         </Link>
         <MonthYearPicker
           contaId={contaId}
@@ -236,8 +237,8 @@ function AccountMonth() {
 
       {/* Header */}
       <header className="mb-4">
-        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl capitalize">
-          Lançamentos de {MONTHS[month]}
+        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">
+          Lançamentos
         </h1>
       </header>
 

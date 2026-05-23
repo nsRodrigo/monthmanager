@@ -63,6 +63,9 @@ import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
 import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
 import { DeleteRecurringDialog } from "@/components/DeleteRecurringDialog";
 import { useConfirm } from "@/store/confirm";
+import { useLongPress } from "@/hooks/use-long-press";
+
+type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({

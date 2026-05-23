@@ -175,6 +175,41 @@ function AccountMonth() {
   const monthDebits = getMonthDebits(debits, installments, year, month);
   const monthIncomes = getMonthIncomes(incomes, installments, year, month);
 
+  // Ordem desejada para todas as listas: recorrentes → parcelados → à vista.
+  // Dentro de cada grupo, ordenar por data (asc) com desempate estável por id.
+  const byDateAsc = <T extends { date: string; id: string }>(a: T, b: T) =>
+    a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
+  const byInstDueAsc = <T extends { installment: { dueDate: string; parentId: string; number: number; id: string } }>(
+    a: T,
+    b: T,
+  ) =>
+    a.installment.dueDate.localeCompare(b.installment.dueDate) ||
+    a.installment.parentId.localeCompare(b.installment.parentId) ||
+    a.installment.number - b.installment.number ||
+    a.installment.id.localeCompare(b.installment.id);
+
+  const debitsRecurring = monthDebits.single
+    .filter((d) => !!d.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const debitsCash = monthDebits.single
+    .filter((d) => !d.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const debitsParcelled = monthDebits.parcelled.slice().sort(byInstDueAsc);
+
+  const incomesRecurring = monthIncomes.single
+    .filter((i) => !!i.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const incomesCash = monthIncomes.single
+    .filter((i) => !i.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const incomesParcelled = monthIncomes.parcelled.slice().sort(byInstDueAsc);
+
+  const investmentsSorted = investments.slice().sort(byDateAsc);
+
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
     monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
@@ -267,7 +302,8 @@ function AccountMonth() {
 
           emptyText="Nenhum recebimento neste mês."
         >
-          {monthIncomes.single.map((i) => (
+          {/* 1) recorrentes */}
+          {incomesRecurring.map((i) => (
             <IncomeRow
               key={i.id}
               income={i}
@@ -275,51 +311,28 @@ function AccountMonth() {
                 toggleIncome.mutate({ id: i.id, received: !i.received })
               }
               onEdit={() => {
-                if (i.recurrenceGroupId) {
-                  setEditingRecurring({
-                    kind: "income",
-                    id: i.id,
-                    groupId: i.recurrenceGroupId,
-                    description: i.description,
-                    amount: i.amount,
-                    date: i.date,
-                  });
-                } else {
-                  setEditingSingle({
-                    item: {
-                      kind: "income",
-                      id: i.id,
-                      description: i.description,
-                      amount: i.amount,
-                      date: i.date,
-                      paid: i.received,
-                    },
-                    onDeleteParent: () => removeIncome.mutate(i.id),
-                  });
-                }
+                setEditingRecurring({
+                  kind: "income",
+                  id: i.id,
+                  groupId: i.recurrenceGroupId!,
+                  description: i.description,
+                  amount: i.amount,
+                  date: i.date,
+                });
               }}
               onRemove={async () => {
-                if (i.recurrenceGroupId) {
-                  setDeletingRecurring({
-                    kind: "income",
-                    id: i.id,
-                    groupId: i.recurrenceGroupId,
-                    date: i.date,
-                    label: i.description,
-                  });
-                } else {
-                  const ok = await confirmDialog({
-                    title: "Excluir recebimento",
-                    description: `Excluir "${i.description}"?`,
-                    variant: "destructive",
-                    confirmLabel: "Excluir",
-                  });
-                  if (ok) removeIncome.mutate(i.id);
-                }
+                setDeletingRecurring({
+                  kind: "income",
+                  id: i.id,
+                  groupId: i.recurrenceGroupId!,
+                  date: i.date,
+                  label: i.description,
+                });
               }}
             />
           ))}
-          {monthIncomes.parcelled.map((p) => (
+          {/* 2) parcelados */}
+          {incomesParcelled.map((p) => (
             <ParcelledRow
               key={p.installment.id}
               kind="income"
@@ -335,6 +348,38 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+            />
+          ))}
+          {/* 3) à vista */}
+          {incomesCash.map((i) => (
+            <IncomeRow
+              key={i.id}
+              income={i}
+              onToggle={() =>
+                toggleIncome.mutate({ id: i.id, received: !i.received })
+              }
+              onEdit={() => {
+                setEditingSingle({
+                  item: {
+                    kind: "income",
+                    id: i.id,
+                    description: i.description,
+                    amount: i.amount,
+                    date: i.date,
+                    paid: i.received,
+                  },
+                  onDeleteParent: () => removeIncome.mutate(i.id),
+                });
+              }}
+              onRemove={async () => {
+                const ok = await confirmDialog({
+                  title: "Excluir recebimento",
+                  description: `Excluir "${i.description}"?`,
+                  variant: "destructive",
+                  confirmLabel: "Excluir",
+                });
+                if (ok) removeIncome.mutate(i.id);
+              }}
             />
           ))}
         </GroupedSection>
@@ -371,7 +416,7 @@ function AccountMonth() {
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
         >
-          {investments.map((inv) => (
+          {investmentsSorted.map((inv) => (
             <InvestmentRow
               key={inv.id}
               inv={inv}
@@ -416,57 +461,35 @@ function AccountMonth() {
           }
           emptyText="Nenhum débito neste mês."
         >
-          {monthDebits.single.map((d) => (
+          {/* 1) recorrentes */}
+          {debitsRecurring.map((d) => (
             <DebitRow
               key={d.id}
               debit={d}
               onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() => {
-                if (d.recurrenceGroupId) {
-                  setEditingRecurring({
-                    kind: "debit",
-                    id: d.id,
-                    groupId: d.recurrenceGroupId,
-                    description: d.description,
-                    amount: d.amount,
-                    date: d.date,
-                  });
-                } else {
-                  setEditingSingle({
-                    item: {
-                      kind: "debit",
-                      id: d.id,
-                      description: d.description,
-                      amount: d.amount,
-                      date: d.date,
-                      paid: d.paid,
-                    },
-                    onDeleteParent: () => removeDebit.mutate(d.id),
-                  });
-                }
-              }}
-              onRemove={async () => {
-                if (d.recurrenceGroupId) {
-                  setDeletingRecurring({
-                    kind: "debit",
-                    id: d.id,
-                    groupId: d.recurrenceGroupId,
-                    date: d.date,
-                    label: d.description,
-                  });
-                } else {
-                  const ok = await confirmDialog({
-                    title: "Excluir débito",
-                    description: `Excluir "${d.description}"?`,
-                    variant: "destructive",
-                    confirmLabel: "Excluir",
-                  });
-                  if (ok) removeDebit.mutate(d.id);
-                }
-              }}
+              onEdit={() =>
+                setEditingRecurring({
+                  kind: "debit",
+                  id: d.id,
+                  groupId: d.recurrenceGroupId!,
+                  description: d.description,
+                  amount: d.amount,
+                  date: d.date,
+                })
+              }
+              onRemove={async () =>
+                setDeletingRecurring({
+                  kind: "debit",
+                  id: d.id,
+                  groupId: d.recurrenceGroupId!,
+                  date: d.date,
+                  label: d.description,
+                })
+              }
             />
           ))}
-          {monthDebits.parcelled.map((p) => (
+          {/* 2) parcelados */}
+          {debitsParcelled.map((p) => (
             <ParcelledRow
               key={p.installment.id}
               kind="debit"
@@ -482,6 +505,36 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+            />
+          ))}
+          {/* 3) à vista */}
+          {debitsCash.map((d) => (
+            <DebitRow
+              key={d.id}
+              debit={d}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onEdit={() =>
+                setEditingSingle({
+                  item: {
+                    kind: "debit",
+                    id: d.id,
+                    description: d.description,
+                    amount: d.amount,
+                    date: d.date,
+                    paid: d.paid,
+                  },
+                  onDeleteParent: () => removeDebit.mutate(d.id),
+                })
+              }
+              onRemove={async () => {
+                const ok = await confirmDialog({
+                  title: "Excluir débito",
+                  description: `Excluir "${d.description}"?`,
+                  variant: "destructive",
+                  confirmLabel: "Excluir",
+                });
+                if (ok) removeDebit.mutate(d.id);
+              }}
             />
           ))}
         </GroupedSection>
@@ -979,7 +1032,13 @@ function CardRow({
             <div className="divide-y divide-border">
               {items
                 .slice()
-                .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                .sort(
+                  (a, b) =>
+                    a.dueDate.localeCompare(b.dueDate) ||
+                    (a.purchaseId ?? "").localeCompare(b.purchaseId ?? "") ||
+                    a.number - b.number ||
+                    a.id.localeCompare(b.id),
+                )
                 .map((inst) => {
                   const pur = purchases.find((p) => p.id === inst.parentId);
                   if (!pur) return null;

@@ -74,7 +74,7 @@ export function AddInvestmentDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Valor aplicado">
-            <CurrencyInput value={amount} onValueChange={setAmount} />
+            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
           <Field label="Rendimento (% a.a.)">
             <input

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   useAccounts,
   useAddAccount,
@@ -155,7 +156,12 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                             variant: "destructive",
                             confirmLabel: "Excluir",
                           });
-                          if (ok) removeAccount.mutate(a.id);
+                          if (ok) {
+                            removeAccount.mutate(a.id, {
+                              onSuccess: () => toast.success("Conta excluída com sucesso."),
+                              onError: () => toast.error("Erro ao excluir conta. Tente novamente."),
+                            });
+                          }
                         }}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       >

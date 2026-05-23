@@ -72,23 +72,23 @@ function IrpfPage() {
   const [year, setYear] = useState<number>(CURRENT_YEAR - 1);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:py-10">
+    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
       <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" /> Home
       </Link>
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="mb-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
             <FileText className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Análise do IRPF {year}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Imposto de Renda</h1>
             <p className="text-sm text-muted-foreground">
               Pré-análise a partir das movimentações do app e documentos importados.
             </p>
           </div>
         </div>
-        <div className="w-full sm:w-44">
+        <div className="w-44 shrink-0">
           <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
             <SelectTrigger>
               <SelectValue />

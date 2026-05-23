@@ -197,7 +197,7 @@ function AccountHome() {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {account.type}
             </p>
-            <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
+            <h1 className="break-words text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
               {account.name}
             </h1>
           </div>

@@ -570,7 +570,9 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+              {...selProps("debits", p.debit!.id)}
             />
+
           ))}
           {/* 3) à vista */}
           {debitsCash.map((d) => (

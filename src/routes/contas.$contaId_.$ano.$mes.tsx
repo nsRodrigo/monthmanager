@@ -1172,13 +1172,50 @@ function CardRow({
 
 /* ───────── ROWS ───────── */
 
+type SelectionRowProps = {
+  selectionMode: boolean;
+  selected: boolean;
+  onSelectToggle: () => void;
+  onLongPress: () => void;
+};
+
+function SelectCheckbox({
+  selected,
+  onClick,
+}: {
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+        selected
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border"
+      }`}
+      aria-label={selected ? "Desmarcar" : "Marcar"}
+    >
+      {selected && <Check className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
 function PurchaseInstRow({
   inst,
   purchase,
-  cardColor,
+  cardColor: _cardColor,
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   inst: Installment;
   purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
@@ -1186,31 +1223,29 @@ function PurchaseInstRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   const isInstallment = inst.total > 1;
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button
-        onClick={onToggle}
-        title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-        style={{
-          backgroundColor: inst.paid
-            ? "transparent"
-            : `color-mix(in oklab, ${cardColor} 25%, transparent)`,
-          border: inst.paid ? `2px solid var(--success)` : "none",
-          color: inst.paid ? "var(--success)" : cardColor,
-        }}
-      >
-        {inst.paid ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <span className="text-[10px] font-bold">
-            {purchase.description.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </button>
-      <button onClick={onEdit} className="min-w-0 flex-1 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
           className={`truncate text-sm font-semibold ${
             inst.paid ? "text-muted-foreground line-through" : ""
@@ -1225,17 +1260,33 @@ function PurchaseInstRow({
             : `${formatCurrency(purchase.totalAmount)} à vista`}
         </p>
       </button>
-      <div className="flex flex-col items-end gap-0.5">
-        <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
-        {isInstallment && (
-          <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
-            {inst.number}/{inst.total}
-          </span>
-        )}
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
+          {isInstallment && (
+            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
+              {inst.number}/{inst.total}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={guard(onToggle)}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            inst.paid
+              ? "bg-success/15 text-success hover:bg-success/25"
+              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+          }`}
+        >
+          {inst.paid ? (
+            <>
+              <Check className="h-3 w-3" /> Pago
+            </>
+          ) : (
+            "Marcar pago"
+          )}
+        </button>
       </div>
-      {onRemove && (
-        <RemoveInstButton onRemove={onRemove} />
-      )}
+      {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} />}
     </div>
   );
 }
@@ -1245,15 +1296,37 @@ function DebitRow({
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   debit: Debit;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -1281,25 +1354,30 @@ function DebitRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
+          onClick={guard(onToggle)}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             debit.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
-          {debit.paid ? <><Check className="h-3 w-3" /> Pago</> : "Marcar pago"}
+          {debit.paid ? (
+            <>
+              <Check className="h-3 w-3" /> Pago
+            </>
+          ) : (
+            "Marcar pago"
+          )}
         </button>
       </div>
-      <button
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {!selectionMode && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -1309,15 +1387,37 @@ function IncomeRow({
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   income: Income;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${
             income.received ? "text-muted-foreground" : ""
@@ -1332,25 +1432,30 @@ function IncomeRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
+          onClick={guard(onToggle)}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             income.received
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
-          {income.received ? <><Check className="h-3 w-3" /> Recebido</> : "Marcar recebido"}
+          {income.received ? (
+            <>
+              <Check className="h-3 w-3" /> Recebido
+            </>
+          ) : (
+            "Marcar recebido"
+          )}
         </button>
       </div>
-      <button
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {!selectionMode && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -1362,6 +1467,10 @@ function ParcelledRow({
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   kind: "debit" | "income";
   installment: Installment;
@@ -1369,22 +1478,43 @@ function ParcelledRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button
-        onClick={onToggle}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-          installment.paid
-            ? "border-success bg-success text-success-foreground"
-            : "border-border hover:border-primary"
-        }`}
-      >
-        {installment.paid && <Check className="h-3.5 w-3.5" />}
-      </button>
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <button
+          onClick={onToggle}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+            installment.paid
+              ? "border-success bg-success text-success-foreground"
+              : "border-border hover:border-primary"
+          }`}
+        >
+          {installment.paid && <Check className="h-3.5 w-3.5" />}
+        </button>
+      )}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -1409,7 +1539,7 @@ function ParcelledRow({
         </p>
       </button>
       <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
-      {onRemove && (
+      {!selectionMode && onRemove && (
         <button
           onClick={onRemove}
           className="text-muted-foreground hover:text-destructive"
@@ -1422,23 +1552,58 @@ function ParcelledRow({
   );
 }
 
-function InvestmentRow({ inv, onEdit, onRemove }: { inv: Investment; onEdit: () => void; onRemove: () => void }) {
+function InvestmentRow({
+  inv,
+  onEdit,
+  onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
+}: {
+  inv: Investment;
+  onEdit: () => void;
+  onRemove: () => void;
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-        <TrendingUp className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <TrendingUp className="h-3.5 w-3.5" />
+        </div>
+      )}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">{inv.percentage}% rendimento</p>
       </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
-      <button
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {!selectionMode && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

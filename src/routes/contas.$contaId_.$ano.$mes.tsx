@@ -1032,28 +1032,33 @@ function CardRow({
             <div className="divide-y divide-border">
               {items
                 .slice()
-                .sort(
-                  (a, b) =>
-                    a.dueDate.localeCompare(b.dueDate) ||
-                    (a.purchaseId ?? "").localeCompare(b.purchaseId ?? "") ||
-                    a.number - b.number ||
-                    a.id.localeCompare(b.id),
-                )
                 .map((inst) => {
                   const pur = purchases.find((p) => p.id === inst.parentId);
-                  if (!pur) return null;
+                  return { inst, pur };
+                })
+                .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
+                .sort((a, b) => {
+                  const aParc = a.pur.installmentsCount > 1 ? 0 : 1;
+                  const bParc = b.pur.installmentsCount > 1 ? 0 : 1;
                   return (
-                    <PurchaseInstRow
-                      key={inst.id}
-                      inst={inst}
-                      purchase={pur}
-                      cardColor={cardColor}
-                      onToggle={() => onToggleInst(inst.id, !inst.paid)}
-                      onEdit={() => onEditInst(inst)}
-                      onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
-                    />
+                    aParc - bParc ||
+                    a.inst.dueDate.localeCompare(b.inst.dueDate) ||
+                    (a.inst.purchaseId ?? "").localeCompare(b.inst.purchaseId ?? "") ||
+                    a.inst.number - b.inst.number ||
+                    a.inst.id.localeCompare(b.inst.id)
                   );
-                })}
+                })
+                .map(({ inst, pur }) => (
+                  <PurchaseInstRow
+                    key={inst.id}
+                    inst={inst}
+                    purchase={pur}
+                    cardColor={cardColor}
+                    onToggle={() => onToggleInst(inst.id, !inst.paid)}
+                    onEdit={() => onEditInst(inst)}
+                    onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
+                  />
+                ))}
             </div>
           )}
 

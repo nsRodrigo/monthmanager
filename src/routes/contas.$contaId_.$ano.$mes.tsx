@@ -602,7 +602,9 @@ function AccountMonth() {
                 });
                 if (ok) removeDebit.mutate(d.id);
               }}
+              {...selProps("debits", d.id)}
             />
+
           ))}
         </GroupedSection>
 

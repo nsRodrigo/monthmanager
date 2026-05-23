@@ -144,6 +144,51 @@ function AccountMonth() {
   const deleteRecurring = useDeleteRecurringSeries();
   useEnsureRecurringForMonth(year, month);
 
+  // ── Modo seleção múltipla (long-press) ─────────────────────────────────
+  const [selection, setSelection] = useState<{ key: SelectionKey; ids: Set<string> } | null>(null);
+  const isSelMode = (key: SelectionKey) => selection?.key === key;
+  const isSelected = (key: SelectionKey, id: string) =>
+    selection?.key === key && selection.ids.has(id);
+  const startSelection = (key: SelectionKey, id: string) =>
+    setSelection({ key, ids: new Set([id]) });
+  const toggleSelect = (key: SelectionKey, id: string) =>
+    setSelection((prev) => {
+      if (!prev || prev.key !== key) return { key, ids: new Set([id]) };
+      const ids = new Set(prev.ids);
+      if (ids.has(id)) ids.delete(id);
+      else ids.add(id);
+      if (ids.size === 0) return null;
+      return { key, ids };
+    });
+  const clearSelection = () => setSelection(null);
+
+  const bulkDelete = async (key: SelectionKey) => {
+    if (!selection || selection.key !== key) return;
+    const ids = Array.from(selection.ids);
+    const labelMap: Record<string, string> = {
+      incomes: ids.length === 1 ? "recebimento" : "recebimentos",
+      debits: ids.length === 1 ? "débito" : "débitos",
+      investments: ids.length === 1 ? "investimento" : "investimentos",
+    };
+    const label = key.startsWith("card:")
+      ? ids.length === 1
+        ? "compra"
+        : "compras"
+      : labelMap[key];
+    const ok = await confirmDialog({
+      title: "Excluir selecionados",
+      description: `Excluir ${ids.length} ${label}? Esta ação não pode ser desfeita.`,
+      variant: "destructive",
+      confirmLabel: "Excluir",
+    });
+    if (!ok) return;
+    if (key === "incomes") ids.forEach((id) => removeIncome.mutate(id));
+    else if (key === "debits") ids.forEach((id) => removeDebit.mutate(id));
+    else if (key === "investments") ids.forEach((id) => removeInvestment.mutate(id));
+    else if (key.startsWith("card:")) ids.forEach((id) => removePurchase.mutate(id));
+    clearSelection();
+  };
+
   const askDeleteInst = (
     inst: Installment,
     label: string,

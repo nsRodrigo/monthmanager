@@ -1,17 +1,21 @@
-## Problema
+## Mudanças em `src/routes/contas.$contaId_.$ano.$mes.tsx`
 
-Em `src/store/finance.ts` (`useRemoveCard`, linhas 872-878), a remoção de `card_payments` por escopo de mês/período usa apenas `gte("year", …)` + `lte("year", …)`, ignorando o mês. Resultado: ao excluir "só junho/2025" o status de pago de todos os meses de 2025 é apagado.
+### 1. Lista interna de cada cartão (fix do reordenar ao desmarcar pago)
+Hoje sort só por `dueDate` (linha 982). Como todas as parcelas do mês têm a mesma data, o desempate é instável e muda após o refetch do toggle.
+**Fix**: sort por `(dueDate, purchaseId, number, id)` para ordem determinística.
 
-## Correção
+### 2. Recebimentos e Débitos — ordem nova
+Renderizar nesta ordem, dentro da mesma seção:
 
-Aplicar a mesma lógica `ym = year * 12 + month` já usada nas parcelas:
+1. **Recorrentes** — itens de `monthDebits.single` / `monthIncomes.single` com `recurrenceGroupId`, ordenados por `date` asc.
+2. **Parcelados** — `monthDebits.parcelled` / `monthIncomes.parcelled`, ordenados por `installment.dueDate` asc (desempate por `parentId`+`number`+`id`).
+3. **À vista** — itens single sem `recurrenceGroupId`, ordenados por `date` asc.
 
-1. Buscar `id, year, month` de `card_payments` do cartão.
-2. Filtrar em memória pelos registros com `ym` dentro de `[sYM, eYM]`.
-3. Deletar apenas esses ids.
+Sem mexer em `getMonthDebits` / `getMonthIncomes` em `finance.ts` — só split/sort no componente.
 
-Restante do fluxo (parcelas, compras órfãs, preservação do cartão fora da janela) já está correto e não muda.
+### 3. Investimentos
+Lista atual (`investments.map`) sem ordenação. Ordenar por `date` asc.
 
-## Arquivo
-
-- `src/store/finance.ts` — substituir o bloco de delete de `card_payments` no `useRemoveCard`.
+### Fora do escopo
+- Lista interna do cartão não tem "recorrente/à vista" — só parcelas; o fix #1 já cobre.
+- Cards (seção CARTÕES DE CRÉDITO): a ordem dos cartões em si não muda.

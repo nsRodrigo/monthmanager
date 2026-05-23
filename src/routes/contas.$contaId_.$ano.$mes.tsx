@@ -302,7 +302,9 @@ function AccountMonth() {
 
           emptyText="Nenhum recebimento neste mês."
         >
-          {monthIncomes.single.map((i) => (
+          {[...incomesRecurring, ...incomesCash].length === 0 && incomesParcelled.length === 0 ? null : null}
+          {/* 1) recorrentes */}
+          {incomesRecurring.map((i) => (
             <IncomeRow
               key={i.id}
               income={i}
@@ -310,51 +312,28 @@ function AccountMonth() {
                 toggleIncome.mutate({ id: i.id, received: !i.received })
               }
               onEdit={() => {
-                if (i.recurrenceGroupId) {
-                  setEditingRecurring({
-                    kind: "income",
-                    id: i.id,
-                    groupId: i.recurrenceGroupId,
-                    description: i.description,
-                    amount: i.amount,
-                    date: i.date,
-                  });
-                } else {
-                  setEditingSingle({
-                    item: {
-                      kind: "income",
-                      id: i.id,
-                      description: i.description,
-                      amount: i.amount,
-                      date: i.date,
-                      paid: i.received,
-                    },
-                    onDeleteParent: () => removeIncome.mutate(i.id),
-                  });
-                }
+                setEditingRecurring({
+                  kind: "income",
+                  id: i.id,
+                  groupId: i.recurrenceGroupId!,
+                  description: i.description,
+                  amount: i.amount,
+                  date: i.date,
+                });
               }}
               onRemove={async () => {
-                if (i.recurrenceGroupId) {
-                  setDeletingRecurring({
-                    kind: "income",
-                    id: i.id,
-                    groupId: i.recurrenceGroupId,
-                    date: i.date,
-                    label: i.description,
-                  });
-                } else {
-                  const ok = await confirmDialog({
-                    title: "Excluir recebimento",
-                    description: `Excluir "${i.description}"?`,
-                    variant: "destructive",
-                    confirmLabel: "Excluir",
-                  });
-                  if (ok) removeIncome.mutate(i.id);
-                }
+                setDeletingRecurring({
+                  kind: "income",
+                  id: i.id,
+                  groupId: i.recurrenceGroupId!,
+                  date: i.date,
+                  label: i.description,
+                });
               }}
             />
           ))}
-          {monthIncomes.parcelled.map((p) => (
+          {/* 2) parcelados */}
+          {incomesParcelled.map((p) => (
             <ParcelledRow
               key={p.installment.id}
               kind="income"
@@ -370,6 +349,38 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+            />
+          ))}
+          {/* 3) à vista */}
+          {incomesCash.map((i) => (
+            <IncomeRow
+              key={i.id}
+              income={i}
+              onToggle={() =>
+                toggleIncome.mutate({ id: i.id, received: !i.received })
+              }
+              onEdit={() => {
+                setEditingSingle({
+                  item: {
+                    kind: "income",
+                    id: i.id,
+                    description: i.description,
+                    amount: i.amount,
+                    date: i.date,
+                    paid: i.received,
+                  },
+                  onDeleteParent: () => removeIncome.mutate(i.id),
+                });
+              }}
+              onRemove={async () => {
+                const ok = await confirmDialog({
+                  title: "Excluir recebimento",
+                  description: `Excluir "${i.description}"?`,
+                  variant: "destructive",
+                  confirmLabel: "Excluir",
+                });
+                if (ok) removeIncome.mutate(i.id);
+              }}
             />
           ))}
         </GroupedSection>

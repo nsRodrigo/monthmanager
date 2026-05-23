@@ -357,7 +357,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
         </a>
-        <main id="main-content" className="min-w-0 overflow-x-hidden" tabIndex={-1}>
+        <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
           {children}
         </main>
       </div>

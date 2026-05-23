@@ -495,7 +495,7 @@ function AccountMonth() {
               kind="debit"
               installment={p.installment}
               parent={p.debit!}
-              onToggle={() => toggleInst(p.installment.id, true)}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
               onEdit={() =>
                 setEditing({
                   inst: p.installment,

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccounts,
   useCards,
@@ -175,17 +175,107 @@ function AccountHome() {
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
 
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [headerOut, setHeaderOut] = useState(false);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setHeaderOut(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-60px 0px 0px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const goPrevYear = () => {
+    const idx = yearList.indexOf(year);
+    const next = idx > 0 ? yearList[idx - 1] : yearList[0] - 1;
+    setYear(next);
+    sessionStorage.setItem(yearStorageKey, String(next));
+  };
+  const goNextYear = () => {
+    const idx = yearList.indexOf(year);
+    const next =
+      idx >= 0 && idx < yearList.length - 1
+        ? yearList[idx + 1]
+        : yearList[yearList.length - 1] + 1;
+    setYear(next);
+    sessionStorage.setItem(yearStorageKey, String(next));
+  };
+
+  const YearPickerChip = ({ compact = false }: { compact?: boolean }) => (
+    <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+      <button
+        type="button"
+        onClick={goPrevYear}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        aria-label="Ano anterior"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <Popover open={openYear} onOpenChange={setOpenYear}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "cursor-pointer rounded-md bg-transparent px-2 py-0.5 font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring",
+              compact ? "text-xs" : "text-sm",
+            )}
+            aria-label="Selecionar ano"
+          >
+            {year}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="center" className="w-28 p-1">
+          <ul className="max-h-64 overflow-y-auto">
+            {(yearList.includes(year) ? yearList : [...yearList, year].sort((a, b) => a - b)).map((y) => (
+              <li key={y}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setYear(y);
+                    sessionStorage.setItem(yearStorageKey, String(y));
+                    setOpenYear(false);
+                  }}
+                  className={cn(
+                    "w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-secondary",
+                    y === year && "bg-secondary font-semibold",
+                  )}
+                >
+                  {y}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        onClick={goNextYear}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        aria-label="Próximo ano"
+      >
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
-      <Link
-        to="/"
-        className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" /> Consolidado
-      </Link>
+      {/* Sticky top bar — breadcrumb + (when header is scrolled out) year picker */}
+      <div className="sticky top-0 z-30 -mx-5 mb-4 flex items-center justify-between gap-2 border-b border-transparent bg-background/85 px-5 py-3 backdrop-blur-md transition-colors data-[stuck=true]:border-border/60" data-stuck={headerOut}>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" /> Consolidado
+        </Link>
+        {headerOut && <YearPickerChip compact />}
+      </div>
 
       {/* HEADER + DASHBOARD */}
-      <header className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+      <header ref={headerRef} className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -216,70 +306,13 @@ function AccountHome() {
       </header>
 
       {/* YEAR PICKER */}
-      {/* YEAR PICKER */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">Meses de</h2>
-          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => {
-              const idx = yearList.indexOf(year);
-              if (idx > 0) { setYear(yearList[idx - 1]); sessionStorage.setItem(yearStorageKey, String(yearList[idx - 1])); }
-              else { setYear(yearList[0] - 1); sessionStorage.setItem(yearStorageKey, String(yearList[0] - 1)); }
-            }}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-            aria-label="Ano anterior"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <Popover open={openYear} onOpenChange={setOpenYear}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="cursor-pointer rounded-md bg-transparent px-2 py-0.5 text-sm font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Selecionar ano"
-              >
-                {year}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="center" className="w-28 p-1">
-              <ul className="max-h-64 overflow-y-auto">
-                {(yearList.includes(year) ? yearList : [...yearList, year].sort((a, b) => a - b)).map((y) => (
-                  <li key={y}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setYear(y); sessionStorage.setItem(yearStorageKey, String(y));
-                        setOpenYear(false);
-                      }}
-                      className={cn(
-                        "w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-secondary",
-                        y === year && "bg-secondary font-semibold",
-                      )}
-                    >
-                      {y}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </PopoverContent>
-          </Popover>
-          <button
-            type="button"
-            onClick={() => {
-              const idx = yearList.indexOf(year);
-              if (idx >= 0 && idx < yearList.length - 1) { setYear(yearList[idx + 1]); sessionStorage.setItem(yearStorageKey, String(yearList[idx + 1])); }
-              else { setYear(yearList[yearList.length - 1] + 1); sessionStorage.setItem(yearStorageKey, String(yearList[yearList.length - 1] + 1)); }
-            }}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-            aria-label="Próximo ano"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-          </div>
+          <YearPickerChip />
         </div>
       </div>
+
 
 
 

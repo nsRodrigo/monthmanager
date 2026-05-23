@@ -1022,6 +1022,8 @@ function CardRow({
   onToggleInst,
   onEditInst,
   onRemoveInst,
+  itemSelProps,
+  selectionBar,
 }: {
   cardName: string;
   cardColor: string;
@@ -1043,6 +1045,8 @@ function CardRow({
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
   onRemoveInst?: (inst: Installment) => void;
+  itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
+  selectionBar?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   return (

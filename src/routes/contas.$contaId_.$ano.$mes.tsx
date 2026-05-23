@@ -338,7 +338,7 @@ function AccountMonth() {
               kind="income"
               installment={p.installment}
               parent={p.income!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onToggle={() => toggleInst(p.installment.id, true)}
               onEdit={() =>
                 setEditing({
                   inst: p.installment,
@@ -356,7 +356,7 @@ function AccountMonth() {
               key={i.id}
               income={i}
               onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: !i.received })
+                toggleIncome.mutate({ id: i.id, received: true })
               }
               onEdit={() => {
                 setEditingSingle({
@@ -466,7 +466,7 @@ function AccountMonth() {
             <DebitRow
               key={d.id}
               debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: true })}
               onEdit={() =>
                 setEditingRecurring({
                   kind: "debit",
@@ -495,7 +495,7 @@ function AccountMonth() {
               kind="debit"
               installment={p.installment}
               parent={p.debit!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+              onToggle={() => toggleInst(p.installment.id, true)}
               onEdit={() =>
                 setEditing({
                   inst: p.installment,
@@ -512,7 +512,7 @@ function AccountMonth() {
             <DebitRow
               key={d.id}
               debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: true })}
               onEdit={() =>
                 setEditingSingle({
                   item: {

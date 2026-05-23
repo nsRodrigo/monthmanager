@@ -1108,11 +1108,8 @@ function PurchaseInstRow({
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
-        onClick={() => {
-          if (!inst.paid) onToggle();
-        }}
-        disabled={inst.paid}
-        title={inst.paid ? "Pago" : "Marcar como pago"}
+        onClick={onToggle}
+        title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
         style={{
           backgroundColor: inst.paid

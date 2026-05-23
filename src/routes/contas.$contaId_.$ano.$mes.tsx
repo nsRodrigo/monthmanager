@@ -861,11 +861,6 @@ function GroupedSection({
   title,
   description,
   tone,
-function GroupedSection({
-  icon: Icon,
-  title,
-  description,
-  tone,
   totalTone,
   onAdd,
   addLabel,

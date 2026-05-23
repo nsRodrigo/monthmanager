@@ -549,7 +549,9 @@ function AccountMonth() {
                   label: d.description,
                 })
               }
+              {...selProps("debits", d.id)}
             />
+
           ))}
           {/* 2) parcelados */}
           {debitsParcelled.map((p) => (

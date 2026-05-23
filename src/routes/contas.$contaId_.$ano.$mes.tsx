@@ -861,6 +861,11 @@ function GroupedSection({
   title,
   description,
   tone,
+function GroupedSection({
+  icon: Icon,
+  title,
+  description,
+  tone,
   totalTone,
   onAdd,
   addLabel,
@@ -869,6 +874,7 @@ function GroupedSection({
   total,
   count,
   defaultOpen = false,
+  headerBar,
   children,
 }: {
   icon: typeof Building2;
@@ -883,6 +889,7 @@ function GroupedSection({
   total?: number;
   count?: number;
   defaultOpen?: boolean;
+  headerBar?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -925,6 +932,7 @@ function GroupedSection({
       {/* Body */}
       {open && (
         <div className="border-t border-border">
+          {headerBar}
           {empty ? (
             <Empty text={emptyText} />
           ) : (
@@ -943,6 +951,38 @@ function GroupedSection({
         </div>
       )}
     </section>
+  );
+}
+
+function SelectionBar({
+  count,
+  onCancel,
+  onDelete,
+}: {
+  count: number;
+  onCancel: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 bg-primary/10 px-3 py-2 md:px-4">
+      <p className="text-xs font-semibold text-primary">
+        {count} selecionado{count === 1 ? "" : "s"}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onCancel}
+          className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={onDelete}
+          className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/25"
+        >
+          <Trash2 className="h-3 w-3" /> Excluir
+        </button>
+      </div>
+    </div>
   );
 }
 

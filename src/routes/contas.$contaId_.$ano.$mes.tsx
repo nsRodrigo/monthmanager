@@ -1060,7 +1060,7 @@ function CardRow({
                     inst={inst}
                     purchase={pur}
                     cardColor={cardColor}
-                    onToggle={() => onToggleInst(inst.id, true)}
+                    onToggle={() => onToggleInst(inst.id, !inst.paid)}
                     onEdit={() => onEditInst(inst)}
                     onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                   />

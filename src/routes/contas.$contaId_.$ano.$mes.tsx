@@ -926,7 +926,7 @@ function CardRow({
   paymentPending?: boolean;
   count: number;
   dueLabel: string;
-  onMarkPaid: () => void;
+  onTogglePaid: () => void;
   onAdd: () => void;
   onEditCard?: () => void;
   onHideMonth?: () => void;

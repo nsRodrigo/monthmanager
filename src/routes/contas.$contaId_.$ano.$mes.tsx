@@ -1292,10 +1292,7 @@ function ParcelledRow({
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
-        onClick={() => {
-          if (!installment.paid) onToggle();
-        }}
-        disabled={installment.paid}
+        onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
           installment.paid
             ? "border-success bg-success text-success-foreground"

@@ -485,6 +485,15 @@ function AccountMonth() {
           defaultOpen={false}
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
+          headerBar={
+            isSelMode("investments") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("investments")}
+              />
+            ) : null
+          }
         >
           {investmentsSorted.map((inv) => (
             <InvestmentRow

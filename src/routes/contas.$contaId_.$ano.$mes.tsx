@@ -297,7 +297,7 @@ function AccountMonth() {
                   });
                 }
               }}
-              onRemove={() => {
+              onRemove={async () => {
                 if (i.recurrenceGroupId) {
                   setDeletingRecurring({
                     kind: "income",
@@ -307,7 +307,13 @@ function AccountMonth() {
                     label: i.description,
                   });
                 } else {
-                  removeIncome.mutate(i.id);
+                  const ok = await confirmDialog({
+                    title: "Excluir recebimento",
+                    description: `Excluir "${i.description}"?`,
+                    variant: "destructive",
+                    confirmLabel: "Excluir",
+                  });
+                  if (ok) removeIncome.mutate(i.id);
                 }
               }}
             />

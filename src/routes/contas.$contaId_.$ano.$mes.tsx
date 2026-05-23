@@ -1032,7 +1032,13 @@ function CardRow({
             <div className="divide-y divide-border">
               {items
                 .slice()
-                .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                .sort(
+                  (a, b) =>
+                    a.dueDate.localeCompare(b.dueDate) ||
+                    (a.purchaseId ?? "").localeCompare(b.purchaseId ?? "") ||
+                    a.number - b.number ||
+                    a.id.localeCompare(b.id),
+                )
                 .map((inst) => {
                   const pur = purchases.find((p) => p.id === inst.parentId);
                   if (!pur) return null;

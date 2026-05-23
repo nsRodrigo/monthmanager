@@ -541,6 +541,15 @@ function AccountMonth() {
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
           emptyText="Nenhum débito neste mês."
+          headerBar={
+            isSelMode("debits") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("debits")}
+              />
+            ) : null
+          }
         >
           {/* 1) recorrentes */}
           {debitsRecurring.map((d) => (

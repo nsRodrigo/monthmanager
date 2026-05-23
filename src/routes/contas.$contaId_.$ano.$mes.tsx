@@ -63,6 +63,9 @@ import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
 import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
 import { DeleteRecurringDialog } from "@/components/DeleteRecurringDialog";
 import { useConfirm } from "@/store/confirm";
+import { useLongPress } from "@/hooks/use-long-press";
+
+type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
@@ -140,6 +143,58 @@ function AccountMonth() {
   const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
   const deleteRecurring = useDeleteRecurringSeries();
   useEnsureRecurringForMonth(year, month);
+
+  // ── Modo seleção múltipla (long-press) ─────────────────────────────────
+  const [selection, setSelection] = useState<{ key: SelectionKey; ids: Set<string> } | null>(null);
+  const isSelMode = (key: SelectionKey) => selection?.key === key;
+  const isSelected = (key: SelectionKey, id: string) =>
+    selection?.key === key && selection.ids.has(id);
+  const startSelection = (key: SelectionKey, id: string) =>
+    setSelection({ key, ids: new Set([id]) });
+  const toggleSelect = (key: SelectionKey, id: string) =>
+    setSelection((prev) => {
+      if (!prev || prev.key !== key) return { key, ids: new Set([id]) };
+      const ids = new Set(prev.ids);
+      if (ids.has(id)) ids.delete(id);
+      else ids.add(id);
+      if (ids.size === 0) return null;
+      return { key, ids };
+    });
+  const clearSelection = () => setSelection(null);
+
+  const selProps = (key: SelectionKey, id: string) => ({
+    selectionMode: isSelMode(key),
+    selected: isSelected(key, id),
+    onSelectToggle: () => toggleSelect(key, id),
+    onLongPress: () => startSelection(key, id),
+  });
+
+  const bulkDelete = async (key: SelectionKey) => {
+    if (!selection || selection.key !== key) return;
+    const ids = Array.from(selection.ids);
+    const labelMap: Record<string, string> = {
+      incomes: ids.length === 1 ? "recebimento" : "recebimentos",
+      debits: ids.length === 1 ? "débito" : "débitos",
+      investments: ids.length === 1 ? "investimento" : "investimentos",
+    };
+    const label = key.startsWith("card:")
+      ? ids.length === 1
+        ? "compra"
+        : "compras"
+      : labelMap[key];
+    const ok = await confirmDialog({
+      title: "Excluir selecionados",
+      description: `Excluir ${ids.length} ${label}? Esta ação não pode ser desfeita.`,
+      variant: "destructive",
+      confirmLabel: "Excluir",
+    });
+    if (!ok) return;
+    if (key === "incomes") ids.forEach((id) => removeIncome.mutate(id));
+    else if (key === "debits") ids.forEach((id) => removeDebit.mutate(id));
+    else if (key === "investments") ids.forEach((id) => removeInvestment.mutate(id));
+    else if (key.startsWith("card:")) ids.forEach((id) => removePurchase.mutate(id));
+    clearSelection();
+  };
 
   const askDeleteInst = (
     inst: Installment,
@@ -301,6 +356,15 @@ function AccountMonth() {
           }
 
           emptyText="Nenhum recebimento neste mês."
+          headerBar={
+            isSelMode("incomes") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("incomes")}
+              />
+            ) : null
+          }
         >
           {/* 1) recorrentes */}
           {incomesRecurring.map((i) => (
@@ -329,7 +393,9 @@ function AccountMonth() {
                   label: i.description,
                 });
               }}
+              {...selProps("incomes", i.id)}
             />
+
           ))}
           {/* 2) parcelados */}
           {incomesParcelled.map((p) => (
@@ -348,7 +414,9 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+              {...selProps("incomes", p.income!.id)}
             />
+
           ))}
           {/* 3) à vista */}
           {incomesCash.map((i) => (
@@ -380,7 +448,9 @@ function AccountMonth() {
                 });
                 if (ok) removeIncome.mutate(i.id);
               }}
+              {...selProps("incomes", i.id)}
             />
+
           ))}
         </GroupedSection>
 
@@ -415,6 +485,15 @@ function AccountMonth() {
           defaultOpen={false}
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
+          headerBar={
+            isSelMode("investments") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("investments")}
+              />
+            ) : null
+          }
         >
           {investmentsSorted.map((inv) => (
             <InvestmentRow
@@ -441,7 +520,9 @@ function AccountMonth() {
                 });
                 if (ok) removeInvestment.mutate(inv.id);
               }}
+              {...selProps("investments", inv.id)}
             />
+
           ))}
         </GroupedSection>
 
@@ -460,6 +541,15 @@ function AccountMonth() {
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
           emptyText="Nenhum débito neste mês."
+          headerBar={
+            isSelMode("debits") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("debits")}
+              />
+            ) : null
+          }
         >
           {/* 1) recorrentes */}
           {debitsRecurring.map((d) => (
@@ -486,7 +576,9 @@ function AccountMonth() {
                   label: d.description,
                 })
               }
+              {...selProps("debits", d.id)}
             />
+
           ))}
           {/* 2) parcelados */}
           {debitsParcelled.map((p) => (
@@ -505,7 +597,9 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+              {...selProps("debits", p.debit!.id)}
             />
+
           ))}
           {/* 3) à vista */}
           {debitsCash.map((d) => (
@@ -535,7 +629,9 @@ function AccountMonth() {
                 });
                 if (ok) removeDebit.mutate(d.id);
               }}
+              {...selProps("debits", d.id)}
             />
+
           ))}
         </GroupedSection>
 
@@ -626,7 +722,20 @@ function AccountMonth() {
                             if (ok) removePurchase.mutate(pur.id);
                           }
                         }}
+                        itemSelProps={(_inst, parentId) =>
+                          selProps(`card:${c.id}`, parentId)
+                        }
+                        selectionBar={
+                          isSelMode(`card:${c.id}`) ? (
+                            <SelectionBar
+                              count={selection!.ids.size}
+                              onCancel={clearSelection}
+                              onDelete={() => bulkDelete(`card:${c.id}`)}
+                            />
+                          ) : null
+                        }
                       />
+
                     </div>
                   );
                 })
@@ -821,6 +930,7 @@ function GroupedSection({
   total,
   count,
   defaultOpen = false,
+  headerBar,
   children,
 }: {
   icon: typeof Building2;
@@ -835,6 +945,7 @@ function GroupedSection({
   total?: number;
   count?: number;
   defaultOpen?: boolean;
+  headerBar?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -877,6 +988,7 @@ function GroupedSection({
       {/* Body */}
       {open && (
         <div className="border-t border-border">
+          {headerBar}
           {empty ? (
             <Empty text={emptyText} />
           ) : (
@@ -895,6 +1007,38 @@ function GroupedSection({
         </div>
       )}
     </section>
+  );
+}
+
+function SelectionBar({
+  count,
+  onCancel,
+  onDelete,
+}: {
+  count: number;
+  onCancel: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 bg-primary/10 px-3 py-2 md:px-4">
+      <p className="text-xs font-semibold text-primary">
+        {count} selecionado{count === 1 ? "" : "s"}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onCancel}
+          className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={onDelete}
+          className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/25"
+        >
+          <Trash2 className="h-3 w-3" /> Excluir
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -918,6 +1062,8 @@ function CardRow({
   onToggleInst,
   onEditInst,
   onRemoveInst,
+  itemSelProps,
+  selectionBar,
 }: {
   cardName: string;
   cardColor: string;
@@ -939,6 +1085,8 @@ function CardRow({
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
   onRemoveInst?: (inst: Installment) => void;
+  itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
+  selectionBar?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -998,6 +1146,7 @@ function CardRow({
 
       {open && (
         <div className="border-t border-border bg-background/30">
+          {selectionBar}
           <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
             <button
               type="button"
@@ -1017,6 +1166,7 @@ function CardRow({
           </div>
 
           {items.length === 0 ? (
+
             <div className="space-y-3 px-4 py-6 text-center">
               <p className="text-xs text-muted-foreground">
                 Nenhum lançamento neste mês.
@@ -1063,7 +1213,9 @@ function CardRow({
                     onToggle={() => onToggleInst(inst.id, !inst.paid)}
                     onEdit={() => onEditInst(inst)}
                     onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
+                    {...itemSelProps(inst, inst.parentId)}
                   />
+
                 ))}
             </div>
           )}
@@ -1089,13 +1241,50 @@ function CardRow({
 
 /* ───────── ROWS ───────── */
 
+type SelectionRowProps = {
+  selectionMode: boolean;
+  selected: boolean;
+  onSelectToggle: () => void;
+  onLongPress: () => void;
+};
+
+function SelectCheckbox({
+  selected,
+  onClick,
+}: {
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+        selected
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border"
+      }`}
+      aria-label={selected ? "Desmarcar" : "Marcar"}
+    >
+      {selected && <Check className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
 function PurchaseInstRow({
   inst,
   purchase,
-  cardColor,
+  cardColor: _cardColor,
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   inst: Installment;
   purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
@@ -1103,31 +1292,29 @@ function PurchaseInstRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   const isInstallment = inst.total > 1;
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button
-        onClick={onToggle}
-        title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-        style={{
-          backgroundColor: inst.paid
-            ? "transparent"
-            : `color-mix(in oklab, ${cardColor} 25%, transparent)`,
-          border: inst.paid ? `2px solid var(--success)` : "none",
-          color: inst.paid ? "var(--success)" : cardColor,
-        }}
-      >
-        {inst.paid ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <span className="text-[10px] font-bold">
-            {purchase.description.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </button>
-      <button onClick={onEdit} className="min-w-0 flex-1 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
           className={`truncate text-sm font-semibold ${
             inst.paid ? "text-muted-foreground line-through" : ""
@@ -1142,17 +1329,33 @@ function PurchaseInstRow({
             : `${formatCurrency(purchase.totalAmount)} à vista`}
         </p>
       </button>
-      <div className="flex flex-col items-end gap-0.5">
-        <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
-        {isInstallment && (
-          <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
-            {inst.number}/{inst.total}
-          </span>
-        )}
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
+          {isInstallment && (
+            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
+              {inst.number}/{inst.total}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={guard(onToggle)}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            inst.paid
+              ? "bg-success/15 text-success hover:bg-success/25"
+              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+          }`}
+        >
+          {inst.paid ? (
+            <>
+              <Check className="h-3 w-3" /> Pago
+            </>
+          ) : (
+            "Marcar pago"
+          )}
+        </button>
       </div>
-      {onRemove && (
-        <RemoveInstButton onRemove={onRemove} />
-      )}
+      {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} />}
     </div>
   );
 }
@@ -1162,15 +1365,37 @@ function DebitRow({
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   debit: Debit;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -1198,25 +1423,30 @@ function DebitRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
+          onClick={guard(onToggle)}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             debit.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
-          {debit.paid ? <><Check className="h-3 w-3" /> Pago</> : "Marcar pago"}
+          {debit.paid ? (
+            <>
+              <Check className="h-3 w-3" /> Pago
+            </>
+          ) : (
+            "Marcar pago"
+          )}
         </button>
       </div>
-      <button
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {!selectionMode && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -1226,15 +1456,37 @@ function IncomeRow({
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   income: Income;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${
             income.received ? "text-muted-foreground" : ""
@@ -1249,25 +1501,30 @@ function IncomeRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
+          onClick={guard(onToggle)}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             income.received
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
-          {income.received ? <><Check className="h-3 w-3" /> Recebido</> : "Marcar recebido"}
+          {income.received ? (
+            <>
+              <Check className="h-3 w-3" /> Recebido
+            </>
+          ) : (
+            "Marcar recebido"
+          )}
         </button>
       </div>
-      <button
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {!selectionMode && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -1279,6 +1536,10 @@ function ParcelledRow({
   onToggle,
   onEdit,
   onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
 }: {
   kind: "debit" | "income";
   installment: Installment;
@@ -1286,22 +1547,43 @@ function ParcelledRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
-}) {
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <button
-        onClick={onToggle}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-          installment.paid
-            ? "border-success bg-success text-success-foreground"
-            : "border-border hover:border-primary"
-        }`}
-      >
-        {installment.paid && <Check className="h-3.5 w-3.5" />}
-      </button>
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <button
+          onClick={onToggle}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+            installment.paid
+              ? "border-success bg-success text-success-foreground"
+              : "border-border hover:border-primary"
+          }`}
+        >
+          {installment.paid && <Check className="h-3.5 w-3.5" />}
+        </button>
+      )}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -1326,7 +1608,7 @@ function ParcelledRow({
         </p>
       </button>
       <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
-      {onRemove && (
+      {!selectionMode && onRemove && (
         <button
           onClick={onRemove}
           className="text-muted-foreground hover:text-destructive"
@@ -1339,23 +1621,58 @@ function ParcelledRow({
   );
 }
 
-function InvestmentRow({ inv, onEdit, onRemove }: { inv: Investment; onEdit: () => void; onRemove: () => void }) {
+function InvestmentRow({
+  inv,
+  onEdit,
+  onRemove,
+  selectionMode,
+  selected,
+  onSelectToggle,
+  onLongPress,
+}: {
+  inv: Investment;
+  onEdit: () => void;
+  onRemove: () => void;
+} & SelectionRowProps) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
   return (
-    <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-        <TrendingUp className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left">
+    <div
+      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      {...lp.handlers}
+    >
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <TrendingUp className="h-3.5 w-3.5" />
+        </div>
+      )}
+      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">{inv.percentage}% rendimento</p>
       </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
-      <button
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {!selectionMode && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

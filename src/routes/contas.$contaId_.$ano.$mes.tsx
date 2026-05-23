@@ -386,7 +386,15 @@ function AccountMonth() {
                   onDeleteParent: () => removeInvestment.mutate(inv.id),
                 })
               }
-              onRemove={() => removeInvestment.mutate(inv.id)}
+              onRemove={async () => {
+                const ok = await confirmDialog({
+                  title: "Excluir investimento",
+                  description: `Excluir "${inv.type}"?`,
+                  variant: "destructive",
+                  confirmLabel: "Excluir",
+                });
+                if (ok) removeInvestment.mutate(inv.id);
+              }}
             />
           ))}
         </GroupedSection>

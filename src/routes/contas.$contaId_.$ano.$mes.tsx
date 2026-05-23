@@ -439,7 +439,9 @@ function AccountMonth() {
                 });
                 if (ok) removeIncome.mutate(i.id);
               }}
+              {...selProps("incomes", i.id)}
             />
+
           ))}
         </GroupedSection>
 

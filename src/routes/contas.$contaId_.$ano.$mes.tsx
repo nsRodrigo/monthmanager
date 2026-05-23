@@ -502,7 +502,9 @@ function AccountMonth() {
                 });
                 if (ok) removeInvestment.mutate(inv.id);
               }}
+              {...selProps("investments", inv.id)}
             />
+
           ))}
         </GroupedSection>
 

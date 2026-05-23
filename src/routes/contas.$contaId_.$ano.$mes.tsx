@@ -405,7 +405,9 @@ function AccountMonth() {
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+              {...selProps("incomes", p.income!.id)}
             />
+
           ))}
           {/* 3) à vista */}
           {incomesCash.map((i) => (

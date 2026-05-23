@@ -308,7 +308,7 @@ function AccountMonth() {
               key={i.id}
               income={i}
               onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: true })
+                toggleIncome.mutate({ id: i.id, received: !i.received })
               }
               onEdit={() => {
                 setEditingRecurring({

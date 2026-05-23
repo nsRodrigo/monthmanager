@@ -466,7 +466,7 @@ function AccountMonth() {
             <DebitRow
               key={d.id}
               debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: true })}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
               onEdit={() =>
                 setEditingRecurring({
                   kind: "debit",

@@ -131,6 +131,19 @@ function AccountHome() {
 
   const [openYear, setOpenYear] = useState(false);
   const [openAddMonth, setOpenAddMonth] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [headerOut, setHeaderOut] = useState(false);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setHeaderOut(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-60px 0px 0px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const monthlyBalances = useMemo(() => {
     if (!account) return new Map<string, number>();
@@ -174,19 +187,6 @@ function AccountHome() {
   const balance = normalizeZero(
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
-
-  const headerRef = useRef<HTMLElement | null>(null);
-  const [headerOut, setHeaderOut] = useState(false);
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => setHeaderOut(!entry.isIntersecting),
-      { threshold: 0, rootMargin: "-60px 0px 0px 0px" },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
 
   const goPrevYear = () => {
     const idx = yearList.indexOf(year);

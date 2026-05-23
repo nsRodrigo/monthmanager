@@ -586,11 +586,14 @@ function AccountMonth() {
                         cardColor={c.color}
                         total={total}
                         paid={paid}
+                        paymentPending={setCardPaid.isPending}
                         count={cardInst.length}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                        onTogglePaid={() =>
-                          setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
-                        }
+                        onMarkPaid={() => {
+                          if (!paid && !setCardPaid.isPending) {
+                            setCardPaid.mutate({ cardId: c.id, year, month, paid: true });
+                          }
+                        }}
                         onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
                         items={cardInst}
@@ -903,9 +906,10 @@ function CardRow({
   cardColor,
   total,
   paid,
+  paymentPending,
   count,
   dueLabel,
-  onTogglePaid,
+  onMarkPaid,
   onAdd,
   onEditCard,
   onHideMonth,
@@ -919,9 +923,10 @@ function CardRow({
   cardColor: string;
   total: number;
   paid: boolean;
+  paymentPending?: boolean;
   count: number;
   dueLabel: string;
-  onTogglePaid: () => void;
+  onMarkPaid: () => void;
   onAdd: () => void;
   onEditCard?: () => void;
   onHideMonth?: () => void;
@@ -996,17 +1001,18 @@ function CardRow({
           <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
             <button
               type="button"
+              disabled={paid || paymentPending}
               onClick={(e) => {
                 e.stopPropagation();
-                onTogglePaid();
+                if (!paid && !paymentPending) onMarkPaid();
               }}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
                 paid
                   ? "bg-success/15 text-success hover:bg-success/25"
                   : "bg-warning/15 text-warning hover:bg-warning/25"
               }`}
             >
-              {paid ? "✓ Paga" : "Marcar paga"}
+              {paid ? "✓ Paga" : paymentPending ? "Marcando..." : "Marcar paga"}
             </button>
           </div>
 

@@ -384,7 +384,9 @@ function AccountMonth() {
                   label: i.description,
                 });
               }}
+              {...selProps("incomes", i.id)}
             />
+
           ))}
           {/* 2) parcelados */}
           {incomesParcelled.map((p) => (

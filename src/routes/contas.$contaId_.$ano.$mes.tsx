@@ -436,7 +436,7 @@ function AccountMonth() {
                   });
                 }
               }}
-              onRemove={() => {
+              onRemove={async () => {
                 if (d.recurrenceGroupId) {
                   setDeletingRecurring({
                     kind: "debit",
@@ -446,7 +446,13 @@ function AccountMonth() {
                     label: d.description,
                   });
                 } else {
-                  removeDebit.mutate(d.id);
+                  const ok = await confirmDialog({
+                    title: "Excluir débito",
+                    description: `Excluir "${d.description}"?`,
+                    variant: "destructive",
+                    confirmLabel: "Excluir",
+                  });
+                  if (ok) removeDebit.mutate(d.id);
                 }
               }}
             />

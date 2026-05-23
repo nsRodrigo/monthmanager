@@ -308,7 +308,7 @@ function AccountMonth() {
               key={i.id}
               income={i}
               onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: true })
+                toggleIncome.mutate({ id: i.id, received: !i.received })
               }
               onEdit={() => {
                 setEditingRecurring({
@@ -338,7 +338,7 @@ function AccountMonth() {
               kind="income"
               installment={p.installment}
               parent={p.income!}
-              onToggle={() => toggleInst(p.installment.id, true)}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
               onEdit={() =>
                 setEditing({
                   inst: p.installment,
@@ -356,7 +356,7 @@ function AccountMonth() {
               key={i.id}
               income={i}
               onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: true })
+                toggleIncome.mutate({ id: i.id, received: !i.received })
               }
               onEdit={() => {
                 setEditingSingle({
@@ -466,7 +466,7 @@ function AccountMonth() {
             <DebitRow
               key={d.id}
               debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: true })}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
               onEdit={() =>
                 setEditingRecurring({
                   kind: "debit",
@@ -495,7 +495,7 @@ function AccountMonth() {
               kind="debit"
               installment={p.installment}
               parent={p.debit!}
-              onToggle={() => toggleInst(p.installment.id, true)}
+              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
               onEdit={() =>
                 setEditing({
                   inst: p.installment,
@@ -512,7 +512,7 @@ function AccountMonth() {
             <DebitRow
               key={d.id}
               debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: true })}
+              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
               onEdit={() =>
                 setEditingSingle({
                   item: {
@@ -589,9 +589,9 @@ function AccountMonth() {
                         paymentPending={setCardPaid.isPending}
                         count={cardInst.length}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                        onMarkPaid={() => {
-                          if (!paid && !setCardPaid.isPending) {
-                            setCardPaid.mutate({ cardId: c.id, year, month, paid: true });
+                        onTogglePaid={() => {
+                          if (!setCardPaid.isPending) {
+                            setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid });
                           }
                         }}
                         onAdd={() => setPurchaseFor(c.id)}
@@ -909,7 +909,7 @@ function CardRow({
   paymentPending,
   count,
   dueLabel,
-  onMarkPaid,
+  onTogglePaid,
   onAdd,
   onEditCard,
   onHideMonth,
@@ -926,7 +926,7 @@ function CardRow({
   paymentPending?: boolean;
   count: number;
   dueLabel: string;
-  onMarkPaid: () => void;
+  onTogglePaid: () => void;
   onAdd: () => void;
   onEditCard?: () => void;
   onHideMonth?: () => void;
@@ -1001,10 +1001,10 @@ function CardRow({
           <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
             <button
               type="button"
-              disabled={paid || paymentPending}
+              disabled={paymentPending}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!paid && !paymentPending) onMarkPaid();
+                if (!paymentPending) onTogglePaid();
               }}
               className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
                 paid
@@ -1012,7 +1012,7 @@ function CardRow({
                   : "bg-warning/15 text-warning hover:bg-warning/25"
               }`}
             >
-              {paid ? "✓ Paga" : paymentPending ? "Marcando..." : "Marcar paga"}
+              {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
             </button>
           </div>
 
@@ -1060,7 +1060,7 @@ function CardRow({
                     inst={inst}
                     purchase={pur}
                     cardColor={cardColor}
-                    onToggle={() => onToggleInst(inst.id, true)}
+                    onToggle={() => onToggleInst(inst.id, !inst.paid)}
                     onEdit={() => onEditInst(inst)}
                     onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                   />
@@ -1108,11 +1108,8 @@ function PurchaseInstRow({
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
-        onClick={() => {
-          if (!inst.paid) onToggle();
-        }}
-        disabled={inst.paid}
-        title={inst.paid ? "Pago" : "Marcar como pago"}
+        onClick={onToggle}
+        title={inst.paid ? "Marcar como não pago" : "Marcar como pago"}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
         style={{
           backgroundColor: inst.paid
@@ -1203,12 +1200,11 @@ function DebitRow({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (!debit.paid) onToggle();
+            onToggle();
           }}
-          disabled={debit.paid}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             debit.paid
-              ? "bg-success/15 text-success"
+              ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
@@ -1255,12 +1251,11 @@ function IncomeRow({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (!income.received) onToggle();
+            onToggle();
           }}
-          disabled={income.received}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             income.received
-              ? "bg-success/15 text-success"
+              ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
         >
@@ -1297,10 +1292,7 @@ function ParcelledRow({
   return (
     <div className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4">
       <button
-        onClick={() => {
-          if (!installment.paid) onToggle();
-        }}
-        disabled={installment.paid}
+        onClick={onToggle}
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
           installment.paid
             ? "border-success bg-success text-success-foreground"

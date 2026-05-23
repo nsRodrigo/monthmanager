@@ -909,7 +909,7 @@ function CardRow({
   paymentPending,
   count,
   dueLabel,
-  onMarkPaid,
+  onTogglePaid,
   onAdd,
   onEditCard,
   onHideMonth,

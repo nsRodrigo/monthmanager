@@ -695,7 +695,20 @@ function AccountMonth() {
                             if (ok) removePurchase.mutate(pur.id);
                           }
                         }}
+                        itemSelProps={(_inst, parentId) =>
+                          selProps(`card:${c.id}`, parentId)
+                        }
+                        selectionBar={
+                          isSelMode(`card:${c.id}`) ? (
+                            <SelectionBar
+                              count={selection!.ids.size}
+                              onCancel={clearSelection}
+                              onDelete={() => bulkDelete(`card:${c.id}`)}
+                            />
+                          ) : null
+                        }
                       />
+
                     </div>
                   );
                 })

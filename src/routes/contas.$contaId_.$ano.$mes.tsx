@@ -586,11 +586,14 @@ function AccountMonth() {
                         cardColor={c.color}
                         total={total}
                         paid={paid}
+                        paymentPending={setCardPaid.isPending}
                         count={cardInst.length}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                        onTogglePaid={() =>
-                          setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid })
-                        }
+                        onMarkPaid={() => {
+                          if (!paid && !setCardPaid.isPending) {
+                            setCardPaid.mutate({ cardId: c.id, year, month, paid: true });
+                          }
+                        }}
                         onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
                         items={cardInst}

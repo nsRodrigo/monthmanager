@@ -182,7 +182,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onClick={() => setManageOpen(true)}
           className="mt-2 flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
         >
-          <Plus className="h-3.5 w-3.5" /> Adicionar conta
+          <Settings className="h-3.5 w-3.5" /> Gerenciar Conta
         </button>
       </nav>
 

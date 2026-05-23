@@ -302,7 +302,6 @@ function AccountMonth() {
 
           emptyText="Nenhum recebimento neste mês."
         >
-          {[...incomesRecurring, ...incomesCash].length === 0 && incomesParcelled.length === 0 ? null : null}
           {/* 1) recorrentes */}
           {incomesRecurring.map((i) => (
             <IncomeRow

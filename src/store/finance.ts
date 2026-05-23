@@ -869,13 +869,21 @@ export function useRemoveCard() {
         }
       }
 
-      // 2) Delete card_payments inside window
-      await supabase
+      // 2) Delete card_payments inside window (filter by year+month, not just year)
+      const { data: cps } = await supabase
         .from("card_payments")
-        .delete()
-        .eq("card_id", id)
-        .gte("year", win.start_year!)
-        .lte("year", win.end_year!);
+        .select("id,year,month")
+        .eq("card_id", id);
+      const cpToDelete = (cps ?? []).filter((c: any) => {
+        const ym = (c.year as number) * 12 + (c.month as number);
+        return ym >= sYM && ym <= eYM;
+      });
+      if (cpToDelete.length > 0) {
+        await supabase
+          .from("card_payments")
+          .delete()
+          .in("id", cpToDelete.map((c: any) => c.id));
+      }
 
       // 3) IMPORTANTE: NÃO apaga o cartão e NÃO altera a janela start/end.
       //    Para escopo "period" / "month", o usuário quer remover apenas

@@ -416,7 +416,7 @@ function AccountMonth() {
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
         >
-          {investments.map((inv) => (
+          {investmentsSorted.map((inv) => (
             <InvestmentRow
               key={inv.id}
               inv={inv}

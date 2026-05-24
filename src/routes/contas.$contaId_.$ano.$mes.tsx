@@ -99,6 +99,14 @@ function AccountMonth() {
   const { setAccountId } = useAccountFilter();
   useEffect(() => setAccountId(contaId), [contaId, setAccountId]);
 
+  // Persiste o ano atual no sessionStorage para que, ao voltar para a tela
+  // de lista de meses, ela abra exatamente no ano do mês que estava sendo
+  // editado (ex.: navegou de Dez/2015 para Jan/2016 → voltar abre em 2016).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(`selected-year-${contaId}`, String(year));
+  }, [contaId, year]);
+
   const account = accounts.find((a) => a.id === contaId);
 
   const toggleInst = useToggleInstallmentPaid();
@@ -1006,7 +1014,14 @@ function AccountMonth() {
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
-                    <div key={c.id} className="rounded-2xl border border-border bg-card">
+                    <div
+                      key={c.id}
+                      className={`rounded-2xl border bg-card transition-colors ${
+                        paid
+                          ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+                          : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
+                      }`}
+                    >
                       <CardRowSorted
                         card={c}
                         cardInst={cardInst}
@@ -1565,13 +1580,15 @@ function CardRow({
           <p className="text-[10px] text-muted-foreground">
             {count} {count === 1 ? "item" : "itens"}
           </p>
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-              paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
-            }`}
-          >
-            {paid ? "Pago" : "Em aberto"}
-          </span>
+          {open && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+                paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+              }`}
+            >
+              {paid ? "Pago" : "Em aberto"}
+            </span>
+          )}
         </div>
         {open && (
           <button

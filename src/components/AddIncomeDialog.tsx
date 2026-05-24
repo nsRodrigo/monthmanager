@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useAddIncome, useAccounts } from "@/store/finance";
+import { useAddIncome, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 
 export function AddIncomeDialog({
   open,

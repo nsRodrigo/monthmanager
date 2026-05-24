@@ -42,7 +42,7 @@ export function EditRecurringDialog({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
-  const [scope, setScope] = useState<"one" | "forward">("one");
+  const [askSaveScope, setAskSaveScope] = useState(false);
   const [askDuplicate, setAskDuplicate] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
 
@@ -51,7 +51,6 @@ export function EditRecurringDialog({
     setDescription(target.description);
     setAmount(target.amount);
     setDate(target.date);
-    setScope("one");
   }, [open, target]);
 
   if (!target) return null;
@@ -61,8 +60,7 @@ export function EditRecurringDialog({
     amount !== target.amount ||
     date !== target.date;
 
-  const save = async () => {
-    if (!description.trim() || amount === 0) return;
+  const runUpdate = async (scope: "one" | "forward") => {
     const patch: { description?: string; amount?: number; date?: string } = {};
     if (description.trim() !== target.description) patch.description = description.trim();
     if (amount !== target.amount) patch.amount = amount;
@@ -79,7 +77,13 @@ export function EditRecurringDialog({
       scope,
       patch,
     });
+    setAskSaveScope(false);
     onClose();
+  };
+
+  const handleSave = () => {
+    if (!description.trim() || amount === 0 || !dirty) return;
+    setAskSaveScope(true);
   };
 
   void confirm;

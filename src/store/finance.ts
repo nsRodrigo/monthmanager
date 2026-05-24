@@ -1627,7 +1627,7 @@ export function useToggleDebitPaid() {
       await qc.cancelQueries({ queryKey: ["debits"] });
       const prev = qc.getQueriesData<Debit[]>({ queryKey: ["debits"] });
       qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
-        old ? old.map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
+        old ? uniqueById(old).map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
       );
       return { prev };
     },

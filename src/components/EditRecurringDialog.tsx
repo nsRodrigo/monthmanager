@@ -94,11 +94,11 @@ export function EditRecurringDialog({
 
   return (
     <>
-    <Modal open={open && !askDuplicate && !askDelete} onClose={onClose} title="Editar lançamento recorrente">
+    <Modal open={open && !askDuplicate && !askDelete && !askSaveScope} onClose={onClose} title="Editar lançamento">
       <div className="space-y-4">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">Recorrente</span> · cada mês é um
-          lançamento independente. Escolha abaixo o escopo da alteração.
+          lançamento independente. Ao salvar você escolhe o escopo.
         </div>
 
         <Field label={target.kind === "debit" ? "Descrição do débito" : "Descrição do recebimento"}>
@@ -121,42 +121,6 @@ export function EditRecurringDialog({
               onChange={(e) => setDate(e.target.value)}
             />
           </Field>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Aplicar em
-          </p>
-          <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 p-3 cursor-pointer hover:border-primary">
-            <input
-              type="radio"
-              name="rec-scope"
-              checked={scope === "one"}
-              onChange={() => setScope("one")}
-              className="mt-0.5 h-4 w-4 accent-primary"
-            />
-            <span className="text-sm">
-              <span className="font-semibold">Apenas este mês</span>
-              <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                Os demais meses da série não serão alterados.
-              </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 p-3 cursor-pointer hover:border-primary">
-            <input
-              type="radio"
-              name="rec-scope"
-              checked={scope === "forward"}
-              onChange={() => setScope("forward")}
-              className="mt-0.5 h-4 w-4 accent-primary"
-            />
-            <span className="text-sm">
-              <span className="font-semibold">Este e os próximos meses</span>
-              <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                Aplica também em todos os meses futuros da mesma série.
-              </span>
-            </span>
-          </label>
         </div>
 
         <div className="flex gap-2 pt-2">
@@ -183,7 +147,7 @@ export function EditRecurringDialog({
             Cancelar
           </button>
           <button
-            onClick={save}
+            onClick={handleSave}
             disabled={update.isPending || !dirty || !description.trim() || amount === 0}
             className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
@@ -192,6 +156,42 @@ export function EditRecurringDialog({
         </div>
       </div>
     </Modal>
+
+    <Modal open={askSaveScope} onClose={() => setAskSaveScope(false)} title="Aplicar alterações em…">
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Escolha o escopo da alteração desta série recorrente.
+        </p>
+        <button
+          onClick={() => runUpdate("one")}
+          disabled={update.isPending}
+          className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+        >
+          <span className="font-semibold">Apenas este mês</span>
+          <span className="text-xs text-muted-foreground">
+            Os demais meses da série não serão alterados.
+          </span>
+        </button>
+        <button
+          onClick={() => runUpdate("forward")}
+          disabled={update.isPending}
+          className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+        >
+          <span className="font-semibold">Este e os próximos meses</span>
+          <span className="text-xs text-muted-foreground">
+            Aplica também em todos os meses futuros da mesma série.
+          </span>
+        </button>
+        <button
+          onClick={() => setAskSaveScope(false)}
+          disabled={update.isPending}
+          className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+      </div>
+    </Modal>
+
 
     <CardScopeConfirmDialog
       open={askDuplicate}

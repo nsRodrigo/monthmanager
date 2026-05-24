@@ -82,7 +82,7 @@ export function AddDebitDialog({
       <div className="space-y-4">
         {!fixedAccountId && <AccountSelect value={accountId} onChange={setAccountId} />}
         <Field label="Descrição">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: IPVA, aluguel" />
+          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: IPVA, aluguel" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

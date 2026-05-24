@@ -1,0 +1,1 @@
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS excluded_months text[] NOT NULL DEFAULT '{}';

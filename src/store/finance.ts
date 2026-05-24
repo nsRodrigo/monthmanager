@@ -27,6 +27,7 @@ export type Card = {
   startMonth: number | null;
   endYear: number | null;
   endMonth: number | null;
+  excludedMonths: string[]; // ["YYYY-MM"]
 };
 
 /**
@@ -40,6 +41,10 @@ export type CardScope =
   | { kind: "period"; startYear: number; startMonth: number; endYear: number; endMonth: number }
   | { kind: "month"; year: number; month: number };
 
+function ymKey(year: number, month: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
 /** Returns true when a card should be visible in the given year/month. */
 export function isCardVisibleInMonth(card: Card, year: number, month: number): boolean {
   const ym = year * 12 + month;
@@ -49,8 +54,10 @@ export function isCardVisibleInMonth(card: Card, year: number, month: number): b
   if (card.endYear != null && card.endMonth != null) {
     if (ym > card.endYear * 12 + card.endMonth) return false;
   }
+  if (card.excludedMonths?.includes(ymKey(year, month))) return false;
   return true;
 }
+
 
 function scopeToWindow(scope: CardScope): {
   start_year: number | null;
@@ -425,7 +432,7 @@ export function useCards() {
       const { data, error } = await supabase
         .from("cards")
         .select(
-          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month",
+          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months",
         )
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -440,6 +447,7 @@ export function useCards() {
         startMonth: c.start_month ?? null,
         endYear: c.end_year ?? null,
         endMonth: c.end_month ?? null,
+        excludedMonths: (c.excluded_months ?? []) as string[],
       }));
     },
   });
@@ -800,7 +808,7 @@ export function useAddCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (
-      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth"> & {
+      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths"> & {
         scope?: CardScope;
       },
     ) => {
@@ -909,11 +917,23 @@ export function useRemoveCard() {
           .in("id", cpToDelete.map((c: any) => c.id));
       }
 
-      // 3) IMPORTANTE: NÃO apaga o cartão e NÃO altera a janela start/end.
-      //    Para escopo "period" / "month", o usuário quer remover apenas
-      //    as movimentações daquele intervalo — o cartão deve continuar
-      //    visível nos demais meses, mesmo que fique vazio dentro do
-      //    período (ele pode adicionar novas compras lá depois).
+      // 3) Esconde o cartão nos meses do escopo adicionando-os a excluded_months.
+      //    O cartão continua existindo (e visível fora do escopo) — o usuário
+      //    pode voltar a usá-lo em outros meses normalmente.
+      const { data: cardRow } = await supabase
+        .from("cards")
+        .select("excluded_months")
+        .eq("id", id)
+        .maybeSingle();
+      const current: string[] = (cardRow?.excluded_months ?? []) as string[];
+      const toHide: string[] = [];
+      for (let ym = sYM; ym <= eYM; ym++) {
+        const y = Math.floor(ym / 12);
+        const m = ym % 12;
+        toHide.push(`${y}-${String(m + 1).padStart(2, "0")}`);
+      }
+      const merged = Array.from(new Set([...current, ...toHide]));
+      await supabase.from("cards").update({ excluded_months: merged }).eq("id", id);
     },
     onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
   });

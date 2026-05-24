@@ -637,7 +637,7 @@ function AccountMonth() {
                   inst: p.installment,
                   label: p.debit!.description,
                   subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
-                  onDeleteParent: () => removeDebit.mutate(p.debit!.id),
+                  onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}

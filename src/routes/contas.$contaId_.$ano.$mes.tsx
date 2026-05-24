@@ -836,14 +836,13 @@ function AccountMonth() {
                             subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
                               pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
                             }`,
-                            onDeleteParent: () =>
-                              askDeleteParcelled(pur.id, "purchase", pur.description),
+                            onDeleteParent: () => askDeletePurchase(pur),
                           });
                         }}
                         onRemoveInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
                           if (!pur) return;
-                          askDeleteParcelled(pur.id, "purchase", pur.description);
+                          askDeletePurchase(pur);
                         }}
                         itemSelProps={(_inst, parentId) =>
                           selProps(`card:${c.id}`, parentId)

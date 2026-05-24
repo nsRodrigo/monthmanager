@@ -1948,13 +1948,20 @@ function IncomeRow({
     >
       {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            income.received ? "text-muted-foreground" : ""
-          }`}
-        >
-          {income.description}
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p
+            className={`truncate text-sm font-semibold ${
+              income.received ? "text-muted-foreground" : ""
+            }`}
+          >
+            {income.description}
+          </p>
+          {income.recurrenceGroupId && (
+            <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
+              Obrig.
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>

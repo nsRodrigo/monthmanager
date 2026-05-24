@@ -82,8 +82,9 @@ export function EditRecurringDialog({
     onClose();
   };
 
-  // Mantemos `remove`/`confirm` disponíveis para futuras ações pontuais.
-  void remove; void confirm;
+  void confirm;
+
+
 
 
 

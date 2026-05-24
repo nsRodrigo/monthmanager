@@ -527,7 +527,7 @@ export function useDebits() {
     enabled: !!user,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
-    queryFn: async (): Promise<Debit[]> => {
+    queryFn: async ({ signal }): Promise<Debit[]> => {
       const data = await fetchAllRows<{
         id: string;
         account_id: string;
@@ -541,14 +541,18 @@ export function useDebits() {
         installments_count: number;
         is_parent: boolean;
         recurrence_group_id: string | null;
-      }>(() =>
-        supabase
-          .from("debits")
-          .select(
-            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
-          )
-          .order("date", { ascending: true })
-          .order("id", { ascending: true }),
+      }>(
+        (abortSignal) =>
+          supabase
+            .from("debits")
+            .select(
+              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
+            )
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .abortSignal(abortSignal),
+        1000,
+        signal,
       );
       return uniqueById(
         data.map((d) => ({

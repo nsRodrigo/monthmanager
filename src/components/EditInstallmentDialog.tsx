@@ -229,32 +229,24 @@ export function EditInstallmentDialog({
           </div>
 
           {canConvert && (
-            <div className="space-y-3 rounded-xl border border-border bg-background/30 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Tipo de lançamento
-              </p>
-              <div className="flex gap-1 rounded-full bg-secondary p-1">
-                {(["cash", "parcelled", "recurring"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setSingleType(t)}
-                    className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      singleType === t ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {t === "cash" ? "À vista" : t === "parcelled" ? "Parcelado" : "Recorrente"}
-                  </button>
-                ))}
-              </div>
+            <>
+              <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+                <input
+                  type="checkbox"
+                  checked={singleType === "parcelled"}
+                  onChange={(e) => setSingleType(e.target.checked ? "parcelled" : "cash")}
+                  className="h-4 w-4 accent-primary"
+                />
+                <span className="text-sm font-medium">É parcelado?</span>
+              </label>
 
               {singleType === "parcelled" && (
-                <div className="space-y-3">
+                <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
                   <div className="flex gap-1 rounded-full bg-secondary p-1">
                     <button
                       type="button"
                       onClick={() => setConvMode("total")}
-                      className={`flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                      className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                         convMode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                       }`}
                     >
@@ -263,7 +255,7 @@ export function EditInstallmentDialog({
                     <button
                       type="button"
                       onClick={() => setConvMode("perInstallment")}
-                      className={`flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                      className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                         convMode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                       }`}
                     >
@@ -293,7 +285,7 @@ export function EditInstallmentDialog({
                     </Field>
                   </div>
                   {amount > 0 && convN > 1 && (
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {convN}x de <span className="font-semibold text-foreground">{formatCurrency(convPer)}</span> · total{" "}
                       <span className="font-semibold text-foreground">{formatCurrency(convTotal)}</span>
                       <br />
@@ -303,18 +295,30 @@ export function EditInstallmentDialog({
                 </div>
               )}
 
-              {singleType === "recurring" && (
-                <p className="text-[11px] text-muted-foreground">
-                  Será replicado nos próximos 24 meses mantendo o dia. Cada mês é independente e pode ser editado/excluído.
-                </p>
-              )}
+              <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
+                <input
+                  type="checkbox"
+                  checked={singleType === "recurring"}
+                  onChange={(e) => setSingleType(e.target.checked ? "recurring" : "cash")}
+                  disabled={singleType === "parcelled"}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span className="text-sm">
+                  <span className="font-medium">Recorrente</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    {singleType === "parcelled"
+                      ? "Indisponível para parcelados."
+                      : "Replicado automaticamente nos próximos 24 meses, mantendo o dia."}
+                  </span>
+                </span>
+              </label>
 
               {singleType !== "cash" && (
                 <p className="text-[11px] text-amber-500/90">
                   ⚠ Ao salvar, o lançamento atual será substituído pela nova série.
                 </p>
               )}
-            </div>
+            </>
           )}
 
           {single.kind !== "investment" && singleType === "cash" && (

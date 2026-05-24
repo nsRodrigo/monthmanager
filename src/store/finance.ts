@@ -3542,9 +3542,9 @@ export function useDescriptionSuggestions(
         .order("created_at", { ascending: false })
         .limit(1000);
       if (error) throw error;
-      return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
-        label: String((row as Record<string, unknown>)[field] ?? "").trim(),
-        createdAt: String((row as Record<string, unknown>)["created_at"] ?? ""),
+      return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => ({
+        label: String(row[field] ?? "").trim(),
+        createdAt: String(row["created_at"] ?? ""),
       }));
     },
   });

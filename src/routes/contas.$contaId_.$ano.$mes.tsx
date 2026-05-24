@@ -1014,7 +1014,14 @@ function AccountMonth() {
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
-                    <div key={c.id} className="rounded-2xl border border-border bg-card">
+                    <div
+                      key={c.id}
+                      className={`rounded-2xl border bg-card transition-colors ${
+                        paid
+                          ? "border-success/50 shadow-[0_4px_18px_-6px_hsl(var(--success)/0.35)]"
+                          : "border-warning/50 shadow-[0_4px_18px_-6px_hsl(var(--warning)/0.30)]"
+                      }`}
+                    >
                       <CardRowSorted
                         card={c}
                         cardInst={cardInst}

@@ -659,7 +659,7 @@ function AccountMonth() {
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-debit"}`}>
+            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-destructive"}`}>
               {formatCurrency(totalDebits + totalInvested)}
             </p>
           </div>
@@ -739,6 +739,13 @@ function AccountMonth() {
           addLabel="Novo débito"
           total={totalDebitsNet}
           count={monthDebits.single.length + monthDebits.parcelled.length}
+          paidState={
+            monthDebits.single.length + monthDebits.parcelled.length > 0
+              ? debitsAllPaid
+                ? "paid"
+                : "open"
+              : null
+          }
           empty={
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
@@ -1260,6 +1267,7 @@ function GroupedSection({
   headerBar,
   sortControl,
   paidControl,
+  paidState,
   children,
 }: {
   icon: typeof Building2;
@@ -1277,13 +1285,21 @@ function GroupedSection({
   headerBar?: React.ReactNode;
   sortControl?: React.ReactNode;
   paidControl?: React.ReactNode;
+  paidState?: "paid" | "open" | null;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const totalColor = toneText[totalTone ?? tone];
   const toggle = () => setOpen((o) => !o);
+  const stateClass =
+    paidState === "paid"
+      ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+      : paidState === "open"
+        ? "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
+        : "border-border";
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+    <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
+
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-3 md:px-4 md:py-3.5">
         <button

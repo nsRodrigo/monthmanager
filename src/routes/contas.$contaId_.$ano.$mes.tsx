@@ -739,6 +739,13 @@ function AccountMonth() {
           addLabel="Novo débito"
           total={totalDebitsNet}
           count={monthDebits.single.length + monthDebits.parcelled.length}
+          paidState={
+            monthDebits.single.length + monthDebits.parcelled.length > 0
+              ? debitsAllPaid
+                ? "paid"
+                : "open"
+              : null
+          }
           empty={
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }

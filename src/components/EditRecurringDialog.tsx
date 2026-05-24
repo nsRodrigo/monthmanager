@@ -180,10 +180,10 @@ export function EditRecurringDialog({
             <Copy className="h-4 w-4" />
           </button>
           <button
-            onClick={handleDelete}
-            disabled={remove.isPending}
+            onClick={() => setAskDelete(true)}
+            disabled={deleteScope.isPending || remove.isPending}
             className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
-            title="Excluir conforme escopo selecionado"
+            title="Excluir lançamento"
           >
             <Trash2 className="h-4 w-4" />
           </button>

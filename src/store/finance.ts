@@ -542,15 +542,16 @@ export function useDebits() {
         is_parent: boolean;
         recurrence_group_id: string | null;
       }>(
-        (abortSignal) =>
-          supabase
+        (abortSignal) => {
+          const query = supabase
             .from("debits")
             .select(
               "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
             )
             .order("date", { ascending: true })
-            .order("id", { ascending: true })
-            .abortSignal(abortSignal),
+            .order("id", { ascending: true });
+          return abortSignal ? query.abortSignal(abortSignal) : query;
+        },
         1000,
         signal,
       );

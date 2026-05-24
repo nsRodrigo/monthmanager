@@ -261,6 +261,29 @@ function AccountMonth() {
     parentId: string,
   ) => askDeleteParcelled(parentId, parentType, label);
 
+  /**
+   * Exclusão de compra no cartão:
+   * - parceladas (>1x) → diálogo de escopo (este mês / período / tudo)
+   * - 1x → confirmação simples + remove
+   */
+  const askDeletePurchase = async (pur: {
+    id: string;
+    description: string;
+    installmentsCount: number;
+  }) => {
+    if (pur.installmentsCount > 1) {
+      askDeleteParcelled(pur.id, "purchase", pur.description);
+      return;
+    }
+    const ok = await confirmDialog({
+      title: "Excluir compra",
+      description: `Excluir "${pur.description}"?`,
+      variant: "destructive",
+      confirmLabel: "Excluir",
+    });
+    if (ok) removePurchase.mutate(pur.id);
+  };
+
   const accountCards = useMemo(
     () =>
       cards.filter(
@@ -310,6 +333,10 @@ function AccountMonth() {
     .slice()
     .sort(byDateAsc);
   const debitsParcelled = monthDebits.parcelled.slice().sort(byInstDueAsc);
+  const debitsAllPaid =
+    monthDebits.single.length + monthDebits.parcelled.length > 0 &&
+    monthDebits.single.every((d) => d.paid) &&
+    monthDebits.parcelled.every((p) => p.installment.paid);
 
   const incomesRecurring = monthIncomes.single
     .filter((i) => !!i.recurrenceGroupId)
@@ -663,13 +690,41 @@ function AccountMonth() {
             />
           }
           headerBar={
-            isSelMode("debits") ? (
-              <SelectionBar
-                count={selection!.ids.size}
-                onCancel={clearSelection}
-                onDelete={() => bulkDelete("debits")}
-              />
-            ) : null
+            <>
+              {isSelMode("debits") ? (
+                <SelectionBar
+                  count={selection!.ids.size}
+                  onCancel={clearSelection}
+                  onDelete={() => bulkDelete("debits")}
+                />
+              ) : null}
+              {!isSelMode("debits") &&
+                monthDebits.single.length + monthDebits.parcelled.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = !debitsAllPaid;
+                        monthDebits.single.forEach((d) => {
+                          if (d.paid !== target)
+                            toggleDebit.mutate({ id: d.id, paid: target });
+                        });
+                        monthDebits.parcelled.forEach((p) => {
+                          if (p.installment.paid !== target)
+                            toggleInst(p.installment.id, target);
+                        });
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        debitsAllPaid
+                          ? "bg-success/15 text-success hover:bg-success/25"
+                          : "bg-warning/15 text-warning hover:bg-warning/25"
+                      }`}
+                    >
+                      {debitsAllPaid ? "✓ Desmarcar todos" : "Marcar todos como pagos"}
+                    </button>
+                  </div>
+                )}
+            </>
           }
         >
           {debitsOrdered.map((e) => {
@@ -813,14 +868,13 @@ function AccountMonth() {
                             subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
                               pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
                             }`,
-                            onDeleteParent: () =>
-                              askDeleteParcelled(pur.id, "purchase", pur.description),
+                            onDeleteParent: () => askDeletePurchase(pur),
                           });
                         }}
                         onRemoveInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
                           if (!pur) return;
-                          askDeleteParcelled(pur.id, "purchase", pur.description);
+                          askDeletePurchase(pur);
                         }}
                         itemSelProps={(_inst, parentId) =>
                           selProps(`card:${c.id}`, parentId)

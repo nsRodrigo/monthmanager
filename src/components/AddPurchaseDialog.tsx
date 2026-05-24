@@ -55,6 +55,11 @@ export function AddPurchaseDialog({
 
   const submit = async () => {
     if (!description.trim() || amount === 0 || !cardId) return;
+    // When adding inside a specific invoice month (fixedCardId), pin the
+    // installment to that month while keeping the user-entered purchase date.
+    const invoiceAnchorDate = fixedCardId
+      ? `${defaultYear}-${String(defaultMonth + 1).padStart(2, "0")}-${String(Math.min(new Date(defaultYear, defaultMonth + 1, 0).getDate(), Number(date.slice(8, 10)) || 1)).padStart(2, "0")}`
+      : undefined;
     // Recurring purchase: create one purchase with 24 monthly "installments"
     // of the same amount, anchored at the chosen month. Each month is
     // independent and can be edited / deleted later.
@@ -66,6 +71,7 @@ export function AddPurchaseDialog({
         date,
         installmentsCount: 24,
         installmentNumber: 1,
+        invoiceAnchorDate,
       });
       onClose();
       return;
@@ -80,6 +86,7 @@ export function AddPurchaseDialog({
       date,
       installmentsCount: n,
       installmentNumber: cur,
+      invoiceAnchorDate,
     });
     onClose();
   };

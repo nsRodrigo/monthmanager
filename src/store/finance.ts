@@ -1090,7 +1090,7 @@ export function useAddPurchase() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number }) => {
+    mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number; invoiceAnchorDate?: string }) => {
       const { data, error } = await supabase
         .from("purchases")
         .insert({
@@ -1107,6 +1107,8 @@ export function useAddPurchase() {
       const purchaseId = (data as { id: string }).id;
       // Manual entry: anchor at the chosen date so the installment lands
       // in the month the user picked (no closing-day rollover surprises).
+      // When adding from inside a specific invoice month, use invoiceAnchorDate
+      // so the installment lands in that month regardless of purchase_date.
       const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
       const inst = buildInstallmentsAnchored(
         purchaseId,
@@ -1114,7 +1116,7 @@ export function useAddPurchase() {
         p.totalAmount,
         p.installmentsCount,
         anchor,
-        p.date,
+        p.invoiceAnchorDate ?? p.date,
         "purchase",
         true,
       );

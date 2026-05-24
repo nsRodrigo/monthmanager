@@ -729,7 +729,7 @@ function AccountMonth() {
           tone="debit"
           onAdd={() => setOpenDebit(true)}
           addLabel="Novo débito"
-          total={totalDebits}
+          total={totalDebitsNet}
           count={monthDebits.single.length + monthDebits.parcelled.length}
           empty={
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0

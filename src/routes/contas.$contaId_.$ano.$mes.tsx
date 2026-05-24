@@ -119,6 +119,7 @@ function AccountMonth() {
     label: string;
     subtitle?: string;
     onDeleteParent?: () => void;
+    parentSource?: import("@/store/finance").DuplicateSource;
   } | null>(null);
   const [editingSingle, setEditingSingle] = useState<{
     item: SingleEditTarget;

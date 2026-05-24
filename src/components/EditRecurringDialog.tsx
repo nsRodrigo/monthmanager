@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
-import { useUpdateRecurringSeries, useDeleteRecurringSeries, useDuplicateOverScope, type CardScope } from "@/store/finance";
+import { useUpdateRecurringSeries, useDeleteRecurringSeries, useDuplicateOverScope, useDeleteOverScope, type CardScope, type DeleteSource } from "@/store/finance";
 import { useConfirm } from "@/store/confirm";
 import { Trash2, Copy } from "lucide-react";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
@@ -37,12 +37,14 @@ export function EditRecurringDialog({
   const update = useUpdateRecurringSeries();
   const remove = useDeleteRecurringSeries();
   const duplicate = useDuplicateOverScope();
+  const deleteScope = useDeleteOverScope();
   const confirm = useConfirm();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [scope, setScope] = useState<"one" | "forward">("one");
   const [askDuplicate, setAskDuplicate] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;
@@ -80,30 +82,15 @@ export function EditRecurringDialog({
     onClose();
   };
 
-  const handleDelete = async () => {
-    const ok = await confirm({
-      title: "Excluir recorrente",
-      description:
-        scope === "forward"
-          ? "Este lançamento e todos os meses seguintes da série serão removidos."
-          : "Apenas este mês será removido. Os outros meses da série permanecem.",
-      variant: "destructive",
-      confirmLabel: "Excluir",
-    });
-    if (!ok) return;
-    await remove.mutateAsync({
-      kind: target.kind,
-      id: target.id,
-      groupId: target.groupId,
-      anchorDate: target.date,
-      scope,
-    });
-    onClose();
-  };
+  void confirm;
+
+
+
+
 
   return (
     <>
-    <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento recorrente">
+    <Modal open={open && !askDuplicate && !askDelete} onClose={onClose} title="Editar lançamento recorrente">
       <div className="space-y-4">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">Recorrente</span> · cada mês é um
@@ -178,10 +165,10 @@ export function EditRecurringDialog({
             <Copy className="h-4 w-4" />
           </button>
           <button
-            onClick={handleDelete}
-            disabled={remove.isPending}
+            onClick={() => setAskDelete(true)}
+            disabled={deleteScope.isPending || remove.isPending}
             className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
-            title="Excluir conforme escopo selecionado"
+            title="Excluir lançamento"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -227,6 +214,36 @@ export function EditRecurringDialog({
           anchorMonth: defaultMonth ?? new Date().getMonth(),
         });
         setAskDuplicate(false);
+        onClose();
+      }}
+    />
+
+    <CardScopeConfirmDialog
+      open={askDelete}
+      onClose={() => setAskDelete(false)}
+      title={`Excluir · ${target.description}`}
+      description="Serão removidos os lançamentos desta série recorrente em cada mês do escopo selecionado."
+      confirmLabel="Excluir"
+      variant="destructive"
+      defaultYear={defaultYear ?? new Date().getFullYear()}
+      defaultMonth={defaultMonth ?? new Date().getMonth()}
+      initialKind="month"
+      loading={deleteScope.isPending}
+      onConfirm={async (s: CardScope) => {
+        const src: DeleteSource = {
+          kind: target.kind,
+          accountId: target.accountId,
+          description: target.description,
+          amount: target.amount,
+          groupId: target.groupId,
+        };
+        await deleteScope.mutateAsync({
+          source: src,
+          scope: s,
+          anchorYear: defaultYear ?? new Date().getFullYear(),
+          anchorMonth: defaultMonth ?? new Date().getMonth(),
+        });
+        setAskDelete(false);
         onClose();
       }}
     />

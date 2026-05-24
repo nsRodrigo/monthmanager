@@ -1980,6 +1980,95 @@ export function useDuplicateOverScope() {
   });
 }
 
+// =======================
+// Delete any item over a scope (month / period / all)
+// Finds matching single-payment rows in each target month and removes them.
+// For recurring series, matches by recurrence_group_id within the target months.
+// =======================
+export type DeleteSource =
+  | { kind: "debit"; accountId: string; description: string; amount: number; groupId?: string | null }
+  | { kind: "income"; accountId: string; description: string; amount: number; groupId?: string | null }
+  | { kind: "investment"; accountId: string; type: string; amount: number };
+
+export function useDeleteOverScope() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { source: DeleteSource; scope: CardScope; anchorYear: number; anchorMonth: number }) => {
+      const targets = resolveScopeMonths(args.scope, args.anchorYear, args.anchorMonth);
+      if (targets.length === 0) return;
+      const src = args.source;
+      for (const t of targets) {
+        const start = fmtLocalDate(t.year, t.month, 1);
+        const lastDay = new Date(t.year, t.month + 1, 0).getDate();
+        const end = fmtLocalDate(t.year, t.month, lastDay);
+        if (src.kind === "debit") {
+          let q = supabase
+            .from("debits")
+            .select("id")
+            .eq("account_id", src.accountId)
+            .gte("date", start)
+            .lte("date", end)
+            .eq("installments_count", 1)
+            .eq("is_parent", false);
+          if (src.groupId) {
+            q = q.eq("recurrence_group_id", src.groupId);
+          } else {
+            q = q.eq("description", src.description).eq("amount", src.amount);
+          }
+          const { data, error } = await q;
+          if (error) throw error;
+          const ids = (data ?? []).map((r: { id: string }) => r.id);
+          if (ids.length) {
+            await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "debit");
+            const { error: e2 } = await supabase.from("debits").delete().in("id", ids);
+            if (e2) throw e2;
+          }
+        } else if (src.kind === "income") {
+          let q = supabase
+            .from("incomes")
+            .select("id")
+            .eq("account_id", src.accountId)
+            .gte("date", start)
+            .lte("date", end)
+            .eq("installments_count", 1)
+            .eq("is_parent", false);
+          if (src.groupId) {
+            q = q.eq("recurrence_group_id", src.groupId);
+          } else {
+            q = q.eq("description", src.description).eq("amount", src.amount);
+          }
+          const { data, error } = await q;
+          if (error) throw error;
+          const ids = (data ?? []).map((r: { id: string }) => r.id);
+          if (ids.length) {
+            await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "income");
+            const { error: e2 } = await supabase.from("incomes").delete().in("id", ids);
+            if (e2) throw e2;
+          }
+        } else {
+          const { data, error } = await supabase
+            .from("investments")
+            .select("id")
+            .eq("account_id", src.accountId)
+            .eq("type", src.type)
+            .eq("amount", src.amount)
+            .gte("date", start)
+            .lte("date", end);
+          if (error) throw error;
+          const ids = (data ?? []).map((r: { id: string }) => r.id);
+          if (ids.length) {
+            const { error: e2 } = await supabase.from("investments").delete().in("id", ids);
+            if (e2) throw e2;
+          }
+        }
+      }
+      inv(["debits", "incomes", "investments", "installments"]);
+    },
+  });
+}
+
+
+
 
 
 // =======================

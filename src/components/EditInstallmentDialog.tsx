@@ -15,8 +15,10 @@ import {
   useRemoveIncome,
   useDescriptionSuggestions,
   useDuplicateOverScope,
+  useDeleteOverScope,
   type Installment,
   type CardScope,
+  type DeleteSource,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
@@ -66,9 +68,11 @@ export function EditInstallmentDialog({
   const removeDebit = useRemoveDebit();
   const removeIncome = useRemoveIncome();
   const duplicate = useDuplicateOverScope();
+  const deleteScope = useDeleteOverScope();
   
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
   const dupAnchorY = defaultYear ?? new Date().getFullYear();
   const dupAnchorM = defaultMonth ?? new Date().getMonth();
 
@@ -218,7 +222,7 @@ export function EditInstallmentDialog({
       removeIncome.isPending;
     return (
       <>
-      <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento">
+      <Modal open={open && !askDuplicate && !askDelete} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
             <AutocompleteInput
@@ -358,19 +362,10 @@ export function EditInstallmentDialog({
             </button>
             {onDeleteParent && (
               <button
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: "Excluir lançamento",
-                    description: "Tem certeza que deseja excluir este lançamento?",
-                    variant: "destructive",
-                    confirmLabel: "Excluir",
-                  });
-                  if (ok) {
-                    onDeleteParent();
-                    onClose();
-                  }
-                }}
-                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
+                onClick={() => setAskDelete(true)}
+                disabled={deleteScope.isPending}
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
+                title="Excluir lançamento"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -411,6 +406,36 @@ export function EditInstallmentDialog({
               : { kind: "investment" as const, accountId: single.accountId, type: single.description, amount: single.amount, percentage: 0, date: single.date };
           await duplicate.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });
           setAskDuplicate(false);
+          onClose();
+        }}
+      />
+
+      <CardScopeConfirmDialog
+        open={askDelete}
+        onClose={() => setAskDelete(false)}
+        title={`Excluir · ${single.description || "lançamento"}`}
+        description="Serão removidos lançamentos correspondentes (mesma descrição e valor) em cada mês do escopo selecionado."
+        confirmLabel="Excluir"
+        variant="destructive"
+        defaultYear={dupAnchorY}
+        defaultMonth={dupAnchorM}
+        initialKind="month"
+        loading={deleteScope.isPending}
+        onConfirm={async (s: CardScope) => {
+          // For the anchor month, also remove the currently-edited row to ensure
+          // it is deleted even if data drifted (e.g. amount edited but not saved).
+          if (s.kind === "month" && s.year === dupAnchorY && s.month === dupAnchorM && onDeleteParent) {
+            onDeleteParent();
+          } else {
+            const src: DeleteSource =
+              single.kind === "debit"
+                ? { kind: "debit", accountId: single.accountId, description: single.description, amount: single.amount }
+                : single.kind === "income"
+                ? { kind: "income", accountId: single.accountId, description: single.description, amount: single.amount }
+                : { kind: "investment", accountId: single.accountId, type: single.description, amount: single.amount };
+            await deleteScope.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });
+          }
+          setAskDelete(false);
           onClose();
         }}
       />

@@ -28,6 +28,7 @@ import {
   useEnsureRecurringForMonth,
   useDeleteParcelledByScope,
   useDeleteRecurringByScope,
+  useReorderCards,
   type CardScope,
   type Installment,
   type Debit,

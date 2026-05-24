@@ -9,16 +9,22 @@ import {
   useUpdateInvestment,
   useUpdatePurchase,
   useChangePurchaseInstallments,
+  useAddDebit,
+  useAddIncome,
+  useRemoveDebit,
+  useRemoveIncome,
+  useDescriptionSuggestions,
   type Installment,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Trash2, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 
 export type SingleEditTarget =
-  | { kind: "debit"; id: string; description: string; amount: number; date: string; paid: boolean }
-  | { kind: "income"; id: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "investment"; id: string; description: string; amount: number; date: string };
 
 export function EditInstallmentDialog({

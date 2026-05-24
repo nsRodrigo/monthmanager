@@ -427,8 +427,22 @@ function AccountMonth() {
       allIncomes,
       allInvestments,
     );
-    const prevKey = month === 0 ? `${year - 1}-11` : `${year}-${month - 1}`;
-    const saldoAnterior = monthly.get(prevKey)?.saldoEmConta ?? account.initialBalance;
+    // Find the most recent month with data BEFORE the current month.
+    // Using only `month - 1` breaks when the immediate previous month has no
+    // entries (e.g. Nov 2020 → Oct 2020 is empty → must fall back to Sep 2020),
+    // otherwise we'd silently revert to account.initialBalance.
+    let saldoAnterior = account.initialBalance;
+    let bestY = -Infinity;
+    let bestM = -Infinity;
+    for (const [, mb] of monthly) {
+      const isBefore = mb.year < year || (mb.year === year && mb.month < month);
+      if (!isBefore) continue;
+      if (mb.year > bestY || (mb.year === bestY && mb.month > bestM)) {
+        bestY = mb.year;
+        bestM = mb.month;
+        saldoAnterior = mb.saldoEmConta;
+      }
+    }
     return normalizeZero(saldoAnterior + totalIncome);
   })();
 

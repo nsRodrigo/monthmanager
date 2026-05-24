@@ -23,6 +23,7 @@ export function AddPurchaseDialog({
 }) {
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
+  const suggestions = useDescriptionSuggestions("purchase");
   const selectableCards = useMemo(
     () => (fixedAccountId ? cards.filter((card) => card.accountId === fixedAccountId) : cards),
     [cards, fixedAccountId],

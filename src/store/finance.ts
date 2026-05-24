@@ -3479,6 +3479,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
             const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
 
             const row: any = {
+              id: await deterministicUuid(`recurring:${table}:${gid}:${year}:${month}`),
               user_id: user.id,
               account_id: t.account_id,
               description: t.description,

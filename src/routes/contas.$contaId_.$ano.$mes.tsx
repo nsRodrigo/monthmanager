@@ -971,6 +971,7 @@ function AccountMonth() {
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
         onDeleteParent={editing?.onDeleteParent}
+        parentSource={editing?.parentSource}
         defaultYear={year}
         defaultMonth={month}
       />

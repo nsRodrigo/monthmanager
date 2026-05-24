@@ -1293,21 +1293,35 @@ export function useSetCardPaid() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { cardId: string; year: number; month: number; paid: boolean }) => {
-      const { data: pursRaw, error: e1 } = await supabase
-        .from("purchases")
-        .select("id")
-        .eq("card_id", args.cardId);
-      if (e1) throw e1;
-      const purIds = (pursRaw ?? []).map((p) => p.id);
+      const pursRaw = await fetchAllRows<{ id: string }>(() =>
+        supabase.from("purchases").select("id").eq("card_id", args.cardId),
+      );
+      const purIds = pursRaw.map((p) => p.id);
       if (purIds.length > 0) {
-        const { error: e2 } = await supabase
-          .from("installments")
-          .update({ paid: args.paid })
-          .in("parent_id", purIds)
-          .eq("parent_type", "purchase")
-          .eq("year", args.year)
-          .eq("month", args.month);
-        if (e2) throw e2;
+        const purIdSet = new Set(purIds);
+        const monthRows = await fetchAllRows<{
+          id: string;
+          parent_id: string | null;
+          purchase_id: string | null;
+        }>(() =>
+          supabase
+            .from("installments")
+            .select("id,parent_id,purchase_id")
+            .eq("parent_type", "purchase")
+            .eq("year", args.year)
+            .eq("month", args.month),
+        );
+        const targetIds = monthRows
+          .filter((i) => purIdSet.has(i.parent_id ?? "") || purIdSet.has(i.purchase_id ?? ""))
+          .map((i) => i.id);
+        for (let i = 0; i < targetIds.length; i += 200) {
+          const chunk = targetIds.slice(i, i + 200);
+          const { error: e2 } = await supabase
+            .from("installments")
+            .update({ paid: args.paid })
+            .in("id", chunk);
+          if (e2) throw e2;
+        }
       }
       const { error: e3 } = await supabase.from("card_payments").upsert(
         {
@@ -1342,8 +1356,7 @@ export function useSetCardPaid() {
           i.parentType === "purchase" &&
           i.year === args.year &&
           i.month === args.month &&
-          i.parentId &&
-          purIds.has(i.parentId)
+          (purIds.has(i.parentId) || (i.purchaseId ? purIds.has(i.purchaseId) : false))
             ? { ...i, paid: args.paid }
             : i,
         );

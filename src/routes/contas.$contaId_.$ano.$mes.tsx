@@ -659,7 +659,7 @@ function AccountMonth() {
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-debit"}`}>
+            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-destructive"}`}>
               {formatCurrency(totalDebits + totalInvested)}
             </p>
           </div>

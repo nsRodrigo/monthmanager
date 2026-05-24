@@ -102,7 +102,8 @@ export function EditRecurringDialog({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Editar lançamento recorrente">
+    <>
+    <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento recorrente">
       <div className="space-y-4">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">Recorrente</span> · cada mês é um

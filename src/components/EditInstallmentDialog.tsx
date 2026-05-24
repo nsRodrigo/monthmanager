@@ -792,6 +792,30 @@ export function EditInstallmentDialog({
           </div>
         )}
       </Modal>
+
+      {parentSource && (
+        <CardScopeConfirmDialog
+          open={askDuplicate}
+          onClose={() => setAskDuplicate(false)}
+          title={`Duplicar · ${parentLabel ?? "lançamento"}`}
+          description="Será criada uma cópia independente em cada mês do escopo selecionado."
+          confirmLabel="Duplicar"
+          defaultYear={dupAnchorY}
+          defaultMonth={dupAnchorM}
+          initialKind="month"
+          loading={duplicate.isPending}
+          onConfirm={async (s: CardScope) => {
+            await duplicate.mutateAsync({
+              source: parentSource,
+              scope: s,
+              anchorYear: dupAnchorY,
+              anchorMonth: dupAnchorM,
+            });
+            setAskDuplicate(false);
+            onClose();
+          }}
+        />
+      )}
     </>
   );
 }

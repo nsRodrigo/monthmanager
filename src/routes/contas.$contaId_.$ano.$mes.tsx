@@ -62,9 +62,8 @@ import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
-import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
+import { CardScopeConfirmDialog } from "@/components/CardScopeConfirmDialog";
 import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
-import { DeleteRecurringDialog } from "@/components/DeleteRecurringDialog";
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 

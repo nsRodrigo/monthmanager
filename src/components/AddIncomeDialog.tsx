@@ -88,7 +88,7 @@ export function AddIncomeDialog({
           <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
         )}
         <Field label="Descrição">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Salário, freelance" />
+          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Salário, freelance" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

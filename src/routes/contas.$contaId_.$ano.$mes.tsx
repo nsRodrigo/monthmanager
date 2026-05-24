@@ -720,7 +720,7 @@ function AccountMonth() {
                           : "bg-warning/15 text-warning hover:bg-warning/25"
                       }`}
                     >
-                      {debitsAllPaid ? "✓ Desmarcar todos" : "Marcar todos como pagos"}
+                      {debitsAllPaid ? "✓ Pago" : "Marcar pago"}
                     </button>
                   </div>
                 )}

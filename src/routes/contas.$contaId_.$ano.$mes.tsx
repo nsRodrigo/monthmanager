@@ -1209,7 +1209,7 @@ function CardRow({
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {items
+              {(sortedItems ?? items)
                 .slice()
                 .map((inst) => {
                   const pur = purchases.find((p) => p.id === inst.parentId);
@@ -1217,6 +1217,7 @@ function CardRow({
                 })
                 .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
                 .sort((a, b) => {
+                  if (sortedItems) return 0; // respect provided order
                   const aParc = a.pur.installmentsCount > 1 ? 0 : 1;
                   const bParc = b.pur.installmentsCount > 1 ? 0 : 1;
                   return (
@@ -1238,6 +1239,8 @@ function CardRow({
                     onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                     {...itemSelProps(inst, inst.parentId)}
                   />
+
+
 
                 ))}
             </div>

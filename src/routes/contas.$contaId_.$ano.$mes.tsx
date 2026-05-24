@@ -1018,8 +1018,8 @@ function AccountMonth() {
                       key={c.id}
                       className={`rounded-2xl border bg-card transition-colors ${
                         paid
-                          ? "border-success/50 shadow-[0_4px_18px_-6px_hsl(var(--success)/0.35)]"
-                          : "border-warning/50 shadow-[0_4px_18px_-6px_hsl(var(--warning)/0.30)]"
+                          ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+                          : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
                       }`}
                     >
                       <CardRowSorted

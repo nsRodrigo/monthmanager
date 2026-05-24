@@ -842,6 +842,15 @@ function AccountMonth() {
 
         {/* CARDS — mostra TODOS os cartões da conta, mesmo sem movimento no mês */}
         {(() => {
+          // Todos os cartões da conta (incluindo escondidos no mês) para o modo reordenar.
+          const allAccountCards = cards.filter((c) => c.accountId === contaId);
+          const orderedAllCards =
+            reorderMode && reorderIds
+              ? (reorderIds
+                  .map((id) => allAccountCards.find((c) => c.id === id))
+                  .filter(Boolean) as typeof allAccountCards)
+              : allAccountCards;
+
           const cardsAll = accountCards.map((c) => {
             const items = monthInst.filter((i) => {
               if (i.parentType !== "purchase") return false;
@@ -851,6 +860,39 @@ function AccountMonth() {
             return { card: c, items };
           });
 
+          const moveCard = (idx: number, dir: -1 | 1) => {
+            setReorderIds((prev) => {
+              const base = prev ?? allAccountCards.map((c) => c.id);
+              const next = [...base];
+              const swap = idx + dir;
+              if (swap < 0 || swap >= next.length) return prev;
+              [next[idx], next[swap]] = [next[swap], next[idx]];
+              return next;
+            });
+          };
+
+          const enterReorder = () => {
+            setReorderIds(allAccountCards.map((c) => c.id));
+            setReorderMode(true);
+          };
+
+          const cancelReorder = () => {
+            setReorderMode(false);
+            setReorderIds(null);
+          };
+
+          const saveReorder = async () => {
+            if (!reorderIds) {
+              cancelReorder();
+              return;
+            }
+            await reorderCards.mutateAsync({
+              accountId: contaId,
+              orderedIds: reorderIds,
+            });
+            cancelReorder();
+          };
+
           return (
             <section className="space-y-3 pt-2">
               <div className="flex items-center justify-between gap-3 px-1">
@@ -859,18 +901,80 @@ function AccountMonth() {
                     CARTÕES DE CRÉDITO
                   </h2>
                   <p className="truncate text-[11px] text-muted-foreground">
-                    Faturas e compras no crédito
+                    {reorderMode
+                      ? "Arraste a ordem dos cartões — vale para a conta inteira"
+                      : "Faturas e compras no crédito"}
                   </p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
-                  </p>
-                </div>
+                {reorderMode ? (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={cancelReorder}
+                      className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold hover:bg-secondary"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={saveReorder}
+                      disabled={reorderCards.isPending}
+                      className="rounded-full bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                    >
+                      {reorderCards.isPending ? "Salvando..." : "Concluir"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {cardsAll.length === 0 ? (
+              {reorderMode ? (
+                orderedAllCards.length === 0 ? (
+                  <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
+                    Nenhum cartão para reordenar.
+                  </p>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                    {orderedAllCards.map((c, idx) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0 md:px-4"
+                      >
+                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: c.color }}
+                        />
+                        <p className="min-w-0 flex-1 truncate text-sm font-semibold">{c.name}</p>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveCard(idx, -1)}
+                            disabled={idx === 0}
+                            aria-label="Subir"
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveCard(idx, 1)}
+                            disabled={idx === orderedAllCards.length - 1}
+                            aria-label="Descer"
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : cardsAll.length === 0 ? (
                 <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
                   Nenhum cartão vinculado a esta conta.
                 </p>
@@ -897,6 +1001,7 @@ function AccountMonth() {
                         }}
                         onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
+                        onRequestReorder={enterReorder}
                         onToggleInst={(id, p) => toggleInst(id, p)}
                         onEditInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
@@ -941,12 +1046,14 @@ function AccountMonth() {
                 })
               )}
 
-              <button
-                onClick={() => setOpenCard(true)}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
-              >
-                <Plus className="h-4 w-4" /> Novo cartão
-              </button>
+              {!reorderMode && (
+                <button
+                  onClick={() => setOpenCard(true)}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+                >
+                  <Plus className="h-4 w-4" /> Novo cartão
+                </button>
+              )}
             </section>
           );
         })()}

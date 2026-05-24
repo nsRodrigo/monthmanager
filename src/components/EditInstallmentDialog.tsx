@@ -40,6 +40,7 @@ export function EditInstallmentDialog({
   parentLabel,
   parentSubtitle,
   onDeleteParent,
+  parentSource,
   defaultYear,
   defaultMonth,
 }: {
@@ -52,6 +53,8 @@ export function EditInstallmentDialog({
   parentLabel?: string;
   parentSubtitle?: string;
   onDeleteParent?: () => void;
+  /** Origem para duplicar o lançamento parcelado em outros meses. */
+  parentSource?: import("@/store/finance").DuplicateSource;
   defaultYear?: number;
   defaultMonth?: number;
 }) {
@@ -522,7 +525,7 @@ export function EditInstallmentDialog({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="Editar lançamento">
+      <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label="Descrição">
             <AutocompleteInput
@@ -592,6 +595,16 @@ export function EditInstallmentDialog({
           )}
 
           <div className="flex gap-2 pt-2">
+            {parentSource && (
+              <button
+                onClick={() => setAskDuplicate(true)}
+                disabled={duplicate.isPending}
+                className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+                title="Duplicar lançamento"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            )}
             {onDeleteParent && (
               <button
                 onClick={async () => {
@@ -779,6 +792,30 @@ export function EditInstallmentDialog({
           </div>
         )}
       </Modal>
+
+      {parentSource && (
+        <CardScopeConfirmDialog
+          open={askDuplicate}
+          onClose={() => setAskDuplicate(false)}
+          title={`Duplicar · ${parentLabel ?? "lançamento"}`}
+          description="Será criada uma cópia independente em cada mês do escopo selecionado."
+          confirmLabel="Duplicar"
+          defaultYear={dupAnchorY}
+          defaultMonth={dupAnchorM}
+          initialKind="month"
+          loading={duplicate.isPending}
+          onConfirm={async (s: CardScope) => {
+            await duplicate.mutateAsync({
+              source: parentSource,
+              scope: s,
+              anchorYear: dupAnchorY,
+              anchorMonth: dupAnchorM,
+            });
+            setAskDuplicate(false);
+            onClose();
+          }}
+        />
+      )}
     </>
   );
 }

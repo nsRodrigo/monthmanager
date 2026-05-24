@@ -119,6 +119,7 @@ function AccountMonth() {
     label: string;
     subtitle?: string;
     onDeleteParent?: () => void;
+    parentSource?: import("@/store/finance").DuplicateSource;
   } | null>(null);
   const [editingSingle, setEditingSingle] = useState<{
     item: SingleEditTarget;
@@ -542,6 +543,13 @@ function AccountMonth() {
                       label: p.income!.description,
                       subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
                       onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
+                      parentSource: {
+                        kind: "income",
+                        accountId: p.income!.accountId,
+                        description: p.income!.description,
+                        amount: p.income!.amount,
+                        date: p.income!.date,
+                      },
                     })
                   }
                   onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
@@ -759,6 +767,14 @@ function AccountMonth() {
                       label: p.debit!.description,
                       subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
                       onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
+                      parentSource: {
+                        kind: "debit",
+                        accountId: p.debit!.accountId,
+                        description: p.debit!.description,
+                        amount: p.debit!.amount,
+                        date: p.debit!.date,
+                        required: p.debit!.required,
+                      },
                     })
                   }
                   onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
@@ -886,6 +902,13 @@ function AccountMonth() {
                               pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
                             }`,
                             onDeleteParent: () => askDeletePurchase(pur),
+                            parentSource: {
+                              kind: "purchase",
+                              cardId: c.id,
+                              description: pur.description,
+                              totalAmount: pur.totalAmount,
+                              date: pur.date,
+                            },
                           });
                         }}
                         onRemoveInst={(inst) => {
@@ -963,6 +986,7 @@ function AccountMonth() {
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
         onDeleteParent={editing?.onDeleteParent}
+        parentSource={editing?.parentSource}
         defaultYear={year}
         defaultMonth={month}
       />

@@ -1369,18 +1369,48 @@ function CardRow({
   sortedItems?: Installment[] | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const lp = useLongPress(() => {
+    if (onEditCard || onRequestReorder) setMenuOpen(true);
+  });
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [menuOpen]);
+
+  const toggle = () => {
+    if (lp.didFire()) {
+      lp.reset();
+      return;
+    }
+    setOpen((o) => !o);
+  };
+
   return (
-    <div>
+    <div className="relative">
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setOpen((o) => !o);
           }
         }}
+        {...lp.handlers}
         className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <span
@@ -1388,21 +1418,7 @@ function CardRow({
           style={{ backgroundColor: cardColor }}
         />
         <div className="min-w-0 flex-1">
-          {onEditCard ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditCard();
-              }}
-              className="block w-full truncate text-left text-sm font-semibold hover:text-primary hover:underline"
-              aria-label={`Editar cartão ${cardName}`}
-            >
-              {cardName}
-            </button>
-          ) : (
-            <p className="truncate text-sm font-semibold">{cardName}</p>
-          )}
+          <p className="truncate text-sm font-semibold">{cardName}</p>
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {dueLabel}
           </p>
@@ -1420,34 +1436,76 @@ function CardRow({
             {paid ? "Pago" : "Em aberto"}
           </span>
         </div>
-        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
-        {open ? (
-          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-        ) : (
-          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+        {open && (
+          <button
+            type="button"
+            disabled={paymentPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!paymentPending) onTogglePaid();
+            }}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+              paid
+                ? "bg-success/15 text-success hover:bg-success/25"
+                : "bg-warning/15 text-warning hover:bg-warning/25"
+            }`}
+          >
+            {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
+          </button>
         )}
+        {open && sortControl ? (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            {sortControl}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((o) => !o);
+          }}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
+
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className="absolute left-4 top-full z-20 mt-1 min-w-[180px] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+        >
+          {onEditCard && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onEditCard();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Editar cartão
+            </button>
+          )}
+          {onRequestReorder && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onRequestReorder();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
+            >
+              <GripVertical className="h-3.5 w-3.5" /> Reordenar cartões
+            </button>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-border bg-background/30">
           {selectionBar}
-          <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
-              }}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                paid
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
-            </button>
-          </div>
 
           {items.length === 0 ? (
 

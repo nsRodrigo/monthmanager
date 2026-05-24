@@ -63,6 +63,7 @@ import { CardScopeConfirmDialog } from "@/components/CardScopeConfirmDialog";
 import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
+import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 
 type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 

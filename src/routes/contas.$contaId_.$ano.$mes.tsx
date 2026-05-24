@@ -63,6 +63,7 @@ import { CardScopeConfirmDialog } from "@/components/CardScopeConfirmDialog";
 import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
+import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 
 type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 
@@ -322,6 +323,60 @@ function AccountMonth() {
 
   const investmentsSorted = investments.slice().sort(byDateAsc);
 
+  // ───── Sort prefs (per-section, persisted in localStorage) ─────
+  const debitsSort = useSortPreference("debits");
+  const incomesSort = useSortPreference("incomes");
+  const investmentsSort = useSortPreference("investments");
+
+  // Tagged unions for sort-aware flat rendering of debits/incomes.
+  type DebitEntry =
+    | { kind: "single"; debit: Debit }
+    | { kind: "parcelled"; entry: (typeof debitsParcelled)[number] };
+  type IncomeEntry =
+    | { kind: "single"; income: Income }
+    | { kind: "parcelled"; entry: (typeof incomesParcelled)[number] };
+
+  const debitsDefaultOrder: DebitEntry[] = [
+    ...debitsRecurring.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
+    ...debitsParcelled.map<DebitEntry>((p) => ({ kind: "parcelled", entry: p })),
+    ...debitsCash.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
+  ];
+  const debitsOrdered =
+    debitsSort.sort.option === "default"
+      ? debitsDefaultOrder
+      : applySort(debitsDefaultOrder, debitsSort.sort, {
+          name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
+          amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.debit.date : e.entry.installment.dueDate),
+          id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
+        });
+
+  const incomesDefaultOrder: IncomeEntry[] = [
+    ...incomesRecurring.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
+    ...incomesParcelled.map<IncomeEntry>((p) => ({ kind: "parcelled", entry: p })),
+    ...incomesCash.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
+  ];
+  const incomesOrdered =
+    incomesSort.sort.option === "default"
+      ? incomesDefaultOrder
+      : applySort(incomesDefaultOrder, incomesSort.sort, {
+          name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
+          amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.income.date : e.entry.installment.dueDate),
+          id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
+        });
+
+  const investmentsOrdered =
+    investmentsSort.sort.option === "default"
+      ? investmentsSorted
+      : applySort(investmentsSorted, investmentsSort.sort, {
+          name: (i) => i.type,
+          amount: (i) => i.amount,
+          date: (i) => i.date,
+          id: (i) => i.id,
+        });
+
+
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
     monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);
@@ -413,6 +468,13 @@ function AccountMonth() {
           }
 
           emptyText="Nenhum recebimento neste mês."
+          sortControl={
+            <SortMenu
+              scope="incomes"
+              state={incomesSort.sort}
+              onChange={incomesSort.set}
+            />
+          }
           headerBar={
             isSelMode("incomes") ? (
               <SelectionBar
@@ -423,85 +485,80 @@ function AccountMonth() {
             ) : null
           }
         >
-          {/* 1) recorrentes */}
-          {incomesRecurring.map((i) => (
-            <IncomeRow
-              key={i.id}
-              income={i}
-              onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: !i.received })
-              }
-              onEdit={() => {
-                setEditingRecurring({
-                  kind: "income",
-                  id: i.id,
-                  groupId: i.recurrenceGroupId!,
-                  description: i.description,
-                  amount: i.amount,
-                  date: i.date,
-                });
-              }}
-              onRemove={() => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)}
-              {...selProps("incomes", i.id)}
-            />
-
-          ))}
-          {/* 2) parcelados */}
-          {incomesParcelled.map((p) => (
-            <ParcelledRow
-              key={p.installment.id}
-              kind="income"
-              installment={p.installment}
-              parent={p.income!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
-              onEdit={() =>
-                setEditing({
-                  inst: p.installment,
-                  label: p.income!.description,
-                  subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
-                  onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
-                })
-              }
-              onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
-              {...selProps("incomes", p.income!.id)}
-            />
-
-          ))}
-          {/* 3) à vista */}
-          {incomesCash.map((i) => (
-            <IncomeRow
-              key={i.id}
-              income={i}
-              onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: !i.received })
-              }
-              onEdit={() => {
-                setEditingSingle({
-                  item: {
-                    kind: "income",
-                    id: i.id,
-                    accountId: i.accountId,
-                    description: i.description,
-                    amount: i.amount,
-                    date: i.date,
-                    paid: i.received,
-                  },
-                  onDeleteParent: () => removeIncome.mutate(i.id),
-                });
-              }}
-              onRemove={async () => {
-                const ok = await confirmDialog({
-                  title: "Excluir recebimento",
-                  description: `Excluir "${i.description}"?`,
-                  variant: "destructive",
-                  confirmLabel: "Excluir",
-                });
-                if (ok) removeIncome.mutate(i.id);
-              }}
-              {...selProps("incomes", i.id)}
-            />
-
-          ))}
+          {incomesOrdered.map((e) => {
+            if (e.kind === "parcelled") {
+              const p = e.entry;
+              return (
+                <ParcelledRow
+                  key={p.installment.id}
+                  kind="income"
+                  installment={p.installment}
+                  parent={p.income!}
+                  onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+                  onEdit={() =>
+                    setEditing({
+                      inst: p.installment,
+                      label: p.income!.description,
+                      subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
+                      onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
+                    })
+                  }
+                  onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+                  {...selProps("incomes", p.income!.id)}
+                />
+              );
+            }
+            const i = e.income;
+            const isRecurring = !!i.recurrenceGroupId;
+            return (
+              <IncomeRow
+                key={i.id}
+                income={i}
+                onToggle={() =>
+                  toggleIncome.mutate({ id: i.id, received: !i.received })
+                }
+                onEdit={() => {
+                  if (isRecurring) {
+                    setEditingRecurring({
+                      kind: "income",
+                      id: i.id,
+                      groupId: i.recurrenceGroupId!,
+                      description: i.description,
+                      amount: i.amount,
+                      date: i.date,
+                    });
+                  } else {
+                    setEditingSingle({
+                      item: {
+                        kind: "income",
+                        id: i.id,
+                        accountId: i.accountId,
+                        description: i.description,
+                        amount: i.amount,
+                        date: i.date,
+                        paid: i.received,
+                      },
+                      onDeleteParent: () => removeIncome.mutate(i.id),
+                    });
+                  }
+                }}
+                onRemove={
+                  isRecurring
+                    ? () => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)
+                    : async () => {
+                        const ok = await confirmDialog({
+                          title: "Excluir recebimento",
+                          description: `Excluir "${i.description}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeIncome.mutate(i.id);
+                      }
+                }
+                {...selProps("incomes", i.id)}
+              />
+            );
+          })}
         </GroupedSection>
 
         {/* CONTA CORRENTE header */}
@@ -535,6 +592,13 @@ function AccountMonth() {
           defaultOpen={false}
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
+          sortControl={
+            <SortMenu
+              scope="investments"
+              state={investmentsSort.sort}
+              onChange={investmentsSort.set}
+            />
+          }
           headerBar={
             isSelMode("investments") ? (
               <SelectionBar
@@ -545,7 +609,7 @@ function AccountMonth() {
             ) : null
           }
         >
-          {investmentsSorted.map((inv) => (
+          {investmentsOrdered.map((inv) => (
             <InvestmentRow
               key={inv.id}
               inv={inv}
@@ -591,6 +655,13 @@ function AccountMonth() {
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
           emptyText="Nenhum débito neste mês."
+          sortControl={
+            <SortMenu
+              scope="debits"
+              state={debitsSort.sort}
+              onChange={debitsSort.set}
+            />
+          }
           headerBar={
             isSelMode("debits") ? (
               <SelectionBar
@@ -601,81 +672,78 @@ function AccountMonth() {
             ) : null
           }
         >
-          {/* 1) recorrentes */}
-          {debitsRecurring.map((d) => (
-            <DebitRow
-              key={d.id}
-              debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingRecurring({
-                  kind: "debit",
-                  id: d.id,
-                  groupId: d.recurrenceGroupId!,
-                  description: d.description,
-                  amount: d.amount,
-                  date: d.date,
-                })
-              }
-              onRemove={() => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)}
-              {...selProps("debits", d.id)}
-            />
-
-          ))}
-          {/* 2) parcelados */}
-          {debitsParcelled.map((p) => (
-            <ParcelledRow
-              key={p.installment.id}
-              kind="debit"
-              installment={p.installment}
-              parent={p.debit!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
-              onEdit={() =>
-                setEditing({
-                  inst: p.installment,
-                  label: p.debit!.description,
-                  subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
-                  onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
-                })
-              }
-              onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
-              {...selProps("debits", p.debit!.id)}
-            />
-
-          ))}
-          {/* 3) à vista */}
-          {debitsCash.map((d) => (
-            <DebitRow
-              key={d.id}
-              debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
-                    kind: "debit",
-                    id: d.id,
-                    accountId: d.accountId,
-                    description: d.description,
-                    amount: d.amount,
-                    date: d.date,
-                    paid: d.paid,
-                  },
-                  onDeleteParent: () => removeDebit.mutate(d.id),
-                })
-              }
-              onRemove={async () => {
-                const ok = await confirmDialog({
-                  title: "Excluir débito",
-                  description: `Excluir "${d.description}"?`,
-                  variant: "destructive",
-                  confirmLabel: "Excluir",
-                });
-                if (ok) removeDebit.mutate(d.id);
-              }}
-              {...selProps("debits", d.id)}
-            />
-
-          ))}
+          {debitsOrdered.map((e) => {
+            if (e.kind === "parcelled") {
+              const p = e.entry;
+              return (
+                <ParcelledRow
+                  key={p.installment.id}
+                  kind="debit"
+                  installment={p.installment}
+                  parent={p.debit!}
+                  onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+                  onEdit={() =>
+                    setEditing({
+                      inst: p.installment,
+                      label: p.debit!.description,
+                      subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
+                      onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
+                    })
+                  }
+                  onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+                  {...selProps("debits", p.debit!.id)}
+                />
+              );
+            }
+            const d = e.debit;
+            const isRecurring = !!d.recurrenceGroupId;
+            return (
+              <DebitRow
+                key={d.id}
+                debit={d}
+                onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+                onEdit={() => {
+                  if (isRecurring) {
+                    setEditingRecurring({
+                      kind: "debit",
+                      id: d.id,
+                      groupId: d.recurrenceGroupId!,
+                      description: d.description,
+                      amount: d.amount,
+                      date: d.date,
+                    });
+                  } else {
+                    setEditingSingle({
+                      item: {
+                        kind: "debit",
+                        id: d.id,
+                        accountId: d.accountId,
+                        description: d.description,
+                        amount: d.amount,
+                        date: d.date,
+                        paid: d.paid,
+                      },
+                      onDeleteParent: () => removeDebit.mutate(d.id),
+                    });
+                  }
+                }}
+                onRemove={
+                  isRecurring
+                    ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)
+                    : async () => {
+                        const ok = await confirmDialog({
+                          title: "Excluir débito",
+                          description: `Excluir "${d.description}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeDebit.mutate(d.id);
+                      }
+                }
+                {...selProps("debits", d.id)}
+              />
+            );
+          })}
         </GroupedSection>
 
         {/* CARDS — mostra TODOS os cartões da conta, mesmo sem movimento no mês */}
@@ -720,13 +788,13 @@ function AccountMonth() {
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
                     <div key={c.id} className="rounded-2xl border border-border bg-card">
-                      <CardRow
-                        cardName={c.name}
-                        cardColor={c.color}
+                      <CardRowSorted
+                        card={c}
+                        cardInst={cardInst}
+                        purchases={purchases}
                         total={total}
                         paid={paid}
                         paymentPending={setCardPaid.isPending}
-                        count={cardInst.length}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
                         onTogglePaid={() => {
                           if (!setCardPaid.isPending) {
@@ -735,8 +803,6 @@ function AccountMonth() {
                         }}
                         onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
-                        items={cardInst}
-                        purchases={purchases}
                         onToggleInst={(id, p) => toggleInst(id, p)}
                         onEditInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
@@ -942,6 +1008,7 @@ function GroupedSection({
   count,
   defaultOpen = false,
   headerBar,
+  sortControl,
   children,
 }: {
   icon: typeof Building2;
@@ -957,6 +1024,7 @@ function GroupedSection({
   count?: number;
   defaultOpen?: boolean;
   headerBar?: React.ReactNode;
+  sortControl?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -994,6 +1062,7 @@ function GroupedSection({
             <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
           )}
         </button>
+        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
       </div>
 
       {/* Body */}
@@ -1056,6 +1125,91 @@ function SelectionBar({
 
 /* ───────── CARD ROW (collapsible card inside CARDS section) ───────── */
 
+type PurchaseList = ReturnType<typeof usePurchases>["data"] extends infer T
+  ? T extends Array<infer P>
+    ? P[]
+    : never
+  : never;
+type Purchase = PurchaseList[number];
+type Card = ReturnType<typeof useCards>["data"] extends infer T
+  ? T extends Array<infer C>
+    ? C
+    : never
+  : never;
+
+function CardRowSorted({
+  card,
+  cardInst,
+  purchases,
+  total,
+  paid,
+  paymentPending,
+  dueLabel,
+  onTogglePaid,
+  onAdd,
+  onEditCard,
+  onToggleInst,
+  onEditInst,
+  onRemoveInst,
+  itemSelProps,
+  selectionBar,
+}: {
+  card: Card;
+  cardInst: Installment[];
+  purchases: PurchaseList;
+  total: number;
+  paid: boolean;
+  paymentPending?: boolean;
+  dueLabel: string;
+  onTogglePaid: () => void;
+  onAdd: () => void;
+  onEditCard?: () => void;
+  onToggleInst: (id: string, paid: boolean) => void;
+  onEditInst: (inst: Installment) => void;
+  onRemoveInst?: (inst: Installment) => void;
+  itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
+  selectionBar?: React.ReactNode;
+}) {
+  const { sort, set } = useSortPreference(`card:${card.id}`);
+  const sortedItems =
+    sort.option === "default"
+      ? null
+      : applySort(cardInst, sort, {
+          name: (i) => {
+            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+            return pur?.description ?? "";
+          },
+          amount: (i) => i.amount,
+          date: (i) => i.dueDate,
+          id: (i) => i.id,
+        });
+  return (
+    <CardRow
+      cardName={card.name}
+      cardColor={card.color}
+      total={total}
+      paid={paid}
+      paymentPending={paymentPending}
+      count={cardInst.length}
+      dueLabel={dueLabel}
+      onTogglePaid={onTogglePaid}
+      onAdd={onAdd}
+      onEditCard={onEditCard}
+      items={cardInst}
+      purchases={purchases}
+      onToggleInst={onToggleInst}
+      onEditInst={onEditInst}
+      onRemoveInst={onRemoveInst}
+      itemSelProps={itemSelProps}
+      selectionBar={selectionBar}
+      sortedItems={sortedItems}
+      sortControl={
+        <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
+      }
+    />
+  );
+}
+
 function CardRow({
   cardName,
   cardColor,
@@ -1075,6 +1229,8 @@ function CardRow({
   onRemoveInst,
   itemSelProps,
   selectionBar,
+  sortControl,
+  sortedItems,
 }: {
   cardName: string;
   cardColor: string;
@@ -1098,6 +1254,9 @@ function CardRow({
   onRemoveInst?: (inst: Installment) => void;
   itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
   selectionBar?: React.ReactNode;
+  sortControl?: React.ReactNode;
+  /** When provided, overrides the default sort (parcelled→cash) with this order. */
+  sortedItems?: Installment[] | null;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -1151,6 +1310,7 @@ function CardRow({
             {paid ? "Pago" : "Em aberto"}
           </span>
         </div>
+        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
         {open ? (
           <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (
@@ -1200,7 +1360,7 @@ function CardRow({
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {items
+              {(sortedItems ?? items)
                 .slice()
                 .map((inst) => {
                   const pur = purchases.find((p) => p.id === inst.parentId);
@@ -1208,6 +1368,7 @@ function CardRow({
                 })
                 .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
                 .sort((a, b) => {
+                  if (sortedItems) return 0; // respect provided order
                   const aParc = a.pur.installmentsCount > 1 ? 0 : 1;
                   const bParc = b.pur.installmentsCount > 1 ? 0 : 1;
                   return (
@@ -1229,6 +1390,8 @@ function CardRow({
                     onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                     {...itemSelProps(inst, inst.parentId)}
                   />
+
+
 
                 ))}
             </div>

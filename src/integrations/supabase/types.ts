@@ -169,6 +169,7 @@ export type Database = {
           due_day: number
           end_month: number | null
           end_year: number | null
+          excluded_months: string[]
           id: string
           name: string
           start_month: number | null
@@ -183,6 +184,7 @@ export type Database = {
           due_day?: number
           end_month?: number | null
           end_year?: number | null
+          excluded_months?: string[]
           id?: string
           name: string
           start_month?: number | null
@@ -197,6 +199,7 @@ export type Database = {
           due_day?: number
           end_month?: number | null
           end_year?: number | null
+          excluded_months?: string[]
           id?: string
           name?: string
           start_month?: number | null

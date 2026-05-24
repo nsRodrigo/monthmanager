@@ -595,6 +595,16 @@ export function EditInstallmentDialog({
           )}
 
           <div className="flex gap-2 pt-2">
+            {parentSource && (
+              <button
+                onClick={() => setAskDuplicate(true)}
+                disabled={duplicate.isPending}
+                className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+                title="Duplicar lançamento"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            )}
             {onDeleteParent && (
               <button
                 onClick={async () => {

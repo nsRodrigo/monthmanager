@@ -145,10 +145,15 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-async function fetchAllRows<T>(queryFactory: () => any, pageSize = 1000): Promise<T[]> {
+async function fetchAllRows<T>(
+  queryFactory: (signal?: AbortSignal) => any,
+  pageSize = 1000,
+  signal?: AbortSignal,
+): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if (signal?.aborted) throw new DOMException("Query cancelled", "AbortError");
+    const { data, error } = await queryFactory(signal).range(from, from + pageSize - 1);
     if (error) throw error;
     const page = (data ?? []) as T[];
     rows.push(...page);

@@ -37,12 +37,14 @@ export function EditRecurringDialog({
   const update = useUpdateRecurringSeries();
   const remove = useDeleteRecurringSeries();
   const duplicate = useDuplicateOverScope();
+  const deleteScope = useDeleteOverScope();
   const confirm = useConfirm();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [scope, setScope] = useState<"one" | "forward">("one");
   const [askDuplicate, setAskDuplicate] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;

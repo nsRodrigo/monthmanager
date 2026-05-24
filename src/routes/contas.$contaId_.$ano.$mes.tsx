@@ -1605,8 +1605,7 @@ function ParcelledRow({
           )}
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(parent.date)} · {formatCurrency(parent.amount)} em {installment.total}x · venc.{" "}
-          {formatDate(installment.dueDate)}
+          {formatDate(parent.date)} · {formatCurrency(parent.amount)} em {installment.total}x
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">

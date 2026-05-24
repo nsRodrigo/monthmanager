@@ -654,6 +654,7 @@ function AccountMonth() {
                   item: {
                     kind: "debit",
                     id: d.id,
+                    accountId: d.accountId,
                     description: d.description,
                     amount: d.amount,
                     date: d.date,

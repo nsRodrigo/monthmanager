@@ -485,85 +485,80 @@ function AccountMonth() {
             ) : null
           }
         >
-          {/* 1) recorrentes */}
-          {incomesRecurring.map((i) => (
-            <IncomeRow
-              key={i.id}
-              income={i}
-              onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: !i.received })
-              }
-              onEdit={() => {
-                setEditingRecurring({
-                  kind: "income",
-                  id: i.id,
-                  groupId: i.recurrenceGroupId!,
-                  description: i.description,
-                  amount: i.amount,
-                  date: i.date,
-                });
-              }}
-              onRemove={() => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)}
-              {...selProps("incomes", i.id)}
-            />
-
-          ))}
-          {/* 2) parcelados */}
-          {incomesParcelled.map((p) => (
-            <ParcelledRow
-              key={p.installment.id}
-              kind="income"
-              installment={p.installment}
-              parent={p.income!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
-              onEdit={() =>
-                setEditing({
-                  inst: p.installment,
-                  label: p.income!.description,
-                  subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
-                  onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
-                })
-              }
-              onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
-              {...selProps("incomes", p.income!.id)}
-            />
-
-          ))}
-          {/* 3) à vista */}
-          {incomesCash.map((i) => (
-            <IncomeRow
-              key={i.id}
-              income={i}
-              onToggle={() =>
-                toggleIncome.mutate({ id: i.id, received: !i.received })
-              }
-              onEdit={() => {
-                setEditingSingle({
-                  item: {
-                    kind: "income",
-                    id: i.id,
-                    accountId: i.accountId,
-                    description: i.description,
-                    amount: i.amount,
-                    date: i.date,
-                    paid: i.received,
-                  },
-                  onDeleteParent: () => removeIncome.mutate(i.id),
-                });
-              }}
-              onRemove={async () => {
-                const ok = await confirmDialog({
-                  title: "Excluir recebimento",
-                  description: `Excluir "${i.description}"?`,
-                  variant: "destructive",
-                  confirmLabel: "Excluir",
-                });
-                if (ok) removeIncome.mutate(i.id);
-              }}
-              {...selProps("incomes", i.id)}
-            />
-
-          ))}
+          {incomesOrdered.map((e) => {
+            if (e.kind === "parcelled") {
+              const p = e.entry;
+              return (
+                <ParcelledRow
+                  key={p.installment.id}
+                  kind="income"
+                  installment={p.installment}
+                  parent={p.income!}
+                  onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+                  onEdit={() =>
+                    setEditing({
+                      inst: p.installment,
+                      label: p.income!.description,
+                      subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
+                      onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
+                    })
+                  }
+                  onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+                  {...selProps("incomes", p.income!.id)}
+                />
+              );
+            }
+            const i = e.income;
+            const isRecurring = !!i.recurrenceGroupId;
+            return (
+              <IncomeRow
+                key={i.id}
+                income={i}
+                onToggle={() =>
+                  toggleIncome.mutate({ id: i.id, received: !i.received })
+                }
+                onEdit={() => {
+                  if (isRecurring) {
+                    setEditingRecurring({
+                      kind: "income",
+                      id: i.id,
+                      groupId: i.recurrenceGroupId!,
+                      description: i.description,
+                      amount: i.amount,
+                      date: i.date,
+                    });
+                  } else {
+                    setEditingSingle({
+                      item: {
+                        kind: "income",
+                        id: i.id,
+                        accountId: i.accountId,
+                        description: i.description,
+                        amount: i.amount,
+                        date: i.date,
+                        paid: i.received,
+                      },
+                      onDeleteParent: () => removeIncome.mutate(i.id),
+                    });
+                  }
+                }}
+                onRemove={
+                  isRecurring
+                    ? () => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)
+                    : async () => {
+                        const ok = await confirmDialog({
+                          title: "Excluir recebimento",
+                          description: `Excluir "${i.description}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeIncome.mutate(i.id);
+                      }
+                }
+                {...selProps("incomes", i.id)}
+              />
+            );
+          })}
         </GroupedSection>
 
         {/* CONTA CORRENTE header */}

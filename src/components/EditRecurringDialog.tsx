@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
-import { useUpdateRecurringSeries, useDeleteRecurringSeries, useDuplicateOverScope, useDebits, useIncomes, type CardScope } from "@/store/finance";
+import { useUpdateRecurringSeries, useDeleteRecurringSeries, useDuplicateOverScope, type CardScope } from "@/store/finance";
 import { useConfirm } from "@/store/confirm";
 import { Trash2, Copy } from "lucide-react";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";

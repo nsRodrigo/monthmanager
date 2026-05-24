@@ -40,6 +40,7 @@ export function EditInstallmentDialog({
   parentLabel,
   parentSubtitle,
   onDeleteParent,
+  parentSource,
   defaultYear,
   defaultMonth,
 }: {
@@ -52,6 +53,8 @@ export function EditInstallmentDialog({
   parentLabel?: string;
   parentSubtitle?: string;
   onDeleteParent?: () => void;
+  /** Origem para duplicar o lançamento parcelado em outros meses. */
+  parentSource?: import("@/store/finance").DuplicateSource;
   defaultYear?: number;
   defaultMonth?: number;
 }) {

@@ -18,6 +18,7 @@ import {
   useDeleteOverScope,
   type Installment,
   type CardScope,
+  type DeleteSource,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";

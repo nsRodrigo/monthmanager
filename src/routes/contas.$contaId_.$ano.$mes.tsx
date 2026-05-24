@@ -109,7 +109,11 @@ function AccountMonth() {
   const toggleIncome = useToggleIncomeReceived();
   const removeIncome = useRemoveIncome();
   const removeInvestment = useRemoveInvestment();
+  const reorderCards = useReorderCards();
   const confirmDialog = useConfirm();
+
+  const [reorderMode, setReorderMode] = useState(false);
+  const [reorderIds, setReorderIds] = useState<string[] | null>(null);
 
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);

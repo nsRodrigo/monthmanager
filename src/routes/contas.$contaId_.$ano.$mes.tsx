@@ -1341,6 +1341,7 @@ function CardRow({
   selectionBar,
   sortControl,
   sortedItems,
+  onRequestReorder,
 }: {
   cardName: string;
   cardColor: string;
@@ -1367,6 +1368,7 @@ function CardRow({
   sortControl?: React.ReactNode;
   /** When provided, overrides the default sort (parcelled→cash) with this order. */
   sortedItems?: Installment[] | null;
+  onRequestReorder?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1377,7 +1379,7 @@ function CardRow({
 
   useEffect(() => {
     if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: Event) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }

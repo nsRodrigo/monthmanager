@@ -1854,6 +1854,135 @@ export function useRemoveInvestment() {
 }
 
 // =======================
+// Duplicate any item over a scope (month / period / all)
+// =======================
+export type DuplicateSource =
+  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean }
+  | { kind: "income"; accountId: string; description: string; amount: number; date: string }
+  | { kind: "investment"; accountId: string; type: string; amount: number; percentage: number; date: string }
+  | { kind: "purchase"; cardId: string; description: string; totalAmount: number; date: string };
+
+/** Resolve a CardScope into a list of {year, month} targets. */
+function resolveScopeMonths(scope: CardScope, anchorYear: number, anchorMonth: number): Array<{ year: number; month: number }> {
+  if (scope.kind === "month") return [{ year: scope.year, month: scope.month }];
+  if (scope.kind === "period") {
+    const out: Array<{ year: number; month: number }> = [];
+    let y = scope.startYear, m = scope.startMonth;
+    const endIdx = scope.endYear * 12 + scope.endMonth;
+    while (y * 12 + m <= endIdx) {
+      out.push({ year: y, month: m });
+      m += 1;
+      if (m > 11) { m = 0; y += 1; }
+    }
+    return out;
+  }
+  // 'all' → 24 meses a partir do mês âncora (inclusive)
+  const out: Array<{ year: number; month: number }> = [];
+  let y = anchorYear, m = anchorMonth;
+  for (let i = 0; i < 24; i++) {
+    out.push({ year: y, month: m });
+    m += 1; if (m > 11) { m = 0; y += 1; }
+  }
+  return out;
+}
+
+export function useDuplicateOverScope() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { source: DuplicateSource; scope: CardScope; anchorYear: number; anchorMonth: number }) => {
+      const targets = resolveScopeMonths(args.scope, args.anchorYear, args.anchorMonth);
+      if (targets.length === 0) return;
+      const [, , _d] = args.source.date.slice(0, 10).split("-").map(Number);
+      const srcDay = _d || 1;
+      const dateFor = (y: number, m: number) => {
+        const lastDay = new Date(y, m + 1, 0).getDate();
+        return fmtLocalDate(y, m, Math.min(srcDay, lastDay));
+      };
+      const src = args.source;
+      if (src.kind === "debit") {
+        const rows = targets.map((t) => ({
+          user_id: user!.id,
+          account_id: src.accountId,
+          description: src.description,
+          amount: src.amount,
+          date: dateFor(t.year, t.month),
+          required: src.required,
+          paid: false,
+          installments_count: 1,
+          is_parent: false,
+        }));
+        const { error } = await supabase.from("debits").insert(rows);
+        if (error) throw error;
+        inv(["debits"]);
+      } else if (src.kind === "income") {
+        const rows = targets.map((t) => ({
+          user_id: user!.id,
+          account_id: src.accountId,
+          description: src.description,
+          amount: src.amount,
+          date: dateFor(t.year, t.month),
+          received: false,
+          installments_count: 1,
+          is_parent: false,
+        }));
+        const { error } = await supabase.from("incomes").insert(rows);
+        if (error) throw error;
+        inv(["incomes"]);
+      } else if (src.kind === "investment") {
+        const rows = targets.map((t) => ({
+          user_id: user!.id,
+          account_id: src.accountId,
+          type: src.type,
+          amount: src.amount,
+          percentage: src.percentage,
+          date: dateFor(t.year, t.month),
+        }));
+        const { error } = await supabase.from("investments").insert(rows);
+        if (error) throw error;
+        inv(["investments"]);
+      } else {
+        // purchase → uma compra independente (1 parcela) por mês
+        for (const t of targets) {
+          const newDate = dateFor(t.year, t.month);
+          const { data: p, error: e1 } = await supabase
+            .from("purchases")
+            .insert({
+              user_id: user!.id,
+              card_id: src.cardId,
+              description: src.description,
+              total_amount: src.totalAmount,
+              purchase_date: newDate,
+              installments_count: 1,
+            })
+            .select("id")
+            .single();
+          if (e1 || !p) throw e1 ?? new Error("Falha ao duplicar compra");
+          const pid = (p as { id: string }).id;
+          const { error: e2 } = await supabase.from("installments").insert({
+            user_id: user!.id,
+            parent_type: "purchase",
+            parent_id: pid,
+            purchase_id: pid,
+            number: 1,
+            total: 1,
+            amount: src.totalAmount,
+            due_date: newDate,
+            year: t.year,
+            month: t.month,
+            paid: false,
+          });
+          if (e2) throw e2;
+        }
+        inv(["purchases", "installments"]);
+      }
+    },
+  });
+}
+
+
+
+// =======================
 // Importer (cards live inside an account, so card already carries account)
 // =======================
 export type ImportedRow = {

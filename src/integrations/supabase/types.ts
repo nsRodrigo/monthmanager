@@ -172,6 +172,7 @@ export type Database = {
           excluded_months: string[]
           id: string
           name: string
+          position: number
           start_month: number | null
           start_year: number | null
           user_id: string
@@ -187,6 +188,7 @@ export type Database = {
           excluded_months?: string[]
           id?: string
           name: string
+          position?: number
           start_month?: number | null
           start_year?: number | null
           user_id: string
@@ -202,6 +204,7 @@ export type Database = {
           excluded_months?: string[]
           id?: string
           name?: string
+          position?: number
           start_month?: number | null
           start_year?: number | null
           user_id?: string

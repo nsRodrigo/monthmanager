@@ -1293,12 +1293,10 @@ export function useSetCardPaid() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { cardId: string; year: number; month: number; paid: boolean }) => {
-      const { data: pursRaw, error: e1 } = await supabase
-        .from("purchases")
-        .select("id")
-        .eq("card_id", args.cardId);
-      if (e1) throw e1;
-      const purIds = (pursRaw ?? []).map((p) => p.id);
+      const pursRaw = await fetchAllRows<{ id: string }>(() =>
+        supabase.from("purchases").select("id").eq("card_id", args.cardId),
+      );
+      const purIds = pursRaw.map((p) => p.id);
       if (purIds.length > 0) {
         const purIdSet = new Set(purIds);
         const monthRows = await fetchAllRows<{

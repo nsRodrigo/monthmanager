@@ -949,12 +949,16 @@ function AccountMonth() {
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
         onDeleteParent={editing?.onDeleteParent}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <EditInstallmentDialog
         open={!!editingSingle}
         onClose={() => setEditingSingle(null)}
         single={editingSingle?.item ?? null}
         onDeleteParent={editingSingle?.onDeleteParent}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} defaultYear={year} defaultMonth={month} />
       <EditCardDialog
@@ -968,6 +972,8 @@ function AccountMonth() {
         open={!!editingRecurring}
         onClose={() => setEditingRecurring(null)}
         target={editingRecurring}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <CardScopeConfirmDialog
         open={!!scopeDelete}

@@ -48,10 +48,13 @@ import {
   TrendingUp,
   Trash2,
   Check,
-  
   Zap,
   Building2,
   Download,
+  Pencil,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";

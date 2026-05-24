@@ -82,26 +82,10 @@ export function EditRecurringDialog({
     onClose();
   };
 
-  const handleDelete = async () => {
-    const ok = await confirm({
-      title: "Excluir recorrente",
-      description:
-        scope === "forward"
-          ? "Este lançamento e todos os meses seguintes da série serão removidos."
-          : "Apenas este mês será removido. Os outros meses da série permanecem.",
-      variant: "destructive",
-      confirmLabel: "Excluir",
-    });
-    if (!ok) return;
-    await remove.mutateAsync({
-      kind: target.kind,
-      id: target.id,
-      groupId: target.groupId,
-      anchorDate: target.date,
-      scope,
-    });
-    onClose();
-  };
+  // Mantemos `remove`/`confirm` disponíveis para futuras ações pontuais.
+  void remove; void confirm;
+
+
 
   return (
     <>

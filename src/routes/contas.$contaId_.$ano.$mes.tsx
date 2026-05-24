@@ -945,7 +945,7 @@ function AccountMonth() {
                   </div>
                 ) : (
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
+                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
                     </p>

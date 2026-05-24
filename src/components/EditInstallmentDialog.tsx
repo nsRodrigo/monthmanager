@@ -451,10 +451,10 @@ export function EditInstallmentDialog({
       <Modal open={open} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label="Descrição">
-            <input
-              className={inputClass}
+            <AutocompleteInput
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              suggestions={suggestions}
             />
           </Field>
 

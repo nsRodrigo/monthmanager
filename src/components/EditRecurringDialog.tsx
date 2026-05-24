@@ -13,6 +13,7 @@ export type RecurringEditTarget = {
   description: string;
   amount: number;
   date: string;
+  accountId: string;
 };
 
 /**

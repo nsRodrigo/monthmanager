@@ -28,6 +28,7 @@ export type Card = {
   endYear: number | null;
   endMonth: number | null;
   excludedMonths: string[]; // ["YYYY-MM"]
+  position: number;
 };
 
 /**

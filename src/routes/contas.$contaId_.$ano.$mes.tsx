@@ -592,6 +592,13 @@ function AccountMonth() {
           defaultOpen={false}
           empty={investments.length === 0}
           emptyText="Nenhum investimento nesta conta."
+          sortControl={
+            <SortMenu
+              scope="investments"
+              state={investmentsSort.sort}
+              onChange={investmentsSort.set}
+            />
+          }
           headerBar={
             isSelMode("investments") ? (
               <SelectionBar
@@ -602,7 +609,7 @@ function AccountMonth() {
             ) : null
           }
         >
-          {investmentsSorted.map((inv) => (
+          {investmentsOrdered.map((inv) => (
             <InvestmentRow
               key={inv.id}
               inv={inv}

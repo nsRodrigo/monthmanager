@@ -126,24 +126,82 @@ function AccountMonth() {
     item: SingleEditTarget;
     onDeleteParent?: () => void;
   } | null>(null);
-  const [deletingParcelled, setDeletingParcelled] = useState<{
-    inst: Installment;
-    label: string;
-    parentType: "purchase" | "debit" | "income";
-    parentId: string;
-  } | null>(null);
   const [editingRecurring, setEditingRecurring] = useState<RecurringEditTarget | null>(null);
-  const [deletingRecurring, setDeletingRecurring] = useState<{
-    kind: "debit" | "income";
-    id: string;
-    groupId: string;
-    date: string;
-    label: string;
+
+  const deleteParcelledScoped = useDeleteParcelledByScope();
+  const deleteRecurringScoped = useDeleteRecurringByScope();
+
+  // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
+  const [scopeDelete, setScopeDelete] = useState<{
+    title: string;
+    description?: React.ReactNode;
+    execute: (scope: CardScope) => Promise<void>;
   } | null>(null);
 
-  const deleteSingleInst = useDeleteSingleInstallment();
-  const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
-  const deleteRecurring = useDeleteRecurringSeries();
+  /** Abre o "Aplicar em" para uma compra/débito/recebimento parcelado. */
+  const askDeleteParcelled = (
+    parentId: string,
+    parentType: "purchase" | "debit" | "income",
+    label: string,
+  ) => {
+    setScopeDelete({
+      title:
+        parentType === "purchase"
+          ? "Excluir compra parcelada"
+          : parentType === "debit"
+            ? "Excluir débito parcelado"
+            : "Excluir recebimento parcelado",
+      description: (
+        <>
+          Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: (scope) =>
+        deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+    });
+  };
+
+  /** Abre o "Aplicar em" para uma série recorrente (débito/recebimento). */
+  const askDeleteRecurring = (
+    kind: "debit" | "income",
+    groupId: string,
+    label: string,
+  ) => {
+    setScopeDelete({
+      title: kind === "debit" ? "Excluir débito recorrente" : "Excluir recebimento recorrente",
+      description: (
+        <>
+          Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: (scope) =>
+        deleteRecurringScoped.mutateAsync({ kind, groupId, scope }),
+    });
+  };
+
+  /** Abre o "Aplicar em" para uma compra à vista (1x): só este mês ou tudo. */
+  const askDeleteSingle = (
+    parentId: string,
+    parentType: "purchase" | "debit" | "income",
+    label: string,
+  ) => {
+    setScopeDelete({
+      title:
+        parentType === "purchase"
+          ? "Excluir compra"
+          : parentType === "debit"
+            ? "Excluir débito"
+            : "Excluir recebimento",
+      description: (
+        <>
+          Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: (scope) =>
+        deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+    });
+  };
+
   useEnsureRecurringForMonth(year, month);
 
   // ── Modo seleção múltipla (long-press) ─────────────────────────────────

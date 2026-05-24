@@ -1127,7 +1127,16 @@ export function useUpdateInstallment() {
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data));
     },
-    onSettled: () => inv(["installments", "card_payments"]),
+    onSuccess: (_data, args) => {
+      // Se só atualizou paid, não refaz fetch de installments para evitar
+      // conflito de estado otimista — apenas invalida card_payments.
+      if (args.paid !== undefined && args.amount === undefined && args.dueDate === undefined) {
+        inv(["card_payments"]);
+      } else {
+        inv(["installments", "card_payments"]);
+      }
+    },
+    onSettled: () => {},
   });
 }
 

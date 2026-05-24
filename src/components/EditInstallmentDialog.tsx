@@ -54,7 +54,19 @@ export function EditInstallmentDialog({
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
   const changeInstCount = useChangePurchaseInstallments();
+  const addDebit = useAddDebit();
+  const addIncome = useAddIncome();
+  const removeDebit = useRemoveDebit();
+  const removeIncome = useRemoveIncome();
   const confirm = useConfirm();
+
+  // Same-category suggestion source — falls back to "debit" when no item is open.
+  const suggestionKind: "debit" | "income" | "purchase" | "investment" = single
+    ? single.kind
+    : installment
+      ? (installment.parentType as "debit" | "income" | "purchase" | "investment")
+      : "debit";
+  const suggestions = useDescriptionSuggestions(suggestionKind);
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
@@ -65,6 +77,11 @@ export function EditInstallmentDialog({
   const [newInstCount, setNewInstCount] = useState("");
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
   const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
+  // Single-mode type conversion state
+  const [singleType, setSingleType] = useState<"cash" | "parcelled" | "recurring">("cash");
+  const [convInstallments, setConvInstallments] = useState("2");
+  const [convInstNumber, setConvInstNumber] = useState("1");
+  const [convMode, setConvMode] = useState<"total" | "perInstallment">("total");
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +97,10 @@ export function EditInstallmentDialog({
       setAmount(single.amount);
       setDueDate(single.date);
       setPaid(single.kind === "investment" ? false : single.paid);
+      setSingleType("cash");
+      setConvInstallments("2");
+      setConvInstNumber("1");
+      setConvMode("total");
     }
     setAskDateScope(false);
     setAdvanceCount("");

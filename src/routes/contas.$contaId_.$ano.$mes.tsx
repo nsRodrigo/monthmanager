@@ -655,6 +655,13 @@ function AccountMonth() {
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
           }
           emptyText="Nenhum débito neste mês."
+          sortControl={
+            <SortMenu
+              scope="debits"
+              state={debitsSort.sort}
+              onChange={debitsSort.set}
+            />
+          }
           headerBar={
             isSelMode("debits") ? (
               <SelectionBar
@@ -665,81 +672,78 @@ function AccountMonth() {
             ) : null
           }
         >
-          {/* 1) recorrentes */}
-          {debitsRecurring.map((d) => (
-            <DebitRow
-              key={d.id}
-              debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingRecurring({
-                  kind: "debit",
-                  id: d.id,
-                  groupId: d.recurrenceGroupId!,
-                  description: d.description,
-                  amount: d.amount,
-                  date: d.date,
-                })
-              }
-              onRemove={() => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)}
-              {...selProps("debits", d.id)}
-            />
-
-          ))}
-          {/* 2) parcelados */}
-          {debitsParcelled.map((p) => (
-            <ParcelledRow
-              key={p.installment.id}
-              kind="debit"
-              installment={p.installment}
-              parent={p.debit!}
-              onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
-              onEdit={() =>
-                setEditing({
-                  inst: p.installment,
-                  label: p.debit!.description,
-                  subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
-                  onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
-                })
-              }
-              onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
-              {...selProps("debits", p.debit!.id)}
-            />
-
-          ))}
-          {/* 3) à vista */}
-          {debitsCash.map((d) => (
-            <DebitRow
-              key={d.id}
-              debit={d}
-              onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-              onEdit={() =>
-                setEditingSingle({
-                  item: {
-                    kind: "debit",
-                    id: d.id,
-                    accountId: d.accountId,
-                    description: d.description,
-                    amount: d.amount,
-                    date: d.date,
-                    paid: d.paid,
-                  },
-                  onDeleteParent: () => removeDebit.mutate(d.id),
-                })
-              }
-              onRemove={async () => {
-                const ok = await confirmDialog({
-                  title: "Excluir débito",
-                  description: `Excluir "${d.description}"?`,
-                  variant: "destructive",
-                  confirmLabel: "Excluir",
-                });
-                if (ok) removeDebit.mutate(d.id);
-              }}
-              {...selProps("debits", d.id)}
-            />
-
-          ))}
+          {debitsOrdered.map((e) => {
+            if (e.kind === "parcelled") {
+              const p = e.entry;
+              return (
+                <ParcelledRow
+                  key={p.installment.id}
+                  kind="debit"
+                  installment={p.installment}
+                  parent={p.debit!}
+                  onToggle={() => toggleInst(p.installment.id, !p.installment.paid)}
+                  onEdit={() =>
+                    setEditing({
+                      inst: p.installment,
+                      label: p.debit!.description,
+                      subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
+                      onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
+                    })
+                  }
+                  onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+                  {...selProps("debits", p.debit!.id)}
+                />
+              );
+            }
+            const d = e.debit;
+            const isRecurring = !!d.recurrenceGroupId;
+            return (
+              <DebitRow
+                key={d.id}
+                debit={d}
+                onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
+                onEdit={() => {
+                  if (isRecurring) {
+                    setEditingRecurring({
+                      kind: "debit",
+                      id: d.id,
+                      groupId: d.recurrenceGroupId!,
+                      description: d.description,
+                      amount: d.amount,
+                      date: d.date,
+                    });
+                  } else {
+                    setEditingSingle({
+                      item: {
+                        kind: "debit",
+                        id: d.id,
+                        accountId: d.accountId,
+                        description: d.description,
+                        amount: d.amount,
+                        date: d.date,
+                        paid: d.paid,
+                      },
+                      onDeleteParent: () => removeDebit.mutate(d.id),
+                    });
+                  }
+                }}
+                onRemove={
+                  isRecurring
+                    ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)
+                    : async () => {
+                        const ok = await confirmDialog({
+                          title: "Excluir débito",
+                          description: `Excluir "${d.description}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeDebit.mutate(d.id);
+                      }
+                }
+                {...selProps("debits", d.id)}
+              />
+            );
+          })}
         </GroupedSection>
 
         {/* CARDS — mostra TODOS os cartões da conta, mesmo sem movimento no mês */}

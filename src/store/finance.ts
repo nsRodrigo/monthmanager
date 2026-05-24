@@ -542,7 +542,8 @@ export function useDebits() {
           .select(
             "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
           )
-          .order("date", { ascending: true }),
+          .order("date", { ascending: true })
+          .order("id", { ascending: true }),
       );
       return uniqueById(
         data.map((d) => ({

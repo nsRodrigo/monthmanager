@@ -28,6 +28,7 @@ export type Card = {
   endYear: number | null;
   endMonth: number | null;
   excludedMonths: string[]; // ["YYYY-MM"]
+  position: number;
 };
 
 /**
@@ -432,8 +433,9 @@ export function useCards() {
       const { data, error } = await supabase
         .from("cards")
         .select(
-          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months",
+          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months,position,created_at",
         )
+        .order("position", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((c: any) => ({
@@ -448,6 +450,7 @@ export function useCards() {
         endYear: c.end_year ?? null,
         endMonth: c.end_month ?? null,
         excludedMonths: (c.excluded_months ?? []) as string[],
+        position: (c.position as number) ?? 0,
       }));
     },
   });
@@ -808,11 +811,20 @@ export function useAddCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (
-      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths"> & {
+      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths" | "position"> & {
         scope?: CardScope;
       },
     ) => {
       const win = scopeToWindow(c.scope ?? { kind: "all" });
+      // Place at the end of the account's cards list
+      const { data: maxRow } = await supabase
+        .from("cards")
+        .select("position")
+        .eq("account_id", c.accountId)
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextPosition = ((maxRow?.position as number | null) ?? 0) + 1;
       const { error } = await supabase.from("cards").insert({
         user_id: user!.id,
         account_id: c.accountId,
@@ -820,6 +832,7 @@ export function useAddCard() {
         color: c.color,
         closing_day: c.closingDay,
         due_day: c.dueDay,
+        position: nextPosition,
         ...win,
       });
       if (error) throw error;
@@ -968,6 +981,27 @@ export function useUpdateCard() {
     onSuccess: () => inv(["cards"]),
   });
 }
+
+/**
+ * Reordena os cartões de uma conta. Recebe a lista de ids na ordem desejada
+ * e grava `position` sequencialmente (1, 2, 3, ...). Vale para a conta inteira
+ * em todos os meses.
+ */
+export function useReorderCards() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { accountId: string; orderedIds: string[] }) => {
+      await Promise.all(
+        args.orderedIds.map((id, idx) =>
+          supabase.from("cards").update({ position: idx + 1 }).eq("id", id),
+        ),
+      );
+    },
+    onSuccess: () => inv(["cards"]),
+  });
+}
+
+
 
 export function useDuplicateCard() {
   const { user } = useAuth();

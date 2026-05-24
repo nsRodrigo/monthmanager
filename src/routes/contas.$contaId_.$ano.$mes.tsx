@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccounts,
   useCards,
@@ -28,6 +28,7 @@ import {
   useEnsureRecurringForMonth,
   useDeleteParcelledByScope,
   useDeleteRecurringByScope,
+  useReorderCards,
   type CardScope,
   type Installment,
   type Debit,
@@ -47,10 +48,13 @@ import {
   TrendingUp,
   Trash2,
   Check,
-  
   Zap,
   Building2,
   Download,
+  Pencil,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -105,7 +109,11 @@ function AccountMonth() {
   const toggleIncome = useToggleIncomeReceived();
   const removeIncome = useRemoveIncome();
   const removeInvestment = useRemoveInvestment();
+  const reorderCards = useReorderCards();
   const confirmDialog = useConfirm();
+
+  const [reorderMode, setReorderMode] = useState(false);
+  const [reorderIds, setReorderIds] = useState<string[] | null>(null);
 
   const [openDebit, setOpenDebit] = useState(false);
   const [openIncome, setOpenIncome] = useState(false);
@@ -714,41 +722,39 @@ function AccountMonth() {
             />
           }
           headerBar={
-            <>
-              {isSelMode("debits") ? (
-                <SelectionBar
-                  count={selection!.ids.size}
-                  onCancel={clearSelection}
-                  onDelete={() => bulkDelete("debits")}
-                />
-              ) : null}
-              {!isSelMode("debits") &&
-                monthDebits.single.length + monthDebits.parcelled.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const target = !debitsAllPaid;
-                        monthDebits.single.forEach((d) => {
-                          if (d.paid !== target)
-                            toggleDebit.mutate({ id: d.id, paid: target });
-                        });
-                        monthDebits.parcelled.forEach((p) => {
-                          if (p.installment.paid !== target)
-                            toggleInst(p.installment.id, target);
-                        });
-                      }}
-                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                        debitsAllPaid
-                          ? "bg-success/15 text-success hover:bg-success/25"
-                          : "bg-warning/15 text-warning hover:bg-warning/25"
-                      }`}
-                    >
-                      {debitsAllPaid ? "✓ Pago" : "Marcar pago"}
-                    </button>
-                  </div>
-                )}
-            </>
+            isSelMode("debits") ? (
+              <SelectionBar
+                count={selection!.ids.size}
+                onCancel={clearSelection}
+                onDelete={() => bulkDelete("debits")}
+              />
+            ) : null
+          }
+          paidControl={
+            !isSelMode("debits") &&
+            monthDebits.single.length + monthDebits.parcelled.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const target = !debitsAllPaid;
+                  monthDebits.single.forEach((d) => {
+                    if (d.paid !== target)
+                      toggleDebit.mutate({ id: d.id, paid: target });
+                  });
+                  monthDebits.parcelled.forEach((p) => {
+                    if (p.installment.paid !== target)
+                      toggleInst(p.installment.id, target);
+                  });
+                }}
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  debitsAllPaid
+                    ? "bg-success/15 text-success hover:bg-success/25"
+                    : "bg-warning/15 text-warning hover:bg-warning/25"
+                }`}
+              >
+                {debitsAllPaid ? "✓ Pago" : "Marcar pago"}
+              </button>
+            ) : null
           }
         >
           {debitsOrdered.map((e) => {
@@ -836,6 +842,15 @@ function AccountMonth() {
 
         {/* CARDS — mostra TODOS os cartões da conta, mesmo sem movimento no mês */}
         {(() => {
+          // Todos os cartões da conta (incluindo escondidos no mês) para o modo reordenar.
+          const allAccountCards = cards.filter((c) => c.accountId === contaId);
+          const orderedAllCards =
+            reorderMode && reorderIds
+              ? (reorderIds
+                  .map((id) => allAccountCards.find((c) => c.id === id))
+                  .filter(Boolean) as typeof allAccountCards)
+              : allAccountCards;
+
           const cardsAll = accountCards.map((c) => {
             const items = monthInst.filter((i) => {
               if (i.parentType !== "purchase") return false;
@@ -845,6 +860,39 @@ function AccountMonth() {
             return { card: c, items };
           });
 
+          const moveCard = (idx: number, dir: -1 | 1) => {
+            setReorderIds((prev) => {
+              const base = prev ?? allAccountCards.map((c) => c.id);
+              const next = [...base];
+              const swap = idx + dir;
+              if (swap < 0 || swap >= next.length) return prev;
+              [next[idx], next[swap]] = [next[swap], next[idx]];
+              return next;
+            });
+          };
+
+          const enterReorder = () => {
+            setReorderIds(allAccountCards.map((c) => c.id));
+            setReorderMode(true);
+          };
+
+          const cancelReorder = () => {
+            setReorderMode(false);
+            setReorderIds(null);
+          };
+
+          const saveReorder = async () => {
+            if (!reorderIds) {
+              cancelReorder();
+              return;
+            }
+            await reorderCards.mutateAsync({
+              accountId: contaId,
+              orderedIds: reorderIds,
+            });
+            cancelReorder();
+          };
+
           return (
             <section className="space-y-3 pt-2">
               <div className="flex items-center justify-between gap-3 px-1">
@@ -853,18 +901,80 @@ function AccountMonth() {
                     CARTÕES DE CRÉDITO
                   </h2>
                   <p className="truncate text-[11px] text-muted-foreground">
-                    Faturas e compras no crédito
+                    {reorderMode
+                      ? "Arraste a ordem dos cartões — vale para a conta inteira"
+                      : "Faturas e compras no crédito"}
                   </p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
-                  </p>
-                </div>
+                {reorderMode ? (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={cancelReorder}
+                      className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold hover:bg-secondary"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={saveReorder}
+                      disabled={reorderCards.isPending}
+                      className="rounded-full bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                    >
+                      {reorderCards.isPending ? "Salvando..." : "Concluir"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {cardsAll.length === 0 ? (
+              {reorderMode ? (
+                orderedAllCards.length === 0 ? (
+                  <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
+                    Nenhum cartão para reordenar.
+                  </p>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                    {orderedAllCards.map((c, idx) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0 md:px-4"
+                      >
+                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: c.color }}
+                        />
+                        <p className="min-w-0 flex-1 truncate text-sm font-semibold">{c.name}</p>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveCard(idx, -1)}
+                            disabled={idx === 0}
+                            aria-label="Subir"
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveCard(idx, 1)}
+                            disabled={idx === orderedAllCards.length - 1}
+                            aria-label="Descer"
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary disabled:opacity-30"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : cardsAll.length === 0 ? (
                 <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
                   Nenhum cartão vinculado a esta conta.
                 </p>
@@ -891,6 +1001,7 @@ function AccountMonth() {
                         }}
                         onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
+                        onRequestReorder={enterReorder}
                         onToggleInst={(id, p) => toggleInst(id, p)}
                         onEditInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
@@ -935,12 +1046,14 @@ function AccountMonth() {
                 })
               )}
 
-              <button
-                onClick={() => setOpenCard(true)}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
-              >
-                <Plus className="h-4 w-4" /> Novo cartão
-              </button>
+              {!reorderMode && (
+                <button
+                  onClick={() => setOpenCard(true)}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
+                >
+                  <Plus className="h-4 w-4" /> Novo cartão
+                </button>
+              )}
             </section>
           );
         })()}
@@ -1110,6 +1223,7 @@ function GroupedSection({
   defaultOpen = false,
   headerBar,
   sortControl,
+  paidControl,
   children,
 }: {
   icon: typeof Building2;
@@ -1126,16 +1240,18 @@ function GroupedSection({
   defaultOpen?: boolean;
   headerBar?: React.ReactNode;
   sortControl?: React.ReactNode;
+  paidControl?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const totalColor = toneText[totalTone ?? tone];
+  const toggle = () => setOpen((o) => !o);
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
-      {/* Header (clickable to toggle) */}
+      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-3 md:px-4 md:py-3.5">
         <button
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggle}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left md:gap-3"
         >
           <div
@@ -1157,13 +1273,17 @@ function GroupedSection({
               )}
             </div>
           )}
-          {open ? (
-            <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-          ) : (
-            <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-          )}
         </button>
+        {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
         {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Body */}
@@ -1254,6 +1374,7 @@ function CardRowSorted({
   onRemoveInst,
   itemSelProps,
   selectionBar,
+  onRequestReorder,
 }: {
   card: Card;
   cardInst: Installment[];
@@ -1270,6 +1391,7 @@ function CardRowSorted({
   onRemoveInst?: (inst: Installment) => void;
   itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
   selectionBar?: React.ReactNode;
+  onRequestReorder?: () => void;
 }) {
   const { sort, set } = useSortPreference(`card:${card.id}`);
   const sortedItems =
@@ -1304,6 +1426,7 @@ function CardRowSorted({
       itemSelProps={itemSelProps}
       selectionBar={selectionBar}
       sortedItems={sortedItems}
+      onRequestReorder={onRequestReorder}
       sortControl={
         <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
       }
@@ -1332,6 +1455,7 @@ function CardRow({
   selectionBar,
   sortControl,
   sortedItems,
+  onRequestReorder,
 }: {
   cardName: string;
   cardColor: string;
@@ -1358,20 +1482,51 @@ function CardRow({
   sortControl?: React.ReactNode;
   /** When provided, overrides the default sort (parcelled→cash) with this order. */
   sortedItems?: Installment[] | null;
+  onRequestReorder?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const lp = useLongPress(() => {
+    if (onEditCard || onRequestReorder) setMenuOpen(true);
+  });
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: Event) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [menuOpen]);
+
+  const toggle = () => {
+    if (lp.didFire()) {
+      lp.reset();
+      return;
+    }
+    setOpen((o) => !o);
+  };
+
   return (
-    <div>
+    <div className="relative">
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setOpen((o) => !o);
           }
         }}
+        {...lp.handlers}
         className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
       >
         <span
@@ -1379,21 +1534,7 @@ function CardRow({
           style={{ backgroundColor: cardColor }}
         />
         <div className="min-w-0 flex-1">
-          {onEditCard ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditCard();
-              }}
-              className="block w-full truncate text-left text-sm font-semibold hover:text-primary hover:underline"
-              aria-label={`Editar cartão ${cardName}`}
-            >
-              {cardName}
-            </button>
-          ) : (
-            <p className="truncate text-sm font-semibold">{cardName}</p>
-          )}
+          <p className="truncate text-sm font-semibold">{cardName}</p>
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {dueLabel}
           </p>
@@ -1411,34 +1552,76 @@ function CardRow({
             {paid ? "Pago" : "Em aberto"}
           </span>
         </div>
-        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
-        {open ? (
-          <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-        ) : (
-          <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
+        {open && (
+          <button
+            type="button"
+            disabled={paymentPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!paymentPending) onTogglePaid();
+            }}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+              paid
+                ? "bg-success/15 text-success hover:bg-success/25"
+                : "bg-warning/15 text-warning hover:bg-warning/25"
+            }`}
+          >
+            {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
+          </button>
         )}
+        {open && sortControl ? (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            {sortControl}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((o) => !o);
+          }}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
+
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className="absolute left-4 top-full z-20 mt-1 min-w-[180px] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+        >
+          {onEditCard && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onEditCard();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Editar cartão
+            </button>
+          )}
+          {onRequestReorder && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onRequestReorder();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
+            >
+              <GripVertical className="h-3.5 w-3.5" /> Reordenar cartões
+            </button>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-border bg-background/30">
           {selectionBar}
-          <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
-              }}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                paid
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
-            </button>
-          </div>
 
           {items.length === 0 ? (
 

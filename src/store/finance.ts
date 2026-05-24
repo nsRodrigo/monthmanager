@@ -2788,7 +2788,7 @@ export function getMonthDebits(
   year: number,
   month: number,
 ) {
-  const single = debits
+  const single = uniqueById(debits)
     .filter((d) => !d.isParent)
     .filter((d) => {
       const [y, m] = d.date.slice(0, 10).split("-").map(Number);

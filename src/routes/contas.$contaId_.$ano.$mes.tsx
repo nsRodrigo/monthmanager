@@ -767,6 +767,7 @@ function AccountMonth() {
                       description: d.description,
                       amount: d.amount,
                       date: d.date,
+                      accountId: d.accountId,
                     });
                   } else {
                     setEditingSingle({

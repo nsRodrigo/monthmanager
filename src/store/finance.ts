@@ -811,11 +811,20 @@ export function useAddCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (
-      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths"> & {
+      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths" | "position"> & {
         scope?: CardScope;
       },
     ) => {
       const win = scopeToWindow(c.scope ?? { kind: "all" });
+      // Place at the end of the account's cards list
+      const { data: maxRow } = await supabase
+        .from("cards")
+        .select("position")
+        .eq("account_id", c.accountId)
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextPosition = ((maxRow?.position as number | null) ?? 0) + 1;
       const { error } = await supabase.from("cards").insert({
         user_id: user!.id,
         account_id: c.accountId,
@@ -823,6 +832,7 @@ export function useAddCard() {
         color: c.color,
         closing_day: c.closingDay,
         due_day: c.dueDay,
+        position: nextPosition,
         ...win,
       });
       if (error) throw error;

@@ -1140,6 +1140,9 @@ function CardRow({
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {count} {count === 1 ? "item" : "itens"}
+          </p>
           <span
             className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
               paid ? "bg-success/15 text-success" : "bg-warning/15 text-warning"

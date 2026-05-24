@@ -686,13 +686,41 @@ function AccountMonth() {
             />
           }
           headerBar={
-            isSelMode("debits") ? (
-              <SelectionBar
-                count={selection!.ids.size}
-                onCancel={clearSelection}
-                onDelete={() => bulkDelete("debits")}
-              />
-            ) : null
+            <>
+              {isSelMode("debits") ? (
+                <SelectionBar
+                  count={selection!.ids.size}
+                  onCancel={clearSelection}
+                  onDelete={() => bulkDelete("debits")}
+                />
+              ) : null}
+              {!isSelMode("debits") &&
+                monthDebits.single.length + monthDebits.parcelled.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-end gap-2 px-3 py-2 md:px-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = !debitsAllPaid;
+                        monthDebits.single.forEach((d) => {
+                          if (d.paid !== target)
+                            toggleDebit.mutate({ id: d.id, paid: target });
+                        });
+                        monthDebits.parcelled.forEach((p) => {
+                          if (p.installment.paid !== target)
+                            toggleInst(p.installment.id, target);
+                        });
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        debitsAllPaid
+                          ? "bg-success/15 text-success hover:bg-success/25"
+                          : "bg-warning/15 text-warning hover:bg-warning/25"
+                      }`}
+                    >
+                      {debitsAllPaid ? "✓ Desmarcar todos" : "Marcar todos como pagos"}
+                    </button>
+                  </div>
+                )}
+            </>
           }
         >
           {debitsOrdered.map((e) => {

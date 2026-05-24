@@ -1296,6 +1296,125 @@ export function useDeleteParentKeepingPaid() {
   });
 }
 
+/**
+ * Apaga um pai parcelado (purchase/debit/income) respeitando um CardScope:
+ * - all    → apaga TODAS as parcelas + o pai
+ * - month  → apaga apenas as parcelas daquele (ano, mês); se sobrar 0, apaga o pai
+ * - period → apaga as parcelas dentro do intervalo; se sobrar 0, apaga o pai
+ */
+export function useDeleteParcelledByScope() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: "purchase" | "debit" | "income";
+      scope: CardScope;
+    }) => {
+      const table =
+        args.parentType === "purchase"
+          ? "purchases"
+          : args.parentType === "debit"
+            ? "debits"
+            : "incomes";
+
+      if (args.scope.kind === "all") {
+        await supabase
+          .from("installments")
+          .delete()
+          .eq("parent_id", args.parentId)
+          .eq("parent_type", args.parentType);
+        const { error } = await supabase.from(table).delete().eq("id", args.parentId);
+        if (error) throw error;
+        return;
+      }
+
+      const win =
+        args.scope.kind === "month"
+          ? { sy: args.scope.year, sm: args.scope.month, ey: args.scope.year, em: args.scope.month }
+          : {
+              sy: args.scope.startYear,
+              sm: args.scope.startMonth,
+              ey: args.scope.endYear,
+              em: args.scope.endMonth,
+            };
+      const sYM = win.sy * 12 + win.sm;
+      const eYM = win.ey * 12 + win.em;
+
+      const { data: insts } = await supabase
+        .from("installments")
+        .select("id,year,month")
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType);
+      const rows = (insts ?? []) as { id: string; year: number; month: number }[];
+      const toDel = rows.filter((i) => {
+        const ym = i.year * 12 + i.month;
+        return ym >= sYM && ym <= eYM;
+      });
+      if (toDel.length > 0) {
+        const ids = toDel.map((i) => i.id);
+        for (let i = 0; i < ids.length; i += 200) {
+          await supabase
+            .from("installments")
+            .delete()
+            .in("id", ids.slice(i, i + 200));
+        }
+      }
+      const remaining = rows.length - toDel.length;
+      if (remaining === 0) {
+        await supabase.from(table).delete().eq("id", args.parentId);
+      }
+    },
+    onSuccess: () =>
+      inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
+  });
+}
+
+/**
+ * Apaga linhas de uma série recorrente (debits/incomes) por CardScope:
+ * - all    → apaga toda a série (todos os meses)
+ * - month  → apaga apenas a linha daquele mês para a série
+ * - period → apaga linhas no intervalo
+ */
+export function useDeleteRecurringByScope() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      kind: "debit" | "income";
+      groupId: string;
+      scope: CardScope;
+    }) => {
+      const table = args.kind === "debit" ? "debits" : "incomes";
+      if (args.scope.kind === "all") {
+        const { error } = await supabase
+          .from(table)
+          .delete()
+          .eq("recurrence_group_id", args.groupId);
+        if (error) throw error;
+        return;
+      }
+      const sY =
+        args.scope.kind === "month" ? args.scope.year : args.scope.startYear;
+      const sM =
+        args.scope.kind === "month" ? args.scope.month : args.scope.startMonth;
+      const eY =
+        args.scope.kind === "month" ? args.scope.year : args.scope.endYear;
+      const eM =
+        args.scope.kind === "month" ? args.scope.month : args.scope.endMonth;
+      const start = `${sY}-${String(sM + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(eY, eM + 1, 0).getDate();
+      const end = `${eY}-${String(eM + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq("recurrence_group_id", args.groupId)
+        .gte("date", start)
+        .lte("date", end);
+      if (error) throw error;
+    },
+    onSuccess: () => inv(["debits", "incomes"]),
+  });
+}
+
 export function useSetCardPaid() {
   const { user } = useAuth();
   const inv = useInvalidate();

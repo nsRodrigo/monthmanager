@@ -39,6 +39,8 @@ export function EditInstallmentDialog({
   parentLabel,
   parentSubtitle,
   onDeleteParent,
+  defaultYear,
+  defaultMonth,
 }: {
   open: boolean;
   onClose: () => void;
@@ -49,6 +51,8 @@ export function EditInstallmentDialog({
   parentLabel?: string;
   parentSubtitle?: string;
   onDeleteParent?: () => void;
+  defaultYear?: number;
+  defaultMonth?: number;
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
@@ -62,7 +66,12 @@ export function EditInstallmentDialog({
   const addIncome = useAddIncome();
   const removeDebit = useRemoveDebit();
   const removeIncome = useRemoveIncome();
+  const duplicate = useDuplicateOverScope();
+  const { data: cardsData = [] } = useCards();
   const confirm = useConfirm();
+  const [askDuplicate, setAskDuplicate] = useState(false);
+  const dupAnchorY = defaultYear ?? new Date().getFullYear();
+  const dupAnchorM = defaultMonth ?? new Date().getMonth();
 
   // Same-category suggestion source — falls back to "debit" when no item is open.
   const suggestionKind: "debit" | "income" | "purchase" | "investment" = single

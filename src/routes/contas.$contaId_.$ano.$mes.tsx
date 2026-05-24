@@ -323,6 +323,60 @@ function AccountMonth() {
 
   const investmentsSorted = investments.slice().sort(byDateAsc);
 
+  // ───── Sort prefs (per-section, persisted in localStorage) ─────
+  const debitsSort = useSortPreference("debits");
+  const incomesSort = useSortPreference("incomes");
+  const investmentsSort = useSortPreference("investments");
+
+  // Tagged unions for sort-aware flat rendering of debits/incomes.
+  type DebitEntry =
+    | { kind: "single"; debit: Debit }
+    | { kind: "parcelled"; entry: (typeof debitsParcelled)[number] };
+  type IncomeEntry =
+    | { kind: "single"; income: Income }
+    | { kind: "parcelled"; entry: (typeof incomesParcelled)[number] };
+
+  const debitsDefaultOrder: DebitEntry[] = [
+    ...debitsRecurring.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
+    ...debitsParcelled.map<DebitEntry>((p) => ({ kind: "parcelled", entry: p })),
+    ...debitsCash.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
+  ];
+  const debitsOrdered =
+    debitsSort.sort.option === "default"
+      ? debitsDefaultOrder
+      : applySort(debitsDefaultOrder, debitsSort.sort, {
+          name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
+          amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.debit.date : e.entry.installment.dueDate),
+          id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
+        });
+
+  const incomesDefaultOrder: IncomeEntry[] = [
+    ...incomesRecurring.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
+    ...incomesParcelled.map<IncomeEntry>((p) => ({ kind: "parcelled", entry: p })),
+    ...incomesCash.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
+  ];
+  const incomesOrdered =
+    incomesSort.sort.option === "default"
+      ? incomesDefaultOrder
+      : applySort(incomesDefaultOrder, incomesSort.sort, {
+          name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
+          amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.income.date : e.entry.installment.dueDate),
+          id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
+        });
+
+  const investmentsOrdered =
+    investmentsSort.sort.option === "default"
+      ? investmentsSorted
+      : applySort(investmentsSorted, investmentsSort.sort, {
+          name: (i) => i.type,
+          amount: (i) => i.amount,
+          date: (i) => i.date,
+          id: (i) => i.id,
+        });
+
+
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
     monthDebits.parcelled.reduce((s, p) => s + p.installment.amount, 0);

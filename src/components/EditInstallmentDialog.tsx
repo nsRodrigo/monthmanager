@@ -408,6 +408,36 @@ export function EditInstallmentDialog({
           onClose();
         }}
       />
+
+      <CardScopeConfirmDialog
+        open={askDelete}
+        onClose={() => setAskDelete(false)}
+        title={`Excluir · ${single.description || "lançamento"}`}
+        description="Serão removidos lançamentos correspondentes (mesma descrição e valor) em cada mês do escopo selecionado."
+        confirmLabel="Excluir"
+        variant="destructive"
+        defaultYear={dupAnchorY}
+        defaultMonth={dupAnchorM}
+        initialKind="month"
+        loading={deleteScope.isPending}
+        onConfirm={async (s: CardScope) => {
+          // For the anchor month, also remove the currently-edited row to ensure
+          // it is deleted even if data drifted (e.g. amount edited but not saved).
+          if (s.kind === "month" && s.year === dupAnchorY && s.month === dupAnchorM && onDeleteParent) {
+            onDeleteParent();
+          } else {
+            const src: DeleteSource =
+              single.kind === "debit"
+                ? { kind: "debit", accountId: single.accountId, description: single.description, amount: single.amount }
+                : single.kind === "income"
+                ? { kind: "income", accountId: single.accountId, description: single.description, amount: single.amount }
+                : { kind: "investment", accountId: single.accountId, type: single.description, amount: single.amount };
+            await deleteScope.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });
+          }
+          setAskDelete(false);
+          onClose();
+        }}
+      />
       </>
     );
   }

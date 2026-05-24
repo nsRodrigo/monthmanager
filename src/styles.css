@@ -74,8 +74,8 @@
 
   --credit: oklch(0.7 0.18 285);
   --credit-foreground: oklch(0.98 0.005 285);
-  --debit: oklch(0.68 0.2 25);
-  --debit-foreground: oklch(0.98 0.005 25);
+  --debit: oklch(0.78 0.16 75);
+  --debit-foreground: oklch(0.2 0.04 75);
   --income: oklch(0.74 0.17 155);
   --income-foreground: oklch(0.15 0.02 155);
 

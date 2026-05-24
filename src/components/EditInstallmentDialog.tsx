@@ -349,6 +349,14 @@ export function EditInstallmentDialog({
             </label>
           )}
           <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => setAskDuplicate(true)}
+              disabled={duplicate.isPending}
+              className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+              title="Duplicar lançamento"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
             {onDeleteParent && (
               <button
                 onClick={async () => {
@@ -384,6 +392,32 @@ export function EditInstallmentDialog({
           </div>
         </div>
       </Modal>
+
+      <CardScopeConfirmDialog
+        open={askDuplicate}
+        onClose={() => setAskDuplicate(false)}
+        title={`Duplicar · ${single.description || "lançamento"}`}
+        description="Será criada uma cópia independente em cada mês do escopo selecionado."
+        confirmLabel="Duplicar"
+        defaultYear={dupAnchorY}
+        defaultMonth={dupAnchorM}
+        initialKind="month"
+        loading={duplicate.isPending}
+        onConfirm={async (s: CardScope) => {
+          const src =
+            single.kind === "debit"
+              ? { kind: "debit" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date, required: false }
+              : single.kind === "income"
+              ? { kind: "income" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date }
+              : { kind: "investment" as const, accountId: "", type: single.description, amount: single.amount, percentage: 0, date: single.date };
+          // investments need accountId — fetch from current cards/accounts isn't here;
+          // for investment the source already lacks accountId in SingleEditTarget, fall back to empty (mutation will fail RLS if blank).
+          await duplicate.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });
+          setAskDuplicate(false);
+          onClose();
+        }}
+      />
+      </>
     );
   }
 

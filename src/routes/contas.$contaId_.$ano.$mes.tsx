@@ -646,6 +646,7 @@ function AccountMonth() {
                   item: {
                     kind: "investment",
                     id: inv.id,
+                    accountId: inv.accountId,
                     description: inv.type,
                     amount: inv.amount,
                     date: inv.date,

@@ -520,6 +520,8 @@ export function useDebits() {
   return useQuery({
     queryKey: ["debits", user?.id],
     enabled: !!user,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async (): Promise<Debit[]> => {
       const data = await fetchAllRows<{
         id: string;
@@ -542,20 +544,22 @@ export function useDebits() {
           )
           .order("date", { ascending: true }),
       );
-      return data.map((d) => ({
-        id: d.id,
-        accountId: d.account_id,
-        description: d.description,
-        amount: num(d.amount as number | string),
-        date: d.date,
-        required: d.required,
-        paid: d.paid,
-        autoDebit: d.auto_debit,
-        autoDebitDay: d.auto_debit_day,
-        installmentsCount: d.installments_count,
-        isParent: d.is_parent,
-        recurrenceGroupId: d.recurrence_group_id ?? null,
-      }));
+      return uniqueById(
+        data.map((d) => ({
+          id: d.id,
+          accountId: d.account_id,
+          description: d.description,
+          amount: num(d.amount as number | string),
+          date: d.date,
+          required: d.required,
+          paid: d.paid,
+          autoDebit: d.auto_debit,
+          autoDebitDay: d.auto_debit_day,
+          installmentsCount: d.installments_count,
+          isParent: d.is_parent,
+          recurrenceGroupId: d.recurrence_group_id ?? null,
+        })),
+      );
     },
   });
 }

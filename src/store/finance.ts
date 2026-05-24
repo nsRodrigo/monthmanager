@@ -3387,11 +3387,22 @@ export function useDeleteRecurringSeries() {
  * latest row with the same day-of-month (clamped). Runs once per
  * (user, year, month).
  */
+// Tracks which (user, year, month) combinations have already been ensured
+// in this browser session. Prevents the ensure routine from re-running on
+// every mount/navigation, which was racing against in-flight optimistic
+// mutations (toggle paid, delete) and causing visual duplication.
+const ensuredRecurringKeys = new Set<string>();
+
 export function useEnsureRecurringForMonth(year: number, month: number) {
   const { user } = useAuth();
-  const inv = useInvalidate();
+  const qc = useQueryClient();
   useEffect(() => {
     if (!user) return;
+    const key = `${user.id}:${year}:${month}`;
+    if (ensuredRecurringKeys.has(key)) return;
+    // Mark immediately so concurrent mounts of the same route don't double-run.
+    ensuredRecurringKeys.add(key);
+
     let cancelled = false;
     (async () => {
       const monthStr = String(month + 1).padStart(2, "0");
@@ -3400,78 +3411,96 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
       const endStr = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
       let inserted = false;
 
-      for (const table of ["debits", "incomes"] as const) {
-        const { data: groupRows, error } = await supabase
-          .from(table)
-          .select("recurrence_group_id")
-          .not("recurrence_group_id", "is", null);
-        if (error || cancelled) return;
-
-        const groupIds = Array.from(
-          new Set((groupRows ?? []).map((g: any) => g.recurrence_group_id as string)),
-        ).filter(Boolean);
-
-        for (const gid of groupIds) {
-          if (cancelled) return;
-          const { data: existing } = await supabase
+      try {
+        for (const table of ["debits", "incomes"] as const) {
+          const { data: groupRows, error } = await supabase
             .from(table)
-            .select("id")
-            .eq("recurrence_group_id", gid)
-            .gte("date", startStr)
-            .lte("date", endStr)
-            .limit(1);
-          if (existing && existing.length > 0) continue;
+            .select("recurrence_group_id")
+            .not("recurrence_group_id", "is", null);
+          if (error || cancelled) return;
 
-          // Busca o registro mais antigo do grupo para saber quando a série começou.
-          // Só cria o mês alvo se ele for >= ao mês de início da série.
-          const { data: earliest } = await supabase
-            .from(table)
-            .select("date")
-            .eq("recurrence_group_id", gid)
-            .order("date", { ascending: true })
-            .limit(1);
-          if (!earliest || earliest.length === 0) continue;
-          const seriesStartDate = earliest[0].date as string;
-          const seriesYear = parseInt(seriesStartDate.slice(0, 4), 10);
-          const seriesMonth = parseInt(seriesStartDate.slice(5, 7), 10) - 1;
-          if (year < seriesYear || (year === seriesYear && month < seriesMonth)) continue;
+          const groupIds = Array.from(
+            new Set((groupRows ?? []).map((g: any) => g.recurrence_group_id as string)),
+          ).filter(Boolean);
 
-          const { data: latest } = await supabase
-            .from(table)
-            .select("*")
-            .eq("recurrence_group_id", gid)
-            .order("date", { ascending: false })
-            .limit(1);
-          if (!latest || latest.length === 0) continue;
-          const t = latest[0] as any;
-          const day = parseInt(String(t.date).slice(8, 10), 10);
-          const dd = Math.min(day, lastDay);
-          const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
+          for (const gid of groupIds) {
+            if (cancelled) return;
+            const { data: existing } = await supabase
+              .from(table)
+              .select("id")
+              .eq("recurrence_group_id", gid)
+              .gte("date", startStr)
+              .lte("date", endStr)
+              .limit(1);
+            if (existing && existing.length > 0) continue;
 
-          const row: any = {
-            user_id: user.id,
-            account_id: t.account_id,
-            description: t.description,
-            amount: t.amount,
-            date: newDate,
-            installments_count: 1,
-            is_parent: false,
-            recurrence_group_id: gid,
-          };
-          if (table === "debits") {
-            row.required = true;
-            row.paid = false;
-            row.auto_debit = t.auto_debit ?? false;
-            row.auto_debit_day = t.auto_debit_day ?? null;
-          } else {
-            row.received = false;
+            const { data: earliest } = await supabase
+              .from(table)
+              .select("date")
+              .eq("recurrence_group_id", gid)
+              .order("date", { ascending: true })
+              .limit(1);
+            if (!earliest || earliest.length === 0) continue;
+            const seriesStartDate = earliest[0].date as string;
+            const seriesYear = parseInt(seriesStartDate.slice(0, 4), 10);
+            const seriesMonth = parseInt(seriesStartDate.slice(5, 7), 10) - 1;
+            if (year < seriesYear || (year === seriesYear && month < seriesMonth)) continue;
+
+            const { data: latest } = await supabase
+              .from(table)
+              .select("*")
+              .eq("recurrence_group_id", gid)
+              .order("date", { ascending: false })
+              .limit(1);
+            if (!latest || latest.length === 0) continue;
+            const t = latest[0] as any;
+            const day = parseInt(String(t.date).slice(8, 10), 10);
+            const dd = Math.min(day, lastDay);
+            const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
+
+            const row: any = {
+              user_id: user.id,
+              account_id: t.account_id,
+              description: t.description,
+              amount: t.amount,
+              date: newDate,
+              installments_count: 1,
+              is_parent: false,
+              recurrence_group_id: gid,
+            };
+            if (table === "debits") {
+              row.required = true;
+              row.paid = false;
+              row.auto_debit = t.auto_debit ?? false;
+              row.auto_debit_day = t.auto_debit_day ?? null;
+            } else {
+              row.received = false;
+            }
+            const { error: ie } = await (supabase.from(table) as any).insert(row);
+            if (ie) continue;
+            inserted = true;
           }
-          const { error: ie } = await (supabase.from(table) as any).insert(row);
-          if (ie) continue;
-          inserted = true;
         }
+
+        if (cancelled || !inserted) return;
+
+        // Wait for any in-flight mutations to settle before invalidating.
+        // Without this wait, an optimistic toggle/delete in progress would
+        // be clobbered by the refetch and reappear visually.
+        const waitForMutationsIdle = async () => {
+          const deadline = Date.now() + 5000;
+          while (qc.isMutating() > 0 && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 150));
+          }
+        };
+        await waitForMutationsIdle();
+        if (cancelled) return;
+        qc.invalidateQueries({ queryKey: ["debits"], refetchType: "active" });
+        qc.invalidateQueries({ queryKey: ["incomes"], refetchType: "active" });
+      } catch {
+        // If anything threw, allow a future mount to retry.
+        ensuredRecurringKeys.delete(key);
       }
-      if (!cancelled && inserted) inv(["debits", "incomes"]);
     })();
     return () => {
       cancelled = true;

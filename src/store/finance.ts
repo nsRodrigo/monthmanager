@@ -808,7 +808,7 @@ export function useAddCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (
-      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth"> & {
+      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths"> & {
         scope?: CardScope;
       },
     ) => {

@@ -1617,7 +1617,6 @@ export function useAddDebit() {
 }
 
 export function useToggleDebitPaid() {
-  const inv = useInvalidate();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; paid: boolean }) => {
@@ -1635,7 +1634,14 @@ export function useToggleDebitPaid() {
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
     },
-    onSettled: () => inv(["debits"]),
+    onSuccess: (_data, args) => {
+      // Keep the committed state in cache and avoid an immediate refetch.
+      // Realtime/background invalidations can arrive right after the update;
+      // the local patch prevents the just-toggled row from flashing/duplicating.
+      qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
+        old ? uniqueById(old).map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
+      );
+    },
   });
 }
 

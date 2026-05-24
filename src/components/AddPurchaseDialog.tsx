@@ -54,7 +54,7 @@ export function AddPurchaseDialog({
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
   const submit = async () => {
-    if (!description.trim() || amount <= 0 || !cardId) return;
+    if (!description.trim() || amount === 0 || !cardId) return;
     // Recurring purchase: create one purchase with 24 monthly "installments"
     // of the same amount, anchored at the chosen month. Each month is
     // independent and can be edited / deleted later.

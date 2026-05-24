@@ -25,18 +25,24 @@ export function EditRecurringDialog({
   open,
   onClose,
   target,
+  defaultYear,
+  defaultMonth,
 }: {
   open: boolean;
   onClose: () => void;
   target: RecurringEditTarget | null;
+  defaultYear?: number;
+  defaultMonth?: number;
 }) {
   const update = useUpdateRecurringSeries();
   const remove = useDeleteRecurringSeries();
+  const duplicate = useDuplicateOverScope();
   const confirm = useConfirm();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [scope, setScope] = useState<"one" | "forward">("one");
+  const [askDuplicate, setAskDuplicate] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;

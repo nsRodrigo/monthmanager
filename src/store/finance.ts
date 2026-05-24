@@ -3182,9 +3182,13 @@ export function computeMonthlyAccountBalance(
   investments: Investment[],
 ): Map<string, MonthlyBalance> {
   const accountCardIds = new Set(cards.filter((c) => c.accountId === account.id).map((c) => c.id));
-  const accPurchaseIds = new Set(
-    purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
-  );
+  // Map purchase id → card, to allow per-month visibility filtering of invoice installments.
+  const purchaseCard = new Map<string, Card>();
+  for (const p of purchases) {
+    if (!accountCardIds.has(p.cardId)) continue;
+    const card = cards.find((c) => c.id === p.cardId);
+    if (card) purchaseCard.set(p.id, card);
+  }
 
   const buckets = new Map<string, { rec: number; deb: number; fat: number; inv: number }>();
   const ensure = (y: number, m: number) => {
@@ -3218,7 +3222,14 @@ export function computeMonthlyAccountBalance(
       const parent = debits.find((x) => x.id === i.parentId);
       if (parent?.accountId === account.id) ensure(i.year, i.month).deb += i.amount;
     } else if (i.parentType === "purchase") {
-      if (i.parentId && accPurchaseIds.has(i.parentId)) ensure(i.year, i.month).fat += i.amount;
+      if (!i.parentId) continue;
+      const card = purchaseCard.get(i.parentId);
+      // Only include invoice installments for months where the card is visible.
+      // Mirrors the per-route filter so the running balance matches the displayed
+      // "Gastos Totais" / "Saldo Final" of each month.
+      if (card && isCardVisibleInMonth(card, i.year, i.month)) {
+        ensure(i.year, i.month).fat += i.amount;
+      }
     }
   }
   // investments

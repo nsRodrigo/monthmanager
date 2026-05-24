@@ -29,7 +29,7 @@ import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 export type SingleEditTarget =
   | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
-  | { kind: "investment"; id: string; description: string; amount: number; date: string };
+  | { kind: "investment"; id: string; accountId: string; description: string; amount: number; date: string };
 
 export function EditInstallmentDialog({
   open,

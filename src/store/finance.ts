@@ -432,7 +432,7 @@ export function useCards() {
       const { data, error } = await supabase
         .from("cards")
         .select(
-          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month",
+          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months",
         )
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -447,6 +447,7 @@ export function useCards() {
         startMonth: c.start_month ?? null,
         endYear: c.end_year ?? null,
         endMonth: c.end_month ?? null,
+        excludedMonths: (c.excluded_months ?? []) as string[],
       }));
     },
   });

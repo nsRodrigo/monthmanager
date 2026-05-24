@@ -1114,6 +1114,7 @@ function GroupedSection({
   defaultOpen = false,
   headerBar,
   sortControl,
+  paidControl,
   children,
 }: {
   icon: typeof Building2;
@@ -1130,16 +1131,18 @@ function GroupedSection({
   defaultOpen?: boolean;
   headerBar?: React.ReactNode;
   sortControl?: React.ReactNode;
+  paidControl?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const totalColor = toneText[totalTone ?? tone];
+  const toggle = () => setOpen((o) => !o);
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
-      {/* Header (clickable to toggle) */}
+      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-3 md:px-4 md:py-3.5">
         <button
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggle}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left md:gap-3"
         >
           <div
@@ -1161,13 +1164,17 @@ function GroupedSection({
               )}
             </div>
           )}
-          {open ? (
-            <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-          ) : (
-            <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
-          )}
         </button>
+        {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
         {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Body */}

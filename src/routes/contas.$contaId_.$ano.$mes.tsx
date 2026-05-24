@@ -942,6 +942,7 @@ function GroupedSection({
   count,
   defaultOpen = false,
   headerBar,
+  sortControl,
   children,
 }: {
   icon: typeof Building2;
@@ -957,6 +958,7 @@ function GroupedSection({
   count?: number;
   defaultOpen?: boolean;
   headerBar?: React.ReactNode;
+  sortControl?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -994,6 +996,7 @@ function GroupedSection({
             <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
           )}
         </button>
+        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
       </div>
 
       {/* Body */}

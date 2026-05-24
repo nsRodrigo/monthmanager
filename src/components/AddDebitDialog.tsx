@@ -21,6 +21,7 @@ export function AddDebitDialog({
 }) {
   const addDebit = useAddDebit();
   const { data: accounts = [] } = useAccounts();
+  const suggestions = useDescriptionSuggestions("debit");
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");

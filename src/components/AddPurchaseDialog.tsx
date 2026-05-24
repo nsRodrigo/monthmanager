@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useCards, useAddPurchase } from "@/store/finance";
+import { useCards, useAddPurchase, useDescriptionSuggestions } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 
 export function AddPurchaseDialog({
   open,

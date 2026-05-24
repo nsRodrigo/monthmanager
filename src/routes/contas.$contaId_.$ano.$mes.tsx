@@ -532,7 +532,7 @@ function AccountMonth() {
           tone="income"
           onAdd={() => setOpenIncome(true)}
           addLabel="Novo recebimento"
-          total={totalIncome}
+          total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0

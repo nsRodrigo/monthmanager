@@ -93,7 +93,7 @@ export function AddPurchaseDialog({
     <Modal open={open} onClose={onClose} title={fixedCardId ? "Adicionar à fatura" : "Nova compra no cartão"}>
       <div className="space-y-4">
         <Field label="Descrição">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Tênis novo" />
+          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Tênis novo" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

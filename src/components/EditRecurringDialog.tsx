@@ -200,35 +200,36 @@ export function EditRecurringDialog({
           </button>
         </div>
       </div>
-
-      <CardScopeConfirmDialog
-        open={askDuplicate}
-        onClose={() => setAskDuplicate(false)}
-        title={`Duplicar · ${target.description}`}
-        description="Será criada uma cópia independente do lançamento em cada mês do escopo selecionado."
-        confirmLabel="Duplicar"
-        defaultYear={defaultYear ?? new Date().getFullYear()}
-        defaultMonth={defaultMonth ?? new Date().getMonth()}
-        initialKind="month"
-        loading={duplicate.isPending}
-        onConfirm={async (s: CardScope) => {
-          await duplicate.mutateAsync({
-            source: {
-              kind: target.kind,
-              accountId: target.accountId,
-              description: target.description,
-              amount: target.amount,
-              date: target.date,
-              ...(target.kind === "debit" ? { required: true } : {}),
-            } as never,
-            scope: s,
-            anchorYear: defaultYear ?? new Date().getFullYear(),
-            anchorMonth: defaultMonth ?? new Date().getMonth(),
-          });
-          setAskDuplicate(false);
-          onClose();
-        }}
-      />
     </Modal>
+
+    <CardScopeConfirmDialog
+      open={askDuplicate}
+      onClose={() => setAskDuplicate(false)}
+      title={`Duplicar · ${target.description}`}
+      description="Será criada uma cópia independente do lançamento em cada mês do escopo selecionado."
+      confirmLabel="Duplicar"
+      defaultYear={defaultYear ?? new Date().getFullYear()}
+      defaultMonth={defaultMonth ?? new Date().getMonth()}
+      initialKind="month"
+      loading={duplicate.isPending}
+      onConfirm={async (s: CardScope) => {
+        await duplicate.mutateAsync({
+          source: {
+            kind: target.kind,
+            accountId: target.accountId,
+            description: target.description,
+            amount: target.amount,
+            date: target.date,
+            ...(target.kind === "debit" ? { required: true } : {}),
+          } as never,
+          scope: s,
+          anchorYear: defaultYear ?? new Date().getFullYear(),
+          anchorMonth: defaultMonth ?? new Date().getMonth(),
+        });
+        setAskDuplicate(false);
+        onClose();
+      }}
+    />
+    </>
   );
 }

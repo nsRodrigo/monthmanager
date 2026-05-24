@@ -261,6 +261,29 @@ function AccountMonth() {
     parentId: string,
   ) => askDeleteParcelled(parentId, parentType, label);
 
+  /**
+   * Exclusão de compra no cartão:
+   * - parceladas (>1x) → diálogo de escopo (este mês / período / tudo)
+   * - 1x → confirmação simples + remove
+   */
+  const askDeletePurchase = async (pur: {
+    id: string;
+    description: string;
+    installmentsCount: number;
+  }) => {
+    if (pur.installmentsCount > 1) {
+      askDeleteParcelled(pur.id, "purchase", pur.description);
+      return;
+    }
+    const ok = await confirmDialog({
+      title: "Excluir compra",
+      description: `Excluir "${pur.description}"?`,
+      variant: "destructive",
+      confirmLabel: "Excluir",
+    });
+    if (ok) removePurchase.mutate(pur.id);
+  };
+
   const accountCards = useMemo(
     () =>
       cards.filter(

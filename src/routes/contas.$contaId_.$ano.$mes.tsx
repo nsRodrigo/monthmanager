@@ -1125,6 +1125,91 @@ function SelectionBar({
 
 /* ───────── CARD ROW (collapsible card inside CARDS section) ───────── */
 
+type PurchaseList = ReturnType<typeof usePurchases>["data"] extends infer T
+  ? T extends Array<infer P>
+    ? P[]
+    : never
+  : never;
+type Purchase = PurchaseList[number];
+type Card = ReturnType<typeof useCards>["data"] extends infer T
+  ? T extends Array<infer C>
+    ? C
+    : never
+  : never;
+
+function CardRowSorted({
+  card,
+  cardInst,
+  purchases,
+  total,
+  paid,
+  paymentPending,
+  dueLabel,
+  onTogglePaid,
+  onAdd,
+  onEditCard,
+  onToggleInst,
+  onEditInst,
+  onRemoveInst,
+  itemSelProps,
+  selectionBar,
+}: {
+  card: Card;
+  cardInst: Installment[];
+  purchases: PurchaseList;
+  total: number;
+  paid: boolean;
+  paymentPending?: boolean;
+  dueLabel: string;
+  onTogglePaid: () => void;
+  onAdd: () => void;
+  onEditCard?: () => void;
+  onToggleInst: (id: string, paid: boolean) => void;
+  onEditInst: (inst: Installment) => void;
+  onRemoveInst?: (inst: Installment) => void;
+  itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
+  selectionBar?: React.ReactNode;
+}) {
+  const { sort, set } = useSortPreference(`card:${card.id}`);
+  const sortedItems =
+    sort.option === "default"
+      ? null
+      : applySort(cardInst, sort, {
+          name: (i) => {
+            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+            return pur?.description ?? "";
+          },
+          amount: (i) => i.amount,
+          date: (i) => i.dueDate,
+          id: (i) => i.id,
+        });
+  return (
+    <CardRow
+      cardName={card.name}
+      cardColor={card.color}
+      total={total}
+      paid={paid}
+      paymentPending={paymentPending}
+      count={cardInst.length}
+      dueLabel={dueLabel}
+      onTogglePaid={onTogglePaid}
+      onAdd={onAdd}
+      onEditCard={onEditCard}
+      items={cardInst}
+      purchases={purchases}
+      onToggleInst={onToggleInst}
+      onEditInst={onEditInst}
+      onRemoveInst={onRemoveInst}
+      itemSelProps={itemSelProps}
+      selectionBar={selectionBar}
+      sortedItems={sortedItems}
+      sortControl={
+        <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
+      }
+    />
+  );
+}
+
 function CardRow({
   cardName,
   cardColor,

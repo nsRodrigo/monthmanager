@@ -66,7 +66,7 @@ export function EditInstallmentDialog({
   const removeDebit = useRemoveDebit();
   const removeIncome = useRemoveIncome();
   const duplicate = useDuplicateOverScope();
-  const { data: cardsData = [] } = useCards();
+  
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
   const dupAnchorY = defaultYear ?? new Date().getFullYear();

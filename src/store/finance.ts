@@ -157,6 +157,15 @@ async function fetchAllRows<T>(queryFactory: () => any, pageSize = 1000): Promis
   return rows;
 }
 
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
+}
+
 /**
  * Compute the invoice (fatura) month/year for a credit-card purchase.
  *

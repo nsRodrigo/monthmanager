@@ -468,6 +468,13 @@ function AccountMonth() {
           }
 
           emptyText="Nenhum recebimento neste mês."
+          sortControl={
+            <SortMenu
+              scope="incomes"
+              state={incomesSort.sort}
+              onChange={incomesSort.set}
+            />
+          }
           headerBar={
             isSelMode("incomes") ? (
               <SelectionBar

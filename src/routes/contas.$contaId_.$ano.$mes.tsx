@@ -902,6 +902,13 @@ function AccountMonth() {
                               pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
                             }`,
                             onDeleteParent: () => askDeletePurchase(pur),
+                            parentSource: {
+                              kind: "purchase",
+                              cardId: c.id,
+                              description: pur.description,
+                              totalAmount: pur.totalAmount,
+                              date: pur.date,
+                            },
                           });
                         }}
                         onRemoveInst={(inst) => {

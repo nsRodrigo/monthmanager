@@ -232,6 +232,36 @@ export function EditRecurringDialog({
         onClose();
       }}
     />
+
+    <CardScopeConfirmDialog
+      open={askDelete}
+      onClose={() => setAskDelete(false)}
+      title={`Excluir · ${target.description}`}
+      description="Serão removidos os lançamentos desta série recorrente em cada mês do escopo selecionado."
+      confirmLabel="Excluir"
+      variant="destructive"
+      defaultYear={defaultYear ?? new Date().getFullYear()}
+      defaultMonth={defaultMonth ?? new Date().getMonth()}
+      initialKind="month"
+      loading={deleteScope.isPending}
+      onConfirm={async (s: CardScope) => {
+        const src: DeleteSource = {
+          kind: target.kind,
+          accountId: target.accountId,
+          description: target.description,
+          amount: target.amount,
+          groupId: target.groupId,
+        };
+        await deleteScope.mutateAsync({
+          source: src,
+          scope: s,
+          anchorYear: defaultYear ?? new Date().getFullYear(),
+          anchorMonth: defaultMonth ?? new Date().getMonth(),
+        });
+        setAskDelete(false);
+        onClose();
+      }}
+    />
     </>
   );
 }

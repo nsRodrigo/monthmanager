@@ -1159,6 +1159,7 @@ function CardRow({
             {paid ? "Pago" : "Em aberto"}
           </span>
         </div>
+        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
         {open ? (
           <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-muted-foreground md:ml-2" />
         ) : (

@@ -99,6 +99,14 @@ function AccountMonth() {
   const { setAccountId } = useAccountFilter();
   useEffect(() => setAccountId(contaId), [contaId, setAccountId]);
 
+  // Persiste o ano atual no sessionStorage para que, ao voltar para a tela
+  // de lista de meses, ela abra exatamente no ano do mês que estava sendo
+  // editado (ex.: navegou de Dez/2015 para Jan/2016 → voltar abre em 2016).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(`selected-year-${contaId}`, String(year));
+  }, [contaId, year]);
+
   const account = accounts.find((a) => a.id === contaId);
 
   const toggleInst = useToggleInstallmentPaid();

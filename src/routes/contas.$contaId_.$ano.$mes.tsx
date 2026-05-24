@@ -424,6 +424,27 @@ function AccountMonth() {
     .reduce((s, i) => s + i.amount, 0);
   const totalInvested = investments.reduce((s, i) => s + i.amount, 0);
 
+  // "Net" totals exibidos no cabeçalho de cada seção:
+  // itens marcados (recebido/pago) somam; itens pendentes subtraem.
+  // Conforme o usuário marca, o total cresce de -bruto até +bruto.
+  const sign = (done: boolean) => (done ? 1 : -1);
+  const totalIncomeNet =
+    monthIncomes.single.reduce((s, i) => s + sign(i.received) * i.amount, 0) +
+    monthIncomes.parcelled.reduce(
+      (s, p) => s + sign(p.installment.paid) * p.installment.amount,
+      0,
+    );
+  const totalDebitsNet =
+    monthDebits.single.reduce((s, d) => s + sign(d.paid) * d.amount, 0) +
+    monthDebits.parcelled.reduce(
+      (s, p) => s + sign(p.installment.paid) * p.installment.amount,
+      0,
+    );
+  const totalCardsNet = monthInst
+    .filter((i) => i.parentType === "purchase")
+    .reduce((s, i) => s + sign(i.paid) * i.amount, 0);
+
+
   // Saldo Atual = saldo final do mês anterior + recebíveis do mês atual
   const saldoAtual = (() => {
     if (!account) return 0;
@@ -511,7 +532,7 @@ function AccountMonth() {
           tone="income"
           onAdd={() => setOpenIncome(true)}
           addLabel="Novo recebimento"
-          total={totalIncome}
+          total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
@@ -708,7 +729,7 @@ function AccountMonth() {
           tone="debit"
           onAdd={() => setOpenDebit(true)}
           addLabel="Novo débito"
-          total={totalDebits}
+          total={totalDebitsNet}
           count={monthDebits.single.length + monthDebits.parcelled.length}
           empty={
             monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
@@ -924,7 +945,7 @@ function AccountMonth() {
                   </div>
                 ) : (
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
+                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
                     </p>

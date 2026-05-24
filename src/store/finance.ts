@@ -1358,8 +1358,7 @@ export function useSetCardPaid() {
           i.parentType === "purchase" &&
           i.year === args.year &&
           i.month === args.month &&
-          i.parentId &&
-          purIds.has(i.parentId)
+          (purIds.has(i.parentId) || (i.purchaseId ? purIds.has(i.purchaseId) : false))
             ? { ...i, paid: args.paid }
             : i,
         );

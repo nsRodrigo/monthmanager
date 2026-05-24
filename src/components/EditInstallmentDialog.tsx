@@ -218,7 +218,8 @@ export function EditInstallmentDialog({
       removeDebit.isPending ||
       removeIncome.isPending;
     return (
-      <Modal open={open} onClose={onClose} title="Editar lançamento">
+      <>
+      <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
             <AutocompleteInput

@@ -124,8 +124,8 @@
   --warning-foreground: oklch(0.18 0.04 75);
   --credit: oklch(0.5 0.2 285);
   --credit-foreground: oklch(0.99 0.005 285);
-  --debit: oklch(0.55 0.22 25);
-  --debit-foreground: oklch(0.99 0.005 25);
+  --debit: oklch(0.65 0.16 75);
+  --debit-foreground: oklch(0.18 0.04 75);
   --income: oklch(0.55 0.18 155);
   --income-foreground: oklch(0.99 0.005 155);
   --gradient-card: linear-gradient(135deg, oklch(1 0 0), oklch(0.97 0.008 260));

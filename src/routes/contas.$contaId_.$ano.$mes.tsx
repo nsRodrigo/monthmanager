@@ -480,6 +480,7 @@ function AccountMonth() {
                   item: {
                     kind: "income",
                     id: i.id,
+                    accountId: i.accountId,
                     description: i.description,
                     amount: i.amount,
                     date: i.date,

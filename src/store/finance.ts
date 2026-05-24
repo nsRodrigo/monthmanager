@@ -917,11 +917,23 @@ export function useRemoveCard() {
           .in("id", cpToDelete.map((c: any) => c.id));
       }
 
-      // 3) IMPORTANTE: NÃO apaga o cartão e NÃO altera a janela start/end.
-      //    Para escopo "period" / "month", o usuário quer remover apenas
-      //    as movimentações daquele intervalo — o cartão deve continuar
-      //    visível nos demais meses, mesmo que fique vazio dentro do
-      //    período (ele pode adicionar novas compras lá depois).
+      // 3) Esconde o cartão nos meses do escopo adicionando-os a excluded_months.
+      //    O cartão continua existindo (e visível fora do escopo) — o usuário
+      //    pode voltar a usá-lo em outros meses normalmente.
+      const { data: cardRow } = await supabase
+        .from("cards")
+        .select("excluded_months")
+        .eq("id", id)
+        .maybeSingle();
+      const current: string[] = (cardRow?.excluded_months ?? []) as string[];
+      const toHide: string[] = [];
+      for (let ym = sYM; ym <= eYM; ym++) {
+        const y = Math.floor(ym / 12);
+        const m = ym % 12;
+        toHide.push(`${y}-${String(m + 1).padStart(2, "0")}`);
+      }
+      const merged = Array.from(new Set([...current, ...toHide]));
+      await supabase.from("cards").update({ excluded_months: merged }).eq("id", id);
     },
     onSuccess: () => inv(["cards", "purchases", "installments", "card_payments"]),
   });

@@ -15,7 +15,6 @@ import {
   useRemoveIncome,
   useDescriptionSuggestions,
   useDuplicateOverScope,
-  useCards,
   type Installment,
   type CardScope,
 } from "@/store/finance";

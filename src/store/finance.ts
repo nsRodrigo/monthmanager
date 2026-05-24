@@ -982,6 +982,24 @@ export function useUpdateCard() {
   });
 }
 
+/**
+ * Reordena os cartões de uma conta. Recebe a lista de ids na ordem desejada
+ * e grava `position` sequencialmente (1, 2, 3, ...). Vale para a conta inteira
+ * em todos os meses.
+ */
+export function useReorderCards() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { accountId: string; orderedIds: string[] }) => {
+      await Promise.all(
+        args.orderedIds.map((id, idx) =>
+          supabase.from("cards").update({ position: idx + 1 }).eq("id", id),
+        ),
+      );
+    },
+    onSuccess: () => inv(["cards"]),
+  });
+
 export function useDuplicateCard() {
   const { user } = useAuth();
   const inv = useInvalidate();

@@ -1300,14 +1300,30 @@ export function useSetCardPaid() {
       if (e1) throw e1;
       const purIds = (pursRaw ?? []).map((p) => p.id);
       if (purIds.length > 0) {
-        const { error: e2 } = await supabase
-          .from("installments")
-          .update({ paid: args.paid })
-          .in("parent_id", purIds)
-          .eq("parent_type", "purchase")
-          .eq("year", args.year)
-          .eq("month", args.month);
-        if (e2) throw e2;
+        const purIdSet = new Set(purIds);
+        const monthRows = await fetchAllRows<{
+          id: string;
+          parent_id: string | null;
+          purchase_id: string | null;
+        }>(() =>
+          supabase
+            .from("installments")
+            .select("id,parent_id,purchase_id")
+            .eq("parent_type", "purchase")
+            .eq("year", args.year)
+            .eq("month", args.month),
+        );
+        const targetIds = monthRows
+          .filter((i) => purIdSet.has(i.parent_id ?? "") || purIdSet.has(i.purchase_id ?? ""))
+          .map((i) => i.id);
+        for (let i = 0; i < targetIds.length; i += 200) {
+          const chunk = targetIds.slice(i, i + 200);
+          const { error: e2 } = await supabase
+            .from("installments")
+            .update({ paid: args.paid })
+            .in("id", chunk);
+          if (e2) throw e2;
+        }
       }
       const { error: e3 } = await supabase.from("card_payments").upsert(
         {

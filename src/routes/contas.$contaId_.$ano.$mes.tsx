@@ -1578,26 +1578,17 @@ function ParcelledRow({
   };
   const tone = kind === "debit" ? "text-debit" : "text-success";
   const auto = kind === "debit" && (parent as Debit).autoDebit;
+  const badgeClass =
+    kind === "debit"
+      ? "bg-debit/15 text-debit"
+      : "bg-success/15 text-success";
   return (
     <div
       className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
       {...lp.handlers}
     >
-      {selectionMode ? (
-        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
-      ) : (
-        <button
-          onClick={onToggle}
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            installment.paid
-              ? "border-success bg-success text-success-foreground"
-              : "border-border hover:border-primary"
-          }`}
-        >
-          {installment.paid && <Check className="h-3.5 w-3.5" />}
-        </button>
-      )}
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
+      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
@@ -1606,9 +1597,6 @@ function ParcelledRow({
           >
             {parent.description}
           </p>
-          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-            {installment.number}/{installment.total}
-          </span>
           {auto && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
@@ -1621,7 +1609,30 @@ function ParcelledRow({
           {formatDate(installment.dueDate)}
         </p>
       </button>
-      <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex items-center gap-1.5">
+          <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
+          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${badgeClass}`}>
+            {installment.number}/{installment.total}
+          </span>
+        </div>
+        <button
+          onClick={guard(onToggle)}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            installment.paid
+              ? "bg-success/15 text-success hover:bg-success/25"
+              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+          }`}
+        >
+          {installment.paid ? (
+            <>
+              <Check className="h-3 w-3" /> Pago
+            </>
+          ) : (
+            "Marcar pago"
+          )}
+        </button>
+      </div>
       {!selectionMode && onRemove && (
         <button
           onClick={onRemove}

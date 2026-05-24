@@ -25,10 +25,10 @@ import {
   computeMonthlyAccountBalance,
   isCardVisibleInMonth,
   normalizeZero,
-  useDeleteSingleInstallment,
-  useDeleteParentKeepingPaid,
   useEnsureRecurringForMonth,
-  useDeleteRecurringSeries,
+  useDeleteParcelledByScope,
+  useDeleteRecurringByScope,
+  type CardScope,
   type Installment,
   type Debit,
   type Income,
@@ -59,9 +59,8 @@ import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
-import { DeleteParcelledDialog } from "@/components/DeleteParcelledDialog";
+import { CardScopeConfirmDialog } from "@/components/CardScopeConfirmDialog";
 import { EditRecurringDialog, type RecurringEditTarget } from "@/components/EditRecurringDialog";
-import { DeleteRecurringDialog } from "@/components/DeleteRecurringDialog";
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 
@@ -124,24 +123,82 @@ function AccountMonth() {
     item: SingleEditTarget;
     onDeleteParent?: () => void;
   } | null>(null);
-  const [deletingParcelled, setDeletingParcelled] = useState<{
-    inst: Installment;
-    label: string;
-    parentType: "purchase" | "debit" | "income";
-    parentId: string;
-  } | null>(null);
   const [editingRecurring, setEditingRecurring] = useState<RecurringEditTarget | null>(null);
-  const [deletingRecurring, setDeletingRecurring] = useState<{
-    kind: "debit" | "income";
-    id: string;
-    groupId: string;
-    date: string;
-    label: string;
+
+  const deleteParcelledScoped = useDeleteParcelledByScope();
+  const deleteRecurringScoped = useDeleteRecurringByScope();
+
+  // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
+  const [scopeDelete, setScopeDelete] = useState<{
+    title: string;
+    description?: React.ReactNode;
+    execute: (scope: CardScope) => Promise<void>;
   } | null>(null);
 
-  const deleteSingleInst = useDeleteSingleInstallment();
-  const deleteParentKeepingPaid = useDeleteParentKeepingPaid();
-  const deleteRecurring = useDeleteRecurringSeries();
+  /** Abre o "Aplicar em" para uma compra/débito/recebimento parcelado. */
+  const askDeleteParcelled = (
+    parentId: string,
+    parentType: "purchase" | "debit" | "income",
+    label: string,
+  ) => {
+    setScopeDelete({
+      title:
+        parentType === "purchase"
+          ? "Excluir compra parcelada"
+          : parentType === "debit"
+            ? "Excluir débito parcelado"
+            : "Excluir recebimento parcelado",
+      description: (
+        <>
+          Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: (scope) =>
+        deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+    });
+  };
+
+  /** Abre o "Aplicar em" para uma série recorrente (débito/recebimento). */
+  const askDeleteRecurring = (
+    kind: "debit" | "income",
+    groupId: string,
+    label: string,
+  ) => {
+    setScopeDelete({
+      title: kind === "debit" ? "Excluir débito recorrente" : "Excluir recebimento recorrente",
+      description: (
+        <>
+          Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: (scope) =>
+        deleteRecurringScoped.mutateAsync({ kind, groupId, scope }),
+    });
+  };
+
+  /** Abre o "Aplicar em" para uma compra à vista (1x): só este mês ou tudo. */
+  const askDeleteSingle = (
+    parentId: string,
+    parentType: "purchase" | "debit" | "income",
+    label: string,
+  ) => {
+    setScopeDelete({
+      title:
+        parentType === "purchase"
+          ? "Excluir compra"
+          : parentType === "debit"
+            ? "Excluir débito"
+            : "Excluir recebimento",
+      description: (
+        <>
+          Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: (scope) =>
+        deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+    });
+  };
+
   useEnsureRecurringForMonth(year, month);
 
   // ── Modo seleção múltipla (long-press) ─────────────────────────────────
@@ -197,11 +254,11 @@ function AccountMonth() {
   };
 
   const askDeleteInst = (
-    inst: Installment,
+    _inst: Installment,
     label: string,
     parentType: "purchase" | "debit" | "income",
     parentId: string,
-  ) => setDeletingParcelled({ inst, label, parentType, parentId });
+  ) => askDeleteParcelled(parentId, parentType, label);
 
   const accountCards = useMemo(
     () =>
@@ -384,15 +441,7 @@ function AccountMonth() {
                   date: i.date,
                 });
               }}
-              onRemove={async () => {
-                setDeletingRecurring({
-                  kind: "income",
-                  id: i.id,
-                  groupId: i.recurrenceGroupId!,
-                  date: i.date,
-                  label: i.description,
-                });
-              }}
+              onRemove={() => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)}
               {...selProps("incomes", i.id)}
             />
 
@@ -410,7 +459,7 @@ function AccountMonth() {
                   inst: p.installment,
                   label: p.income!.description,
                   subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
-                  onDeleteParent: () => removeIncome.mutate(p.income!.id),
+                  onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
@@ -567,15 +616,7 @@ function AccountMonth() {
                   date: d.date,
                 })
               }
-              onRemove={async () =>
-                setDeletingRecurring({
-                  kind: "debit",
-                  id: d.id,
-                  groupId: d.recurrenceGroupId!,
-                  date: d.date,
-                  label: d.description,
-                })
-              }
+              onRemove={() => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)}
               {...selProps("debits", d.id)}
             />
 
@@ -593,7 +634,7 @@ function AccountMonth() {
                   inst: p.installment,
                   label: p.debit!.description,
                   subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
-                  onDeleteParent: () => removeDebit.mutate(p.debit!.id),
+                  onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
                 })
               }
               onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
@@ -704,23 +745,14 @@ function AccountMonth() {
                             subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
                               pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
                             }`,
-                            onDeleteParent: () => removePurchase.mutate(pur.id),
+                            onDeleteParent: () =>
+                              askDeleteParcelled(pur.id, "purchase", pur.description),
                           });
                         }}
-                        onRemoveInst={async (inst) => {
+                        onRemoveInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);
                           if (!pur) return;
-                          if (pur.installmentsCount > 1) {
-                            askDeleteInst(inst, pur.description, "purchase", pur.id);
-                          } else {
-                            const ok = await confirmDialog({
-                              title: "Excluir compra",
-                              description: `Excluir "${pur.description}"?`,
-                              variant: "destructive",
-                              confirmLabel: "Excluir",
-                            });
-                            if (ok) removePurchase.mutate(pur.id);
-                          }
+                          askDeleteParcelled(pur.id, "purchase", pur.description);
                         }}
                         itemSelProps={(_inst, parentId) =>
                           selProps(`card:${c.id}`, parentId)
@@ -807,49 +839,26 @@ function AccountMonth() {
         defaultYear={year}
         defaultMonth={month}
       />
-      <DeleteParcelledDialog
-        open={!!deletingParcelled}
-        onClose={() => setDeletingParcelled(null)}
-        itemLabel={deletingParcelled?.label}
-        onDeleteOnlyThis={() => {
-          if (deletingParcelled) deleteSingleInst.mutate(deletingParcelled.inst.id);
-        }}
-        onDeleteAllUnpaid={() => {
-          if (deletingParcelled)
-            deleteParentKeepingPaid.mutate({
-              parentId: deletingParcelled.parentId,
-              parentType: deletingParcelled.parentType,
-            });
-        }}
-      />
       <EditRecurringDialog
         open={!!editingRecurring}
         onClose={() => setEditingRecurring(null)}
         target={editingRecurring}
       />
-      <DeleteRecurringDialog
-        open={!!deletingRecurring}
-        onClose={() => setDeletingRecurring(null)}
-        itemLabel={deletingRecurring?.label}
-        onDeleteOnlyThis={() => {
-          if (deletingRecurring)
-            deleteRecurring.mutate({
-              kind: deletingRecurring.kind,
-              id: deletingRecurring.id,
-              groupId: deletingRecurring.groupId,
-              anchorDate: deletingRecurring.date,
-              scope: "one",
-            });
-        }}
-        onDeleteThisAndFuture={() => {
-          if (deletingRecurring)
-            deleteRecurring.mutate({
-              kind: deletingRecurring.kind,
-              id: deletingRecurring.id,
-              groupId: deletingRecurring.groupId,
-              anchorDate: deletingRecurring.date,
-              scope: "forward",
-            });
+      <CardScopeConfirmDialog
+        open={!!scopeDelete}
+        onClose={() => setScopeDelete(null)}
+        title={scopeDelete?.title ?? "Excluir"}
+        description={scopeDelete?.description}
+        confirmLabel="Excluir"
+        variant="destructive"
+        defaultYear={year}
+        defaultMonth={month}
+        initialKind="month"
+        loading={deleteParcelledScoped.isPending || deleteRecurringScoped.isPending}
+        onConfirm={async (scope) => {
+          if (!scopeDelete) return;
+          await scopeDelete.execute(scope);
+          setScopeDelete(null);
         }}
       />
     </div>

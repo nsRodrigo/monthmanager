@@ -257,11 +257,11 @@ function AccountMonth() {
   };
 
   const askDeleteInst = (
-    inst: Installment,
+    _inst: Installment,
     label: string,
     parentType: "purchase" | "debit" | "income",
     parentId: string,
-  ) => setDeletingParcelled({ inst, label, parentType, parentId });
+  ) => askDeleteParcelled(parentId, parentType, label);
 
   const accountCards = useMemo(
     () =>

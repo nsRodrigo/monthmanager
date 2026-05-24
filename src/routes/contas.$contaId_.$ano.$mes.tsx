@@ -553,6 +553,7 @@ function AccountMonth() {
                       description: i.description,
                       amount: i.amount,
                       date: i.date,
+                      accountId: i.accountId,
                     });
                   } else {
                     setEditingSingle({
@@ -645,6 +646,7 @@ function AccountMonth() {
                   item: {
                     kind: "investment",
                     id: inv.id,
+                    accountId: inv.accountId,
                     description: inv.type,
                     amount: inv.amount,
                     date: inv.date,
@@ -766,6 +768,7 @@ function AccountMonth() {
                       description: d.description,
                       amount: d.amount,
                       date: d.date,
+                      accountId: d.accountId,
                     });
                   } else {
                     setEditingSingle({
@@ -946,12 +949,16 @@ function AccountMonth() {
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
         onDeleteParent={editing?.onDeleteParent}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <EditInstallmentDialog
         open={!!editingSingle}
         onClose={() => setEditingSingle(null)}
         single={editingSingle?.item ?? null}
         onDeleteParent={editingSingle?.onDeleteParent}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} defaultYear={year} defaultMonth={month} />
       <EditCardDialog
@@ -965,6 +972,8 @@ function AccountMonth() {
         open={!!editingRecurring}
         onClose={() => setEditingRecurring(null)}
         target={editingRecurring}
+        defaultYear={year}
+        defaultMonth={month}
       />
       <CardScopeConfirmDialog
         open={!!scopeDelete}

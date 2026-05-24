@@ -14,18 +14,21 @@ import {
   useRemoveDebit,
   useRemoveIncome,
   useDescriptionSuggestions,
+  useDuplicateOverScope,
   type Installment,
+  type CardScope,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Trash2, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
+import { Trash2, Copy, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
+import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 
 export type SingleEditTarget =
   | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
-  | { kind: "investment"; id: string; description: string; amount: number; date: string };
+  | { kind: "investment"; id: string; accountId: string; description: string; amount: number; date: string };
 
 export function EditInstallmentDialog({
   open,
@@ -35,6 +38,8 @@ export function EditInstallmentDialog({
   parentLabel,
   parentSubtitle,
   onDeleteParent,
+  defaultYear,
+  defaultMonth,
 }: {
   open: boolean;
   onClose: () => void;
@@ -45,6 +50,8 @@ export function EditInstallmentDialog({
   parentLabel?: string;
   parentSubtitle?: string;
   onDeleteParent?: () => void;
+  defaultYear?: number;
+  defaultMonth?: number;
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
@@ -58,7 +65,12 @@ export function EditInstallmentDialog({
   const addIncome = useAddIncome();
   const removeDebit = useRemoveDebit();
   const removeIncome = useRemoveIncome();
+  const duplicate = useDuplicateOverScope();
+  
   const confirm = useConfirm();
+  const [askDuplicate, setAskDuplicate] = useState(false);
+  const dupAnchorY = defaultYear ?? new Date().getFullYear();
+  const dupAnchorM = defaultMonth ?? new Date().getMonth();
 
   // Same-category suggestion source — falls back to "debit" when no item is open.
   const suggestionKind: "debit" | "income" | "purchase" | "investment" = single
@@ -205,7 +217,8 @@ export function EditInstallmentDialog({
       removeDebit.isPending ||
       removeIncome.isPending;
     return (
-      <Modal open={open} onClose={onClose} title="Editar lançamento">
+      <>
+      <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
             <AutocompleteInput
@@ -335,6 +348,14 @@ export function EditInstallmentDialog({
             </label>
           )}
           <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => setAskDuplicate(true)}
+              disabled={duplicate.isPending}
+              className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+              title="Duplicar lançamento"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
             {onDeleteParent && (
               <button
                 onClick={async () => {
@@ -370,6 +391,30 @@ export function EditInstallmentDialog({
           </div>
         </div>
       </Modal>
+
+      <CardScopeConfirmDialog
+        open={askDuplicate}
+        onClose={() => setAskDuplicate(false)}
+        title={`Duplicar · ${single.description || "lançamento"}`}
+        description="Será criada uma cópia independente em cada mês do escopo selecionado."
+        confirmLabel="Duplicar"
+        defaultYear={dupAnchorY}
+        defaultMonth={dupAnchorM}
+        initialKind="month"
+        loading={duplicate.isPending}
+        onConfirm={async (s: CardScope) => {
+          const src =
+            single.kind === "debit"
+              ? { kind: "debit" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date, required: false }
+              : single.kind === "income"
+              ? { kind: "income" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date }
+              : { kind: "investment" as const, accountId: single.accountId, type: single.description, amount: single.amount, percentage: 0, date: single.date };
+          await duplicate.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });
+          setAskDuplicate(false);
+          onClose();
+        }}
+      />
+      </>
     );
   }
 

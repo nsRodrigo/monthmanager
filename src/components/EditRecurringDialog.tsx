@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
-import { useUpdateRecurringSeries, useDeleteRecurringSeries } from "@/store/finance";
+import { useUpdateRecurringSeries, useDeleteRecurringSeries, useDuplicateOverScope, type CardScope } from "@/store/finance";
 import { useConfirm } from "@/store/confirm";
-import { Trash2 } from "lucide-react";
+import { Trash2, Copy } from "lucide-react";
+import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 
 export type RecurringEditTarget = {
   kind: "debit" | "income";
@@ -12,6 +13,7 @@ export type RecurringEditTarget = {
   description: string;
   amount: number;
   date: string;
+  accountId: string;
 };
 
 /**
@@ -23,18 +25,24 @@ export function EditRecurringDialog({
   open,
   onClose,
   target,
+  defaultYear,
+  defaultMonth,
 }: {
   open: boolean;
   onClose: () => void;
   target: RecurringEditTarget | null;
+  defaultYear?: number;
+  defaultMonth?: number;
 }) {
   const update = useUpdateRecurringSeries();
   const remove = useDeleteRecurringSeries();
+  const duplicate = useDuplicateOverScope();
   const confirm = useConfirm();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [scope, setScope] = useState<"one" | "forward">("one");
+  const [askDuplicate, setAskDuplicate] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;
@@ -94,7 +102,8 @@ export function EditRecurringDialog({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Editar lançamento recorrente">
+    <>
+    <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento recorrente">
       <div className="space-y-4">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">Recorrente</span> · cada mês é um
@@ -161,6 +170,14 @@ export function EditRecurringDialog({
 
         <div className="flex gap-2 pt-2">
           <button
+            onClick={() => setAskDuplicate(true)}
+            disabled={duplicate.isPending}
+            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+            title="Duplicar lançamento"
+          >
+            <Copy className="h-4 w-4" />
+          </button>
+          <button
             onClick={handleDelete}
             disabled={remove.isPending}
             className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
@@ -184,5 +201,35 @@ export function EditRecurringDialog({
         </div>
       </div>
     </Modal>
+
+    <CardScopeConfirmDialog
+      open={askDuplicate}
+      onClose={() => setAskDuplicate(false)}
+      title={`Duplicar · ${target.description}`}
+      description="Será criada uma cópia independente do lançamento em cada mês do escopo selecionado."
+      confirmLabel="Duplicar"
+      defaultYear={defaultYear ?? new Date().getFullYear()}
+      defaultMonth={defaultMonth ?? new Date().getMonth()}
+      initialKind="month"
+      loading={duplicate.isPending}
+      onConfirm={async (s: CardScope) => {
+        await duplicate.mutateAsync({
+          source: {
+            kind: target.kind,
+            accountId: target.accountId,
+            description: target.description,
+            amount: target.amount,
+            date: target.date,
+            ...(target.kind === "debit" ? { required: true } : {}),
+          } as never,
+          scope: s,
+          anchorYear: defaultYear ?? new Date().getFullYear(),
+          anchorMonth: defaultMonth ?? new Date().getMonth(),
+        });
+        setAskDuplicate(false);
+        onClose();
+      }}
+    />
+    </>
   );
 }

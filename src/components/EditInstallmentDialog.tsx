@@ -9,16 +9,22 @@ import {
   useUpdateInvestment,
   useUpdatePurchase,
   useChangePurchaseInstallments,
+  useAddDebit,
+  useAddIncome,
+  useRemoveDebit,
+  useRemoveIncome,
+  useDescriptionSuggestions,
   type Installment,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Trash2, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 
 export type SingleEditTarget =
-  | { kind: "debit"; id: string; description: string; amount: number; date: string; paid: boolean }
-  | { kind: "income"; id: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "investment"; id: string; description: string; amount: number; date: string };
 
 export function EditInstallmentDialog({
@@ -48,7 +54,19 @@ export function EditInstallmentDialog({
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
   const changeInstCount = useChangePurchaseInstallments();
+  const addDebit = useAddDebit();
+  const addIncome = useAddIncome();
+  const removeDebit = useRemoveDebit();
+  const removeIncome = useRemoveIncome();
   const confirm = useConfirm();
+
+  // Same-category suggestion source — falls back to "debit" when no item is open.
+  const suggestionKind: "debit" | "income" | "purchase" | "investment" = single
+    ? single.kind
+    : installment
+      ? (installment.parentType as "debit" | "income" | "purchase" | "investment")
+      : "debit";
+  const suggestions = useDescriptionSuggestions(suggestionKind);
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
@@ -59,6 +77,11 @@ export function EditInstallmentDialog({
   const [newInstCount, setNewInstCount] = useState("");
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
   const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
+  // Single-mode type conversion state
+  const [singleType, setSingleType] = useState<"cash" | "parcelled" | "recurring">("cash");
+  const [convInstallments, setConvInstallments] = useState("2");
+  const [convInstNumber, setConvInstNumber] = useState("1");
+  const [convMode, setConvMode] = useState<"total" | "perInstallment">("total");
 
   useEffect(() => {
     if (!open) return;
@@ -74,6 +97,10 @@ export function EditInstallmentDialog({
       setAmount(single.amount);
       setDueDate(single.date);
       setPaid(single.kind === "investment" ? false : single.paid);
+      setSingleType("cash");
+      setConvInstallments("2");
+      setConvInstNumber("1");
+      setConvMode("total");
     }
     setAskDateScope(false);
     setAdvanceCount("");
@@ -84,7 +111,65 @@ export function EditInstallmentDialog({
 
   // ───── SINGLE (Debit / Income / Investment) ─────
   if (single) {
+    const canConvert = single.kind === "debit" || single.kind === "income";
+    const convN = singleType === "parcelled" ? Math.max(1, parseInt(convInstallments) || 1) : 1;
+    const convCur = singleType === "parcelled"
+      ? Math.max(1, Math.min(convN, parseInt(convInstNumber) || 1))
+      : 1;
+    const convTotal = convMode === "perInstallment" && convN > 1 ? amount * convN : amount;
+    const convPer = convN > 0 ? convTotal / convN : 0;
+
     const handleSave = async () => {
+      // ── Conversion: cash → parcelled or cash → recurring (debit/income only)
+      if (canConvert && singleType !== "cash") {
+        // Remove the original single, then create the new shape using the
+        // existing add hooks (same code path as the "Add" dialogs).
+        if (single.kind === "debit") {
+          await removeDebit.mutateAsync(single.id);
+          if (singleType === "parcelled") {
+            await addDebit.mutateAsync({
+              accountId: single.accountId,
+              description: description.trim(),
+              amount: convTotal,
+              date: dueDate,
+              required: false,
+              installmentsCount: convN,
+              installmentNumber: convCur,
+            });
+          } else {
+            await addDebit.mutateAsync({
+              accountId: single.accountId,
+              description: description.trim(),
+              amount,
+              date: dueDate,
+              required: true,
+            });
+          }
+        } else {
+          await removeIncome.mutateAsync(single.id);
+          if (singleType === "parcelled") {
+            await addIncome.mutateAsync({
+              accountId: single.accountId,
+              description: description.trim(),
+              amount: convTotal,
+              date: dueDate,
+              installmentsCount: convN,
+              installmentNumber: convCur,
+            });
+          } else {
+            await addIncome.mutateAsync({
+              accountId: single.accountId,
+              description: description.trim(),
+              amount,
+              date: dueDate,
+              recurring: true,
+            });
+          }
+        }
+        onClose();
+        return;
+      }
+      // ── Plain edit (no type change)
       if (single.kind === "debit") {
         await updateDebit.mutateAsync({
           id: single.id,
@@ -112,19 +197,25 @@ export function EditInstallmentDialog({
       onClose();
     };
     const pending =
-      updateDebit.isPending || updateIncome.isPending || updateInvestment.isPending;
+      updateDebit.isPending ||
+      updateIncome.isPending ||
+      updateInvestment.isPending ||
+      addDebit.isPending ||
+      addIncome.isPending ||
+      removeDebit.isPending ||
+      removeIncome.isPending;
     return (
       <Modal open={open} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
-            <input
-              className={inputClass}
+            <AutocompleteInput
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              suggestions={suggestions}
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Valor">
+            <Field label={singleType === "parcelled" && convMode === "perInstallment" ? "Valor por parcela" : "Valor"}>
               <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
             <Field label="Data">
@@ -136,7 +227,97 @@ export function EditInstallmentDialog({
               />
             </Field>
           </div>
-          {single.kind !== "investment" && (
+
+          {canConvert && (
+            <div className="space-y-3 rounded-xl border border-border bg-background/30 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Tipo de lançamento
+              </p>
+              <div className="flex gap-1 rounded-full bg-secondary p-1">
+                {(["cash", "parcelled", "recurring"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setSingleType(t)}
+                    className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      singleType === t ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {t === "cash" ? "À vista" : t === "parcelled" ? "Parcelado" : "Recorrente"}
+                  </button>
+                ))}
+              </div>
+
+              {singleType === "parcelled" && (
+                <div className="space-y-3">
+                  <div className="flex gap-1 rounded-full bg-secondary p-1">
+                    <button
+                      type="button"
+                      onClick={() => setConvMode("total")}
+                      className={`flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        convMode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Valor total
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConvMode("perInstallment")}
+                      className={`flex-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        convMode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Valor por parcela
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Total de parcelas">
+                      <input
+                        type="number"
+                        min="2"
+                        max="60"
+                        className={inputClass}
+                        value={convInstallments}
+                        onChange={(e) => setConvInstallments(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Parcela atual">
+                      <input
+                        type="number"
+                        min="1"
+                        max={convN}
+                        className={inputClass}
+                        value={convInstNumber}
+                        onChange={(e) => setConvInstNumber(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  {amount > 0 && convN > 1 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {convN}x de <span className="font-semibold text-foreground">{formatCurrency(convPer)}</span> · total{" "}
+                      <span className="font-semibold text-foreground">{formatCurrency(convTotal)}</span>
+                      <br />
+                      Esta é a parcela <span className="font-semibold text-foreground">{convCur}/{convN}</span>.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {singleType === "recurring" && (
+                <p className="text-[11px] text-muted-foreground">
+                  Será replicado nos próximos 24 meses mantendo o dia. Cada mês é independente e pode ser editado/excluído.
+                </p>
+              )}
+
+              {singleType !== "cash" && (
+                <p className="text-[11px] text-amber-500/90">
+                  ⚠ Ao salvar, o lançamento atual será substituído pela nova série.
+                </p>
+              )}
+            </div>
+          )}
+
+          {single.kind !== "investment" && singleType === "cash" && (
             <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
               <input
                 type="checkbox"
@@ -270,10 +451,10 @@ export function EditInstallmentDialog({
       <Modal open={open} onClose={onClose} title="Editar lançamento">
         <div className="space-y-4">
           <Field label="Descrição">
-            <input
-              className={inputClass}
+            <AutocompleteInput
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
+              suggestions={suggestions}
             />
           </Field>
 

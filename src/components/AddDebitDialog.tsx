@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useAddDebit, useAccounts } from "@/store/finance";
+import { useAddDebit, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 
 export function AddDebitDialog({
   open,
@@ -20,6 +21,7 @@ export function AddDebitDialog({
 }) {
   const addDebit = useAddDebit();
   const { data: accounts = [] } = useAccounts();
+  const suggestions = useDescriptionSuggestions("debit");
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
@@ -80,7 +82,7 @@ export function AddDebitDialog({
       <div className="space-y-4">
         {!fixedAccountId && <AccountSelect value={accountId} onChange={setAccountId} />}
         <Field label="Descrição">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: IPVA, aluguel" />
+          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: IPVA, aluguel" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

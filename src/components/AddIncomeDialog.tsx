@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useAddIncome, useAccounts } from "@/store/finance";
+import { useAddIncome, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 
 export function AddIncomeDialog({
   open,
@@ -20,6 +21,7 @@ export function AddIncomeDialog({
 }) {
   const addIncome = useAddIncome();
   const { data: accounts = [] } = useAccounts();
+  const suggestions = useDescriptionSuggestions("income");
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
@@ -86,7 +88,7 @@ export function AddIncomeDialog({
           <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
         )}
         <Field label="Descrição">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Salário, freelance" />
+          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Salário, freelance" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

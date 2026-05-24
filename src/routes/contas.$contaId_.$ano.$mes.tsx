@@ -480,6 +480,7 @@ function AccountMonth() {
                   item: {
                     kind: "income",
                     id: i.id,
+                    accountId: i.accountId,
                     description: i.description,
                     amount: i.amount,
                     date: i.date,
@@ -653,6 +654,7 @@ function AccountMonth() {
                   item: {
                     kind: "debit",
                     id: d.id,
+                    accountId: d.accountId,
                     description: d.description,
                     amount: d.amount,
                     date: d.date,

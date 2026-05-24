@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
@@ -3508,3 +3508,66 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, year, month]);
 }
+
+// =======================
+// Description suggestions (autocomplete)
+// =======================
+/**
+ * Returns previously-used descriptions for the current user from the given
+ * domain, ranked by usage frequency (desc) then recency (desc). Same-category
+ * only — debit suggestions don't pollute income, etc.
+ */
+export function useDescriptionSuggestions(
+  kind: "debit" | "income" | "purchase" | "investment",
+): string[] {
+  const { user } = useAuth();
+  const table =
+    kind === "debit"
+      ? "debits"
+      : kind === "income"
+        ? "incomes"
+        : kind === "purchase"
+          ? "purchases"
+          : "investments";
+  const field = kind === "investment" ? "type" : "description";
+  const { data = [] } = useQuery({
+    queryKey: ["description-suggestions", kind, user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<{ label: string; createdAt: string }[]> => {
+      const { data, error } = await supabase
+        .from(table)
+        .select(`${field}, created_at`)
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => ({
+        label: String(row[field] ?? "").trim(),
+        createdAt: String(row["created_at"] ?? ""),
+      }));
+    },
+  });
+  return useMemo(() => {
+    const stats = new Map<string, { display: string; count: number; latest: string }>();
+    for (const row of data) {
+      const label = row.label;
+      if (!label) continue;
+      const key = label.toLowerCase();
+      const prev = stats.get(key);
+      if (prev) {
+        prev.count += 1;
+        if (row.createdAt > prev.latest) {
+          prev.latest = row.createdAt;
+          prev.display = label;
+        }
+      } else {
+        stats.set(key, { display: label, count: 1, latest: row.createdAt });
+      }
+    }
+    return Array.from(stats.values())
+      .sort((a, b) => (b.count - a.count) || (b.latest > a.latest ? 1 : -1))
+      .map((s) => s.display);
+  }, [data]);
+}
+

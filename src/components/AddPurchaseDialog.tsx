@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { Modal, Field, inputClass } from "./Modal";
-import { useCards, useAddPurchase } from "@/store/finance";
+import { useCards, useAddPurchase, useDescriptionSuggestions } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
+import { AutocompleteInput } from "./AutocompleteInput";
 
 export function AddPurchaseDialog({
   open,
@@ -22,6 +23,7 @@ export function AddPurchaseDialog({
 }) {
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
+  const suggestions = useDescriptionSuggestions("purchase");
   const selectableCards = useMemo(
     () => (fixedAccountId ? cards.filter((card) => card.accountId === fixedAccountId) : cards),
     [cards, fixedAccountId],
@@ -91,7 +93,7 @@ export function AddPurchaseDialog({
     <Modal open={open} onClose={onClose} title={fixedCardId ? "Adicionar à fatura" : "Nova compra no cartão"}>
       <div className="space-y-4">
         <Field label="Descrição">
-          <input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Tênis novo" />
+          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Tênis novo" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

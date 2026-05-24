@@ -1263,6 +1263,7 @@ function CardRowSorted({
   onRemoveInst,
   itemSelProps,
   selectionBar,
+  onRequestReorder,
 }: {
   card: Card;
   cardInst: Installment[];
@@ -1279,6 +1280,7 @@ function CardRowSorted({
   onRemoveInst?: (inst: Installment) => void;
   itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
   selectionBar?: React.ReactNode;
+  onRequestReorder?: () => void;
 }) {
   const { sort, set } = useSortPreference(`card:${card.id}`);
   const sortedItems =
@@ -1313,6 +1315,7 @@ function CardRowSorted({
       itemSelProps={itemSelProps}
       selectionBar={selectionBar}
       sortedItems={sortedItems}
+      onRequestReorder={onRequestReorder}
       sortControl={
         <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
       }

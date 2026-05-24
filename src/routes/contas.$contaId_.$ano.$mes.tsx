@@ -788,13 +788,13 @@ function AccountMonth() {
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
                     <div key={c.id} className="rounded-2xl border border-border bg-card">
-                      <CardRow
-                        cardName={c.name}
-                        cardColor={c.color}
+                      <CardRowSorted
+                        card={c}
+                        cardInst={cardInst}
+                        purchases={purchases}
                         total={total}
                         paid={paid}
                         paymentPending={setCardPaid.isPending}
-                        count={cardInst.length}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
                         onTogglePaid={() => {
                           if (!setCardPaid.isPending) {
@@ -803,8 +803,6 @@ function AccountMonth() {
                         }}
                         onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
-                        items={cardInst}
-                        purchases={purchases}
                         onToggleInst={(id, p) => toggleInst(id, p)}
                         onEditInst={(inst) => {
                           const pur = purchases.find((p) => p.id === inst.parentId);

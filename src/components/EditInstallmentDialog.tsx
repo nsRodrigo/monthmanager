@@ -409,7 +409,7 @@ export function EditInstallmentDialog({
               ? { kind: "debit" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date, required: false }
               : single.kind === "income"
               ? { kind: "income" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date }
-              : { kind: "investment" as const, accountId: "", type: single.description, amount: single.amount, percentage: 0, date: single.date };
+              : { kind: "investment" as const, accountId: single.accountId, type: single.description, amount: single.amount, percentage: 0, date: single.date };
           // investments need accountId — fetch from current cards/accounts isn't here;
           // for investment the source already lacks accountId in SingleEditTarget, fall back to empty (mutation will fail RLS if blank).
           await duplicate.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });

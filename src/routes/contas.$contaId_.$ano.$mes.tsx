@@ -851,49 +851,26 @@ function AccountMonth() {
         defaultYear={year}
         defaultMonth={month}
       />
-      <DeleteParcelledDialog
-        open={!!deletingParcelled}
-        onClose={() => setDeletingParcelled(null)}
-        itemLabel={deletingParcelled?.label}
-        onDeleteOnlyThis={() => {
-          if (deletingParcelled) deleteSingleInst.mutate(deletingParcelled.inst.id);
-        }}
-        onDeleteAllUnpaid={() => {
-          if (deletingParcelled)
-            deleteParentKeepingPaid.mutate({
-              parentId: deletingParcelled.parentId,
-              parentType: deletingParcelled.parentType,
-            });
-        }}
-      />
       <EditRecurringDialog
         open={!!editingRecurring}
         onClose={() => setEditingRecurring(null)}
         target={editingRecurring}
       />
-      <DeleteRecurringDialog
-        open={!!deletingRecurring}
-        onClose={() => setDeletingRecurring(null)}
-        itemLabel={deletingRecurring?.label}
-        onDeleteOnlyThis={() => {
-          if (deletingRecurring)
-            deleteRecurring.mutate({
-              kind: deletingRecurring.kind,
-              id: deletingRecurring.id,
-              groupId: deletingRecurring.groupId,
-              anchorDate: deletingRecurring.date,
-              scope: "one",
-            });
-        }}
-        onDeleteThisAndFuture={() => {
-          if (deletingRecurring)
-            deleteRecurring.mutate({
-              kind: deletingRecurring.kind,
-              id: deletingRecurring.id,
-              groupId: deletingRecurring.groupId,
-              anchorDate: deletingRecurring.date,
-              scope: "forward",
-            });
+      <CardScopeConfirmDialog
+        open={!!scopeDelete}
+        onClose={() => setScopeDelete(null)}
+        title={scopeDelete?.title ?? "Excluir"}
+        description={scopeDelete?.description}
+        confirmLabel="Excluir"
+        variant="destructive"
+        defaultYear={year}
+        defaultMonth={month}
+        initialKind="month"
+        loading={deleteParcelledScoped.isPending || deleteRecurringScoped.isPending}
+        onConfirm={async (scope) => {
+          if (!scopeDelete) return;
+          await scopeDelete.execute(scope);
+          setScopeDelete(null);
         }}
       />
     </div>

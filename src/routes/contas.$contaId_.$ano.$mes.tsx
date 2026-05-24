@@ -619,15 +619,7 @@ function AccountMonth() {
                   date: d.date,
                 })
               }
-              onRemove={async () =>
-                setDeletingRecurring({
-                  kind: "debit",
-                  id: d.id,
-                  groupId: d.recurrenceGroupId!,
-                  date: d.date,
-                  label: d.description,
-                })
-              }
+              onRemove={() => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)}
               {...selProps("debits", d.id)}
             />
 

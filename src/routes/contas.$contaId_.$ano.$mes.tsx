@@ -542,6 +542,13 @@ function AccountMonth() {
                       label: p.income!.description,
                       subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
                       onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
+                      parentSource: {
+                        kind: "income",
+                        accountId: p.income!.accountId,
+                        description: p.income!.description,
+                        amount: p.income!.amount,
+                        date: p.income!.date,
+                      },
                     })
                   }
                   onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}

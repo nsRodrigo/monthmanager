@@ -433,8 +433,9 @@ export function useCards() {
       const { data, error } = await supabase
         .from("cards")
         .select(
-          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months",
+          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months,position,created_at",
         )
+        .order("position", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((c: any) => ({
@@ -449,6 +450,7 @@ export function useCards() {
         endYear: c.end_year ?? null,
         endMonth: c.end_month ?? null,
         excludedMonths: (c.excluded_months ?? []) as string[],
+        position: (c.position as number) ?? 0,
       }));
     },
   });

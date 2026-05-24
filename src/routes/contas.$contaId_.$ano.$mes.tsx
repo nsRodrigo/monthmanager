@@ -1078,6 +1078,8 @@ function CardRow({
   onRemoveInst,
   itemSelProps,
   selectionBar,
+  sortControl,
+  sortedItems,
 }: {
   cardName: string;
   cardColor: string;
@@ -1101,6 +1103,9 @@ function CardRow({
   onRemoveInst?: (inst: Installment) => void;
   itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
   selectionBar?: React.ReactNode;
+  sortControl?: React.ReactNode;
+  /** When provided, overrides the default sort (parcelled→cash) with this order. */
+  sortedItems?: Installment[] | null;
 }) {
   const [open, setOpen] = useState(false);
   return (

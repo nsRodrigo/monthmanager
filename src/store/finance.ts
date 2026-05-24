@@ -27,6 +27,7 @@ export type Card = {
   startMonth: number | null;
   endYear: number | null;
   endMonth: number | null;
+  excludedMonths: string[]; // ["YYYY-MM"]
 };
 
 /**
@@ -40,6 +41,10 @@ export type CardScope =
   | { kind: "period"; startYear: number; startMonth: number; endYear: number; endMonth: number }
   | { kind: "month"; year: number; month: number };
 
+function ymKey(year: number, month: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
 /** Returns true when a card should be visible in the given year/month. */
 export function isCardVisibleInMonth(card: Card, year: number, month: number): boolean {
   const ym = year * 12 + month;
@@ -49,8 +54,10 @@ export function isCardVisibleInMonth(card: Card, year: number, month: number): b
   if (card.endYear != null && card.endMonth != null) {
     if (ym > card.endYear * 12 + card.endMonth) return false;
   }
+  if (card.excludedMonths?.includes(ymKey(year, month))) return false;
   return true;
 }
+
 
 function scopeToWindow(scope: CardScope): {
   start_year: number | null;

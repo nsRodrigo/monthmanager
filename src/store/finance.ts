@@ -145,16 +145,30 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-async function fetchAllRows<T>(queryFactory: () => any, pageSize = 1000): Promise<T[]> {
+async function fetchAllRows<T>(
+  queryFactory: (signal?: AbortSignal) => any,
+  pageSize = 1000,
+  signal?: AbortSignal,
+): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
+    if (signal?.aborted) throw new DOMException("Query cancelled", "AbortError");
+    const { data, error } = await queryFactory(signal).range(from, from + pageSize - 1);
     if (error) throw error;
     const page = (data ?? []) as T[];
     rows.push(...page);
     if (page.length < pageSize) break;
   }
   return rows;
+}
+
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
 }
 
 /**
@@ -511,7 +525,9 @@ export function useDebits() {
   return useQuery({
     queryKey: ["debits", user?.id],
     enabled: !!user,
-    queryFn: async (): Promise<Debit[]> => {
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async ({ signal }): Promise<Debit[]> => {
       const data = await fetchAllRows<{
         id: string;
         account_id: string;
@@ -525,28 +541,36 @@ export function useDebits() {
         installments_count: number;
         is_parent: boolean;
         recurrence_group_id: string | null;
-      }>(() =>
-        supabase
-          .from("debits")
-          .select(
-            "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
-          )
-          .order("date", { ascending: true }),
+      }>(
+        (abortSignal) => {
+          const query = supabase
+            .from("debits")
+            .select(
+              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
+            )
+            .order("date", { ascending: true })
+            .order("id", { ascending: true });
+          return abortSignal ? query.abortSignal(abortSignal) : query;
+        },
+        1000,
+        signal,
       );
-      return data.map((d) => ({
-        id: d.id,
-        accountId: d.account_id,
-        description: d.description,
-        amount: num(d.amount as number | string),
-        date: d.date,
-        required: d.required,
-        paid: d.paid,
-        autoDebit: d.auto_debit,
-        autoDebitDay: d.auto_debit_day,
-        installmentsCount: d.installments_count,
-        isParent: d.is_parent,
-        recurrenceGroupId: d.recurrence_group_id ?? null,
-      }));
+      return uniqueById(
+        data.map((d) => ({
+          id: d.id,
+          accountId: d.account_id,
+          description: d.description,
+          amount: num(d.amount as number | string),
+          date: d.date,
+          required: d.required,
+          paid: d.paid,
+          autoDebit: d.auto_debit,
+          autoDebitDay: d.auto_debit_day,
+          installmentsCount: d.installments_count,
+          isParent: d.is_parent,
+          recurrenceGroupId: d.recurrence_group_id ?? null,
+        })),
+      );
     },
   });
 }
@@ -1604,7 +1628,6 @@ export function useAddDebit() {
 }
 
 export function useToggleDebitPaid() {
-  const inv = useInvalidate();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; paid: boolean }) => {
@@ -1615,14 +1638,21 @@ export function useToggleDebitPaid() {
       await qc.cancelQueries({ queryKey: ["debits"] });
       const prev = qc.getQueriesData<Debit[]>({ queryKey: ["debits"] });
       qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
-        old ? old.map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
+        old ? uniqueById(old).map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
       );
       return { prev };
     },
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
     },
-    onSettled: () => inv(["debits"]),
+    onSuccess: (_data, args) => {
+      // Keep the committed state in cache and avoid an immediate refetch.
+      // Realtime/background invalidations can arrive right after the update;
+      // the local patch prevents the just-toggled row from flashing/duplicating.
+      qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
+        old ? uniqueById(old).map((d) => (d.id === args.id ? { ...d, paid: args.paid } : d)) : old,
+      );
+    },
   });
 }
 
@@ -2769,7 +2799,7 @@ export function getMonthDebits(
   year: number,
   month: number,
 ) {
-  const single = debits
+  const single = uniqueById(debits)
     .filter((d) => !d.isParent)
     .filter((d) => {
       const [y, m] = d.date.slice(0, 10).split("-").map(Number);
@@ -3459,6 +3489,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
             const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
 
             const row: any = {
+              id: await deterministicUuid(`recurring:${table}:${gid}:${year}:${month}`),
               user_id: user.id,
               account_id: t.account_id,
               description: t.description,

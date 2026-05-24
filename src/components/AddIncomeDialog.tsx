@@ -21,6 +21,7 @@ export function AddIncomeDialog({
 }) {
   const addIncome = useAddIncome();
   const { data: accounts = [] } = useAccounts();
+  const suggestions = useDescriptionSuggestions("income");
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");

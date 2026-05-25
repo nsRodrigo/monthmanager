@@ -1299,22 +1299,22 @@ function GroupedSection({
     <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
 
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-3 md:px-4 md:py-3.5">
-        <button
-          onClick={toggle}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left md:gap-3"
-        >
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
-          >
-            <Icon className="h-4 w-4" />
-          </div>
-          <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5">
+        {/* Linha 1: ícone + título (+ valor/controles no desktop) */}
+        <div className="flex items-center gap-2.5 md:gap-3">
+          <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
+            >
+              <Icon className="h-4 w-4" />
+            </div>
+          </button>
+          <button onClick={toggle} className="min-w-0 flex-1 text-left">
             <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
             <p className="truncate text-[11px] text-muted-foreground">{description}</p>
-          </div>
+          </button>
           {typeof total === "number" && (
-            <div className="flex shrink-0 flex-col items-end">
+            <div className="hidden shrink-0 flex-col items-end md:flex">
               <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
               {typeof count === "number" && (
                 <p className="text-[10px] text-muted-foreground">
@@ -1323,17 +1323,37 @@ function GroupedSection({
               )}
             </div>
           )}
-        </button>
-        {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
-        {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={open ? "Recolher" : "Expandir"}
-          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-        >
-          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
+          {open && paidControl ? <div className="hidden shrink-0 md:block">{paidControl}</div> : null}
+          {open && sortControl ? <div className="hidden shrink-0 md:block">{sortControl}</div> : null}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={open ? "Recolher" : "Expandir"}
+            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+          >
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        </div>
+
+        {/* Linha 2 (mobile only): valor + controles */}
+        {(typeof total === "number" || (open && (paidControl || sortControl))) && (
+          <div className="flex items-center justify-between gap-2 md:hidden">
+            {typeof total === "number" ? (
+              <div className="flex flex-col">
+                <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
+                {typeof count === "number" && (
+                  <p className="text-[10px] text-muted-foreground">
+                    {count} {count === 1 ? "item" : "itens"}
+                  </p>
+                )}
+              </div>
+            ) : <div />}
+            <div className="flex items-center gap-2">
+              {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
+              {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Body */}

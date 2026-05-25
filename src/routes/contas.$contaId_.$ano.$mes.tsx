@@ -432,25 +432,23 @@ function AccountMonth() {
     .reduce((s, i) => s + i.amount, 0);
   const totalInvested = investments.reduce((s, i) => s + i.amount, 0);
 
-  // "Net" totals exibidos no cabeçalho de cada seção:
-  // itens marcados (recebido/pago) somam; itens pendentes subtraem.
-  // Conforme o usuário marca, o total cresce de -bruto até +bruto.
-  const sign = (done: boolean) => (done ? 1 : -1);
+  // Totais pagos/recebidos: só contabiliza itens marcados (paid/received = true).
+  // Itens não marcados valem 0 -- não entram negativos.
   const totalIncomeNet =
-    monthIncomes.single.reduce((s, i) => s + sign(i.received) * i.amount, 0) +
+    monthIncomes.single.reduce((s, i) => s + (i.received ? i.amount : 0), 0) +
     monthIncomes.parcelled.reduce(
-      (s, p) => s + sign(p.installment.paid) * p.installment.amount,
+      (s, p) => s + (p.installment.paid ? p.installment.amount : 0),
       0,
     );
   const totalDebitsNet =
-    monthDebits.single.reduce((s, d) => s + sign(d.paid) * d.amount, 0) +
+    monthDebits.single.reduce((s, d) => s + (d.paid ? d.amount : 0), 0) +
     monthDebits.parcelled.reduce(
-      (s, p) => s + sign(p.installment.paid) * p.installment.amount,
+      (s, p) => s + (p.installment.paid ? p.installment.amount : 0),
       0,
     );
   const totalCardsNet = monthInst
     .filter((i) => i.parentType === "purchase")
-    .reduce((s, i) => s + sign(i.paid) * i.amount, 0);
+    .reduce((s, i) => s + (i.paid ? i.amount : 0), 0);
 
 
   // Saldo Atual = saldo final do mês anterior + recebíveis do mês atual

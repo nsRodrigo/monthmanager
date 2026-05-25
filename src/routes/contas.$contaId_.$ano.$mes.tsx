@@ -1597,57 +1597,94 @@ function CardRow({
           }
         }}
         {...lp.handlers}
-        className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:gap-3 md:px-4 md:py-3.5"
+        className="flex w-full cursor-pointer flex-col gap-1.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:px-4 md:py-3.5"
       >
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: cardColor }}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{cardName}</p>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {dueLabel}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
-          <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {count} {count === 1 ? "item" : "itens"}
-          </p>
-        </div>
-        {open && (
+        {/* Linha 1: cor + nome + (desktop: valor + controles) */}
+        <div className="flex items-center gap-2.5 md:gap-3">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: cardColor }}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{cardName}</p>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {dueLabel}
+            </p>
+          </div>
+          <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
+            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {count} {count === 1 ? "item" : "itens"}
+            </p>
+          </div>
+          {open && (
+            <button
+              type="button"
+              disabled={paymentPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!paymentPending) onTogglePaid();
+              }}
+              className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
+                paid
+                  ? "bg-success/15 text-success hover:bg-success/25"
+                  : "bg-warning/15 text-warning hover:bg-warning/25"
+              }`}
+            >
+              {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
+            </button>
+          )}
+          {open && sortControl ? (
+            <div className="hidden shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
+              {sortControl}
+            </div>
+          ) : null}
           <button
             type="button"
-            disabled={paymentPending}
             onClick={(e) => {
               e.stopPropagation();
-              if (!paymentPending) onTogglePaid();
+              setOpen((o) => !o);
             }}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-              paid
-                ? "bg-success/15 text-success hover:bg-success/25"
-                : "bg-warning/15 text-warning hover:bg-warning/25"
-            }`}
+            aria-label={open ? "Recolher" : "Expandir"}
+            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
-            {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
-        )}
-        {open && sortControl ? (
-          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-            {sortControl}
+        </div>
+
+        {/* Linha 2 (mobile only): valor + controles */}
+        <div className="flex items-center justify-between gap-2 md:hidden">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {count} {count === 1 ? "item" : "itens"}
+            </p>
           </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen((o) => !o);
-          }}
-          aria-label={open ? "Recolher" : "Expandir"}
-          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-        >
-          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </button>
+          <div className="flex items-center gap-2">
+            {open && (
+              <button
+                type="button"
+                disabled={paymentPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!paymentPending) onTogglePaid();
+                }}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                  paid
+                    ? "bg-success/15 text-success hover:bg-success/25"
+                    : "bg-warning/15 text-warning hover:bg-warning/25"
+                }`}
+              >
+                {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
+              </button>
+            )}
+            {open && sortControl ? (
+              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                {sortControl}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {menuOpen && (

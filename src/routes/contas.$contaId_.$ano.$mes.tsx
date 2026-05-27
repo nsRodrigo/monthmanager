@@ -1644,26 +1644,30 @@ function CardRow({
           <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
             <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
             <p className="text-[10px] text-muted-foreground">
-              {count} {count === 1 ? "item" : "itens"}
+              {cardState === "paid"
+                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
+                : cardState === "allChecked"
+                ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
+                : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
             </p>
           </div>
-          {open && (
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
-              }}
-              className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
-                paid
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={paymentPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!paymentPending) onTogglePaid();
+            }}
+            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
+              cardState === "paid"
+                ? "bg-success/15 text-success hover:bg-success/25"
+                : cardState === "allChecked"
+                ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
+                : "bg-warning/15 text-warning hover:bg-warning/25"
+            }`}
+          >
+            {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
+          </button>
           {open && sortControl ? (
             <div className="hidden shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
               {sortControl}

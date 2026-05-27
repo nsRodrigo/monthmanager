@@ -1535,6 +1535,8 @@ function CardRow({
   cardColor,
   total,
   paid,
+  cardState,
+  countRevisado,
   paymentPending,
   count,
   dueLabel,
@@ -1557,6 +1559,8 @@ function CardRow({
   cardColor: string;
   total: number;
   paid: boolean;
+  cardState: "paid" | "allChecked" | "open";
+  countRevisado: number;
   paymentPending?: boolean;
   count: number;
   dueLabel: string;

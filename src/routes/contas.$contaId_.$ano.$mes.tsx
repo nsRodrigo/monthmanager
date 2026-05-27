@@ -1939,19 +1939,14 @@ function PurchaseInstRow({
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors ${
             inst.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+              ? "bg-success/80 text-black"
+              : "border border-border bg-background hover:bg-secondary"
           }`}
+          title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
         >
-          {inst.paid ? (
-            <>
-              <Check className="h-3 w-3" /> Pago
-            </>
-          ) : (
-            "Marcar pago"
-          )}
+          {inst.paid && <Check className="h-3 w-3" />}
         </button>
       </div>
       {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} />}

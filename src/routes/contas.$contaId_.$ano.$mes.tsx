@@ -354,6 +354,10 @@ function AccountMonth() {
     monthDebits.single.length + monthDebits.parcelled.length > 0 &&
     monthDebits.single.every((d) => d.paid) &&
     monthDebits.parcelled.every((p) => p.installment.paid);
+  const incomesAllReceived =
+    monthIncomes.single.length + monthIncomes.parcelled.length > 0 &&
+    monthIncomes.single.every((i) => i.received) &&
+    monthIncomes.parcelled.every((p) => p.installment.paid);
 
   const incomesRecurring = monthIncomes.single
     .filter((i) => !!i.recurrenceGroupId)
@@ -540,6 +544,7 @@ function AccountMonth() {
           addLabel="Novo recebimento"
           total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
+          paidState={incomesAllReceived ? "paid" : null}
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
           }
@@ -1015,15 +1020,21 @@ function AccountMonth() {
               ) : (
                 cardsAll.map(({ card: c, items: cardInst }) => {
                   const total = cardInst.reduce((s, i) => s + i.amount, 0);
-                  const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const faturaIsPaid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const allChecked = cardInst.length > 0 && cardInst.every((i) => i.paid);
+                  const cardState: "paid" | "allChecked" | "open" =
+                    faturaIsPaid ? "paid" : allChecked ? "allChecked" : "open";
+                  const countRevisado = cardInst.filter((i) => i.paid).length;
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
                     <div
                       key={c.id}
                       className={`rounded-2xl border bg-card transition-colors ${
-                        paid
+                        cardState === "paid"
                           ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+                          : cardState === "allChecked"
+                          ? "border-blue-500/50 shadow-[0_4px_18px_-6px_rgba(59,130,246,0.3)]"
                           : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
                       }`}
                     >
@@ -1032,12 +1043,20 @@ function AccountMonth() {
                         cardInst={cardInst}
                         purchases={purchases}
                         total={total}
-                        paid={paid}
+                        paid={faturaIsPaid}
+                        cardState={cardState}
+                        countRevisado={countRevisado}
                         paymentPending={setCardPaid.isPending}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
                         onTogglePaid={() => {
                           if (!setCardPaid.isPending) {
-                            setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid });
+                            const newPaid = !faturaIsPaid;
+                            setCardPaid.mutate({ cardId: c.id, year, month, paid: newPaid });
+                            if (newPaid) {
+                              cardInst.forEach((i) => {
+                                if (!i.paid) toggleInst(i.id, true);
+                              });
+                            }
                           }
                         }}
                         onAdd={() => setPurchaseFor(c.id)}
@@ -1434,6 +1453,8 @@ function CardRowSorted({
   purchases,
   total,
   paid,
+  cardState,
+  countRevisado,
   paymentPending,
   dueLabel,
   onTogglePaid,
@@ -1451,6 +1472,8 @@ function CardRowSorted({
   purchases: PurchaseList;
   total: number;
   paid: boolean;
+  cardState: "paid" | "allChecked" | "open";
+  countRevisado: number;
   paymentPending?: boolean;
   dueLabel: string;
   onTogglePaid: () => void;
@@ -1482,6 +1505,8 @@ function CardRowSorted({
       cardColor={card.color}
       total={total}
       paid={paid}
+      cardState={cardState}
+      countRevisado={countRevisado}
       paymentPending={paymentPending}
       count={cardInst.length}
       dueLabel={dueLabel}
@@ -1504,11 +1529,14 @@ function CardRowSorted({
   );
 }
 
+
 function CardRow({
   cardName,
   cardColor,
   total,
   paid,
+  cardState,
+  countRevisado,
   paymentPending,
   count,
   dueLabel,
@@ -1531,6 +1559,8 @@ function CardRow({
   cardColor: string;
   total: number;
   paid: boolean;
+  cardState: "paid" | "allChecked" | "open";
+  countRevisado: number;
   paymentPending?: boolean;
   count: number;
   dueLabel: string;
@@ -1614,26 +1644,30 @@ function CardRow({
           <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
             <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
             <p className="text-[10px] text-muted-foreground">
-              {count} {count === 1 ? "item" : "itens"}
+              {cardState === "paid"
+                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
+                : cardState === "allChecked"
+                ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
+                : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
             </p>
           </div>
-          {open && (
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
-              }}
-              className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
-                paid
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={paymentPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!paymentPending) onTogglePaid();
+            }}
+            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
+              cardState === "paid"
+                ? "bg-success/15 text-success hover:bg-success/25"
+                : cardState === "allChecked"
+                ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
+                : "bg-warning/15 text-warning hover:bg-warning/25"
+            }`}
+          >
+            {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
+          </button>
           {open && sortControl ? (
             <div className="hidden shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
               {sortControl}
@@ -1657,27 +1691,31 @@ function CardRow({
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
             <p className="text-[10px] text-muted-foreground">
-              {count} {count === 1 ? "item" : "itens"}
+              {cardState === "paid"
+                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
+                : cardState === "allChecked"
+                ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
+                : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {open && (
-              <button
-                type="button"
-                disabled={paymentPending}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!paymentPending) onTogglePaid();
-                }}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                  paid
-                    ? "bg-success/15 text-success hover:bg-success/25"
-                    : "bg-warning/15 text-warning hover:bg-warning/25"
-                }`}
-              >
-                {paymentPending ? "Salvando..." : paid ? "✓ Paga" : "Marcar paga"}
-              </button>
-            )}
+            <button
+              type="button"
+              disabled={paymentPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!paymentPending) onTogglePaid();
+              }}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                cardState === "paid"
+                  ? "bg-success/15 text-success hover:bg-success/25"
+                  : cardState === "allChecked"
+                  ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
+                  : "bg-warning/15 text-warning hover:bg-warning/25"
+              }`}
+            >
+              {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
+            </button>
             {open && sortControl ? (
               <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                 {sortControl}
@@ -1901,19 +1939,14 @@ function PurchaseInstRow({
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors ${
             inst.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+              ? "bg-success/80 text-black"
+              : "border border-border bg-background hover:bg-secondary"
           }`}
+          title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
         >
-          {inst.paid ? (
-            <>
-              <Check className="h-3 w-3" /> Pago
-            </>
-          ) : (
-            "Marcar pago"
-          )}
+          {inst.paid && <Check className="h-3 w-3" />}
         </button>
       </div>
       {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} />}

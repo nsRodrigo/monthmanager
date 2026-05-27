@@ -354,6 +354,10 @@ function AccountMonth() {
     monthDebits.single.length + monthDebits.parcelled.length > 0 &&
     monthDebits.single.every((d) => d.paid) &&
     monthDebits.parcelled.every((p) => p.installment.paid);
+  const incomesAllReceived =
+    monthIncomes.single.length + monthIncomes.parcelled.length > 0 &&
+    monthIncomes.single.every((i) => i.received) &&
+    monthIncomes.parcelled.every((p) => p.installment.paid);
 
   const incomesRecurring = monthIncomes.single
     .filter((i) => !!i.recurrenceGroupId)

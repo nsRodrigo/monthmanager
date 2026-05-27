@@ -1020,15 +1020,21 @@ function AccountMonth() {
               ) : (
                 cardsAll.map(({ card: c, items: cardInst }) => {
                   const total = cardInst.reduce((s, i) => s + i.amount, 0);
-                  const paid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const faturaIsPaid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const allChecked = cardInst.length > 0 && cardInst.every((i) => i.paid);
+                  const cardState: "paid" | "allChecked" | "open" =
+                    faturaIsPaid ? "paid" : allChecked ? "allChecked" : "open";
+                  const countRevisado = cardInst.filter((i) => i.paid).length;
                   const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
                   const dueDate = new Date(year, month, Math.min(dueDay, 28));
                   return (
                     <div
                       key={c.id}
                       className={`rounded-2xl border bg-card transition-colors ${
-                        paid
+                        cardState === "paid"
                           ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+                          : cardState === "allChecked"
+                          ? "border-blue-500/50 shadow-[0_4px_18px_-6px_rgba(59,130,246,0.3)]"
                           : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
                       }`}
                     >
@@ -1037,12 +1043,20 @@ function AccountMonth() {
                         cardInst={cardInst}
                         purchases={purchases}
                         total={total}
-                        paid={paid}
+                        paid={faturaIsPaid}
+                        cardState={cardState}
+                        countRevisado={countRevisado}
                         paymentPending={setCardPaid.isPending}
                         dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
                         onTogglePaid={() => {
                           if (!setCardPaid.isPending) {
-                            setCardPaid.mutate({ cardId: c.id, year, month, paid: !paid });
+                            const newPaid = !faturaIsPaid;
+                            setCardPaid.mutate({ cardId: c.id, year, month, paid: newPaid });
+                            if (newPaid) {
+                              cardInst.forEach((i) => {
+                                if (!i.paid) toggleInst(i.id, true);
+                              });
+                            }
                           }
                         }}
                         onAdd={() => setPurchaseFor(c.id)}

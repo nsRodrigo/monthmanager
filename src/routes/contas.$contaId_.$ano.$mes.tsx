@@ -544,6 +544,7 @@ function AccountMonth() {
           addLabel="Novo recebimento"
           total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
+          paidState={incomesAllReceived ? "paid" : null}
           empty={
             monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
           }

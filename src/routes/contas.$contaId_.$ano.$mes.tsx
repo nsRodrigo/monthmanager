@@ -1453,6 +1453,8 @@ function CardRowSorted({
   purchases,
   total,
   paid,
+  cardState,
+  countRevisado,
   paymentPending,
   dueLabel,
   onTogglePaid,
@@ -1470,6 +1472,8 @@ function CardRowSorted({
   purchases: PurchaseList;
   total: number;
   paid: boolean;
+  cardState: "paid" | "allChecked" | "open";
+  countRevisado: number;
   paymentPending?: boolean;
   dueLabel: string;
   onTogglePaid: () => void;
@@ -1501,6 +1505,8 @@ function CardRowSorted({
       cardColor={card.color}
       total={total}
       paid={paid}
+      cardState={cardState}
+      countRevisado={countRevisado}
       paymentPending={paymentPending}
       count={cardInst.length}
       dueLabel={dueLabel}
@@ -1522,6 +1528,7 @@ function CardRowSorted({
     />
   );
 }
+
 
 function CardRow({
   cardName,

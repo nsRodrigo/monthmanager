@@ -3112,21 +3112,17 @@ export function getMonthIncomes(
 }
 
 export function isCardFullyPaid(
-  installments: Installment[],
-  purchases: Purchase[],
+  _installments: Installment[],
+  _purchases: Purchase[],
   cardPayments: Record<string, boolean>,
   cardId: string,
   year: number,
   month: number,
 ) {
-  const monthInst = installments.filter((i) => {
-    if (i.parentType !== "purchase") return false;
-    const pur = purchases.find((p) => p.id === i.parentId);
-    return pur?.cardId === cardId && i.year === year && i.month === month;
-  });
+  // Fonte de verdade para "fatura paga" é exclusivamente o registro em card_payments.
+  // Os inst.paid são checkboxes de revisão da fatura, não de pagamento.
   const key = `${cardId}-${year}-${month}`;
-  if (monthInst.length === 0) return cardPayments[key] ?? false;
-  return monthInst.every((i) => i.paid);
+  return cardPayments[key] ?? false;
 }
 
 // =======================

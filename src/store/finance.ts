@@ -514,7 +514,7 @@ export function useInstallments() {
           .order("month", { ascending: true })
           .order("number", { ascending: true }),
       );
-      return data.map((i) => ({
+      return uniqueById(data).map((i) => ({
         id: i.id,
         parentType: i.parent_type as ParentType,
         parentId: i.parent_id ?? "",

@@ -514,7 +514,7 @@ export function useInstallments() {
           .order("month", { ascending: true })
           .order("number", { ascending: true }),
       );
-      return data.map((i) => ({
+      return uniqueById(data).map((i) => ({
         id: i.id,
         parentType: i.parent_type as ParentType,
         parentId: i.parent_id ?? "",
@@ -3702,7 +3702,31 @@ export function useDeleteRecurringSeries() {
 // in this browser session. Prevents the ensure routine from re-running on
 // every mount/navigation, which was racing against in-flight optimistic
 // mutations (toggle paid, delete) and causing visual duplication.
-const ensuredRecurringKeys = new Set<string>();
+// Persiste no sessionStorage para sobreviver re-mounts do componente
+// mas resetar ao fechar o app/aba.
+const getEnsuredKeys = () => {
+  try {
+    const raw = sessionStorage.getItem("ensuredRecurringKeys");
+    return new Set<string>(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+const addEnsuredKey = (key: string) => {
+  try {
+    const keys = getEnsuredKeys();
+    keys.add(key);
+    sessionStorage.setItem("ensuredRecurringKeys", JSON.stringify([...keys]));
+  } catch {}
+};
+const deleteEnsuredKey = (key: string) => {
+  try {
+    const keys = getEnsuredKeys();
+    keys.delete(key);
+    sessionStorage.setItem("ensuredRecurringKeys", JSON.stringify([...keys]));
+  } catch {}
+};
+const hasEnsuredKey = (key: string) => getEnsuredKeys().has(key);
 
 export function useEnsureRecurringForMonth(year: number, month: number) {
   const { user } = useAuth();
@@ -3710,9 +3734,9 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
   useEffect(() => {
     if (!user) return;
     const key = `${user.id}:${year}:${month}`;
-    if (ensuredRecurringKeys.has(key)) return;
+    if (hasEnsuredKey(key)) return;
     // Mark immediately so concurrent mounts of the same route don't double-run.
-    ensuredRecurringKeys.add(key);
+    addEnsuredKey(key);
 
     let cancelled = false;
     (async () => {
@@ -3811,7 +3835,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
         qc.invalidateQueries({ queryKey: ["incomes"], refetchType: "active" });
       } catch {
         // If anything threw, allow a future mount to retry.
-        ensuredRecurringKeys.delete(key);
+        deleteEnsuredKey(key);
       }
     })();
     return () => {

@@ -3702,7 +3702,31 @@ export function useDeleteRecurringSeries() {
 // in this browser session. Prevents the ensure routine from re-running on
 // every mount/navigation, which was racing against in-flight optimistic
 // mutations (toggle paid, delete) and causing visual duplication.
-const ensuredRecurringKeys = new Set<string>();
+// Persiste no sessionStorage para sobreviver re-mounts do componente
+// mas resetar ao fechar o app/aba.
+const getEnsuredKeys = () => {
+  try {
+    const raw = sessionStorage.getItem("ensuredRecurringKeys");
+    return new Set<string>(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+const addEnsuredKey = (key: string) => {
+  try {
+    const keys = getEnsuredKeys();
+    keys.add(key);
+    sessionStorage.setItem("ensuredRecurringKeys", JSON.stringify([...keys]));
+  } catch {}
+};
+const deleteEnsuredKey = (key: string) => {
+  try {
+    const keys = getEnsuredKeys();
+    keys.delete(key);
+    sessionStorage.setItem("ensuredRecurringKeys", JSON.stringify([...keys]));
+  } catch {}
+};
+const hasEnsuredKey = (key: string) => getEnsuredKeys().has(key);
 
 export function useEnsureRecurringForMonth(year: number, month: number) {
   const { user } = useAuth();

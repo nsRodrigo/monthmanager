@@ -3835,7 +3835,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
         qc.invalidateQueries({ queryKey: ["incomes"], refetchType: "active" });
       } catch {
         // If anything threw, allow a future mount to retry.
-        ensuredRecurringKeys.delete(key);
+        deleteEnsuredKey(key);
       }
     })();
     return () => {

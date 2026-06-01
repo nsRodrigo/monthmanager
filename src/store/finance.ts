@@ -3734,9 +3734,9 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
   useEffect(() => {
     if (!user) return;
     const key = `${user.id}:${year}:${month}`;
-    if (ensuredRecurringKeys.has(key)) return;
+    if (hasEnsuredKey(key)) return;
     // Mark immediately so concurrent mounts of the same route don't double-run.
-    ensuredRecurringKeys.add(key);
+    addEnsuredKey(key);
 
     let cancelled = false;
     (async () => {

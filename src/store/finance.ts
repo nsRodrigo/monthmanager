@@ -1123,7 +1123,7 @@ export function useAddPurchase() {
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
     },
-    onSettled: () => inv(["purchases", "installments", "card_payments"]),
+    onSuccess: () => inv(["purchases", "installments", "card_payments"]),
   });
 }
 
@@ -1332,7 +1332,7 @@ export function useDeleteSingleInstallment() {
       const { error } = await supabase.from("installments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSettled: () => inv(["installments", "card_payments"]),
+    onSuccess: () => inv(["installments", "card_payments"]),
   });
 }
 
@@ -1372,7 +1372,7 @@ export function useDeleteParentKeepingPaid() {
         if (error) throw error;
       }
     },
-    onSettled: () => inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
+    onSuccess: () => inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
   });
 }
 
@@ -1575,7 +1575,7 @@ export function useSetCardPaid() {
       ctx?.prevCp?.forEach(([k, d]) => qc.setQueryData(k, d));
       ctx?.prevInst?.forEach(([k, d]) => qc.setQueryData(k, d));
     },
-    onSettled: () => inv(["installments", "card_payments"]),
+    onSuccess: () => inv(["installments", "card_payments"]),
   });
 }
 

@@ -89,11 +89,11 @@ function AccountMonth() {
 
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
-  const { data: purchases, isLoading: purchasesLoading } = usePurchases();
-  const { data: installments, isLoading: installmentsLoading } = useInstallments();
+  const { data: purchases, isFetching: purchasesFetching } = usePurchases();
+  const { data: installments, isFetching: installmentsFetching } = useInstallments();
   const purchasesList = purchases ?? [];
   const installmentsList = installments ?? [];
-  const listsReady = !purchasesLoading && !installmentsLoading;
+  const listsReady = !purchasesFetching && !installmentsFetching;
   const { data: allDebits = [] } = useDebits();
   const { data: allIncomes = [] } = useIncomes();
   const { data: allInvestments = [] } = useInvestments();

@@ -512,7 +512,13 @@ export function useInstallments() {
           )
           .order("year", { ascending: true })
           .order("month", { ascending: true })
-          .order("number", { ascending: true }),
+          .order("number", { ascending: true })
+          // Tiebreaker estável: sem isso, parcelas com (year, month, number)
+          // iguais (ex.: #4 de várias compras no mesmo mês) podem cair em
+          // ordem não-determinística entre páginas de 1000 linhas e algumas
+          // somem do resultado paginado. Ordenar por id garante paginação
+          // estável e impede que parcelas "desapareçam" da tela.
+          .order("id", { ascending: true }),
       );
       return uniqueById(data).map((i) => ({
         id: i.id,

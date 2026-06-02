@@ -1023,7 +1023,7 @@ function AccountMonth() {
               ) : (
                 cardsAll.map(({ card: c, items: cardInst }) => {
                   const total = cardInst.reduce((s, i) => s + i.amount, 0);
-                  const faturaIsPaid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const faturaIsPaid = isCardFullyPaid(installmentsList, purchasesList, cardPayments, c.id, year, month);
                   const allChecked = cardInst.length > 0 && cardInst.every((i) => i.paid);
                   const cardState: "paid" | "allChecked" | "open" =
                     faturaIsPaid ? "paid" : allChecked ? "allChecked" : "open";

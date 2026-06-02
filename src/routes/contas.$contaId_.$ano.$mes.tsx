@@ -89,8 +89,11 @@ function AccountMonth() {
 
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
-  const { data: purchases = [] } = usePurchases();
-  const { data: installments = [] } = useInstallments();
+  const { data: purchases, isLoading: purchasesLoading } = usePurchases();
+  const { data: installments, isLoading: installmentsLoading } = useInstallments();
+  const purchasesList = purchases ?? [];
+  const installmentsList = installments ?? [];
+  const listsReady = !purchasesLoading && !installmentsLoading;
   const { data: allDebits = [] } = useDebits();
   const { data: allIncomes = [] } = useIncomes();
   const { data: allInvestments = [] } = useInvestments();
@@ -319,14 +322,14 @@ function AccountMonth() {
   );
 
   const visiblePurchaseIds = new Set(
-    purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+    purchasesList.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
   );
 
-  const monthInst = getMonthInstallments(installments, year, month).filter((i) =>
+  const monthInst = getMonthInstallments(installmentsList, year, month).filter((i) =>
     i.parentType === "purchase" ? visiblePurchaseIds.has(i.parentId) : true,
   );
-  const monthDebits = getMonthDebits(debits, installments, year, month);
-  const monthIncomes = getMonthIncomes(incomes, installments, year, month);
+  const monthDebits = getMonthDebits(debits, installmentsList, year, month);
+  const monthIncomes = getMonthIncomes(incomes, installmentsList, year, month);
 
   // Ordem desejada para todas as listas: recorrentes → parcelados → à vista.
   // Dentro de cada grupo, ordenar por data (asc) com desempate estável por id.
@@ -461,8 +464,8 @@ function AccountMonth() {
     const monthly = computeMonthlyAccountBalance(
       account,
       cards,
-      purchases,
-      installments,
+      purchasesList,
+      installmentsList,
       allDebits,
       allIncomes,
       allInvestments,
@@ -486,10 +489,10 @@ function AccountMonth() {
     return normalizeZero(saldoAnterior + totalIncome);
   })();
 
-  if (!account) {
+  if (!account || !listsReady) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center text-muted-foreground">
-        Conta não encontrada.
+        {!account ? "Conta não encontrada." : "Carregando..."}
       </div>
     );
   }
@@ -893,7 +896,7 @@ function AccountMonth() {
           const cardsAll = accountCards.map((c) => {
             const items = monthInst.filter((i) => {
               if (i.parentType !== "purchase") return false;
-              const pur = purchases.find((p) => p.id === i.parentId);
+              const pur = purchasesList.find((p) => p.id === i.parentId);
               return pur?.cardId === c.id;
             });
             return { card: c, items };
@@ -1020,7 +1023,7 @@ function AccountMonth() {
               ) : (
                 cardsAll.map(({ card: c, items: cardInst }) => {
                   const total = cardInst.reduce((s, i) => s + i.amount, 0);
-                  const faturaIsPaid = isCardFullyPaid(installments, purchases, cardPayments, c.id, year, month);
+                  const faturaIsPaid = isCardFullyPaid(installmentsList, purchasesList, cardPayments, c.id, year, month);
                   const allChecked = cardInst.length > 0 && cardInst.every((i) => i.paid);
                   const cardState: "paid" | "allChecked" | "open" =
                     faturaIsPaid ? "paid" : allChecked ? "allChecked" : "open";
@@ -1041,7 +1044,7 @@ function AccountMonth() {
                       <CardRowSorted
                         card={c}
                         cardInst={cardInst}
-                        purchases={purchases}
+                        purchases={purchasesList}
                         total={total}
                         paid={faturaIsPaid}
                         cardState={cardState}
@@ -1064,7 +1067,7 @@ function AccountMonth() {
                         onRequestReorder={enterReorder}
                         onToggleInst={(id, p) => toggleInst(id, p)}
                         onEditInst={(inst) => {
-                          const pur = purchases.find((p) => p.id === inst.parentId);
+                          const pur = purchasesList.find((p) => p.id === inst.parentId);
                           if (!pur) return;
                           setEditing({
                             inst,
@@ -1083,7 +1086,7 @@ function AccountMonth() {
                           });
                         }}
                         onRemoveInst={(inst) => {
-                          const pur = purchases.find((p) => p.id === inst.parentId);
+                          const pur = purchasesList.find((p) => p.id === inst.parentId);
                           if (!pur) return;
                           askDeletePurchase(pur);
                         }}

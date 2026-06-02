@@ -1067,7 +1067,7 @@ function AccountMonth() {
                         onRequestReorder={enterReorder}
                         onToggleInst={(id, p) => toggleInst(id, p)}
                         onEditInst={(inst) => {
-                          const pur = purchases.find((p) => p.id === inst.parentId);
+                          const pur = purchasesList.find((p) => p.id === inst.parentId);
                           if (!pur) return;
                           setEditing({
                             inst,

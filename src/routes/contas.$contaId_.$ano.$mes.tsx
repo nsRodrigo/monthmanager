@@ -322,14 +322,14 @@ function AccountMonth() {
   );
 
   const visiblePurchaseIds = new Set(
-    purchases.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
+    purchasesList.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
   );
 
-  const monthInst = getMonthInstallments(installments, year, month).filter((i) =>
+  const monthInst = getMonthInstallments(installmentsList, year, month).filter((i) =>
     i.parentType === "purchase" ? visiblePurchaseIds.has(i.parentId) : true,
   );
-  const monthDebits = getMonthDebits(debits, installments, year, month);
-  const monthIncomes = getMonthIncomes(incomes, installments, year, month);
+  const monthDebits = getMonthDebits(debits, installmentsList, year, month);
+  const monthIncomes = getMonthIncomes(incomes, installmentsList, year, month);
 
   // Ordem desejada para todas as listas: recorrentes → parcelados → à vista.
   // Dentro de cada grupo, ordenar por data (asc) com desempate estável por id.

@@ -1044,7 +1044,7 @@ function AccountMonth() {
                       <CardRowSorted
                         card={c}
                         cardInst={cardInst}
-                        purchases={purchases}
+                        purchases={purchasesList}
                         total={total}
                         paid={faturaIsPaid}
                         cardState={cardState}

@@ -896,7 +896,7 @@ function AccountMonth() {
           const cardsAll = accountCards.map((c) => {
             const items = monthInst.filter((i) => {
               if (i.parentType !== "purchase") return false;
-              const pur = purchases.find((p) => p.id === i.parentId);
+              const pur = purchasesList.find((p) => p.id === i.parentId);
               return pur?.cardId === c.id;
             });
             return { card: c, items };

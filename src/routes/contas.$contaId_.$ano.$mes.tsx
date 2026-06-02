@@ -489,10 +489,10 @@ function AccountMonth() {
     return normalizeZero(saldoAnterior + totalIncome);
   })();
 
-  if (!account) {
+  if (!account || !listsReady) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center text-muted-foreground">
-        Conta não encontrada.
+        {!account ? "Conta não encontrada." : "Carregando..."}
       </div>
     );
   }

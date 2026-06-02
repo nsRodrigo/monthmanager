@@ -464,8 +464,8 @@ function AccountMonth() {
     const monthly = computeMonthlyAccountBalance(
       account,
       cards,
-      purchases,
-      installments,
+      purchasesList,
+      installmentsList,
       allDebits,
       allIncomes,
       allInvestments,

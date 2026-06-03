@@ -3642,6 +3642,33 @@ export function useUpdatePurchase() {
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
     },
+    onSuccess: (_d, args, ctx) => {
+      const previous = ctx?.prev?.flatMap(([, rows]) => rows ?? []).find((r) => r?.id === args.id);
+      if (!previous) return;
+      const before = {
+        description: previous.description,
+        total_amount: previous.totalAmount,
+        purchase_date: previous.date,
+      };
+      const after = {
+        description: args.description ?? previous.description,
+        total_amount: args.totalAmount ?? previous.totalAmount,
+        purchase_date: args.date ?? previous.date,
+      };
+      const inv2 = inv;
+      const id = args.id;
+      history.push({
+        label: `Editar compra "${previous.description}"`,
+        undo: async () => {
+          await supabase.from("purchases").update(before).eq("id", id);
+          inv2(["purchases", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("purchases").update(after).eq("id", id);
+          inv2(["purchases", "installments"]);
+        },
+      });
+    },
     onSettled: () => inv(["purchases", "installments"]),
   });
 }

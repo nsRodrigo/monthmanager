@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
+import { history } from "./history";
 
 // =======================
 // Types (camelCase domain)
@@ -1097,24 +1098,19 @@ export function useAddPurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number; invoiceAnchorDate?: string }) => {
-      const { data, error } = await supabase
+      const purchaseId = crypto.randomUUID();
+      const { error } = await supabase
         .from("purchases")
         .insert({
+          id: purchaseId,
           user_id: user!.id,
           card_id: p.cardId,
           description: p.description,
           total_amount: p.totalAmount,
           purchase_date: p.date,
           installments_count: p.installmentsCount,
-        })
-        .select("id")
-        .single();
+        });
       if (error) throw error;
-      const purchaseId = (data as { id: string }).id;
-      // Manual entry: anchor at the chosen date so the installment lands
-      // in the month the user picked (no closing-day rollover surprises).
-      // When adding from inside a specific invoice month, use invoiceAnchorDate
-      // so the installment lands in that month regardless of purchase_date.
       const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
       const inst = buildInstallmentsAnchored(
         purchaseId,
@@ -1128,8 +1124,34 @@ export function useAddPurchase() {
       );
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
+      return { purchaseId, payload: p, installmentRows: inst };
     },
-    onSuccess: () => inv(["purchases", "installments", "card_payments"]),
+    onSuccess: (result, p) => {
+      inv(["purchases", "installments", "card_payments"]);
+      const { purchaseId, installmentRows } = result;
+      const userId = user!.id;
+      history.push({
+        label: `Adicionar compra "${p.description}"`,
+        undo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", purchaseId).eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().eq("id", purchaseId);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+        redo: async () => {
+          await supabase.from("purchases").insert({
+            id: purchaseId,
+            user_id: userId,
+            card_id: p.cardId,
+            description: p.description,
+            total_amount: p.totalAmount,
+            purchase_date: p.date,
+            installments_count: p.installmentsCount,
+          });
+          await supabase.from("installments").insert(installmentRows);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1137,15 +1159,34 @@ export function useRemovePurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      await supabase
+      const { data: purchaseRow } = await supabase.from("purchases").select("*").eq("id", id).maybeSingle();
+      const { data: instRows } = await supabase
         .from("installments")
-        .delete()
+        .select("*")
         .eq("parent_id", id)
         .eq("parent_type", "purchase");
+      await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "purchase");
       const { error } = await supabase.from("purchases").delete().eq("id", id);
       if (error) throw error;
+      return { id, purchaseRow, instRows: instRows ?? [] };
     },
-    onSuccess: () => inv(["purchases", "installments", "card_payments"]),
+    onSuccess: ({ id, purchaseRow, instRows }) => {
+      inv(["purchases", "installments", "card_payments"]);
+      if (!purchaseRow) return;
+      history.push({
+        label: `Remover compra "${(purchaseRow as { description?: string }).description ?? ""}"`,
+        undo: async () => {
+          await supabase.from("purchases").insert(purchaseRow as any);
+          if (instRows.length) await supabase.from("installments").insert(instRows as any);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+        redo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().eq("id", id);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1607,30 +1648,29 @@ export function useAddDebit() {
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
       const isRecurring = d.required && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
-      const { data: ins, error } = await supabase
-        .from("debits")
-        .insert({
-          user_id: user!.id,
-          account_id: d.accountId,
-          description: d.description,
-          amount: d.amount,
-          date: d.date,
-          required: d.required,
-          paid: false,
-          auto_debit: d.autoDebit ?? false,
-          auto_debit_day: d.autoDebitDay ?? null,
-          installments_count: count,
-          is_parent: count > 1,
-          recurrence_group_id: groupId,
-        })
-        .select("id")
-        .single();
+      const debitId = crypto.randomUUID();
+      const baseRow = {
+        id: debitId,
+        user_id: user!.id,
+        account_id: d.accountId,
+        description: d.description,
+        amount: d.amount,
+        date: d.date,
+        required: d.required,
+        paid: false,
+        auto_debit: d.autoDebit ?? false,
+        auto_debit_day: d.autoDebitDay ?? null,
+        installments_count: count,
+        is_parent: count > 1,
+        recurrence_group_id: groupId,
+      };
+      const { error } = await supabase.from("debits").insert(baseRow);
       if (error) throw error;
       if (count > 1) {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                (ins as { id: string }).id,
+                debitId,
                 user!.id,
                 d.amount,
                 count,
@@ -1640,7 +1680,7 @@ export function useAddDebit() {
                 true,
               )
             : buildInstallments(
-                (ins as { id: string }).id,
+                debitId,
                 "debit",
                 user!.id,
                 d.amount,
@@ -1684,8 +1724,26 @@ export function useAddDebit() {
           if (e3) throw e3;
         }
       }
+      return { debitId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["debits", "installments"]),
+    onSuccess: (result, d) => {
+      // Histórico só cobre o caso simples (lançamento único, sem parcelas/recorrência).
+      if (!result.simple) return;
+      const inv2 = inv;
+      const { debitId, baseRow } = result;
+      history.push({
+        label: `Adicionar débito "${d.description}"`,
+        undo: async () => {
+          await supabase.from("debits").delete().eq("id", debitId);
+          inv2(["debits", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("debits").insert(baseRow);
+          inv2(["debits", "installments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1722,11 +1780,35 @@ export function useRemoveDebit() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: debitRow } = await supabase.from("debits").select("*").eq("id", id).maybeSingle();
+      const { data: instRows } = await supabase
+        .from("installments")
+        .select("*")
+        .eq("parent_id", id)
+        .eq("parent_type", "debit");
       await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "debit");
       const { error } = await supabase.from("debits").delete().eq("id", id);
       if (error) throw error;
+      return { id, debitRow, instRows: instRows ?? [] };
     },
     onSettled: () => inv(["debits", "installments"]),
+    onSuccess: ({ id, debitRow, instRows }) => {
+      if (!debitRow) return;
+      const inv2 = inv;
+      history.push({
+        label: `Remover débito "${(debitRow as { description?: string }).description ?? ""}"`,
+        undo: async () => {
+          await supabase.from("debits").insert(debitRow as any);
+          if (instRows.length) await supabase.from("installments").insert(instRows as any);
+          inv2(["debits", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "debit");
+          await supabase.from("debits").delete().eq("id", id);
+          inv2(["debits", "installments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1750,27 +1832,26 @@ export function useAddIncome() {
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const isRecurring = !!i.recurring && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
-      const { data: ins, error } = await supabase
-        .from("incomes")
-        .insert({
-          user_id: user!.id,
-          account_id: i.accountId,
-          description: i.description,
-          amount: i.amount,
-          date: i.date,
-          received: false,
-          installments_count: count,
-          is_parent: count > 1,
-          recurrence_group_id: groupId,
-        })
-        .select("id")
-        .single();
+      const incomeId = crypto.randomUUID();
+      const baseRow = {
+        id: incomeId,
+        user_id: user!.id,
+        account_id: i.accountId,
+        description: i.description,
+        amount: i.amount,
+        date: i.date,
+        received: false,
+        installments_count: count,
+        is_parent: count > 1,
+        recurrence_group_id: groupId,
+      };
+      const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
       if (count > 1) {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                (ins as { id: string }).id,
+                incomeId,
                 user!.id,
                 i.amount,
                 count,
@@ -1780,7 +1861,7 @@ export function useAddIncome() {
                 true,
               )
             : buildInstallments(
-                (ins as { id: string }).id,
+                incomeId,
                 "income",
                 user!.id,
                 i.amount,
@@ -1819,8 +1900,25 @@ export function useAddIncome() {
           if (e3) throw e3;
         }
       }
+      return { incomeId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["incomes", "installments"]),
+    onSuccess: (result, i) => {
+      if (!result.simple) return;
+      const inv2 = inv;
+      const { incomeId, baseRow } = result;
+      history.push({
+        label: `Adicionar recebimento "${i.description}"`,
+        undo: async () => {
+          await supabase.from("incomes").delete().eq("id", incomeId);
+          inv2(["incomes", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("incomes").insert(baseRow);
+          inv2(["incomes", "installments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1854,11 +1952,35 @@ export function useRemoveIncome() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: incomeRow } = await supabase.from("incomes").select("*").eq("id", id).maybeSingle();
+      const { data: instRows } = await supabase
+        .from("installments")
+        .select("*")
+        .eq("parent_id", id)
+        .eq("parent_type", "income");
       await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "income");
       const { error } = await supabase.from("incomes").delete().eq("id", id);
       if (error) throw error;
+      return { id, incomeRow, instRows: instRows ?? [] };
     },
     onSettled: () => inv(["incomes", "installments"]),
+    onSuccess: ({ id, incomeRow, instRows }) => {
+      if (!incomeRow) return;
+      const inv2 = inv;
+      history.push({
+        label: `Remover recebimento "${(incomeRow as { description?: string }).description ?? ""}"`,
+        undo: async () => {
+          await supabase.from("incomes").insert(incomeRow as any);
+          if (instRows.length) await supabase.from("installments").insert(instRows as any);
+          inv2(["incomes", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "income");
+          await supabase.from("incomes").delete().eq("id", id);
+          inv2(["incomes", "installments"]);
+        },
+      });
+    },
   });
 }
 
@@ -3350,6 +3472,35 @@ export function useUpdateDebit() {
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
     },
+    onSuccess: (_d, args, ctx) => {
+      const previous = ctx?.prev?.flatMap(([, rows]) => rows ?? []).find((r) => r?.id === args.id);
+      if (!previous) return;
+      const before = {
+        description: previous.description,
+        amount: previous.amount,
+        date: previous.date,
+        paid: previous.paid,
+      };
+      const after = {
+        description: args.description ?? previous.description,
+        amount: args.amount ?? previous.amount,
+        date: args.date ?? previous.date,
+        paid: args.paid ?? previous.paid,
+      };
+      const inv2 = inv;
+      const id = args.id;
+      history.push({
+        label: `Editar débito "${previous.description}"`,
+        undo: async () => {
+          await supabase.from("debits").update(before).eq("id", id);
+          inv2(["debits"]);
+        },
+        redo: async () => {
+          await supabase.from("debits").update(after).eq("id", id);
+          inv2(["debits"]);
+        },
+      });
+    },
     onSettled: () => inv(["debits"]),
   });
 }
@@ -3396,6 +3547,35 @@ export function useUpdateIncome() {
     },
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSuccess: (_d, args, ctx) => {
+      const previous = ctx?.prev?.flatMap(([, rows]) => rows ?? []).find((r) => r?.id === args.id);
+      if (!previous) return;
+      const before = {
+        description: previous.description,
+        amount: previous.amount,
+        date: previous.date,
+        received: previous.received,
+      };
+      const after = {
+        description: args.description ?? previous.description,
+        amount: args.amount ?? previous.amount,
+        date: args.date ?? previous.date,
+        received: args.received ?? previous.received,
+      };
+      const inv2 = inv;
+      const id = args.id;
+      history.push({
+        label: `Editar recebimento "${previous.description}"`,
+        undo: async () => {
+          await supabase.from("incomes").update(before).eq("id", id);
+          inv2(["incomes"]);
+        },
+        redo: async () => {
+          await supabase.from("incomes").update(after).eq("id", id);
+          inv2(["incomes"]);
+        },
+      });
     },
     onSettled: () => inv(["incomes"]),
   });
@@ -3461,6 +3641,33 @@ export function useUpdatePurchase() {
     },
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSuccess: (_d, args, ctx) => {
+      const previous = ctx?.prev?.flatMap(([, rows]) => rows ?? []).find((r) => r?.id === args.id);
+      if (!previous) return;
+      const before = {
+        description: previous.description,
+        total_amount: previous.totalAmount,
+        purchase_date: previous.date,
+      };
+      const after = {
+        description: args.description ?? previous.description,
+        total_amount: args.totalAmount ?? previous.totalAmount,
+        purchase_date: args.date ?? previous.date,
+      };
+      const inv2 = inv;
+      const id = args.id;
+      history.push({
+        label: `Editar compra "${previous.description}"`,
+        undo: async () => {
+          await supabase.from("purchases").update(before).eq("id", id);
+          inv2(["purchases", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("purchases").update(after).eq("id", id);
+          inv2(["purchases", "installments"]);
+        },
+      });
     },
     onSettled: () => inv(["purchases", "installments"]),
   });

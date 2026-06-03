@@ -18,6 +18,8 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
 import { ConfirmProvider } from "@/store/confirm";
+import { UndoRedoBar } from "@/components/UndoRedoBar";
+import { history } from "@/store/history";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -300,6 +302,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, isPublic, navigate, redirected]);
 
+  // Limpa o histórico de desfazer/refazer quando o usuário desloga ou troca.
+  useEffect(() => {
+    if (!user) history.clear();
+  }, [user?.id]);
+
   // close mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
@@ -346,13 +353,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           >
             {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
               <Wallet className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="text-sm font-bold tracking-tight">Gestão Financeira</span>
           </div>
+          <UndoRedoBar compact />
         </header>
+
+        {/* Desktop undo/redo bar */}
+        <div className="hidden border-b border-border bg-card/30 px-6 py-2 md:block">
+          <UndoRedoBar />
+        </div>
 
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo

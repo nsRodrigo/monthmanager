@@ -1952,11 +1952,35 @@ export function useRemoveIncome() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: incomeRow } = await supabase.from("incomes").select("*").eq("id", id).maybeSingle();
+      const { data: instRows } = await supabase
+        .from("installments")
+        .select("*")
+        .eq("parent_id", id)
+        .eq("parent_type", "income");
       await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "income");
       const { error } = await supabase.from("incomes").delete().eq("id", id);
       if (error) throw error;
+      return { id, incomeRow, instRows: instRows ?? [] };
     },
     onSettled: () => inv(["incomes", "installments"]),
+    onSuccess: ({ id, incomeRow, instRows }) => {
+      if (!incomeRow) return;
+      const inv2 = inv;
+      history.push({
+        label: `Remover recebimento "${(incomeRow as { description?: string }).description ?? ""}"`,
+        undo: async () => {
+          await supabase.from("incomes").insert(incomeRow as any);
+          if (instRows.length) await supabase.from("installments").insert(instRows as any);
+          inv2(["incomes", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "income");
+          await supabase.from("incomes").delete().eq("id", id);
+          inv2(["incomes", "installments"]);
+        },
+      });
+    },
   });
 }
 

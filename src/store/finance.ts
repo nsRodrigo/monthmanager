@@ -1832,27 +1832,26 @@ export function useAddIncome() {
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const isRecurring = !!i.recurring && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
-      const { data: ins, error } = await supabase
-        .from("incomes")
-        .insert({
-          user_id: user!.id,
-          account_id: i.accountId,
-          description: i.description,
-          amount: i.amount,
-          date: i.date,
-          received: false,
-          installments_count: count,
-          is_parent: count > 1,
-          recurrence_group_id: groupId,
-        })
-        .select("id")
-        .single();
+      const incomeId = crypto.randomUUID();
+      const baseRow = {
+        id: incomeId,
+        user_id: user!.id,
+        account_id: i.accountId,
+        description: i.description,
+        amount: i.amount,
+        date: i.date,
+        received: false,
+        installments_count: count,
+        is_parent: count > 1,
+        recurrence_group_id: groupId,
+      };
+      const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
       if (count > 1) {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                (ins as { id: string }).id,
+                incomeId,
                 user!.id,
                 i.amount,
                 count,
@@ -1862,7 +1861,7 @@ export function useAddIncome() {
                 true,
               )
             : buildInstallments(
-                (ins as { id: string }).id,
+                incomeId,
                 "income",
                 user!.id,
                 i.amount,
@@ -1901,8 +1900,25 @@ export function useAddIncome() {
           if (e3) throw e3;
         }
       }
+      return { incomeId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["incomes", "installments"]),
+    onSuccess: (result, i) => {
+      if (!result.simple) return;
+      const inv2 = inv;
+      const { incomeId, baseRow } = result;
+      history.push({
+        label: `Adicionar recebimento "${i.description}"`,
+        undo: async () => {
+          await supabase.from("incomes").delete().eq("id", incomeId);
+          inv2(["incomes", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("incomes").insert(baseRow);
+          inv2(["incomes", "installments"]);
+        },
+      });
+    },
   });
 }
 

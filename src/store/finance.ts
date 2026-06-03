@@ -1648,30 +1648,29 @@ export function useAddDebit() {
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
       const isRecurring = d.required && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
-      const { data: ins, error } = await supabase
-        .from("debits")
-        .insert({
-          user_id: user!.id,
-          account_id: d.accountId,
-          description: d.description,
-          amount: d.amount,
-          date: d.date,
-          required: d.required,
-          paid: false,
-          auto_debit: d.autoDebit ?? false,
-          auto_debit_day: d.autoDebitDay ?? null,
-          installments_count: count,
-          is_parent: count > 1,
-          recurrence_group_id: groupId,
-        })
-        .select("id")
-        .single();
+      const debitId = crypto.randomUUID();
+      const baseRow = {
+        id: debitId,
+        user_id: user!.id,
+        account_id: d.accountId,
+        description: d.description,
+        amount: d.amount,
+        date: d.date,
+        required: d.required,
+        paid: false,
+        auto_debit: d.autoDebit ?? false,
+        auto_debit_day: d.autoDebitDay ?? null,
+        installments_count: count,
+        is_parent: count > 1,
+        recurrence_group_id: groupId,
+      };
+      const { error } = await supabase.from("debits").insert(baseRow);
       if (error) throw error;
       if (count > 1) {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                (ins as { id: string }).id,
+                debitId,
                 user!.id,
                 d.amount,
                 count,
@@ -1681,7 +1680,7 @@ export function useAddDebit() {
                 true,
               )
             : buildInstallments(
-                (ins as { id: string }).id,
+                debitId,
                 "debit",
                 user!.id,
                 d.amount,
@@ -1725,8 +1724,26 @@ export function useAddDebit() {
           if (e3) throw e3;
         }
       }
+      return { debitId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["debits", "installments"]),
+    onSuccess: (result, d) => {
+      // Histórico só cobre o caso simples (lançamento único, sem parcelas/recorrência).
+      if (!result.simple) return;
+      const inv2 = inv;
+      const { debitId, baseRow } = result;
+      history.push({
+        label: `Adicionar débito "${d.description}"`,
+        undo: async () => {
+          await supabase.from("debits").delete().eq("id", debitId);
+          inv2(["debits", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("debits").insert(baseRow);
+          inv2(["debits", "installments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1763,11 +1780,35 @@ export function useRemoveDebit() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: debitRow } = await supabase.from("debits").select("*").eq("id", id).maybeSingle();
+      const { data: instRows } = await supabase
+        .from("installments")
+        .select("*")
+        .eq("parent_id", id)
+        .eq("parent_type", "debit");
       await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "debit");
       const { error } = await supabase.from("debits").delete().eq("id", id);
       if (error) throw error;
+      return { id, debitRow, instRows: instRows ?? [] };
     },
     onSettled: () => inv(["debits", "installments"]),
+    onSuccess: ({ id, debitRow, instRows }) => {
+      if (!debitRow) return;
+      const inv2 = inv;
+      history.push({
+        label: `Remover débito "${(debitRow as { description?: string }).description ?? ""}"`,
+        undo: async () => {
+          await supabase.from("debits").insert(debitRow as any);
+          if (instRows.length) await supabase.from("installments").insert(instRows as any);
+          inv2(["debits", "installments"]);
+        },
+        redo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "debit");
+          await supabase.from("debits").delete().eq("id", id);
+          inv2(["debits", "installments"]);
+        },
+      });
+    },
   });
 }
 

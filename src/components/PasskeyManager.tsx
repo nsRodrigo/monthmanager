@@ -13,7 +13,7 @@ import {
   finishRegistration as srvFinishReg,
   listPasskeys as srvList,
   deletePasskey as srvDelete,
-} from "@/server/webauthn";
+} from "@/lib/webauthn.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/store/confirm";
 

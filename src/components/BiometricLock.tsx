@@ -11,7 +11,7 @@ import {
   startAuthentication as srvStartAuth,
   finishAuthentication as srvFinishAuth,
   listPasskeys as srvList,
-} from "@/server/webauthn";
+} from "@/lib/webauthn.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const IDLE_MS = 10 * 60 * 1000; // 10 min de inatividade com app aberto

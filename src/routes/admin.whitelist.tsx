@@ -4,13 +4,13 @@ import { ChevronLeft, Trash2, Plus, ShieldCheck, UserX, Users, Check, X, Bell, C
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useIsAdmin, useMyRoles, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
-import { listUsers, deleteUser, type AdminUser } from "@/server/admin-users.functions";
+import { listUsers, deleteUser, type AdminUser } from "@/lib/admin-users.functions";
 import {
   listPendingRequests,
   approveRequest,
   rejectRequest,
-} from "@/server/access-requests.functions";
-import { getVapidPublicKey, saveSubscription } from "@/server/push.functions";
+} from "@/lib/access-requests.functions";
+import { getVapidPublicKey, saveSubscription } from "@/lib/push.functions";
 import { subscribeToPush, isPushSupported } from "@/lib/push";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/store/confirm";

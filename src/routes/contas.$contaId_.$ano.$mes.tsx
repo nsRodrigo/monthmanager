@@ -89,11 +89,13 @@ function AccountMonth() {
 
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
-  const { data: purchases, isFetching: purchasesFetching } = usePurchases();
-  const { data: installments, isFetching: installmentsFetching } = useInstallments();
+  const { data: purchases } = usePurchases();
+  const { data: installments } = useInstallments();
   const purchasesList = purchases ?? [];
   const installmentsList = installments ?? [];
-  const listsReady = !purchasesFetching && !installmentsFetching;
+  // Only block render on the *initial* load (no cached data yet).
+  // Refetches keep the previous data on screen — no "Carregando..." flash.
+  const listsReady = purchases !== undefined && installments !== undefined;
   const { data: allDebits = [] } = useDebits();
   const { data: allIncomes = [] } = useIncomes();
   const { data: allInvestments = [] } = useInvestments();

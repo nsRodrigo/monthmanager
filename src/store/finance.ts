@@ -1098,24 +1098,19 @@ export function useAddPurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number; invoiceAnchorDate?: string }) => {
-      const { data, error } = await supabase
+      const purchaseId = crypto.randomUUID();
+      const { error } = await supabase
         .from("purchases")
         .insert({
+          id: purchaseId,
           user_id: user!.id,
           card_id: p.cardId,
           description: p.description,
           total_amount: p.totalAmount,
           purchase_date: p.date,
           installments_count: p.installmentsCount,
-        })
-        .select("id")
-        .single();
+        });
       if (error) throw error;
-      const purchaseId = (data as { id: string }).id;
-      // Manual entry: anchor at the chosen date so the installment lands
-      // in the month the user picked (no closing-day rollover surprises).
-      // When adding from inside a specific invoice month, use invoiceAnchorDate
-      // so the installment lands in that month regardless of purchase_date.
       const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
       const inst = buildInstallmentsAnchored(
         purchaseId,
@@ -1129,8 +1124,34 @@ export function useAddPurchase() {
       );
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
+      return { purchaseId, payload: p, installmentRows: inst };
     },
-    onSuccess: () => inv(["purchases", "installments", "card_payments"]),
+    onSuccess: (result, p) => {
+      inv(["purchases", "installments", "card_payments"]);
+      const { purchaseId, installmentRows } = result;
+      const userId = user!.id;
+      history.push({
+        label: `Adicionar compra "${p.description}"`,
+        undo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", purchaseId).eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().eq("id", purchaseId);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+        redo: async () => {
+          await supabase.from("purchases").insert({
+            id: purchaseId,
+            user_id: userId,
+            card_id: p.cardId,
+            description: p.description,
+            total_amount: p.totalAmount,
+            purchase_date: p.date,
+            installments_count: p.installmentsCount,
+          });
+          await supabase.from("installments").insert(installmentRows);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+      });
+    },
   });
 }
 
@@ -1138,15 +1159,34 @@ export function useRemovePurchase() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      await supabase
+      const { data: purchaseRow } = await supabase.from("purchases").select("*").eq("id", id).maybeSingle();
+      const { data: instRows } = await supabase
         .from("installments")
-        .delete()
+        .select("*")
         .eq("parent_id", id)
         .eq("parent_type", "purchase");
+      await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "purchase");
       const { error } = await supabase.from("purchases").delete().eq("id", id);
       if (error) throw error;
+      return { id, purchaseRow, instRows: instRows ?? [] };
     },
-    onSuccess: () => inv(["purchases", "installments", "card_payments"]),
+    onSuccess: ({ id, purchaseRow, instRows }) => {
+      inv(["purchases", "installments", "card_payments"]);
+      if (!purchaseRow) return;
+      history.push({
+        label: `Remover compra "${(purchaseRow as { description?: string }).description ?? ""}"`,
+        undo: async () => {
+          await supabase.from("purchases").insert(purchaseRow as Record<string, unknown>);
+          if (instRows.length) await supabase.from("installments").insert(instRows as Record<string, unknown>[]);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+        redo: async () => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", "purchase");
+          await supabase.from("purchases").delete().eq("id", id);
+          inv(["purchases", "installments", "card_payments"]);
+        },
+      });
+    },
   });
 }
 

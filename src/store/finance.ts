@@ -3472,6 +3472,35 @@ export function useUpdateDebit() {
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
     },
+    onSuccess: (_d, args, ctx) => {
+      const previous = ctx?.prev?.flatMap(([, rows]) => rows ?? []).find((r) => r?.id === args.id);
+      if (!previous) return;
+      const before = {
+        description: previous.description,
+        amount: previous.amount,
+        date: previous.date,
+        paid: previous.paid,
+      };
+      const after = {
+        description: args.description ?? previous.description,
+        amount: args.amount ?? previous.amount,
+        date: args.date ?? previous.date,
+        paid: args.paid ?? previous.paid,
+      };
+      const inv2 = inv;
+      const id = args.id;
+      history.push({
+        label: `Editar débito "${previous.description}"`,
+        undo: async () => {
+          await supabase.from("debits").update(before).eq("id", id);
+          inv2(["debits"]);
+        },
+        redo: async () => {
+          await supabase.from("debits").update(after).eq("id", id);
+          inv2(["debits"]);
+        },
+      });
+    },
     onSettled: () => inv(["debits"]),
   });
 }
@@ -3518,6 +3547,35 @@ export function useUpdateIncome() {
     },
     onError: (_e, _v, ctx) => {
       ctx?.prev?.forEach(([k, d]) => qc.setQueryData(k, d));
+    },
+    onSuccess: (_d, args, ctx) => {
+      const previous = ctx?.prev?.flatMap(([, rows]) => rows ?? []).find((r) => r?.id === args.id);
+      if (!previous) return;
+      const before = {
+        description: previous.description,
+        amount: previous.amount,
+        date: previous.date,
+        received: previous.received,
+      };
+      const after = {
+        description: args.description ?? previous.description,
+        amount: args.amount ?? previous.amount,
+        date: args.date ?? previous.date,
+        received: args.received ?? previous.received,
+      };
+      const inv2 = inv;
+      const id = args.id;
+      history.push({
+        label: `Editar recebimento "${previous.description}"`,
+        undo: async () => {
+          await supabase.from("incomes").update(before).eq("id", id);
+          inv2(["incomes"]);
+        },
+        redo: async () => {
+          await supabase.from("incomes").update(after).eq("id", id);
+          inv2(["incomes"]);
+        },
+      });
     },
     onSettled: () => inv(["incomes"]),
   });

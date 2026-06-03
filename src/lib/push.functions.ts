@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { attachSupabaseAuth } from "@/integrations/supabase/client-auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { VAPID_PUBLIC_KEY } from "./push.server";
+import { VAPID_PUBLIC_KEY } from "@/server/push.server";
 
 export const getVapidPublicKey = createServerFn({ method: "GET" }).handler(async () => {
   return { key: VAPID_PUBLIC_KEY };

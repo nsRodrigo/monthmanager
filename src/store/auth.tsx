@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
-import { reportPendingSignup } from "@/server/access-requests.functions";
+import { reportPendingSignup } from "@/lib/access-requests.functions";
 
 type AuthCtx = {
   user: User | null;

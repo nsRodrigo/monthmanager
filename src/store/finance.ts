@@ -1176,8 +1176,8 @@ export function useRemovePurchase() {
       history.push({
         label: `Remover compra "${(purchaseRow as { description?: string }).description ?? ""}"`,
         undo: async () => {
-          await supabase.from("purchases").insert(purchaseRow as Record<string, unknown>);
-          if (instRows.length) await supabase.from("installments").insert(instRows as Record<string, unknown>[]);
+          await supabase.from("purchases").insert(purchaseRow as any);
+          if (instRows.length) await supabase.from("installments").insert(instRows as any);
           inv(["purchases", "installments", "card_payments"]);
         },
         redo: async () => {

@@ -386,6 +386,7 @@ function RootComponent() {
                   <Outlet />
                 </AuthGate>
               </BiometricLock>
+              <UndoRedoBar />
               <InstallPrompt />
             </ConfirmProvider>
           </AccountFilterProvider>

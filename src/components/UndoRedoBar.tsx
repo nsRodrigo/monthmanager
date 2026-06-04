@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Undo2, Redo2 } from "lucide-react";
 import { useHistory } from "@/store/history";
 
 /**
  * Botões flutuantes de desfazer/refazer.
  *
- * - Aparecem no canto inferior direito apenas quando há algo a desfazer
- *   ou refazer; somem após alguns segundos de inatividade.
+ * - Aparecem no canto inferior direito apenas após uma nova ação ser
+ *   registrada (ex.: salvar em um modal); somem após alguns segundos.
  * - Atalhos globais: Ctrl/⌘+Z e Ctrl/⌘+Shift+Z (ignorados em campos editáveis).
  */
 export function UndoRedoBar() {
-  const { canUndo, canRedo, nextUndoLabel, nextRedoLabel, busy, undo, redo } = useHistory();
+  const { canUndo, canRedo, nextUndoLabel, nextRedoLabel, busy, pushVersion, undo, redo } = useHistory();
   const [visible, setVisible] = useState(false);
+  const lastVersion = useRef(pushVersion);
 
   // Atalhos de teclado globais
   useEffect(() => {

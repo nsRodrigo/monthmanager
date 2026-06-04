@@ -344,22 +344,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
-        <header className="flex items-center gap-3 border-b border-border bg-card/40 px-4 py-3 md:hidden">
-          <button
-            onClick={() => setMobileOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-secondary"
-            aria-label="Abrir menu"
-          >
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
-          <div className="flex flex-1 items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
-              <Wallet className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="text-sm font-bold tracking-tight">Gestão Financeira</span>
-          </div>
-        </header>
+        {/* Floating mobile menu button */}
+        <button
+          onClick={() => setMobileOpen((v) => !v)}
+          className="fixed bottom-4 left-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-elegant hover:bg-secondary md:hidden"
+          aria-label="Abrir menu"
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
 
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo

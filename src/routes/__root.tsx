@@ -359,13 +359,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
             </div>
             <span className="text-sm font-bold tracking-tight">Gestão Financeira</span>
           </div>
-          <UndoRedoBar compact />
         </header>
-
-        {/* Desktop undo/redo bar */}
-        <div className="hidden border-b border-border bg-card/30 px-6 py-2 md:block">
-          <UndoRedoBar />
-        </div>
 
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
@@ -392,6 +386,7 @@ function RootComponent() {
                   <Outlet />
                 </AuthGate>
               </BiometricLock>
+              <UndoRedoBar />
               <InstallPrompt />
             </ConfirmProvider>
           </AccountFilterProvider>

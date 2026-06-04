@@ -38,17 +38,17 @@ export function UndoRedoBar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo]);
 
-  // Mostra os botões quando há ação disponível; oculta após 6s de inatividade.
+  // Mostra os botões apenas quando uma nova ação é registrada (push).
+  // Some após 6s; não reaparece só porque ainda há algo desfazível.
   useEffect(() => {
-    if (!canUndo && !canRedo) {
-      setVisible(false);
-      return;
-    }
+    if (pushVersion === lastVersion.current) return;
+    lastVersion.current = pushVersion;
     setVisible(true);
     const t = window.setTimeout(() => setVisible(false), 6000);
     return () => window.clearTimeout(t);
-  }, [canUndo, canRedo, nextUndoLabel, nextRedoLabel, busy]);
+  }, [pushVersion]);
 
+  if (!visible) return null;
   if (!canUndo && !canRedo) return null;
 
   return (

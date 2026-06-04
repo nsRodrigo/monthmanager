@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Upload, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, Menu, X, User, Receipt, Cloud } from "lucide-react";
+import { LogOut, Upload, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, X, User, Receipt, Cloud, ChevronRight } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -31,6 +31,47 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
   carteira: Wallet,
   investimento: TrendingUp,
 };
+
+function SwipeEdge({ onOpen, hidden }: { onOpen: () => void; hidden: boolean }) {
+  const startX = useState<{ v: number | null }>({ v: null })[0];
+  const startY = useState<{ v: number | null }>({ v: null })[0];
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    startX.v = t.clientX;
+    startY.v = t.clientY;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (startX.v == null || startY.v == null) return;
+    const t = e.touches[0];
+    const dx = t.clientX - startX.v;
+    const dy = Math.abs(t.clientY - startY.v);
+    if (dx > 40 && dy < 60) {
+      startX.v = null;
+      startY.v = null;
+      onOpen();
+    }
+  };
+  const onTouchEnd = () => {
+    startX.v = null;
+    startY.v = null;
+  };
+
+  if (hidden) return null;
+  return (
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      className="fixed inset-y-0 left-0 z-40 w-6 md:hidden"
+      aria-hidden="true"
+    >
+      <div className="pointer-events-none absolute top-1/2 left-0 -translate-y-1/2 flex h-14 w-5 items-center justify-center rounded-r-xl border border-l-0 border-border bg-card/80 text-muted-foreground shadow-elegant backdrop-blur-sm">
+        <ChevronRight className="h-4 w-4" />
+      </div>
+    </div>
+  );
+}
 
 function NotFoundComponent() {
   return (
@@ -344,14 +385,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Floating mobile menu button */}
-        <button
-          onClick={() => setMobileOpen((v) => !v)}
-          className="fixed bottom-4 left-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-elegant hover:bg-secondary md:hidden"
-          aria-label="Abrir menu"
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        {/* Swipe-from-left edge to open menu (mobile) */}
+        <SwipeEdge onOpen={() => setMobileOpen(true)} hidden={mobileOpen} />
+
 
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo

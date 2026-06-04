@@ -21,6 +21,7 @@ type Snapshot = {
   nextUndoLabel: string | null;
   nextRedoLabel: string | null;
   busy: boolean;
+  pushVersion: number;
 };
 
 const MAX = 50;
@@ -30,6 +31,7 @@ class HistoryStore {
   private redoStack: HistoryEntry[] = [];
   private listeners = new Set<() => void>();
   private busy = false;
+  private pushVersion = 0;
   private snap: Snapshot = this.compute();
 
   private compute(): Snapshot {
@@ -39,6 +41,7 @@ class HistoryStore {
       nextUndoLabel: this.undoStack[this.undoStack.length - 1]?.label ?? null,
       nextRedoLabel: this.redoStack[this.redoStack.length - 1]?.label ?? null,
       busy: this.busy,
+      pushVersion: this.pushVersion,
     };
   }
 
@@ -51,6 +54,7 @@ class HistoryStore {
     this.undoStack.push(entry);
     if (this.undoStack.length > MAX) this.undoStack.shift();
     this.redoStack = [];
+    this.pushVersion += 1;
     this.emit();
   };
 

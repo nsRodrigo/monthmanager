@@ -32,29 +32,56 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
   investimento: TrendingUp,
 };
 
-function SwipeEdge({ onOpen, hidden }: { onOpen: () => void; hidden: boolean }) {
-  const startX = useState<{ v: number | null }>({ v: null })[0];
-  const startY = useState<{ v: number | null }>({ v: null })[0];
+const DRAWER_WIDTH = 288; // 18rem (w-72)
+
+function SwipeEdge({
+  onOpen,
+  hidden,
+  onDrag,
+  onDragEnd,
+}: {
+  onOpen: () => void;
+  hidden: boolean;
+  onDrag: (dx: number) => void;
+  onDragEnd: (dx: number) => void;
+}) {
+  const stateRef = useState<{ x: number | null; y: number | null; active: boolean }>({
+    x: null,
+    y: null,
+    active: false,
+  })[0];
 
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
-    startX.v = t.clientX;
-    startY.v = t.clientY;
+    stateRef.x = t.clientX;
+    stateRef.y = t.clientY;
+    stateRef.active = false;
   };
   const onTouchMove = (e: React.TouchEvent) => {
-    if (startX.v == null || startY.v == null) return;
+    if (stateRef.x == null || stateRef.y == null) return;
     const t = e.touches[0];
-    const dx = t.clientX - startX.v;
-    const dy = Math.abs(t.clientY - startY.v);
-    if (dx > 40 && dy < 60) {
-      startX.v = null;
-      startY.v = null;
-      onOpen();
+    const dx = t.clientX - stateRef.x;
+    const dy = Math.abs(t.clientY - stateRef.y);
+    if (!stateRef.active && dx > 8 && dy < 40) {
+      stateRef.active = true;
+    }
+    if (stateRef.active) {
+      onDrag(Math.max(0, Math.min(dx, DRAWER_WIDTH)));
     }
   };
-  const onTouchEnd = () => {
-    startX.v = null;
-    startY.v = null;
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (stateRef.x != null) {
+      const t = e.changedTouches[0];
+      const dx = t ? t.clientX - stateRef.x : 0;
+      if (stateRef.active) {
+        onDragEnd(Math.max(0, Math.min(dx, DRAWER_WIDTH)));
+      } else {
+        onDragEnd(0);
+      }
+    }
+    stateRef.x = null;
+    stateRef.y = null;
+    stateRef.active = false;
   };
 
   if (hidden) return null;
@@ -63,12 +90,18 @@ function SwipeEdge({ onOpen, hidden }: { onOpen: () => void; hidden: boolean }) 
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
       className="fixed inset-y-0 left-0 z-40 w-6 md:hidden"
       aria-hidden="true"
     >
-      <div className="pointer-events-none absolute top-1/2 left-0 -translate-y-1/2 flex h-14 w-5 items-center justify-center rounded-r-xl border border-l-0 border-border bg-card/80 text-muted-foreground shadow-elegant backdrop-blur-sm">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="Abrir menu"
+        className="pointer-events-auto absolute top-1/2 left-0 -translate-y-1/2 flex h-14 w-5 items-center justify-center rounded-r-xl border border-l-0 border-border bg-card/80 text-muted-foreground shadow-elegant backdrop-blur-sm transition-colors hover:text-foreground"
+      >
         <ChevronRight className="h-4 w-4" />
-      </div>
+      </button>
     </div>
   );
 }

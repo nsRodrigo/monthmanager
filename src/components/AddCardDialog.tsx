@@ -75,13 +75,15 @@ export function AddCardDialog({
                 placeholder="Ex: Nubank Roxinho"
               />
             </Field>
-            <Field label="Conta vinculada">
-              <select className={inputClass} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </Field>
+            {!fixedAccountId && (
+              <Field label="Conta vinculada">
+                <select className={inputClass} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <Field label="Cor">
                 <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-full rounded-lg border border-input bg-input" />

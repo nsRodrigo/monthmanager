@@ -9,11 +9,14 @@ export function AddCardDialog({
   onClose,
   defaultYear,
   defaultMonth,
+  fixedAccountId,
 }: {
   open: boolean;
   onClose: () => void;
   defaultYear?: number;
   defaultMonth?: number;
+  /** When provided, the account selector is hidden and this account is used. */
+  fixedAccountId?: string;
 }) {
   const { data: accounts = [] } = useAccounts();
   const { accountId: filter } = useAccountFilter();
@@ -34,11 +37,11 @@ export function AddCardDialog({
     if (!open) return;
     setName("");
     setColor("#8b5cf6");
-    setAccountId(filter ?? accounts[0]?.id ?? "");
+    setAccountId(fixedAccountId ?? filter ?? accounts[0]?.id ?? "");
     setClosingDay("25");
     setDueDay("5");
     setConfirming(false);
-  }, [open, filter, accounts]);
+  }, [open, filter, accounts, fixedAccountId]);
 
   const submit = async (scope: CardScope) => {
     if (!name.trim() || !accountId) return;

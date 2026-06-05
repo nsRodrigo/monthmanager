@@ -397,6 +397,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!user && !isPublic) return null;
   if (isPublic) return <>{children}</>;
 
+  // Drag offset (0..DRAWER_WIDTH) for the swipe-to-open drawer animation.
+  const [dragX, setDragX] = useState(0);
+  const dragging = dragX > 0 && !mobileOpen;
+  const translatePx = mobileOpen ? 0 : dragX - DRAWER_WIDTH;
+  const overlayOpacity = mobileOpen ? 1 : dragX / DRAWER_WIDTH;
+
+  const handleDragEnd = (dx: number) => {
+    if (dx > DRAWER_WIDTH / 3) {
+      setMobileOpen(true);
+    }
+    setDragX(0);
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
@@ -404,22 +417,34 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <SidebarContent />
       </aside>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card p-5 md:hidden">
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
-          </aside>
-        </>
+      {/* Mobile drawer (always mounted so drag can animate it in) */}
+      {(mobileOpen || dragging) && (
+        <div
+          className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
+          style={{ opacity: overlayOpacity, transition: dragging ? "none" : "opacity 300ms ease-out" }}
+          onClick={() => setMobileOpen(false)}
+        />
       )}
+      <aside
+        className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card p-5 md:hidden"
+        style={{
+          transform: `translateX(${translatePx}px)`,
+          transition: dragging ? "none" : "transform 300ms ease-out",
+          visibility: mobileOpen || dragging ? "visible" : "hidden",
+        }}
+        aria-hidden={!mobileOpen && !dragging}
+      >
+        <SidebarContent onNavigate={() => setMobileOpen(false)} />
+      </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Swipe-from-left edge to open menu (mobile) */}
-        <SwipeEdge onOpen={() => setMobileOpen(true)} hidden={mobileOpen} />
+        {/* Swipe-from-left edge / tap-to-open menu (mobile) */}
+        <SwipeEdge
+          onOpen={() => setMobileOpen(true)}
+          hidden={mobileOpen}
+          onDrag={setDragX}
+          onDragEnd={handleDragEnd}
+        />
 
 
         <a href="#main-content" className="skip-link">

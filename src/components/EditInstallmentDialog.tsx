@@ -3,6 +3,7 @@ import { Modal, Field, inputClass } from "./Modal";
 import {
   useUpdateInstallment,
   useShiftInstallmentDate,
+  useUpdateInstallmentAmountScope,
   useAdvanceInstallments,
   useUpdateDebit,
   useUpdateIncome,
@@ -17,6 +18,7 @@ import {
   useDuplicateOverScope,
   useDeleteOverScope,
   type Installment,
+  type InstallmentScope,
   type CardScope,
   type DeleteSource,
 } from "@/store/finance";

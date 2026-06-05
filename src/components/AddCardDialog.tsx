@@ -9,11 +9,14 @@ export function AddCardDialog({
   onClose,
   defaultYear,
   defaultMonth,
+  fixedAccountId,
 }: {
   open: boolean;
   onClose: () => void;
   defaultYear?: number;
   defaultMonth?: number;
+  /** When provided, the account selector is hidden and this account is used. */
+  fixedAccountId?: string;
 }) {
   const { data: accounts = [] } = useAccounts();
   const { accountId: filter } = useAccountFilter();
@@ -34,11 +37,11 @@ export function AddCardDialog({
     if (!open) return;
     setName("");
     setColor("#8b5cf6");
-    setAccountId(filter ?? accounts[0]?.id ?? "");
+    setAccountId(fixedAccountId ?? filter ?? accounts[0]?.id ?? "");
     setClosingDay("25");
     setDueDay("5");
     setConfirming(false);
-  }, [open, filter, accounts]);
+  }, [open, filter, accounts, fixedAccountId]);
 
   const submit = async (scope: CardScope) => {
     if (!name.trim() || !accountId) return;
@@ -72,13 +75,15 @@ export function AddCardDialog({
                 placeholder="Ex: Nubank Roxinho"
               />
             </Field>
-            <Field label="Conta vinculada">
-              <select className={inputClass} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </Field>
+            {!fixedAccountId && (
+              <Field label="Conta vinculada">
+                <select className={inputClass} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <Field label="Cor">
                 <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-full rounded-lg border border-input bg-input" />

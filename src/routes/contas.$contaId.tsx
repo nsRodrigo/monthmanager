@@ -263,15 +263,19 @@ function AccountHome() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
-      {/* Sticky top bar — breadcrumb + (when header is scrolled out) year picker */}
+      {/* Sticky top bar — breadcrumb + year picker */}
       <div className="sticky top-0 z-30 -mx-5 mb-4 flex items-center justify-between gap-2 border-b border-transparent bg-background/85 px-5 py-3 backdrop-blur-md transition-colors data-[stuck=true]:border-border/60" data-stuck={headerOut}>
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" /> Consolidado
-        </Link>
-        {headerOut && <YearPickerChip compact />}
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <ChevronLeft className="h-4 w-4" /> Consolidado
+          </Link>
+          <span className="text-sm text-muted-foreground shrink-0">·</span>
+          <span className="text-sm font-medium text-foreground shrink-0">Meses de</span>
+          <YearPickerChip compact />
+        </div>
       </div>
 
       {/* HEADER + DASHBOARD */}
@@ -304,14 +308,6 @@ function AccountHome() {
         </div>
 
       </header>
-
-      {/* YEAR PICKER */}
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Meses de</h2>
-          <YearPickerChip />
-        </div>
-      </div>
 
 
 

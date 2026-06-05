@@ -147,16 +147,13 @@ export function AddIncomeDialog({
           <input
             type="checkbox"
             checked={isRecurring}
-            onChange={(e) => setIsRecurring(e.target.checked)}
-            disabled={isInstallment}
+            onChange={(e) => { setIsRecurring(e.target.checked); if (e.target.checked) setIsInstallment(false); }}
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              {isInstallment
-                ? "Indisponível para parcelados."
-                : "Replicado automaticamente nos próximos 24 meses, mantendo o dia."}
+              Replicado automaticamente nos próximos 24 meses, mantendo o dia.
             </span>
           </span>
         </label>

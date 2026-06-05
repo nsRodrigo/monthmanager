@@ -652,10 +652,10 @@ export function EditInstallmentDialog({
             </button>
             <button
               onClick={handleSave}
-              disabled={update.isPending || shift.isPending}
+              disabled={update.isPending || shift.isPending || updateAmountScope.isPending}
               className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {update.isPending || shift.isPending ? "Salvando…" : "Salvar"}
+              {update.isPending || shift.isPending || updateAmountScope.isPending ? "Salvando…" : "Salvar"}
             </button>
           </div>
         </div>

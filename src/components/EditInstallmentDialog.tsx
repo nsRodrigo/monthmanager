@@ -461,19 +461,18 @@ export function EditInstallmentDialog({
   const dateChanged = dueDate !== inst.dueDate;
   const amountChanged = amount !== inst.amount;
   const paidChanged = paid !== inst.paid;
-  const isLast = inst.number === inst.total;
   const remaining = Math.max(0, inst.total - inst.number);
+  const isSingleParcel = inst.total <= 1;
 
-  async function commit(applyToFuture: boolean) {
+  async function commit(scope: InstallmentScope) {
     if (dateChanged) {
-      await shift.mutateAsync({ installment: inst, newDate: dueDate, applyToFuture });
+      await shift.mutateAsync({ installment: inst, newDate: dueDate, scope });
     }
-    if (amountChanged || paidChanged) {
-      await update.mutateAsync({
-        id: inst.id,
-        amount: amountChanged ? amount : undefined,
-        paid: paidChanged ? paid : undefined,
-      });
+    if (amountChanged) {
+      await updateAmountScope.mutateAsync({ installment: inst, amount, scope });
+    }
+    if (paidChanged) {
+      await update.mutateAsync({ id: inst.id, paid });
     }
     // Atualiza descrição do parent (purchase / debit / income) se mudou
     if (description.trim() && description.trim() !== (parentLabel ?? "")) {
@@ -490,23 +489,31 @@ export function EditInstallmentDialog({
   }
 
   const handleSave = async () => {
-    if (dateChanged && !isLast) {
+    // Quando o item tem mais de uma parcela e o usuário alterou data ou valor,
+    // perguntamos a qual conjunto de parcelas a mudança se aplica.
+    if ((dateChanged || amountChanged) && !isSingleParcel) {
       setAskDateScope(true);
       return;
     }
-    await commit(false);
+    await commit("current");
   };
 
   if (askDateScope) {
+    const dayLabel = Number(dueDate.slice(8, 10));
+    const summary = (() => {
+      const parts: string[] = [];
+      if (dateChanged) parts.push(`nova data ${formatDate(dueDate)}`);
+      if (amountChanged) parts.push(`novo valor ${formatCurrency(amount)}`);
+      return parts.join(" e ");
+    })();
     return (
-      <Modal open={open} onClose={() => setAskDateScope(false)} title="Aplicar nova data para…">
+      <Modal open={open} onClose={() => setAskDateScope(false)} title="Aplicar alterações para…">
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Você alterou a data para <span className="font-semibold text-foreground">{formatDate(dueDate)}</span>.
-            Como deseja aplicar?
+            Você alterou {summary}. Como deseja aplicar?
           </p>
           <button
-            onClick={() => commit(false)}
+            onClick={() => commit("current")}
             className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
           >
             <span className="font-semibold">Apenas esta parcela</span>
@@ -514,13 +521,26 @@ export function EditInstallmentDialog({
               Só a parcela {inst.number}/{inst.total} muda.
             </span>
           </button>
+          {remaining > 0 && (
+            <button
+              onClick={() => commit("future")}
+              className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
+            >
+              <span className="font-semibold">Esta e as próximas parcelas</span>
+              <span className="text-xs text-muted-foreground">
+                As {inst.total - inst.number + 1} parcelas a partir desta serão atualizadas
+                {dateChanged ? `, mantendo o dia ${dayLabel}` : ""}.
+              </span>
+            </button>
+          )}
           <button
-            onClick={() => commit(true)}
+            onClick={() => commit("all")}
             className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
           >
-            <span className="font-semibold">Esta e as próximas parcelas</span>
+            <span className="font-semibold">Todas as parcelas</span>
             <span className="text-xs text-muted-foreground">
-              As {inst.total - inst.number + 1} parcelas a partir desta serão deslocadas mantendo o dia {Number(dueDate.slice(8, 10))}.
+              As {inst.total} parcelas serão atualizadas
+              {dateChanged ? `, mantendo o dia ${dayLabel}` : ""}.
             </span>
           </button>
           <button onClick={() => setAskDateScope(false)} className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary">

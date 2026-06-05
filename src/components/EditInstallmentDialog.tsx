@@ -62,6 +62,7 @@ export function EditInstallmentDialog({
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
+  const updateAmountScope = useUpdateInstallmentAmountScope();
   const advance = useAdvanceInstallments();
   const updateDebit = useUpdateDebit();
   const updateIncome = useUpdateIncome();

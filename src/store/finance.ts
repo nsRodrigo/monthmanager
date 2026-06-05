@@ -1267,13 +1267,15 @@ export function useUpdateInstallment() {
   });
 }
 
+export type InstallmentScope = "current" | "future" | "all";
+
 export function useShiftInstallmentDate() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
       installment: Installment;
       newDate: string;
-      applyToFuture: boolean;
+      scope: InstallmentScope;
     }) => {
       const { y: ny, m: nm, d: nd } = parseLocalDate(args.newDate);
       const { error: eCur } = await supabase
@@ -1282,30 +1284,64 @@ export function useShiftInstallmentDate() {
         .eq("id", args.installment.id);
       if (eCur) throw eCur;
 
-      if (args.applyToFuture) {
-        const { data: rows, error } = await supabase
+      if (args.scope === "current") return;
+
+      let q = supabase
+        .from("installments")
+        .select("id,number")
+        .eq("parent_id", args.installment.parentId)
+        .eq("parent_type", args.installment.parentType)
+        .neq("id", args.installment.id);
+      if (args.scope === "future") q = q.gt("number", args.installment.number);
+      const { data: rows, error } = await q;
+      if (error) throw error;
+
+      for (const r of (rows ?? []) as Array<{ id: string; number: number }>) {
+        const offset = r.number - args.installment.number;
+        const targetMonthIdx = nm + offset;
+        const targetY = ny + Math.floor(targetMonthIdx / 12);
+        const targetM = ((targetMonthIdx % 12) + 12) % 12;
+        const lastDay = new Date(targetY, targetM + 1, 0).getDate();
+        const day = Math.min(nd, lastDay);
+        const dueDate = fmtLocalDate(targetY, targetM, day);
+        const { error: eUpd } = await supabase
           .from("installments")
-          .select("id,number")
-          .eq("parent_id", args.installment.parentId)
-          .eq("parent_type", args.installment.parentType)
-          .gt("number", args.installment.number);
-        if (error) throw error;
-        for (const r of (rows ?? []) as Array<{ id: string; number: number }>) {
-          const offset = r.number - args.installment.number;
-          // Calendar arithmetic in local terms (avoid Date constructor for ISO).
-          const targetMonthIdx = nm + offset;
-          const targetY = ny + Math.floor(targetMonthIdx / 12);
-          const targetM = ((targetMonthIdx % 12) + 12) % 12;
-          const lastDay = new Date(targetY, targetM + 1, 0).getDate();
-          const day = Math.min(nd, lastDay);
-          const dueDate = fmtLocalDate(targetY, targetM, day);
-          const { error: eUpd } = await supabase
-            .from("installments")
-            .update({ due_date: dueDate, year: targetY, month: targetM })
-            .eq("id", r.id);
-          if (eUpd) throw eUpd;
-        }
+          .update({ due_date: dueDate, year: targetY, month: targetM })
+          .eq("id", r.id);
+        if (eUpd) throw eUpd;
       }
+    },
+    onSuccess: () => inv(["installments", "card_payments"]),
+  });
+}
+
+/**
+ * Atualiza o valor de uma parcela aplicando opcionalmente o mesmo valor às
+ * demais parcelas do mesmo parent (apenas esta, esta+próximas, ou todas).
+ */
+export function useUpdateInstallmentAmountScope() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      installment: Installment;
+      amount: number;
+      scope: InstallmentScope;
+    }) => {
+      const { error: eCur } = await supabase
+        .from("installments")
+        .update({ amount: args.amount })
+        .eq("id", args.installment.id);
+      if (eCur) throw eCur;
+      if (args.scope === "current") return;
+      let q = supabase
+        .from("installments")
+        .update({ amount: args.amount })
+        .eq("parent_id", args.installment.parentId)
+        .eq("parent_type", args.installment.parentType)
+        .neq("id", args.installment.id);
+      if (args.scope === "future") q = q.gt("number", args.installment.number);
+      const { error } = await q;
+      if (error) throw error;
     },
     onSuccess: () => inv(["installments", "card_payments"]),
   });

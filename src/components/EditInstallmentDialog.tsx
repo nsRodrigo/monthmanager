@@ -362,9 +362,19 @@ export function EditInstallmentDialog({
             </button>
             {onDeleteParent && (
               <button
-                onClick={() => setAskDelete(true)}
-                disabled={deleteScope.isPending}
-                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Excluir lançamento",
+                    description: `Excluir "${single.description}"?`,
+                    variant: "destructive",
+                    confirmLabel: "Excluir",
+                  });
+                  if (ok) {
+                    onDeleteParent();
+                    onClose();
+                  }
+                }}
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
                 title="Excluir lançamento"
               >
                 <Trash2 className="h-4 w-4" />

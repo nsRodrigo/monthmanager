@@ -614,19 +614,12 @@ export function EditInstallmentDialog({
             )}
             {onDeleteParent && (
               <button
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: "Excluir lançamento",
-                    description: "Excluir o lançamento inteiro e todas as suas parcelas?",
-                    variant: "destructive",
-                    confirmLabel: "Excluir tudo",
-                  });
-                  if (ok) {
-                    onDeleteParent();
-                    onClose();
-                  }
+                onClick={() => {
+                  onDeleteParent();
+                  onClose();
                 }}
                 className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
+                title="Excluir lançamento parcelado"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

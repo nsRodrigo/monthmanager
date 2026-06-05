@@ -365,6 +365,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dragX, setDragX] = useState(0);
 
   const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
 

@@ -400,6 +400,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Drag offset (0..DRAWER_WIDTH) for the swipe-to-open drawer animation.
   const dragging = dragX > 0 && !mobileOpen;
+  const translatePx = mobileOpen ? 0 : dragX - DRAWER_WIDTH;
+  const overlayOpacity = mobileOpen ? 1 : dragX / DRAWER_WIDTH;
 
   const handleDragEnd = (dx: number) => {
     if (dx > DRAWER_WIDTH / 3) {

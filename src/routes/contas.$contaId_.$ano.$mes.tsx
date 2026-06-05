@@ -1176,7 +1176,7 @@ function AccountMonth() {
         defaultYear={year}
         defaultMonth={month}
       />
-      <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} defaultYear={year} defaultMonth={month} />
+      <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} defaultYear={year} defaultMonth={month} fixedAccountId={contaId} />
       <EditCardDialog
         open={!!editingCardId}
         onClose={() => setEditingCardId(null)}

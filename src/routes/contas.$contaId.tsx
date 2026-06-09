@@ -262,9 +262,9 @@ function AccountHome() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
+    <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
       {/* Sticky top bar — breadcrumb + year picker */}
-      <div className="sticky top-0 z-30 -mx-5 mb-4 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-5 py-3 backdrop-blur-md" data-stuck={headerOut}>
+      <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6" data-stuck={headerOut}>
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground shrink-0 min-w-0"

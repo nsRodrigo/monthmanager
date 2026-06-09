@@ -417,20 +417,23 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <SidebarContent />
       </aside>
 
-      {/* Mobile drawer (always mounted so drag can animate it in) */}
-      {(mobileOpen || dragging) && (
-        <div
-          className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
-          style={{ opacity: overlayOpacity, transition: dragging ? "none" : "opacity 300ms ease-out" }}
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {/* Mobile drawer (always mounted so open/close can animate smoothly) */}
+      <div
+        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
+        style={{
+          opacity: overlayOpacity,
+          transition: dragging ? "none" : "opacity 300ms ease-out",
+          pointerEvents: mobileOpen || dragging ? "auto" : "none",
+        }}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden={!mobileOpen && !dragging}
+      />
       <aside
         className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card p-5 md:hidden"
         style={{
           transform: `translateX(${translatePx}px)`,
           transition: dragging ? "none" : "transform 300ms ease-out",
-          visibility: mobileOpen || dragging ? "visible" : "hidden",
+          pointerEvents: mobileOpen ? "auto" : "none",
         }}
         aria-hidden={!mobileOpen && !dragging}
       >

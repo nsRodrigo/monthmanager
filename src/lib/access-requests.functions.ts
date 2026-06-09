@@ -98,6 +98,15 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
       .maybeSingle();
     if (wl) return { ok: true, whitelisted: true };
 
+    // Bloqueia emails na blacklist — não permite que usuários banidos
+    // se removam da blacklist criando uma nova solicitação.
+    const { data: bl } = await supabaseAdmin
+      .from("blacklist")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+    if (bl) return { ok: false, blocked: true };
+
     // Garante a solicitação pendente de forma idempotente e falha explicitamente
     // se o registro não for salvo — sem isso o cliente podia mostrar sucesso
     // mesmo sem criar nada para o admin aprovar.
@@ -111,7 +120,6 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
 
     let requestId = existing?.id;
     if (!requestId) {
-      await supabaseAdmin.from("blacklist").delete().ilike("email", email);
       const { data: created, error: insertError } = await supabaseAdmin
         .from("access_requests")
         .insert({ email })
@@ -120,6 +128,7 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
       if (insertError) throw new Error(insertError.message);
       requestId = created.id;
     }
+
 
     let notifiedCount = 0;
     try {

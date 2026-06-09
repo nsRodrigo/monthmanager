@@ -98,7 +98,7 @@ function SwipeEdge({
         type="button"
         onClick={onOpen}
         aria-label="Abrir menu"
-        className="pointer-events-auto absolute top-1/2 left-0 -translate-y-1/2 flex h-14 w-5 items-center justify-center rounded-r-xl border border-l-0 border-border bg-card/80 text-muted-foreground shadow-elegant backdrop-blur-sm transition-colors hover:text-foreground"
+        className="pointer-events-auto absolute top-1/2 left-0 -translate-y-1/2 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
       >
         <ChevronRight className="h-4 w-4" />
       </button>

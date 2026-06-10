@@ -1101,7 +1101,89 @@ export function useAddPurchase() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (p: Omit<Purchase, "id"> & { installmentNumber?: number; invoiceAnchorDate?: string }) => {
+    mutationFn: async (p: {
+      cardId: string;
+      description: string;
+      totalAmount: number;
+      date: string;
+      installmentsCount: number;
+      installmentNumber?: number;
+      invoiceAnchorDate?: string;
+      recurring?: boolean;
+    }) => {
+      // Recurring purchase: 24 monthly purchases, each installments_count=1,
+      // sharing the same recurrence_group_id. NO installment-style splitting —
+      // recorrência ≠ parcelamento. Mesmo comportamento dos débitos recorrentes.
+      const isRecurring = !!p.recurring && p.installmentsCount === 1;
+      if (isRecurring) {
+        const RECUR_MONTHS = 24;
+        const groupId = crypto.randomUUID();
+        const anchorIso = p.invoiceAnchorDate ?? p.date;
+        const [_sy, _sm, _sd] = anchorIso.slice(0, 10).split("-").map(Number);
+        const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
+        const day = start.getDate();
+        const purchaseRows: Array<{
+          id: string;
+          user_id: string;
+          card_id: string;
+          description: string;
+          total_amount: number;
+          purchase_date: string;
+          installments_count: number;
+          recurrence_group_id: string;
+        }> = [];
+        const installmentRows: Array<{
+          id: string;
+          user_id: string;
+          parent_id: string;
+          parent_type: ParentType;
+          purchase_id: string;
+          number: number;
+          total: number;
+          amount: number;
+          due_date: string;
+          year: number;
+          month: number;
+          paid: boolean;
+        }> = [];
+        for (let i = 0; i < RECUR_MONTHS; i++) {
+          const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
+          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+          const dd = Math.min(day, lastDay);
+          const dateStr = fmtLocalDate(target.getFullYear(), target.getMonth(), dd);
+          const pid = crypto.randomUUID();
+          purchaseRows.push({
+            id: pid,
+            user_id: user!.id,
+            card_id: p.cardId,
+            description: p.description,
+            total_amount: p.totalAmount,
+            purchase_date: dateStr,
+            installments_count: 1,
+            recurrence_group_id: groupId,
+          });
+          installmentRows.push({
+            id: crypto.randomUUID(),
+            user_id: user!.id,
+            parent_id: pid,
+            parent_type: "purchase",
+            purchase_id: pid,
+            number: 1,
+            total: 1,
+            amount: p.totalAmount,
+            due_date: dateStr,
+            year: target.getFullYear(),
+            month: target.getMonth(),
+            paid: false,
+          });
+        }
+        const { error } = await supabase.from("purchases").insert(purchaseRows);
+        if (error) throw error;
+        const { error: e2 } = await supabase.from("installments").insert(installmentRows);
+        if (e2) throw e2;
+        return { purchaseId: purchaseRows[0].id, payload: p, installmentRows, recurring: true as const };
+      }
+
       const purchaseId = crypto.randomUUID();
       const { error } = await supabase
         .from("purchases")
@@ -1128,10 +1210,11 @@ export function useAddPurchase() {
       );
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
-      return { purchaseId, payload: p, installmentRows: inst };
+      return { purchaseId, payload: p, installmentRows: inst, recurring: false as const };
     },
     onSuccess: (result, p) => {
       inv(["purchases", "installments", "card_payments"]);
+      if (result.recurring) return; // sem histórico para séries recorrentes
       const { purchaseId, installmentRows } = result;
       const userId = user!.id;
       history.push({

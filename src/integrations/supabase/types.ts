@@ -585,6 +585,7 @@ export type Database = {
           id: string
           installments_count: number
           purchase_date: string
+          recurrence_group_id: string | null
           total_amount: number
           user_id: string
         }
@@ -595,6 +596,7 @@ export type Database = {
           id?: string
           installments_count?: number
           purchase_date: string
+          recurrence_group_id?: string | null
           total_amount: number
           user_id: string
         }
@@ -605,6 +607,7 @@ export type Database = {
           id?: string
           installments_count?: number
           purchase_date?: string
+          recurrence_group_id?: string | null
           total_amount?: number
           user_id?: string
         }

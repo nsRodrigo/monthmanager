@@ -93,6 +93,8 @@ export type Purchase = {
   totalAmount: number;
   date: string;
   installmentsCount: number;
+  /** Group id linking all monthly occurrences of a recurring purchase series. */
+  recurrenceGroupId: string | null;
 };
 
 export type ParentType = "purchase" | "debit" | "income";

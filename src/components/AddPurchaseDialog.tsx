@@ -60,18 +60,18 @@ export function AddPurchaseDialog({
     const invoiceAnchorDate = fixedCardId
       ? `${defaultYear}-${String(defaultMonth + 1).padStart(2, "0")}-${String(Math.min(new Date(defaultYear, defaultMonth + 1, 0).getDate(), Number(date.slice(8, 10)) || 1)).padStart(2, "0")}`
       : undefined;
-    // Recurring purchase: create one purchase with 24 monthly "installments"
-    // of the same amount, anchored at the chosen month. Each month is
-    // independent and can be edited / deleted later.
+    // Recurring purchase: same model as recurring debits — 24 monthly
+    // purchases compartilhando recurrence_group_id. Cada mês é independente.
     if (isRecurring && !isInstallment) {
       await addPurchase.mutateAsync({
         cardId,
         description: description.trim(),
-        totalAmount: amount * 24,
+        totalAmount: amount,
         date,
-        installmentsCount: 24,
+        installmentsCount: 1,
         installmentNumber: 1,
         invoiceAnchorDate,
+        recurring: true,
       });
       onClose();
       return;

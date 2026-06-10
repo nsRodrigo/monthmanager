@@ -472,10 +472,11 @@ export function usePurchases() {
         total_amount: number | string;
         purchase_date: string;
         installments_count: number;
+        recurrence_group_id: string | null;
       }>(() =>
         supabase
           .from("purchases")
-          .select("id,card_id,description,total_amount,purchase_date,installments_count"),
+          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id"),
       );
       return data.map((p) => ({
         id: p.id,
@@ -484,6 +485,7 @@ export function usePurchases() {
         totalAmount: num(p.total_amount as number | string),
         date: p.purchase_date,
         installmentsCount: p.installments_count,
+        recurrenceGroupId: p.recurrence_group_id ?? null,
       }));
     },
   });

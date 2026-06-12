@@ -203,9 +203,9 @@ export function getInvoiceMonth(
   const parsed =
     typeof purchaseDate === "string"
       ? (() => {
-          const [yy, mm, dd] = purchaseDate.slice(0, 10).split("-").map(Number);
-          return { y: yy, m: (mm || 1) - 1, d: dd || 1 };
-        })()
+        const [yy, mm, dd] = purchaseDate.slice(0, 10).split("-").map(Number);
+        return { y: yy, m: (mm || 1) - 1, d: dd || 1 };
+      })()
       : { y: purchaseDate.getFullYear(), m: purchaseDate.getMonth(), d: purchaseDate.getDate() };
   const purchaseDay = parsed.d;
   // If purchase happens AFTER the closing day, the invoice closes next month
@@ -1350,7 +1350,7 @@ export function useUpdateInstallment() {
         inv(["installments", "card_payments"]);
       }
     },
-    onSettled: () => {},
+    onSettled: () => { },
   });
 }
 
@@ -1582,11 +1582,11 @@ export function useDeleteParcelledByScope() {
         args.scope.kind === "month"
           ? { sy: args.scope.year, sm: args.scope.month, ey: args.scope.year, em: args.scope.month }
           : {
-              sy: args.scope.startYear,
-              sm: args.scope.startMonth,
-              ey: args.scope.endYear,
-              em: args.scope.endMonth,
-            };
+            sy: args.scope.startYear,
+            sm: args.scope.startMonth,
+            ey: args.scope.endYear,
+            em: args.scope.endMonth,
+          };
       const sYM = win.sy * 12 + win.sm;
       const eYM = win.ey * 12 + win.em;
 
@@ -1732,9 +1732,9 @@ export function useSetCardPaid() {
         if (!old) return old;
         return old.map((i) =>
           i.parentType === "purchase" &&
-          i.year === args.year &&
-          i.month === args.month &&
-          (purIds.has(i.parentId) || (i.purchaseId ? purIds.has(i.purchaseId) : false))
+            i.year === args.year &&
+            i.month === args.month &&
+            (purIds.has(i.parentId) || (i.purchaseId ? purIds.has(i.purchaseId) : false))
             ? { ...i, paid: args.paid }
             : i,
         );
@@ -1793,23 +1793,23 @@ export function useAddDebit() {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                debitId,
-                user!.id,
-                d.amount,
-                count,
-                anchor,
-                d.date,
-                "debit",
-                true,
-              )
+              debitId,
+              user!.id,
+              d.amount,
+              count,
+              anchor,
+              d.date,
+              "debit",
+              true,
+            )
             : buildInstallments(
-                debitId,
-                "debit",
-                user!.id,
-                d.amount,
-                count,
-                d.date,
-              );
+              debitId,
+              "debit",
+              user!.id,
+              d.amount,
+              count,
+              d.date,
+            );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (isRecurring) {
@@ -1974,23 +1974,23 @@ export function useAddIncome() {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                incomeId,
-                user!.id,
-                i.amount,
-                count,
-                anchor,
-                i.date,
-                "income",
-                true,
-              )
+              incomeId,
+              user!.id,
+              i.amount,
+              count,
+              anchor,
+              i.date,
+              "income",
+              true,
+            )
             : buildInstallments(
-                incomeId,
-                "income",
-                user!.id,
-                i.amount,
-                count,
-                i.date,
-              );
+              incomeId,
+              "income",
+              user!.id,
+              i.amount,
+              count,
+              i.date,
+            );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (isRecurring) {
@@ -2550,9 +2550,9 @@ export type HistoricalImportProgress = {
 type HistoricalImportMutationInput =
   | HistoricalImportPlan
   | {
-      plan: HistoricalImportPlan;
-      onProgress?: (progress: HistoricalImportProgress) => void;
-    };
+    plan: HistoricalImportPlan;
+    onProgress?: (progress: HistoricalImportProgress) => void;
+  };
 
 type NaturalIdQueues = Map<string, string[]>;
 
@@ -3578,16 +3578,16 @@ export function useUpdateDebit() {
       qc.setQueriesData<Debit[]>({ queryKey: ["debits"] }, (old) =>
         old
           ? old.map((d) =>
-              d.id === args.id
-                ? {
-                    ...d,
-                    description: args.description ?? d.description,
-                    amount: args.amount ?? d.amount,
-                    date: args.date ?? d.date,
-                    paid: args.paid ?? d.paid,
-                  }
-                : d,
-            )
+            d.id === args.id
+              ? {
+                ...d,
+                description: args.description ?? d.description,
+                amount: args.amount ?? d.amount,
+                date: args.date ?? d.date,
+                paid: args.paid ?? d.paid,
+              }
+              : d,
+          )
           : old,
       );
       return { prev };
@@ -3654,16 +3654,16 @@ export function useUpdateIncome() {
       qc.setQueriesData<Income[]>({ queryKey: ["incomes"] }, (old) =>
         old
           ? old.map((i) =>
-              i.id === args.id
-                ? {
-                    ...i,
-                    description: args.description ?? i.description,
-                    amount: args.amount ?? i.amount,
-                    date: args.date ?? i.date,
-                    received: args.received ?? i.received,
-                  }
-                : i,
-            )
+            i.id === args.id
+              ? {
+                ...i,
+                description: args.description ?? i.description,
+                amount: args.amount ?? i.amount,
+                date: args.date ?? i.date,
+                received: args.received ?? i.received,
+              }
+              : i,
+          )
           : old,
       );
       return { prev };
@@ -3749,15 +3749,15 @@ export function useUpdatePurchase() {
       qc.setQueriesData<Purchase[]>({ queryKey: ["purchases"] }, (old) =>
         old
           ? old.map((p) =>
-              p.id === args.id
-                ? {
-                    ...p,
-                    description: args.description ?? p.description,
-                    totalAmount: args.totalAmount ?? p.totalAmount,
-                    date: args.date ?? p.date,
-                  }
-                : p,
-            )
+            p.id === args.id
+              ? {
+                ...p,
+                description: args.description ?? p.description,
+                totalAmount: args.totalAmount ?? p.totalAmount,
+                date: args.date ?? p.date,
+              }
+              : p,
+          )
           : old,
       );
       return { prev };
@@ -4053,14 +4053,14 @@ const addEnsuredKey = (key: string) => {
     const keys = getEnsuredKeys();
     keys.add(key);
     sessionStorage.setItem("ensuredRecurringKeys", JSON.stringify([...keys]));
-  } catch {}
+  } catch { }
 };
 const deleteEnsuredKey = (key: string) => {
   try {
     const keys = getEnsuredKeys();
     keys.delete(key);
     sessionStorage.setItem("ensuredRecurringKeys", JSON.stringify([...keys]));
-  } catch {}
+  } catch { }
 };
 const hasEnsuredKey = (key: string) => getEnsuredKeys().has(key);
 
@@ -4242,4 +4242,207 @@ export function useDescriptionSuggestions(
       .map((s) => s.display);
   }, [data]);
 }
+export function useReorganizeData() {
+  const inv = useInvalidate();
+  //const { data: user } = useUser();
+  const { user } = useAuth();
 
+  return useMutation({
+    mutationFn: async (args: {
+      contaId: string;
+      mode: "month" | "year";
+      fromMonth: number;
+      fromYear: number;
+      toMonth: number;
+      toYear: number;
+      fromYearOnly: number;
+      toYearOnly: number;
+    }) => {
+      if (!user?.id) throw new Error("Nao autenticado");
+
+      if (args.mode === "month") {
+        // Mover debitos avulsos
+        const fromDate = `${args.fromYear}-${String(args.fromMonth + 1).padStart(2, "0")}`;
+        const toDate = `${args.toYear}-${String(args.toMonth + 1).padStart(2, "0")}`;
+
+        const { data: debitsToMove } = await supabase
+          .from("debits")
+          .select("id, date")
+          .eq("account_id", args.contaId)
+          .like("date", `${fromDate}%`);
+
+        for (const d of debitsToMove ?? []) {
+          const newDate = d.date.replace(fromDate, toDate);
+          await supabase.from("debits").update({ date: newDate }).eq("id", d.id);
+        }
+
+        // Mover receitas avulsas
+        const { data: incomesToMove } = await supabase
+          .from("incomes")
+          .select("id, date")
+          .eq("account_id", args.contaId)
+          .like("date", `${fromDate}%`);
+
+        for (const i of incomesToMove ?? []) {
+          const newDate = i.date.replace(fromDate, toDate);
+          await supabase.from("incomes").update({ date: newDate }).eq("id", i.id);
+        }
+
+        // Mover investimentos
+        const { data: invToMove } = await supabase
+          .from("investments")
+          .select("id, date")
+          .eq("account_id", args.contaId)
+          .like("date", `${fromDate}%`);
+
+        for (const i of invToMove ?? []) {
+          const newDate = i.date.replace(fromDate, toDate);
+          await supabase.from("investments").update({ date: newDate }).eq("id", i.id);
+        }
+
+        // Mover parcelas (installments) do mes
+        // Buscar purchases da conta para filtrar apenas as parcelas corretas
+        const { data: cards } = await supabase
+          .from("cards")
+          .select("id")
+          .eq("account_id", args.contaId);
+        const cardIds = (cards ?? []).map((c: { id: string }) => c.id);
+
+        if (cardIds.length > 0) {
+          const { data: purchases } = await supabase
+            .from("purchases")
+            .select("id")
+            .in("card_id", cardIds);
+          const purchaseIds = (purchases ?? []).map((p: { id: string }) => p.id);
+
+          if (purchaseIds.length > 0) {
+            await supabase
+              .from("installments")
+              .update({ year: args.toYear, month: args.toMonth })
+              .in("purchase_id", purchaseIds)
+              .eq("year", args.fromYear)
+              .eq("month", args.fromMonth);
+          }
+        }
+
+        // Mover parcelas de debitos e receitas parcelados
+        const { data: debitIds } = await supabase
+          .from("debits")
+          .select("id")
+          .eq("account_id", args.contaId);
+
+        if ((debitIds ?? []).length > 0) {
+          await supabase
+            .from("installments")
+            .update({ year: args.toYear, month: args.toMonth })
+            .in("parent_id", (debitIds ?? []).map((d: { id: string }) => d.id))
+            .eq("parent_type", "debit")
+            .eq("year", args.fromYear)
+            .eq("month", args.fromMonth);
+        }
+
+        const { data: incomeIds } = await supabase
+          .from("incomes")
+          .select("id")
+          .eq("account_id", args.contaId);
+
+        if ((incomeIds ?? []).length > 0) {
+          await supabase
+            .from("installments")
+            .update({ year: args.toYear, month: args.toMonth })
+            .in("parent_id", (incomeIds ?? []).map((i: { id: string }) => i.id))
+            .eq("parent_type", "income")
+            .eq("year", args.fromYear)
+            .eq("month", args.fromMonth);
+        }
+
+      } else {
+        // Mover ano inteiro: iterar pelos 12 meses
+        for (let m = 0; m < 12; m++) {
+          const fromDate = `${args.fromYearOnly}-${String(m + 1).padStart(2, "0")}`;
+          const toDate = `${args.toYearOnly}-${String(m + 1).padStart(2, "0")}`;
+
+          // Debitos
+          const { data: debits } = await supabase
+            .from("debits")
+            .select("id, date")
+            .eq("account_id", args.contaId)
+            .like("date", `${fromDate}%`);
+          for (const d of debits ?? []) {
+            await supabase.from("debits").update({ date: d.date.replace(fromDate, toDate) }).eq("id", d.id);
+          }
+
+          // Receitas
+          const { data: incomes } = await supabase
+            .from("incomes")
+            .select("id, date")
+            .eq("account_id", args.contaId)
+            .like("date", `${fromDate}%`);
+          for (const i of incomes ?? []) {
+            await supabase.from("incomes").update({ date: i.date.replace(fromDate, toDate) }).eq("id", i.id);
+          }
+
+          // Investimentos
+          const { data: invs } = await supabase
+            .from("investments")
+            .select("id, date")
+            .eq("account_id", args.contaId)
+            .like("date", `${fromDate}%`);
+          for (const i of invs ?? []) {
+            await supabase.from("investments").update({ date: i.date.replace(fromDate, toDate) }).eq("id", i.id);
+          }
+        }
+
+        // Parcelas: atualizar year diretamente
+        const { data: cards } = await supabase
+          .from("cards")
+          .select("id")
+          .eq("account_id", args.contaId);
+        const cardIds = (cards ?? []).map((c: { id: string }) => c.id);
+
+        if (cardIds.length > 0) {
+          const { data: purchases } = await supabase
+            .from("purchases")
+            .select("id")
+            .in("card_id", cardIds);
+          const purchaseIds = (purchases ?? []).map((p: { id: string }) => p.id);
+
+          if (purchaseIds.length > 0) {
+            await supabase
+              .from("installments")
+              .update({ year: args.toYearOnly })
+              .in("purchase_id", purchaseIds)
+              .eq("year", args.fromYearOnly);
+          }
+        }
+
+        const { data: debitIds } = await supabase
+          .from("debits")
+          .select("id")
+          .eq("account_id", args.contaId);
+        if ((debitIds ?? []).length > 0) {
+          await supabase
+            .from("installments")
+            .update({ year: args.toYearOnly })
+            .in("parent_id", (debitIds ?? []).map((d: { id: string }) => d.id))
+            .eq("parent_type", "debit")
+            .eq("year", args.fromYearOnly);
+        }
+
+        const { data: incomeIds } = await supabase
+          .from("incomes")
+          .select("id")
+          .eq("account_id", args.contaId);
+        if ((incomeIds ?? []).length > 0) {
+          await supabase
+            .from("installments")
+            .update({ year: args.toYearOnly })
+            .in("parent_id", (incomeIds ?? []).map((i: { id: string }) => i.id))
+            .eq("parent_type", "income")
+            .eq("year", args.fromYearOnly);
+        }
+      }
+    },
+    onSuccess: () => inv(["debits", "incomes", "investments", "installments", "purchases"]),
+  });
+}

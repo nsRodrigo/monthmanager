@@ -26,8 +26,10 @@ import {
   Wallet,
   ChevronLeft,
   Plus,
+  ArrowLeftRight,
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
+import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 
 export const Route = createFileRoute("/contas/$contaId")({
   head: () => ({ meta: [{ title: "Conta — Finanças" }] }),
@@ -131,6 +133,7 @@ function AccountHome() {
 
   const [openYear, setOpenYear] = useState(false);
   const [openAddMonth, setOpenAddMonth] = useState(false);
+  const [openReorganize, setOpenReorganize] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
   const [headerOut, setHeaderOut] = useState(false);
 
@@ -304,6 +307,17 @@ function AccountHome() {
           </div>
         </div>
 
+        <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
+          <button
+            type="button"
+            onClick={() => setOpenReorganize(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            Reorganizar dados
+          </button>
+        </div>
+
       </header>
 
 
@@ -430,6 +444,12 @@ function AccountHome() {
         onClose={() => setOpenAddMonth(false)}
         contaId={account.id}
       />
+      <ReorganizeDataDialog
+        open={openReorganize}
+        onClose={() => setOpenReorganize(false)}
+        contaId={contaId}
+        yearList={yearList}
+      />
     </div>
   );
 }
@@ -478,3 +498,4 @@ function Mini({ label, value, tone }: { label: string; value: number; tone: "suc
     </div>
   );
 }
+

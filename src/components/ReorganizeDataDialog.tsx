@@ -16,20 +16,8 @@ export function ReorganizeDataDialog({
   yearList: number[];
 }) {
   const currentYear = new Date().getFullYear();
-  //const years = yearList.length > 0 ? yearList : [currentYear];
-  const minYear =
-    yearList.length > 0
-      ? Math.min(...yearList) - 10
-      : currentYear - 10;
-
-  const maxYear = currentYear + 10;
-
-  const years = Array.from(
-    { length: maxYear - minYear + 1 },
-    (_, i) => minYear + i
-  );
+  const years = yearList.length > 0 ? yearList : [currentYear];
   
-
   const [mode, setMode] = useState<"month" | "year">("month");
 
   // Opcao A: mover mes
@@ -143,15 +131,14 @@ export function ReorganizeDataDialog({
                     </select>
                   </Field>
                   <Field label="">
-                    <select
+                    <input
+                      type="number"
                       className={inputClass}
                       value={fromYear}
+                      min={1900}
+                      max={2100}
                       onChange={(e) => setFromYear(Number(e.target.value))}
-                    >
-                      {years.map((y) => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
+                    />
                   </Field>
                 </div>
               </div>

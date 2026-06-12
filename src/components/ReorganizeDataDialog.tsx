@@ -16,7 +16,19 @@ export function ReorganizeDataDialog({
   yearList: number[];
 }) {
   const currentYear = new Date().getFullYear();
-  const years = yearList.length > 0 ? yearList : [currentYear];
+  //const years = yearList.length > 0 ? yearList : [currentYear];
+  const minYear =
+    yearList.length > 0
+      ? Math.min(...yearList) - 10
+      : currentYear - 10;
+
+  const maxYear = currentYear + 10;
+
+  const years = Array.from(
+    { length: maxYear - minYear + 1 },
+    (_, i) => minYear + i
+  );
+  
 
   const [mode, setMode] = useState<"month" | "year">("month");
 

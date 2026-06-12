@@ -5,6 +5,7 @@ calculadas pela **data de fatura**), débitos da conta corrente, recebimentos
 parcelados e dinheiro físico em carteira. Multi-conta (Itaú, Nubank,
 Mercado Pago, etc.) com filtro global.
 
+Teste
 ---
 
 ## 🌐 Acesso pelo navegador

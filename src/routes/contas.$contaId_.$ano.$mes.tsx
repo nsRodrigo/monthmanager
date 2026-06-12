@@ -2217,10 +2217,10 @@ function ParcelledRow({
         >
           {installment.paid ? (
             <>
-              <Check className="h-3 w-3" /> Pago
+              <Check className="h-3 w-3" /> {kind === "income" ? "Recebido" : "Pago"}
             </>
           ) : (
-            "Marcar pago"
+            kind === "income" ? "Marcar recebido" : "Marcar pago"
           )}
         </button>
       </div>

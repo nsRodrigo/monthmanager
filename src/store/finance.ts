@@ -2349,10 +2349,35 @@ export function useDeleteOverScope() {
           }
         }
       }
+
+      // For recurring series (groupId present) with a bounded scope,
+      // persist per-month "deletion tombstones" so useEnsureRecurringForMonth
+      // does not silently recreate the row when the user revisits the month.
+      // Scope "all" wipes the whole series → nothing to tombstone.
+      if (
+        (src.kind === "debit" || src.kind === "income") &&
+        src.groupId &&
+        args.scope.kind !== "all"
+      ) {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData.user?.id;
+        if (uid) {
+          const rows = targets.map((t) => ({
+            user_id: uid,
+            recurrence_group_id: src.groupId as string,
+            year: t.year,
+            month: t.month,
+          }));
+          await (supabase.from("recurring_deletions" as any) as any)
+            .upsert(rows, { onConflict: "user_id,recurrence_group_id,year,month" });
+        }
+      }
+
       inv(["debits", "incomes", "investments", "installments"]);
     },
   });
 }
+
 
 
 
@@ -4083,6 +4108,17 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
       let inserted = false;
 
       try {
+        // Load tombstones for this exact month once, up front.
+        const { data: tombstones } = await (supabase.from("recurring_deletions" as any) as any)
+          .select("recurrence_group_id")
+          .eq("year", year)
+          .eq("month", month);
+        const tombstonedGroups = new Set<string>(
+          ((tombstones ?? []) as Array<{ recurrence_group_id: string }>).map(
+            (r) => r.recurrence_group_id,
+          ),
+        );
+
         for (const table of ["debits", "incomes"] as const) {
           const { data: groupRows, error } = await supabase
             .from(table)
@@ -4096,6 +4132,8 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
 
           for (const gid of groupIds) {
             if (cancelled) return;
+            // Skip if the user explicitly deleted this group for this month.
+            if (tombstonedGroups.has(gid)) continue;
             const { data: existing } = await supabase
               .from(table)
               .select("id")
@@ -4104,6 +4142,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               .lte("date", endStr)
               .limit(1);
             if (existing && existing.length > 0) continue;
+
 
             const { data: earliest } = await supabase
               .from(table)

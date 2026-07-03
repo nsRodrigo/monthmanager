@@ -87,7 +87,7 @@ export function CardScopeConfirmDialog({
           <p className="text-sm text-muted-foreground">{description}</p>
         )}
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Aplicar em
           </p>
@@ -95,18 +95,22 @@ export function CardScopeConfirmDialog({
             checked={kind === "month"}
             onCheck={() => setKind("month")}
             label={`Só este mês (${MONTHS[defaultMonth]} de ${defaultYear})`}
+            description="Aplica somente a este mês."
           />
           <ScopeOption
             checked={kind === "period"}
             onCheck={() => setKind("period")}
             label="Por um período"
+            description="Selecione um intervalo de datas."
           />
           <ScopeOption
             checked={kind === "all"}
             onCheck={() => setKind("all")}
             label="Toda a conta"
+            description="Aplica a todos os lançamentos da conta, sem limite de data."
           />
         </div>
+
 
         {kind === "period" && (
           <div className="grid grid-cols-2 gap-2">
@@ -163,24 +167,24 @@ function ScopeOption({
   checked,
   onCheck,
   label,
+  description,
 }: {
   checked: boolean;
   onCheck: () => void;
   label: string;
+  description: string;
 }) {
   return (
-    <label
-      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
-        checked ? "border-primary bg-primary/5" : "border-border hover:bg-secondary/40"
+    <button
+      type="button"
+      onClick={onCheck}
+      className={`flex w-full flex-col items-start gap-1 rounded-xl border p-4 text-left transition-colors ${
+        checked ? "border-primary bg-primary/5" : "border-border hover:border-primary"
       }`}
     >
-      <input
-        type="radio"
-        checked={checked}
-        onChange={onCheck}
-        className="h-3.5 w-3.5 accent-primary"
-      />
       <span className="font-semibold text-foreground">{label}</span>
-    </label>
+      <span className="text-xs text-muted-foreground">{description}</span>
+    </button>
   );
 }
+

@@ -2349,10 +2349,35 @@ export function useDeleteOverScope() {
           }
         }
       }
+
+      // For recurring series (groupId present) with a bounded scope,
+      // persist per-month "deletion tombstones" so useEnsureRecurringForMonth
+      // does not silently recreate the row when the user revisits the month.
+      // Scope "all" wipes the whole series → nothing to tombstone.
+      if (
+        (src.kind === "debit" || src.kind === "income") &&
+        src.groupId &&
+        args.scope.kind !== "all"
+      ) {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData.user?.id;
+        if (uid) {
+          const rows = targets.map((t) => ({
+            user_id: uid,
+            recurrence_group_id: src.groupId as string,
+            year: t.year,
+            month: t.month,
+          }));
+          await (supabase.from("recurring_deletions" as any) as any)
+            .upsert(rows, { onConflict: "user_id,recurrence_group_id,year,month" });
+        }
+      }
+
       inv(["debits", "incomes", "investments", "installments"]);
     },
   });
 }
+
 
 
 

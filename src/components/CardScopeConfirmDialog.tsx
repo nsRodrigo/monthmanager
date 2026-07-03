@@ -167,24 +167,24 @@ function ScopeOption({
   checked,
   onCheck,
   label,
+  description,
 }: {
   checked: boolean;
   onCheck: () => void;
   label: string;
+  description: string;
 }) {
   return (
-    <label
-      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
-        checked ? "border-primary bg-primary/5" : "border-border hover:bg-secondary/40"
+    <button
+      type="button"
+      onClick={onCheck}
+      className={`flex w-full flex-col items-start gap-1 rounded-xl border p-4 text-left transition-colors ${
+        checked ? "border-primary bg-primary/5" : "border-border hover:border-primary"
       }`}
     >
-      <input
-        type="radio"
-        checked={checked}
-        onChange={onCheck}
-        className="h-3.5 w-3.5 accent-primary"
-      />
       <span className="font-semibold text-foreground">{label}</span>
-    </label>
+      <span className="text-xs text-muted-foreground">{description}</span>
+    </button>
   );
 }
+

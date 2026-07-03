@@ -651,6 +651,33 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_deletions: {
+        Row: {
+          created_at: string
+          id: string
+          month: number
+          recurrence_group_id: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: number
+          recurrence_group_id: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: number
+          recurrence_group_id?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       user_passkeys: {
         Row: {
           counter: number

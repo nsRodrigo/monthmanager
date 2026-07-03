@@ -87,7 +87,7 @@ export function CardScopeConfirmDialog({
           <p className="text-sm text-muted-foreground">{description}</p>
         )}
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Aplicar em
           </p>
@@ -95,18 +95,22 @@ export function CardScopeConfirmDialog({
             checked={kind === "month"}
             onCheck={() => setKind("month")}
             label={`Só este mês (${MONTHS[defaultMonth]} de ${defaultYear})`}
+            description="Aplica somente a este mês."
           />
           <ScopeOption
             checked={kind === "period"}
             onCheck={() => setKind("period")}
             label="Por um período"
+            description="Selecione um intervalo de datas."
           />
           <ScopeOption
             checked={kind === "all"}
             onCheck={() => setKind("all")}
             label="Toda a conta"
+            description="Aplica a todos os lançamentos da conta, sem limite de data."
           />
         </div>
+
 
         {kind === "period" && (
           <div className="grid grid-cols-2 gap-2">

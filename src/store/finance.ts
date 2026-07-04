@@ -623,11 +623,13 @@ export function useIncomes() {
         installments_count: number;
         is_parent: boolean;
         recurrence_group_id: string | null;
+        reference_year: number | null;
+        reference_month: number | null;
       }>(() =>
         supabase
           .from("incomes")
           .select(
-            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id",
+            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
           )
           .order("date", { ascending: true }),
       );
@@ -641,6 +643,8 @@ export function useIncomes() {
         installmentsCount: d.installments_count,
         isParent: d.is_parent,
         recurrenceGroupId: d.recurrence_group_id ?? null,
+        referenceYear: d.reference_year ?? null,
+        referenceMonth: d.reference_month ?? null,
       }));
     },
   });

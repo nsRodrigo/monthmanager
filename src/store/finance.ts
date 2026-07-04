@@ -4227,6 +4227,8 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               installments_count: 1,
               is_parent: false,
               recurrence_group_id: gid,
+              reference_year: year,
+              reference_month: month,
             };
             if (table === "debits") {
               row.required = true;

@@ -57,6 +57,8 @@ export function AddIncomeDialog({
         amount,
         date,
         recurring: true,
+        referenceYear: defaultYear,
+        referenceMonth: defaultMonth,
       });
       onClose();
       return;
@@ -72,6 +74,8 @@ export function AddIncomeDialog({
       date,
       installmentsCount: n,
       installmentNumber: cur,
+      referenceYear: defaultYear,
+      referenceMonth: defaultMonth,
     });
     onClose();
   };

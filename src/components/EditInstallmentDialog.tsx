@@ -629,10 +629,15 @@ export function EditInstallmentDialog({
           )}
 
           <div className="flex gap-2 pt-2">
-            {parentSource && (
+            {(parentSource || inst.total > 1) && (
               <button
-                onClick={() => setAskDuplicate(true)}
-                disabled={duplicate.isPending}
+                onClick={() => {
+                  // Parcelled → ask which kind of duplicate (this parcel only / whole series).
+                  // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
+                  if (inst.total > 1) setAskDuplicateParcelled(true);
+                  else setAskDuplicate(true);
+                }}
+                disabled={duplicate.isPending || duplicateSeries.isPending}
                 className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
                 title="Duplicar lançamento"
               >

@@ -77,9 +77,11 @@ export function EditInstallmentDialog({
   const removeIncome = useRemoveIncome();
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
-  
+  const duplicateSeries = useDuplicateInstallmentSeries();
+
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
+  const [askDuplicateParcelled, setAskDuplicateParcelled] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const dupAnchorY = defaultYear ?? new Date().getFullYear();
   const dupAnchorM = defaultMonth ?? new Date().getMonth();

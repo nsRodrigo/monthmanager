@@ -860,18 +860,26 @@ export function EditInstallmentDialog({
           </p>
           <button
             onClick={async () => {
-              // Duplicar somente esta parcela: cria um lançamento avulso (1x) no mesmo mês.
+              // Duplicar somente esta parcela: cria um lançamento avulso (1x) no mesmo mês/ano da parcela.
               const newDesc = (parentLabel ?? "").trim() || "Lançamento";
               const anchorDate = inst.dueDate;
-              if (inst.parentType === "purchase") {
-                // Nova purchase 1x + 1 installment no MESMO year/month da parcela original.
-                await duplicateSeries.mutateAsync({
-                  parentId: inst.parentId,
-                  parentType: "purchase",
+              if (inst.parentType === "purchase" && parentSource && parentSource.kind === "purchase") {
+                // Duplica só esta parcela como uma compra 1x no mesmo mês da parcela.
+                await duplicate.mutateAsync({
+                  source: {
+                    kind: "purchase",
+                    cardId: parentSource.cardId,
+                    description: newDesc,
+                    totalAmount: inst.amount,
+                    date: anchorDate,
+                  },
+                  scope: { kind: "month", year: inst.year, month: inst.month },
+                  anchorYear: inst.year,
+                  anchorMonth: inst.month,
                 });
-              } else if (inst.parentType === "debit") {
+              } else if (inst.parentType === "debit" && parentSource && parentSource.kind === "debit") {
                 await addDebit.mutateAsync({
-                  accountId: "",
+                  accountId: parentSource.accountId,
                   description: newDesc,
                   amount: inst.amount,
                   date: anchorDate,
@@ -879,9 +887,9 @@ export function EditInstallmentDialog({
                   referenceYear: inst.year,
                   referenceMonth: inst.month,
                 });
-              } else {
+              } else if (inst.parentType === "income" && parentSource && parentSource.kind === "income") {
                 await addIncome.mutateAsync({
-                  accountId: "",
+                  accountId: parentSource.accountId,
                   description: newDesc,
                   amount: inst.amount,
                   date: anchorDate,
@@ -892,7 +900,7 @@ export function EditInstallmentDialog({
               setAskDuplicateParcelled(false);
               onClose();
             }}
-            disabled={duplicateSeries.isPending || addDebit.isPending || addIncome.isPending}
+            disabled={!parentSource || duplicate.isPending || addDebit.isPending || addIncome.isPending}
             className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
           >
             <span className="font-semibold">Duplicar somente esta parcela</span>

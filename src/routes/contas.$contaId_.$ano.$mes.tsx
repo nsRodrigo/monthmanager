@@ -1207,6 +1207,7 @@ function AccountMonth() {
         defaultMonth={month}
         initialKind="month"
         loading={deleteParcelledScoped.isPending || deleteRecurringScoped.isPending}
+        availableMonths={scopeDelete?.availableMonths}
         onConfirm={async (scope) => {
           if (!scopeDelete) return;
           await scopeDelete.execute(scope);

@@ -2309,6 +2309,74 @@ export function useDuplicateOverScope() {
 }
 
 // =======================
+// Duplicate a parcelled series (purchase / debit / income) as an independent copy.
+// Every installment lands in the SAME year/month as the original — a faithful clone,
+// but with brand new parent + installment ids and zero link to the source.
+// =======================
+export function useDuplicateInstallmentSeries() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+    }) => {
+      const { parentId, parentType } = args;
+      // Load original parent row + installments.
+      const parentTable =
+        parentType === "purchase" ? "purchases" : parentType === "debit" ? "debits" : "incomes";
+      const { data: parent, error: pe } = await supabase
+        .from(parentTable)
+        .select("*")
+        .eq("id", parentId)
+        .maybeSingle();
+      if (pe) throw pe;
+      if (!parent) throw new Error("Lançamento original não encontrado.");
+      const { data: insts, error: ie } = await supabase
+        .from("installments")
+        .select("*")
+        .eq("parent_id", parentId)
+        .eq("parent_type", parentType);
+      if (ie) throw ie;
+      const originalInstallments = (insts ?? []) as any[];
+      if (originalInstallments.length === 0) throw new Error("Sem parcelas para duplicar.");
+
+      const newParentId = crypto.randomUUID();
+      // Clone parent with a fresh id — strip id/user_id/created_at then re-add.
+      const cloneRow: any = { ...(parent as any) };
+      delete cloneRow.id;
+      delete cloneRow.created_at;
+      delete cloneRow.updated_at;
+      cloneRow.id = newParentId;
+      cloneRow.user_id = user!.id;
+      const { error: iep } = await supabase.from(parentTable).insert(cloneRow);
+      if (iep) throw iep;
+
+      const newInsts = originalInstallments.map((r) => ({
+        id: crypto.randomUUID(),
+        user_id: user!.id,
+        parent_id: newParentId,
+        parent_type: parentType,
+        purchase_id: parentType === "purchase" ? newParentId : null,
+        number: r.number,
+        total: r.total,
+        amount: r.amount,
+        due_date: r.due_date,
+        year: r.year,
+        month: r.month,
+        paid: false,
+      }));
+      const { error: iei } = await supabase.from("installments").insert(newInsts);
+      if (iei) throw iei;
+      return { newParentId };
+    },
+    onSuccess: () => inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
+
+
+// =======================
 // Delete any item over a scope (month / period / all)
 // Finds matching single-payment rows in each target month and removes them.
 // For recurring series, matches by recurrence_group_id within the target months.

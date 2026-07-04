@@ -1977,12 +1977,18 @@ export function useAddIncome() {
       installmentsCount?: number;
       installmentNumber?: number;
       recurring?: boolean;
+      /** Reference month/year "position" for this entry — set once on creation. */
+      referenceYear?: number;
+      referenceMonth?: number;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const isRecurring = !!i.recurring && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
       const incomeId = crypto.randomUUID();
+      const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
+      const refYear = i.referenceYear ?? _by;
+      const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
       const baseRow = {
         id: incomeId,
         user_id: user!.id,
@@ -1994,6 +2000,8 @@ export function useAddIncome() {
         installments_count: count,
         is_parent: count > 1,
         recurrence_group_id: groupId,
+        reference_year: refYear,
+        reference_month: refMonth,
       };
       const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
@@ -2043,6 +2051,8 @@ export function useAddIncome() {
             installments_count: 1,
             is_parent: false,
             recurrence_group_id: groupId,
+            reference_year: target.getFullYear(),
+            reference_month: target.getMonth(),
           });
         }
         if (rows.length) {

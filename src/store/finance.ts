@@ -2235,6 +2235,8 @@ export function useDuplicateOverScope() {
           paid: false,
           installments_count: 1,
           is_parent: false,
+          reference_year: t.year,
+          reference_month: t.month,
         }));
         const { error } = await supabase.from("debits").insert(rows);
         if (error) throw error;
@@ -2249,6 +2251,8 @@ export function useDuplicateOverScope() {
           received: false,
           installments_count: 1,
           is_parent: false,
+          reference_year: t.year,
+          reference_month: t.month,
         }));
         const { error } = await supabase.from("incomes").insert(rows);
         if (error) throw error;

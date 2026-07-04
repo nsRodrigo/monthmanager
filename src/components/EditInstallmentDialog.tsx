@@ -29,7 +29,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Trash2, Copy, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
-import { Modal as ModalRoot } from "./Modal";
+
 
 export type SingleEditTarget =
   | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }

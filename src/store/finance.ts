@@ -127,6 +127,9 @@ export type Debit = {
   isParent: boolean;
   /** Group id linking all monthly occurrences of a recurring series. */
   recurrenceGroupId: string | null;
+  /** Month the entry belongs to (set on creation, never touched by date edits). */
+  referenceYear: number | null;
+  referenceMonth: number | null;
 };
 
 export type Income = {
@@ -140,6 +143,9 @@ export type Income = {
   isParent: boolean;
   /** Group id linking all monthly occurrences of a recurring series. */
   recurrenceGroupId: string | null;
+  /** Month the entry belongs to (set on creation, never touched by date edits). */
+  referenceYear: number | null;
+  referenceMonth: number | null;
 };
 
 export type Investment = {

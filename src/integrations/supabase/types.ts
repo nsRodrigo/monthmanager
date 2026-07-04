@@ -233,6 +233,8 @@ export type Database = {
           is_parent: boolean
           paid: boolean
           recurrence_group_id: string | null
+          reference_month: number | null
+          reference_year: number | null
           required: boolean
           user_id: string
         }
@@ -249,6 +251,8 @@ export type Database = {
           is_parent?: boolean
           paid?: boolean
           recurrence_group_id?: string | null
+          reference_month?: number | null
+          reference_year?: number | null
           required?: boolean
           user_id: string
         }
@@ -265,6 +269,8 @@ export type Database = {
           is_parent?: boolean
           paid?: boolean
           recurrence_group_id?: string | null
+          reference_month?: number | null
+          reference_year?: number | null
           required?: boolean
           user_id?: string
         }
@@ -290,6 +296,8 @@ export type Database = {
           is_parent: boolean
           received: boolean
           recurrence_group_id: string | null
+          reference_month: number | null
+          reference_year: number | null
           user_id: string
         }
         Insert: {
@@ -303,6 +311,8 @@ export type Database = {
           is_parent?: boolean
           received?: boolean
           recurrence_group_id?: string | null
+          reference_month?: number | null
+          reference_year?: number | null
           user_id: string
         }
         Update: {
@@ -316,6 +326,8 @@ export type Database = {
           is_parent?: boolean
           received?: boolean
           recurrence_group_id?: string | null
+          reference_month?: number | null
+          reference_year?: number | null
           user_id?: string
         }
         Relationships: [

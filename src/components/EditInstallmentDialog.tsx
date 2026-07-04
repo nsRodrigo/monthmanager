@@ -848,6 +848,84 @@ export function EditInstallmentDialog({
           }}
         />
       )}
+
+      <Modal
+        open={askDuplicateParcelled}
+        onClose={() => setAskDuplicateParcelled(false)}
+        title={`Duplicar · ${parentLabel ?? "lançamento parcelado"}`}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Como deseja duplicar esse parcelamento?
+          </p>
+          <button
+            onClick={async () => {
+              // Duplicar somente esta parcela: cria um lançamento avulso (1x) no mesmo mês.
+              const newDesc = (parentLabel ?? "").trim() || "Lançamento";
+              const anchorDate = inst.dueDate;
+              if (inst.parentType === "purchase") {
+                // Nova purchase 1x + 1 installment no MESMO year/month da parcela original.
+                await duplicateSeries.mutateAsync({
+                  parentId: inst.parentId,
+                  parentType: "purchase",
+                });
+              } else if (inst.parentType === "debit") {
+                await addDebit.mutateAsync({
+                  accountId: "",
+                  description: newDesc,
+                  amount: inst.amount,
+                  date: anchorDate,
+                  required: false,
+                  referenceYear: inst.year,
+                  referenceMonth: inst.month,
+                });
+              } else {
+                await addIncome.mutateAsync({
+                  accountId: "",
+                  description: newDesc,
+                  amount: inst.amount,
+                  date: anchorDate,
+                  referenceYear: inst.year,
+                  referenceMonth: inst.month,
+                });
+              }
+              setAskDuplicateParcelled(false);
+              onClose();
+            }}
+            disabled={duplicateSeries.isPending || addDebit.isPending || addIncome.isPending}
+            className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+          >
+            <span className="font-semibold">Duplicar somente esta parcela</span>
+            <span className="text-xs text-muted-foreground">
+              Cria um lançamento novo e independente (1x) neste mesmo mês.
+            </span>
+          </button>
+          <button
+            onClick={async () => {
+              await duplicateSeries.mutateAsync({
+                parentId: inst.parentId,
+                parentType: inst.parentType,
+              });
+              setAskDuplicateParcelled(false);
+              onClose();
+            }}
+            disabled={duplicateSeries.isPending}
+            className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+          >
+            <span className="font-semibold">Duplicar toda a compra parcelada</span>
+            <span className="text-xs text-muted-foreground">
+              Cria uma cópia fiel: {inst.total}x, cada parcela no mesmo mês da original.
+            </span>
+          </button>
+          <button
+            onClick={() => setAskDuplicateParcelled(false)}
+            disabled={duplicateSeries.isPending || addDebit.isPending || addIncome.isPending}
+            className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }

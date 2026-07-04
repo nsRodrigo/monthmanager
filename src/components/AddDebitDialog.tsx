@@ -68,6 +68,8 @@ export function AddDebitDialog({
       autoDebitDay: autoDebit && autoDebitDay ? Math.max(1, Math.min(31, parseInt(autoDebitDay))) : null,
       installmentsCount: n,
       installmentNumber: cur,
+      referenceYear: defaultYear,
+      referenceMonth: defaultMonth,
     });
     onClose();
   };

@@ -17,6 +17,7 @@ import {
   useDescriptionSuggestions,
   useDuplicateOverScope,
   useDeleteOverScope,
+  useDuplicateInstallmentSeries,
   type Installment,
   type InstallmentScope,
   type CardScope,
@@ -28,6 +29,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Trash2, Copy, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
+
 
 export type SingleEditTarget =
   | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
@@ -75,9 +77,11 @@ export function EditInstallmentDialog({
   const removeIncome = useRemoveIncome();
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
-  
+  const duplicateSeries = useDuplicateInstallmentSeries();
+
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
+  const [askDuplicateParcelled, setAskDuplicateParcelled] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const dupAnchorY = defaultYear ?? new Date().getFullYear();
   const dupAnchorM = defaultMonth ?? new Date().getMonth();
@@ -625,10 +629,15 @@ export function EditInstallmentDialog({
           )}
 
           <div className="flex gap-2 pt-2">
-            {parentSource && (
+            {(parentSource || inst.total > 1) && (
               <button
-                onClick={() => setAskDuplicate(true)}
-                disabled={duplicate.isPending}
+                onClick={() => {
+                  // Parcelled → ask which kind of duplicate (this parcel only / whole series).
+                  // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
+                  if (inst.total > 1) setAskDuplicateParcelled(true);
+                  else setAskDuplicate(true);
+                }}
+                disabled={duplicate.isPending || duplicateSeries.isPending}
                 className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
                 title="Duplicar lançamento"
               >
@@ -839,6 +848,92 @@ export function EditInstallmentDialog({
           }}
         />
       )}
+
+      <Modal
+        open={askDuplicateParcelled}
+        onClose={() => setAskDuplicateParcelled(false)}
+        title={`Duplicar · ${parentLabel ?? "lançamento parcelado"}`}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Como deseja duplicar esse parcelamento?
+          </p>
+          <button
+            onClick={async () => {
+              // Duplicar somente esta parcela: cria um lançamento avulso (1x) no mesmo mês/ano da parcela.
+              const newDesc = (parentLabel ?? "").trim() || "Lançamento";
+              const anchorDate = inst.dueDate;
+              if (inst.parentType === "purchase" && parentSource && parentSource.kind === "purchase") {
+                // Duplica só esta parcela como uma compra 1x no mesmo mês da parcela.
+                await duplicate.mutateAsync({
+                  source: {
+                    kind: "purchase",
+                    cardId: parentSource.cardId,
+                    description: newDesc,
+                    totalAmount: inst.amount,
+                    date: anchorDate,
+                  },
+                  scope: { kind: "month", year: inst.year, month: inst.month },
+                  anchorYear: inst.year,
+                  anchorMonth: inst.month,
+                });
+              } else if (inst.parentType === "debit" && parentSource && parentSource.kind === "debit") {
+                await addDebit.mutateAsync({
+                  accountId: parentSource.accountId,
+                  description: newDesc,
+                  amount: inst.amount,
+                  date: anchorDate,
+                  required: false,
+                  referenceYear: inst.year,
+                  referenceMonth: inst.month,
+                });
+              } else if (inst.parentType === "income" && parentSource && parentSource.kind === "income") {
+                await addIncome.mutateAsync({
+                  accountId: parentSource.accountId,
+                  description: newDesc,
+                  amount: inst.amount,
+                  date: anchorDate,
+                  referenceYear: inst.year,
+                  referenceMonth: inst.month,
+                });
+              }
+              setAskDuplicateParcelled(false);
+              onClose();
+            }}
+            disabled={!parentSource || duplicate.isPending || addDebit.isPending || addIncome.isPending}
+            className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+          >
+            <span className="font-semibold">Duplicar somente esta parcela</span>
+            <span className="text-xs text-muted-foreground">
+              Cria um lançamento novo e independente (1x) neste mesmo mês.
+            </span>
+          </button>
+          <button
+            onClick={async () => {
+              await duplicateSeries.mutateAsync({
+                parentId: inst.parentId,
+                parentType: inst.parentType,
+              });
+              setAskDuplicateParcelled(false);
+              onClose();
+            }}
+            disabled={duplicateSeries.isPending}
+            className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+          >
+            <span className="font-semibold">Duplicar toda a compra parcelada</span>
+            <span className="text-xs text-muted-foreground">
+              Cria uma cópia fiel: {inst.total}x, cada parcela no mesmo mês da original.
+            </span>
+          </button>
+          <button
+            onClick={() => setAskDuplicateParcelled(false)}
+            disabled={duplicateSeries.isPending || addDebit.isPending || addIncome.isPending}
+            className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }

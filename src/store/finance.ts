@@ -127,6 +127,9 @@ export type Debit = {
   isParent: boolean;
   /** Group id linking all monthly occurrences of a recurring series. */
   recurrenceGroupId: string | null;
+  /** Month the entry belongs to (set on creation, never touched by date edits). */
+  referenceYear: number | null;
+  referenceMonth: number | null;
 };
 
 export type Income = {
@@ -140,6 +143,9 @@ export type Income = {
   isParent: boolean;
   /** Group id linking all monthly occurrences of a recurring series. */
   recurrenceGroupId: string | null;
+  /** Month the entry belongs to (set on creation, never touched by date edits). */
+  referenceYear: number | null;
+  referenceMonth: number | null;
 };
 
 export type Investment = {
@@ -563,12 +569,14 @@ export function useDebits() {
         installments_count: number;
         is_parent: boolean;
         recurrence_group_id: string | null;
+        reference_year: number | null;
+        reference_month: number | null;
       }>(
         (abortSignal) => {
           const query = supabase
             .from("debits")
             .select(
-              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id",
+              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
             )
             .order("date", { ascending: true })
             .order("id", { ascending: true });
@@ -591,6 +599,8 @@ export function useDebits() {
           installmentsCount: d.installments_count,
           isParent: d.is_parent,
           recurrenceGroupId: d.recurrence_group_id ?? null,
+          referenceYear: d.reference_year ?? null,
+          referenceMonth: d.reference_month ?? null,
         })),
       );
     },
@@ -613,11 +623,13 @@ export function useIncomes() {
         installments_count: number;
         is_parent: boolean;
         recurrence_group_id: string | null;
+        reference_year: number | null;
+        reference_month: number | null;
       }>(() =>
         supabase
           .from("incomes")
           .select(
-            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id",
+            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
           )
           .order("date", { ascending: true }),
       );
@@ -631,6 +643,8 @@ export function useIncomes() {
         installmentsCount: d.installments_count,
         isParent: d.is_parent,
         recurrenceGroupId: d.recurrence_group_id ?? null,
+        referenceYear: d.reference_year ?? null,
+        referenceMonth: d.reference_month ?? null,
       }));
     },
   });
@@ -1766,12 +1780,19 @@ export function useAddDebit() {
       autoDebitDay?: number | null;
       installmentsCount?: number;
       installmentNumber?: number;
+      /** Reference month/year "position" for this entry — set once on creation. */
+      referenceYear?: number;
+      referenceMonth?: number;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
       const isRecurring = d.required && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
       const debitId = crypto.randomUUID();
+      // Fallback to date when caller didn't pass a reference month.
+      const [_by, _bm] = d.date.slice(0, 10).split("-").map(Number);
+      const refYear = d.referenceYear ?? _by;
+      const refMonth = d.referenceMonth ?? (_bm || 1) - 1;
       const baseRow = {
         id: debitId,
         user_id: user!.id,
@@ -1786,6 +1807,8 @@ export function useAddDebit() {
         installments_count: count,
         is_parent: count > 1,
         recurrence_group_id: groupId,
+        reference_year: refYear,
+        reference_month: refMonth,
       };
       const { error } = await supabase.from("debits").insert(baseRow);
       if (error) throw error;
@@ -1840,6 +1863,9 @@ export function useAddDebit() {
             installments_count: 1,
             is_parent: false,
             recurrence_group_id: groupId,
+            // Each recurring occurrence "belongs" to its own month.
+            reference_year: target.getFullYear(),
+            reference_month: target.getMonth(),
           });
         }
         if (rows.length) {
@@ -1847,6 +1873,7 @@ export function useAddDebit() {
           if (e3) throw e3;
         }
       }
+
       return { debitId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["debits", "installments"]),
@@ -1950,12 +1977,18 @@ export function useAddIncome() {
       installmentsCount?: number;
       installmentNumber?: number;
       recurring?: boolean;
+      /** Reference month/year "position" for this entry — set once on creation. */
+      referenceYear?: number;
+      referenceMonth?: number;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const isRecurring = !!i.recurring && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
       const incomeId = crypto.randomUUID();
+      const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
+      const refYear = i.referenceYear ?? _by;
+      const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
       const baseRow = {
         id: incomeId,
         user_id: user!.id,
@@ -1967,6 +2000,8 @@ export function useAddIncome() {
         installments_count: count,
         is_parent: count > 1,
         recurrence_group_id: groupId,
+        reference_year: refYear,
+        reference_month: refMonth,
       };
       const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
@@ -2016,6 +2051,8 @@ export function useAddIncome() {
             installments_count: 1,
             is_parent: false,
             recurrence_group_id: groupId,
+            reference_year: target.getFullYear(),
+            reference_month: target.getMonth(),
           });
         }
         if (rows.length) {
@@ -2198,6 +2235,8 @@ export function useDuplicateOverScope() {
           paid: false,
           installments_count: 1,
           is_parent: false,
+          reference_year: t.year,
+          reference_month: t.month,
         }));
         const { error } = await supabase.from("debits").insert(rows);
         if (error) throw error;
@@ -2212,6 +2251,8 @@ export function useDuplicateOverScope() {
           received: false,
           installments_count: 1,
           is_parent: false,
+          reference_year: t.year,
+          reference_month: t.month,
         }));
         const { error } = await supabase.from("incomes").insert(rows);
         if (error) throw error;
@@ -2266,6 +2307,74 @@ export function useDuplicateOverScope() {
     },
   });
 }
+
+// =======================
+// Duplicate a parcelled series (purchase / debit / income) as an independent copy.
+// Every installment lands in the SAME year/month as the original — a faithful clone,
+// but with brand new parent + installment ids and zero link to the source.
+// =======================
+export function useDuplicateInstallmentSeries() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+    }) => {
+      const { parentId, parentType } = args;
+      // Load original parent row + installments.
+      const parentTable =
+        parentType === "purchase" ? "purchases" : parentType === "debit" ? "debits" : "incomes";
+      const { data: parent, error: pe } = await supabase
+        .from(parentTable)
+        .select("*")
+        .eq("id", parentId)
+        .maybeSingle();
+      if (pe) throw pe;
+      if (!parent) throw new Error("Lançamento original não encontrado.");
+      const { data: insts, error: ie } = await supabase
+        .from("installments")
+        .select("*")
+        .eq("parent_id", parentId)
+        .eq("parent_type", parentType);
+      if (ie) throw ie;
+      const originalInstallments = (insts ?? []) as any[];
+      if (originalInstallments.length === 0) throw new Error("Sem parcelas para duplicar.");
+
+      const newParentId = crypto.randomUUID();
+      // Clone parent with a fresh id — strip id/user_id/created_at then re-add.
+      const cloneRow: any = { ...(parent as any) };
+      delete cloneRow.id;
+      delete cloneRow.created_at;
+      delete cloneRow.updated_at;
+      cloneRow.id = newParentId;
+      cloneRow.user_id = user!.id;
+      const { error: iep } = await supabase.from(parentTable).insert(cloneRow);
+      if (iep) throw iep;
+
+      const newInsts = originalInstallments.map((r) => ({
+        id: crypto.randomUUID(),
+        user_id: user!.id,
+        parent_id: newParentId,
+        parent_type: parentType,
+        purchase_id: parentType === "purchase" ? newParentId : null,
+        number: r.number,
+        total: r.total,
+        amount: r.amount,
+        due_date: r.due_date,
+        year: r.year,
+        month: r.month,
+        paid: false,
+      }));
+      const { error: iei } = await supabase.from("installments").insert(newInsts);
+      if (iei) throw iei;
+      return { newParentId };
+    },
+    onSuccess: () => inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
+
 
 // =======================
 // Delete any item over a scope (month / period / all)
@@ -3352,6 +3461,11 @@ export function getMonthDebits(
   const single = uniqueById(debits)
     .filter((d) => !d.isParent)
     .filter((d) => {
+      // Prefer reference_year/month — the entry's fixed "position" month.
+      // Fallback to date parsing for legacy rows without the field.
+      if (d.referenceYear != null && d.referenceMonth != null) {
+        return d.referenceYear === year && d.referenceMonth === month;
+      }
       const [y, m] = d.date.slice(0, 10).split("-").map(Number);
       return y === year && m - 1 === month;
     });
@@ -3374,6 +3488,9 @@ export function getMonthIncomes(
   const single = incomes
     .filter((d) => !d.isParent)
     .filter((d) => {
+      if (d.referenceYear != null && d.referenceMonth != null) {
+        return d.referenceYear === year && d.referenceMonth === month;
+      }
       const [y, m] = d.date.slice(0, 10).split("-").map(Number);
       return y === year && m - 1 === month;
     });
@@ -4178,6 +4295,8 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               installments_count: 1,
               is_parent: false,
               recurrence_group_id: gid,
+              reference_year: year,
+              reference_month: month,
             };
             if (table === "debits") {
               row.required = true;

@@ -156,6 +156,7 @@ function AccountMonth() {
     title: string;
     description?: React.ReactNode;
     execute: (scope: CardScope) => Promise<void>;
+    availableMonths?: Array<{ year: number; month: number }>;
   } | null>(null);
 
   /** Abre o "Aplicar em" para uma compra/débito/recebimento parcelado. */
@@ -164,6 +165,9 @@ function AccountMonth() {
     parentType: "purchase" | "debit" | "income",
     label: string,
   ) => {
+    const months = (installments ?? [])
+      .filter((i) => i.parentId === parentId && i.parentType === parentType)
+      .map((i) => ({ year: i.year, month: i.month }));
     setScopeDelete({
       title:
         parentType === "purchase"
@@ -178,6 +182,7 @@ function AccountMonth() {
       ),
       execute: (scope) =>
         deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+      availableMonths: months.length > 0 ? months : undefined,
     });
   };
 
@@ -1202,6 +1207,7 @@ function AccountMonth() {
         defaultMonth={month}
         initialKind="month"
         loading={deleteParcelledScoped.isPending || deleteRecurringScoped.isPending}
+        availableMonths={scopeDelete?.availableMonths}
         onConfirm={async (scope) => {
           if (!scopeDelete) return;
           await scopeDelete.execute(scope);

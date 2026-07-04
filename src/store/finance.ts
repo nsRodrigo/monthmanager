@@ -3366,6 +3366,11 @@ export function getMonthDebits(
   const single = uniqueById(debits)
     .filter((d) => !d.isParent)
     .filter((d) => {
+      // Prefer reference_year/month — the entry's fixed "position" month.
+      // Fallback to date parsing for legacy rows without the field.
+      if (d.referenceYear != null && d.referenceMonth != null) {
+        return d.referenceYear === year && d.referenceMonth === month;
+      }
       const [y, m] = d.date.slice(0, 10).split("-").map(Number);
       return y === year && m - 1 === month;
     });
@@ -3388,6 +3393,9 @@ export function getMonthIncomes(
   const single = incomes
     .filter((d) => !d.isParent)
     .filter((d) => {
+      if (d.referenceYear != null && d.referenceMonth != null) {
+        return d.referenceYear === year && d.referenceMonth === month;
+      }
       const [y, m] = d.date.slice(0, 10).split("-").map(Number);
       return y === year && m - 1 === month;
     });

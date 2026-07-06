@@ -611,7 +611,7 @@ export function EditInstallmentDialog({
             <Field label="Valor">
               <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
-            <Field label="Data de vencimento">
+            <Field label={inst.parentType === "purchase" ? "Data da compra" : "Data"}>
               <input
                 type="date"
                 className={inputClass}

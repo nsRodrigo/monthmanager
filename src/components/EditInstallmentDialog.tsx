@@ -81,6 +81,9 @@ export function EditInstallmentDialog({
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const duplicateSeries = useDuplicateInstallmentSeries();
+  const { data: purchases = [] } = usePurchases();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
 
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
@@ -96,6 +99,23 @@ export function EditInstallmentDialog({
       ? (installment.parentType as "debit" | "income" | "purchase" | "investment")
       : "debit";
   const suggestions = useDescriptionSuggestions(suggestionKind);
+
+  // For installments (parcelas), the editable date is the PARENT's date
+  // (purchase_date / debit.date / income.date), shared by all installments.
+  // Installment.dueDate is the per-month invoice slot and is not touched here.
+  const parentDate = (() => {
+    if (!installment) return "";
+    if (installment.parentType === "purchase") {
+      return purchases.find((p) => p.id === installment.parentId)?.date ?? "";
+    }
+    if (installment.parentType === "debit") {
+      return debits.find((d) => d.id === installment.parentId)?.date ?? "";
+    }
+    if (installment.parentType === "income") {
+      return incomes.find((i) => i.id === installment.parentId)?.date ?? "";
+    }
+    return "";
+  })();
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);

@@ -154,7 +154,7 @@ export function EditInstallmentDialog({
     setAskDateScope(false);
     setAdvanceCount("");
     setManageView("none");
-  }, [open, installment, single, parentLabel]);
+  }, [open, installment, single, parentLabel, parentDate]);
 
   if (!installment && !single) return null;
 

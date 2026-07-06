@@ -485,15 +485,30 @@ export function EditInstallmentDialog({
 
   // ───── INSTALLMENT (parcela) ─────
   const inst = installment!;
-  const dateChanged = dueDate !== inst.dueDate;
+  const baselineDate = parentDate || inst.dueDate;
+  const dateChanged = dueDate !== baselineDate;
   const amountChanged = amount !== inst.amount;
   const paidChanged = paid !== inst.paid;
   const remaining = Math.max(0, inst.total - inst.number);
   const isSingleParcel = inst.total <= 1;
 
   async function commit(scope: InstallmentScope) {
+    // Date edit: for parcelled items with a real parent, update the parent's
+    // shared date (purchase_date / debit.date / income.date). Installments
+    // keep their own month/dueDate — the "data da compra" is shared.
+    // Fallback (no parent match, or investments): shift the installment date.
     if (dateChanged) {
-      await shift.mutateAsync({ installment: inst, newDate: dueDate, scope });
+      if (!isSingleParcel && parentDate) {
+        if (inst.parentType === "purchase") {
+          await updatePurchase.mutateAsync({ id: inst.parentId, date: dueDate });
+        } else if (inst.parentType === "debit") {
+          await updateDebit.mutateAsync({ id: inst.parentId, date: dueDate });
+        } else if (inst.parentType === "income") {
+          await updateIncome.mutateAsync({ id: inst.parentId, date: dueDate });
+        }
+      } else {
+        await shift.mutateAsync({ installment: inst, newDate: dueDate, scope });
+      }
     }
     if (amountChanged) {
       await updateAmountScope.mutateAsync({ installment: inst, amount, scope });
@@ -516,9 +531,9 @@ export function EditInstallmentDialog({
   }
 
   const handleSave = async () => {
-    // Quando o item tem mais de uma parcela e o usuário alterou data ou valor,
-    // perguntamos a qual conjunto de parcelas a mudança se aplica.
-    if ((dateChanged || amountChanged) && !isSingleParcel) {
+    // Scope prompt only makes sense for amount edits now — date edits touch
+    // the shared parent date automatically.
+    if (amountChanged && !isSingleParcel) {
       setAskDateScope(true);
       return;
     }

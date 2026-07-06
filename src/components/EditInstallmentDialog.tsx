@@ -137,7 +137,7 @@ export function EditInstallmentDialog({
     if (installment) {
       setDescription(parentLabel ?? "");
       setAmount(installment.amount);
-      setDueDate(installment.dueDate);
+      setDueDate(parentDate || installment.dueDate);
       setPaid(installment.paid);
       setNewInstCount(String(installment.total));
       setNewTotalAmount(installment.amount * installment.total);

@@ -18,6 +18,9 @@ import {
   useDuplicateOverScope,
   useDeleteOverScope,
   useDuplicateInstallmentSeries,
+  usePurchases,
+  useDebits,
+  useIncomes,
   type Installment,
   type InstallmentScope,
   type CardScope,
@@ -78,6 +81,9 @@ export function EditInstallmentDialog({
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const duplicateSeries = useDuplicateInstallmentSeries();
+  const { data: purchases = [] } = usePurchases();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
 
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
@@ -93,6 +99,23 @@ export function EditInstallmentDialog({
       ? (installment.parentType as "debit" | "income" | "purchase" | "investment")
       : "debit";
   const suggestions = useDescriptionSuggestions(suggestionKind);
+
+  // For installments (parcelas), the editable date is the PARENT's date
+  // (purchase_date / debit.date / income.date), shared by all installments.
+  // Installment.dueDate is the per-month invoice slot and is not touched here.
+  const parentDate = (() => {
+    if (!installment) return "";
+    if (installment.parentType === "purchase") {
+      return purchases.find((p) => p.id === installment.parentId)?.date ?? "";
+    }
+    if (installment.parentType === "debit") {
+      return debits.find((d) => d.id === installment.parentId)?.date ?? "";
+    }
+    if (installment.parentType === "income") {
+      return incomes.find((i) => i.id === installment.parentId)?.date ?? "";
+    }
+    return "";
+  })();
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
@@ -114,7 +137,7 @@ export function EditInstallmentDialog({
     if (installment) {
       setDescription(parentLabel ?? "");
       setAmount(installment.amount);
-      setDueDate(installment.dueDate);
+      setDueDate(parentDate || installment.dueDate);
       setPaid(installment.paid);
       setNewInstCount(String(installment.total));
       setNewTotalAmount(installment.amount * installment.total);
@@ -131,7 +154,7 @@ export function EditInstallmentDialog({
     setAskDateScope(false);
     setAdvanceCount("");
     setManageView("none");
-  }, [open, installment, single, parentLabel]);
+  }, [open, installment, single, parentLabel, parentDate]);
 
   if (!installment && !single) return null;
 
@@ -462,15 +485,30 @@ export function EditInstallmentDialog({
 
   // ───── INSTALLMENT (parcela) ─────
   const inst = installment!;
-  const dateChanged = dueDate !== inst.dueDate;
+  const baselineDate = parentDate || inst.dueDate;
+  const dateChanged = dueDate !== baselineDate;
   const amountChanged = amount !== inst.amount;
   const paidChanged = paid !== inst.paid;
   const remaining = Math.max(0, inst.total - inst.number);
   const isSingleParcel = inst.total <= 1;
 
   async function commit(scope: InstallmentScope) {
+    // Date edit: for parcelled items with a real parent, update the parent's
+    // shared date (purchase_date / debit.date / income.date). Installments
+    // keep their own month/dueDate — the "data da compra" is shared.
+    // Fallback (no parent match, or investments): shift the installment date.
     if (dateChanged) {
-      await shift.mutateAsync({ installment: inst, newDate: dueDate, scope });
+      if (!isSingleParcel && parentDate) {
+        if (inst.parentType === "purchase") {
+          await updatePurchase.mutateAsync({ id: inst.parentId, date: dueDate });
+        } else if (inst.parentType === "debit") {
+          await updateDebit.mutateAsync({ id: inst.parentId, date: dueDate });
+        } else if (inst.parentType === "income") {
+          await updateIncome.mutateAsync({ id: inst.parentId, date: dueDate });
+        }
+      } else {
+        await shift.mutateAsync({ installment: inst, newDate: dueDate, scope });
+      }
     }
     if (amountChanged) {
       await updateAmountScope.mutateAsync({ installment: inst, amount, scope });
@@ -493,9 +531,9 @@ export function EditInstallmentDialog({
   }
 
   const handleSave = async () => {
-    // Quando o item tem mais de uma parcela e o usuário alterou data ou valor,
-    // perguntamos a qual conjunto de parcelas a mudança se aplica.
-    if ((dateChanged || amountChanged) && !isSingleParcel) {
+    // Scope prompt only makes sense for amount edits now — date edits touch
+    // the shared parent date automatically.
+    if (amountChanged && !isSingleParcel) {
       setAskDateScope(true);
       return;
     }
@@ -573,7 +611,7 @@ export function EditInstallmentDialog({
             <Field label="Valor">
               <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
-            <Field label="Data de vencimento">
+            <Field label={inst.parentType === "purchase" ? "Data da compra" : "Data"}>
               <input
                 type="date"
                 className={inputClass}

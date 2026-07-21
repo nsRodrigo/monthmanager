@@ -12,6 +12,7 @@ import {
   useToggleDebitPaid,
   useRemoveDebit,
   useToggleIncomeReceived,
+  useBulkReceiveIncomes,
   useRemoveIncome,
   useToggleInstallmentPaid,
   useSetCardPaid,

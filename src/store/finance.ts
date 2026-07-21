@@ -1124,13 +1124,17 @@ export function useAddPurchase() {
       installmentNumber?: number;
       invoiceAnchorDate?: string;
       recurring?: boolean;
+      /** Number of months to replicate for recurring series (default 24). */
+      recurrenceMonths?: number;
+      /** Mark the just-created current-month item as paid (only for single, non-recurring, non-parcelled). */
+      paidNow?: boolean;
     }) => {
-      // Recurring purchase: 24 monthly purchases, each installments_count=1,
+      // Recurring purchase: N monthly purchases, each installments_count=1,
       // sharing the same recurrence_group_id. NO installment-style splitting —
       // recorrência ≠ parcelamento. Mesmo comportamento dos débitos recorrentes.
       const isRecurring = !!p.recurring && p.installmentsCount === 1;
       if (isRecurring) {
-        const RECUR_MONTHS = 24;
+        const RECUR_MONTHS = Math.max(1, Math.min(120, p.recurrenceMonths ?? 24));
         const groupId = crypto.randomUUID();
         const anchorIso = p.invoiceAnchorDate ?? p.date;
         const [_sy, _sm, _sd] = anchorIso.slice(0, 10).split("-").map(Number);
@@ -1222,6 +1226,11 @@ export function useAddPurchase() {
         "purchase",
         true,
       );
+      // Optional: quick "mark as paid" for the current installment when it's a
+      // single non-parcelled purchase created from the form.
+      if (p.paidNow && p.installmentsCount === 1 && inst.length > 0) {
+        inst[0].paid = true;
+      }
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
       return { purchaseId, payload: p, installmentRows: inst, recurring: false as const };
@@ -1783,6 +1792,10 @@ export function useAddDebit() {
       /** Reference month/year "position" for this entry — set once on creation. */
       referenceYear?: number;
       referenceMonth?: number;
+      /** Number of months to replicate for recurring series (default 24). */
+      recurrenceMonths?: number;
+      /** Mark the just-created current-month item as paid. */
+      paidNow?: boolean;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
@@ -1793,6 +1806,8 @@ export function useAddDebit() {
       const [_by, _bm] = d.date.slice(0, 10).split("-").map(Number);
       const refYear = d.referenceYear ?? _by;
       const refMonth = d.referenceMonth ?? (_bm || 1) - 1;
+      // paidNow applies only to the simple case (single, non-recurring, non-parcelled).
+      const applyPaidNow = !!d.paidNow && count === 1 && !isRecurring;
       const baseRow = {
         id: debitId,
         user_id: user!.id,
@@ -1801,7 +1816,7 @@ export function useAddDebit() {
         amount: d.amount,
         date: d.date,
         required: d.required,
-        paid: false,
+        paid: applyPaidNow,
         auto_debit: d.autoDebit ?? false,
         auto_debit_day: d.autoDebitDay ?? null,
         installments_count: count,
@@ -1839,7 +1854,7 @@ export function useAddDebit() {
         // Replicar como série recorrente: 24 meses à frente, cada mês é um
         // registro independente compartilhando recurrence_group_id. Sem
         // installments — recorrência NÃO é parcelamento.
-        const RECUR_MONTHS = 24;
+        const RECUR_MONTHS = Math.max(1, Math.min(120, d.recurrenceMonths ?? 24));
         // Parse local — evita shift de fuso ao replicar a série.
         const [_sy, _sm, _sd] = d.date.slice(0, 10).split("-").map(Number);
         const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
@@ -1980,6 +1995,10 @@ export function useAddIncome() {
       /** Reference month/year "position" for this entry — set once on creation. */
       referenceYear?: number;
       referenceMonth?: number;
+      /** Number of months to replicate for recurring series (default 24). */
+      recurrenceMonths?: number;
+      /** Mark the just-created current-month item as received. */
+      receivedNow?: boolean;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
@@ -1989,6 +2008,7 @@ export function useAddIncome() {
       const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
       const refYear = i.referenceYear ?? _by;
       const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
+      const applyReceivedNow = !!i.receivedNow && count === 1 && !isRecurring;
       const baseRow = {
         id: incomeId,
         user_id: user!.id,
@@ -1996,7 +2016,7 @@ export function useAddIncome() {
         description: i.description,
         amount: i.amount,
         date: i.date,
-        received: false,
+        received: applyReceivedNow,
         installments_count: count,
         is_parent: count > 1,
         recurrence_group_id: groupId,
@@ -2031,7 +2051,7 @@ export function useAddIncome() {
       } else if (isRecurring) {
         // Série recorrente: 24 meses à frente, registros independentes
         // compartilhando recurrence_group_id. Sem installments.
-        const RECUR_MONTHS = 24;
+        const RECUR_MONTHS = Math.max(1, Math.min(120, i.recurrenceMonths ?? 24));
         // Parse local — evita shift de fuso ao replicar a série.
         const [_sy, _sm, _sd] = i.date.slice(0, 10).split("-").map(Number);
         const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
@@ -2107,6 +2127,35 @@ export function useToggleIncomeReceived() {
     onSettled: () => inv(["incomes"]),
   });
 }
+
+/**
+ * Bulk-mark a set of incomes and income installments as received/paid.
+ * Used by the "Marcar todos recebidos" header action.
+ */
+export function useBulkReceiveIncomes() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { incomeIds: string[]; installmentIds: string[]; received?: boolean }) => {
+      const received = args.received ?? true;
+      if (args.incomeIds.length) {
+        const { error } = await supabase
+          .from("incomes")
+          .update({ received })
+          .in("id", args.incomeIds);
+        if (error) throw error;
+      }
+      if (args.installmentIds.length) {
+        const { error } = await supabase
+          .from("installments")
+          .update({ paid: received })
+          .in("id", args.installmentIds);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => inv(["incomes", "installments"]),
+  });
+}
+
 
 export function useRemoveIncome() {
   const inv = useInvalidate();

@@ -36,7 +36,9 @@ export function AddPurchaseDialog({
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
+  const [markPaid, setMarkPaid] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -49,7 +51,9 @@ export function AddPurchaseDialog({
       setInstallmentNumber("1");
       setIsInstallment(false);
       setIsRecurring(false);
+      setRecurrenceMonths("24");
       setMode("total");
+      setMarkPaid(false);
     }
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
@@ -72,6 +76,7 @@ export function AddPurchaseDialog({
         installmentNumber: 1,
         invoiceAnchorDate,
         recurring: true,
+        recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
       });
       onClose();
       return;
@@ -87,6 +92,7 @@ export function AddPurchaseDialog({
       installmentsCount: n,
       installmentNumber: cur,
       invoiceAnchorDate,
+      paidNow: markPaid && !isInstallment && !isRecurring,
     });
     onClose();
   };
@@ -124,7 +130,13 @@ export function AddPurchaseDialog({
           <input
             type="checkbox"
             checked={isInstallment}
-            onChange={(e) => { setIsInstallment(e.target.checked); if (e.target.checked) setIsRecurring(false); }}
+            onChange={(e) => {
+              setIsInstallment(e.target.checked);
+              if (e.target.checked) {
+                setIsRecurring(false);
+                setMarkPaid(false);
+              }
+            }}
             className="h-4 w-4 accent-primary"
           />
           <span className="text-sm font-medium">É parcelado?</span>
@@ -162,16 +174,49 @@ export function AddPurchaseDialog({
           <input
             type="checkbox"
             checked={isRecurring}
-            onChange={(e) => { setIsRecurring(e.target.checked); if (e.target.checked) setIsInstallment(false); }}
+            onChange={(e) => {
+              setIsRecurring(e.target.checked);
+              if (e.target.checked) {
+                setIsInstallment(false);
+                setMarkPaid(false);
+              }
+            }}
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Compra recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              Ideal para assinaturas (streaming etc). Será replicada nos próximos 24 meses, mantendo o dia. Cada mês é independente.
+              Ideal para assinaturas (streaming etc). Será replicada nos próximos meses, mantendo o dia. Cada mês é independente.
             </span>
           </span>
         </label>
+
+        {isRecurring && (
+          <Field label="Repetir por quantos meses?">
+            <input
+              type="number"
+              min="1"
+              max="120"
+              className={inputClass}
+              value={recurrenceMonths}
+              onChange={(e) => setRecurrenceMonths(e.target.value)}
+              placeholder="24"
+            />
+          </Field>
+        )}
+
+        {!isInstallment && !isRecurring && (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+            <input
+              type="checkbox"
+              checked={markPaid}
+              onChange={(e) => setMarkPaid(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">Marcar como paga</span>
+          </label>
+        )}
+
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">

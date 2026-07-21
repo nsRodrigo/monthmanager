@@ -28,12 +28,14 @@ export function AddDebitDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [required, setRequired] = useState(false);
+  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [autoDebit, setAutoDebit] = useState(false);
   const [autoDebitDay, setAutoDebitDay] = useState("");
   const [isInstallment, setIsInstallment] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
+  const [markPaid, setMarkPaid] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -43,12 +45,14 @@ export function AddDebitDialog({
       setDescription("");
       setAmount(0);
       setRequired(false);
+      setRecurrenceMonths("24");
       setAutoDebit(false);
       setAutoDebitDay("");
       setIsInstallment(false);
       setInstallments("2");
       setInstallmentNumber("1");
       setMode("total");
+      setMarkPaid(false);
     }
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
@@ -70,6 +74,8 @@ export function AddDebitDialog({
       installmentNumber: cur,
       referenceYear: defaultYear,
       referenceMonth: defaultMonth,
+      recurrenceMonths: required && !isInstallment ? Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)) : undefined,
+      paidNow: markPaid && !isInstallment && !required,
     });
     onClose();
   };
@@ -101,12 +107,16 @@ export function AddDebitDialog({
             checked={isInstallment}
             onChange={(e) => {
               setIsInstallment(e.target.checked);
-              if (e.target.checked) setRequired(false);
+              if (e.target.checked) {
+                setRequired(false);
+                setMarkPaid(false);
+              }
             }}
             className="h-4 w-4 accent-primary"
           />
           <span className="text-sm font-medium">É parcelado?</span>
         </label>
+
 
         {isInstallment && (
           <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
@@ -145,17 +155,34 @@ export function AddDebitDialog({
             checked={required}
             onChange={(e) => {
               setRequired(e.target.checked);
-              if (e.target.checked) setIsInstallment(false);
+              if (e.target.checked) {
+                setIsInstallment(false);
+                setMarkPaid(false);
+              }
             }}
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Débito recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              Replicado automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento.
+              Replicado automaticamente nos próximos meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento.
             </span>
           </span>
         </label>
+
+        {required && (
+          <Field label="Repetir por quantos meses?">
+            <input
+              type="number"
+              min="1"
+              max="120"
+              className={inputClass}
+              value={recurrenceMonths}
+              onChange={(e) => setRecurrenceMonths(e.target.value)}
+              placeholder="24"
+            />
+          </Field>
+        )}
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input type="checkbox" checked={autoDebit} onChange={(e) => setAutoDebit(e.target.checked)} className="h-4 w-4 accent-primary" />
@@ -166,6 +193,19 @@ export function AddDebitDialog({
             <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
           </Field>
         )}
+
+        {!isInstallment && !required && (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+            <input
+              type="checkbox"
+              checked={markPaid}
+              onChange={(e) => setMarkPaid(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">Marcar como paga</span>
+          </label>
+        )}
+
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>

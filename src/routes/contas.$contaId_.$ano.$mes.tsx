@@ -12,6 +12,7 @@ import {
   useToggleDebitPaid,
   useRemoveDebit,
   useToggleIncomeReceived,
+  useBulkReceiveIncomes,
   useRemoveIncome,
   useToggleInstallmentPaid,
   useSetCardPaid,
@@ -120,6 +121,7 @@ function AccountMonth() {
   const toggleDebit = useToggleDebitPaid();
   const removeDebit = useRemoveDebit();
   const toggleIncome = useToggleIncomeReceived();
+  const bulkReceiveIncomes = useBulkReceiveIncomes();
   const removeIncome = useRemoveIncome();
   const removeInvestment = useRemoveInvestment();
   const reorderCards = useReorderCards();
@@ -574,6 +576,33 @@ function AccountMonth() {
                 onCancel={clearSelection}
                 onDelete={() => bulkDelete("incomes")}
               />
+            ) : null
+          }
+          paidControl={
+            !isSelMode("incomes") &&
+            monthIncomes.single.length + monthIncomes.parcelled.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const target = !incomesAllReceived;
+                  bulkReceiveIncomes.mutate({
+                    incomeIds: monthIncomes.single
+                      .filter((i) => i.received !== target)
+                      .map((i) => i.id),
+                    installmentIds: monthIncomes.parcelled
+                      .filter((p) => p.installment.paid !== target)
+                      .map((p) => p.installment.id),
+                    received: target,
+                  });
+                }}
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  incomesAllReceived
+                    ? "bg-success/15 text-success hover:bg-success/25"
+                    : "bg-warning/15 text-warning hover:bg-warning/25"
+                }`}
+              >
+                {incomesAllReceived ? "✓ Recebido" : "Marcar recebido"}
+              </button>
             ) : null
           }
         >

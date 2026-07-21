@@ -121,6 +121,7 @@ function AccountMonth() {
   const toggleDebit = useToggleDebitPaid();
   const removeDebit = useRemoveDebit();
   const toggleIncome = useToggleIncomeReceived();
+  const bulkReceiveIncomes = useBulkReceiveIncomes();
   const removeIncome = useRemoveIncome();
   const removeInvestment = useRemoveInvestment();
   const reorderCards = useReorderCards();

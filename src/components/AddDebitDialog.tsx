@@ -151,17 +151,34 @@ export function AddDebitDialog({
             checked={required}
             onChange={(e) => {
               setRequired(e.target.checked);
-              if (e.target.checked) setIsInstallment(false);
+              if (e.target.checked) {
+                setIsInstallment(false);
+                setMarkPaid(false);
+              }
             }}
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Débito recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              Replicado automaticamente nos próximos 24 meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento.
+              Replicado automaticamente nos próximos meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento.
             </span>
           </span>
         </label>
+
+        {required && (
+          <Field label="Repetir por quantos meses?">
+            <input
+              type="number"
+              min="1"
+              max="120"
+              className={inputClass}
+              value={recurrenceMonths}
+              onChange={(e) => setRecurrenceMonths(e.target.value)}
+              placeholder="24"
+            />
+          </Field>
+        )}
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input type="checkbox" checked={autoDebit} onChange={(e) => setAutoDebit(e.target.checked)} className="h-4 w-4 accent-primary" />
@@ -172,6 +189,19 @@ export function AddDebitDialog({
             <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
           </Field>
         )}
+
+        {!isInstallment && !required && (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+            <input
+              type="checkbox"
+              checked={markPaid}
+              onChange={(e) => setMarkPaid(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">Marcar como paga</span>
+          </label>
+        )}
+
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>

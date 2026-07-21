@@ -2128,6 +2128,34 @@ export function useToggleIncomeReceived() {
   });
 }
 
+/**
+ * Bulk-mark a set of incomes and income installments as received/paid.
+ * Used by the "Marcar todos recebidos" header action.
+ */
+export function useBulkReceiveIncomes() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { incomeIds: string[]; installmentIds: string[] }) => {
+      if (args.incomeIds.length) {
+        const { error } = await supabase
+          .from("incomes")
+          .update({ received: true })
+          .in("id", args.incomeIds);
+        if (error) throw error;
+      }
+      if (args.installmentIds.length) {
+        const { error } = await supabase
+          .from("installments")
+          .update({ paid: true })
+          .in("id", args.installmentIds);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => inv(["incomes", "installments"]),
+  });
+}
+
+
 export function useRemoveIncome() {
   const inv = useInvalidate();
   return useMutation({

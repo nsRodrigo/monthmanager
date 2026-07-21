@@ -28,12 +28,14 @@ export function AddDebitDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [required, setRequired] = useState(false);
+  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [autoDebit, setAutoDebit] = useState(false);
   const [autoDebitDay, setAutoDebitDay] = useState("");
   const [isInstallment, setIsInstallment] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
+  const [markPaid, setMarkPaid] = useState(false);
 
   useEffect(() => {
     if (open) {

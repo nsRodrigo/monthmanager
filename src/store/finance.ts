@@ -2051,7 +2051,7 @@ export function useAddIncome() {
       } else if (isRecurring) {
         // Série recorrente: 24 meses à frente, registros independentes
         // compartilhando recurrence_group_id. Sem installments.
-        const RECUR_MONTHS = 24;
+        const RECUR_MONTHS = Math.max(1, Math.min(120, i.recurrenceMonths ?? 24));
         // Parse local — evita shift de fuso ao replicar a série.
         const [_sy, _sm, _sd] = i.date.slice(0, 10).split("-").map(Number);
         const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);

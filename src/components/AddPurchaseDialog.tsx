@@ -51,7 +51,9 @@ export function AddPurchaseDialog({
       setInstallmentNumber("1");
       setIsInstallment(false);
       setIsRecurring(false);
+      setRecurrenceMonths("24");
       setMode("total");
+      setMarkPaid(false);
     }
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 

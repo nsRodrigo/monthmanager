@@ -116,8 +116,7 @@ export function AddDebitDialog({
           />
           <span className="text-sm font-medium">É parcelado?</span>
         </label>
-          <span className="text-sm font-medium">É parcelado?</span>
-        </label>
+
 
         {isInstallment && (
           <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">

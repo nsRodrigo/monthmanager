@@ -36,7 +36,9 @@ export function AddPurchaseDialog({
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [isInstallment, setIsInstallment] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
+  const [markPaid, setMarkPaid] = useState(false);
 
   useEffect(() => {
     if (open) {

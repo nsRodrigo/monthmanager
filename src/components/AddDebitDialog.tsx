@@ -74,6 +74,8 @@ export function AddDebitDialog({
       installmentNumber: cur,
       referenceYear: defaultYear,
       referenceMonth: defaultMonth,
+      recurrenceMonths: required && !isInstallment ? Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)) : undefined,
+      paidNow: markPaid && !isInstallment && !required,
     });
     onClose();
   };

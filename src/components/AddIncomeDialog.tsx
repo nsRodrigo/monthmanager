@@ -44,9 +44,11 @@ export function AddIncomeDialog({
       setAmount(0);
       setIsInstallment(false);
       setIsRecurring(false);
+      setRecurrenceMonths("24");
       setInstallments("2");
       setInstallmentNumber("1");
       setMode("total");
+      setMarkReceived(false);
     }
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 

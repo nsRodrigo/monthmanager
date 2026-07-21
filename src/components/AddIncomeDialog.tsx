@@ -115,7 +115,10 @@ export function AddIncomeDialog({
             checked={isInstallment}
             onChange={(e) => {
               setIsInstallment(e.target.checked);
-              if (e.target.checked) setIsRecurring(false);
+              if (e.target.checked) {
+                setIsRecurring(false);
+                setMarkReceived(false);
+              }
             }}
             className="h-4 w-4 accent-primary"
           />
@@ -157,16 +160,49 @@ export function AddIncomeDialog({
           <input
             type="checkbox"
             checked={isRecurring}
-            onChange={(e) => { setIsRecurring(e.target.checked); if (e.target.checked) setIsInstallment(false); }}
+            onChange={(e) => {
+              setIsRecurring(e.target.checked);
+              if (e.target.checked) {
+                setIsInstallment(false);
+                setMarkReceived(false);
+              }
+            }}
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              Replicado automaticamente nos próximos 24 meses, mantendo o dia.
+              Replicado automaticamente nos próximos meses, mantendo o dia.
             </span>
           </span>
         </label>
+
+        {isRecurring && (
+          <Field label="Repetir por quantos meses?">
+            <input
+              type="number"
+              min="1"
+              max="120"
+              className={inputClass}
+              value={recurrenceMonths}
+              onChange={(e) => setRecurrenceMonths(e.target.value)}
+              placeholder="24"
+            />
+          </Field>
+        )}
+
+        {!isInstallment && !isRecurring && (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
+            <input
+              type="checkbox"
+              checked={markReceived}
+              onChange={(e) => setMarkReceived(e.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span className="text-sm font-medium">Marcar como recebida</span>
+          </label>
+        )}
+
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>

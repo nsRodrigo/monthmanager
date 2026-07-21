@@ -1226,6 +1226,11 @@ export function useAddPurchase() {
         "purchase",
         true,
       );
+      // Optional: quick "mark as paid" for the current installment when it's a
+      // single non-parcelled purchase created from the form.
+      if (p.paidNow && p.installmentsCount === 1 && inst.length > 0) {
+        inst[0].paid = true;
+      }
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
       return { purchaseId, payload: p, installmentRows: inst, recurring: false as const };

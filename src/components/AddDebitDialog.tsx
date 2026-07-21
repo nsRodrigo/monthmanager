@@ -45,12 +45,14 @@ export function AddDebitDialog({
       setDescription("");
       setAmount(0);
       setRequired(false);
+      setRecurrenceMonths("24");
       setAutoDebit(false);
       setAutoDebitDay("");
       setIsInstallment(false);
       setInstallments("2");
       setInstallmentNumber("1");
       setMode("total");
+      setMarkPaid(false);
     }
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 

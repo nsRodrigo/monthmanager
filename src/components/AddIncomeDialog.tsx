@@ -63,6 +63,7 @@ export function AddIncomeDialog({
         recurring: true,
         referenceYear: defaultYear,
         referenceMonth: defaultMonth,
+        recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
       });
       onClose();
       return;
@@ -80,6 +81,7 @@ export function AddIncomeDialog({
       installmentNumber: cur,
       referenceYear: defaultYear,
       referenceMonth: defaultMonth,
+      receivedNow: markReceived && !isInstallment && !isRecurring,
     });
     onClose();
   };

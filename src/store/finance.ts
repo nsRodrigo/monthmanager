@@ -2135,18 +2135,19 @@ export function useToggleIncomeReceived() {
 export function useBulkReceiveIncomes() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: { incomeIds: string[]; installmentIds: string[] }) => {
+    mutationFn: async (args: { incomeIds: string[]; installmentIds: string[]; received?: boolean }) => {
+      const received = args.received ?? true;
       if (args.incomeIds.length) {
         const { error } = await supabase
           .from("incomes")
-          .update({ received: true })
+          .update({ received })
           .in("id", args.incomeIds);
         if (error) throw error;
       }
       if (args.installmentIds.length) {
         const { error } = await supabase
           .from("installments")
-          .update({ paid: true })
+          .update({ paid: received })
           .in("id", args.installmentIds);
         if (error) throw error;
       }

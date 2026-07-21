@@ -1124,13 +1124,17 @@ export function useAddPurchase() {
       installmentNumber?: number;
       invoiceAnchorDate?: string;
       recurring?: boolean;
+      /** Number of months to replicate for recurring series (default 24). */
+      recurrenceMonths?: number;
+      /** Mark the just-created current-month item as paid (only for single, non-recurring, non-parcelled). */
+      paidNow?: boolean;
     }) => {
-      // Recurring purchase: 24 monthly purchases, each installments_count=1,
+      // Recurring purchase: N monthly purchases, each installments_count=1,
       // sharing the same recurrence_group_id. NO installment-style splitting —
       // recorrência ≠ parcelamento. Mesmo comportamento dos débitos recorrentes.
       const isRecurring = !!p.recurring && p.installmentsCount === 1;
       if (isRecurring) {
-        const RECUR_MONTHS = 24;
+        const RECUR_MONTHS = Math.max(1, Math.min(120, p.recurrenceMonths ?? 24));
         const groupId = crypto.randomUUID();
         const anchorIso = p.invoiceAnchorDate ?? p.date;
         const [_sy, _sm, _sd] = anchorIso.slice(0, 10).split("-").map(Number);

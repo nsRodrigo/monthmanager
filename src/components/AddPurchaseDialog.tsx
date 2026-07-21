@@ -76,6 +76,7 @@ export function AddPurchaseDialog({
         installmentNumber: 1,
         invoiceAnchorDate,
         recurring: true,
+        recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
       });
       onClose();
       return;
@@ -91,6 +92,7 @@ export function AddPurchaseDialog({
       installmentsCount: n,
       installmentNumber: cur,
       invoiceAnchorDate,
+      paidNow: markPaid && !isInstallment && !isRecurring,
     });
     onClose();
   };

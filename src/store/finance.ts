@@ -1854,7 +1854,7 @@ export function useAddDebit() {
         // Replicar como série recorrente: 24 meses à frente, cada mês é um
         // registro independente compartilhando recurrence_group_id. Sem
         // installments — recorrência NÃO é parcelamento.
-        const RECUR_MONTHS = 24;
+        const RECUR_MONTHS = Math.max(1, Math.min(120, d.recurrenceMonths ?? 24));
         // Parse local — evita shift de fuso ao replicar a série.
         const [_sy, _sm, _sd] = d.date.slice(0, 10).split("-").map(Number);
         const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);

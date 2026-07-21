@@ -29,9 +29,11 @@ export function AddIncomeDialog({
   const [date, setDate] = useState("");
   const [isInstallment, setIsInstallment] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
+  const [markReceived, setMarkReceived] = useState(false);
 
   useEffect(() => {
     if (open) {

@@ -107,10 +107,15 @@ export function AddDebitDialog({
             checked={isInstallment}
             onChange={(e) => {
               setIsInstallment(e.target.checked);
-              if (e.target.checked) setRequired(false);
+              if (e.target.checked) {
+                setRequired(false);
+                setMarkPaid(false);
+              }
             }}
             className="h-4 w-4 accent-primary"
           />
+          <span className="text-sm font-medium">É parcelado?</span>
+        </label>
           <span className="text-sm font-medium">É parcelado?</span>
         </label>
 

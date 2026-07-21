@@ -1792,6 +1792,10 @@ export function useAddDebit() {
       /** Reference month/year "position" for this entry — set once on creation. */
       referenceYear?: number;
       referenceMonth?: number;
+      /** Number of months to replicate for recurring series (default 24). */
+      recurrenceMonths?: number;
+      /** Mark the just-created current-month item as paid. */
+      paidNow?: boolean;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
@@ -1802,6 +1806,8 @@ export function useAddDebit() {
       const [_by, _bm] = d.date.slice(0, 10).split("-").map(Number);
       const refYear = d.referenceYear ?? _by;
       const refMonth = d.referenceMonth ?? (_bm || 1) - 1;
+      // paidNow applies only to the simple case (single, non-recurring, non-parcelled).
+      const applyPaidNow = !!d.paidNow && count === 1 && !isRecurring;
       const baseRow = {
         id: debitId,
         user_id: user!.id,
@@ -1810,7 +1816,7 @@ export function useAddDebit() {
         amount: d.amount,
         date: d.date,
         required: d.required,
-        paid: false,
+        paid: applyPaidNow,
         auto_debit: d.autoDebit ?? false,
         auto_debit_day: d.autoDebitDay ?? null,
         installments_count: count,

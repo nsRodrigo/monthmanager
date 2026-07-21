@@ -1995,6 +1995,10 @@ export function useAddIncome() {
       /** Reference month/year "position" for this entry — set once on creation. */
       referenceYear?: number;
       referenceMonth?: number;
+      /** Number of months to replicate for recurring series (default 24). */
+      recurrenceMonths?: number;
+      /** Mark the just-created current-month item as received. */
+      receivedNow?: boolean;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
@@ -2004,6 +2008,7 @@ export function useAddIncome() {
       const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
       const refYear = i.referenceYear ?? _by;
       const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
+      const applyReceivedNow = !!i.receivedNow && count === 1 && !isRecurring;
       const baseRow = {
         id: incomeId,
         user_id: user!.id,
@@ -2011,7 +2016,7 @@ export function useAddIncome() {
         description: i.description,
         amount: i.amount,
         date: i.date,
-        received: false,
+        received: applyReceivedNow,
         installments_count: count,
         is_parent: count > 1,
         recurrence_group_id: groupId,

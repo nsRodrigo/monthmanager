@@ -353,12 +353,13 @@ function AccountMonth() {
     a.installment.number - b.installment.number ||
     a.installment.id.localeCompare(b.installment.id);
 
-  const debitsRecurring = monthDebits.single
-    .filter((d) => !!d.recurrenceGroupId)
+  // "Fixos" = recorrentes + débito automático (nos débitos) e recorrentes (nos recebimentos).
+  const debitsFixedSingle = monthDebits.single
+    .filter((d) => !!d.recurrenceGroupId || d.autoDebit)
     .slice()
     .sort(byDateAsc);
   const debitsCash = monthDebits.single
-    .filter((d) => !d.recurrenceGroupId)
+    .filter((d) => !d.recurrenceGroupId && !d.autoDebit)
     .slice()
     .sort(byDateAsc);
   const debitsParcelled = monthDebits.parcelled.slice().sort(byInstDueAsc);
@@ -371,7 +372,7 @@ function AccountMonth() {
     monthIncomes.single.every((i) => i.received) &&
     monthIncomes.parcelled.every((p) => p.installment.paid);
 
-  const incomesRecurring = monthIncomes.single
+  const incomesFixedSingle = monthIncomes.single
     .filter((i) => !!i.recurrenceGroupId)
     .slice()
     .sort(byDateAsc);
@@ -396,9 +397,20 @@ function AccountMonth() {
     | { kind: "single"; income: Income }
     | { kind: "parcelled"; entry: (typeof incomesParcelled)[number] };
 
-  const debitsDefaultOrder: DebitEntry[] = [
-    ...debitsRecurring.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
+  // Ordem padrão: mescla recorrentes + parcelados + débito automático
+  // em um único grupo ordenado por data; à-vista fica ao final.
+  const debitsFixedMerged: DebitEntry[] = [
+    ...debitsFixedSingle.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
     ...debitsParcelled.map<DebitEntry>((p) => ({ kind: "parcelled", entry: p })),
+  ].sort((a, b) => {
+    const da = a.kind === "single" ? a.debit.date : a.entry.installment.dueDate;
+    const db = b.kind === "single" ? b.debit.date : b.entry.installment.dueDate;
+    const ia = a.kind === "single" ? a.debit.id : a.entry.installment.id;
+    const ib = b.kind === "single" ? b.debit.id : b.entry.installment.id;
+    return da.localeCompare(db) || ia.localeCompare(ib);
+  });
+  const debitsDefaultOrder: DebitEntry[] = [
+    ...debitsFixedMerged,
     ...debitsCash.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
   ];
   const debitsOrdered =
@@ -411,9 +423,18 @@ function AccountMonth() {
           id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
         });
 
-  const incomesDefaultOrder: IncomeEntry[] = [
-    ...incomesRecurring.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
+  const incomesFixedMerged: IncomeEntry[] = [
+    ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
     ...incomesParcelled.map<IncomeEntry>((p) => ({ kind: "parcelled", entry: p })),
+  ].sort((a, b) => {
+    const da = a.kind === "single" ? a.income.date : a.entry.installment.dueDate;
+    const db = b.kind === "single" ? b.income.date : b.entry.installment.dueDate;
+    const ia = a.kind === "single" ? a.income.id : a.entry.installment.id;
+    const ib = b.kind === "single" ? b.income.id : b.entry.installment.id;
+    return da.localeCompare(db) || ia.localeCompare(ib);
+  });
+  const incomesDefaultOrder: IncomeEntry[] = [
+    ...incomesFixedMerged,
     ...incomesCash.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
   ];
   const incomesOrdered =

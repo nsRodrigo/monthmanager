@@ -4000,6 +4000,10 @@ export function useChangePurchaseInstallments() {
       purchaseId: string;
       newCount: number;
       totalAmount: number;
+      /** Parcela atual (na nova série) que deve cair no mês visualizado. */
+      newCurrentInstallmentNumber?: number;
+      /** Número da parcela ATUAL (série antiga) que o usuário está vendo. */
+      viewedInstallmentNumber?: number;
     }) => {
       if (!user) throw new Error("Não autenticado.");
       const newCount = Math.max(1, Math.floor(args.newCount));
@@ -4012,10 +4016,23 @@ export function useChangePurchaseInstallments() {
         .eq("parent_type", "purchase")
         .order("number", { ascending: true })
         .limit(1);
-      const firstDue =
+      let firstDue =
         existing && existing.length > 0
           ? (existing[0] as { due_date: string }).due_date
           : new Date().toISOString().slice(0, 10);
+
+      // Reancoragem: se o usuário indicou que a parcela X da nova série deve
+      // ficar no mês da parcela Y da série antiga, deslocamos firstDue em
+      // (Y - X) meses, preservando o dia.
+      const newCur = Math.max(1, Math.min(newCount, Math.floor(args.newCurrentInstallmentNumber ?? 1)));
+      const viewed = Math.max(1, Math.floor(args.viewedInstallmentNumber ?? 1));
+      const shift = viewed - newCur;
+      if (shift !== 0) {
+        const [y, m, d] = firstDue.slice(0, 10).split("-").map(Number);
+        const dt = new Date(y, (m - 1) + shift, d);
+        const p = (n: number) => String(n).padStart(2, "0");
+        firstDue = `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+      }
 
       // 2) Apaga todas as parcelas antigas dessa compra
       await supabase

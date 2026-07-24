@@ -809,58 +809,83 @@ export function EditInstallmentDialog({
           </div>
         )}
 
-        {manageView === "change" && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setManageView("menu")}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Voltar
-            </button>
-            <p className="text-[11px] text-muted-foreground">
-              Recria todas as parcelas mantendo a data da 1ª. Status de pagamento será resetado.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Nº parcelas">
-                <input
-                  type="number"
-                  min={1}
-                  max={120}
-                  className={inputClass}
-                  value={newInstCount}
-                  onChange={(e) => setNewInstCount(e.target.value)}
-                />
-              </Field>
+        {manageView === "change" && (() => {
+          const nParsed = Math.max(1, parseInt(newInstCount) || 1);
+          return (
+            <div className="space-y-3">
+              <button
+                onClick={() => setManageView("menu")}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Voltar
+              </button>
+              <p className="text-[11px] text-muted-foreground">
+                Recria todas as parcelas. A parcela atual permanece no mês visualizado; as demais são recalculadas. Status de pagamento será resetado.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Nº parcelas">
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    className={inputClass}
+                    value={newInstCount}
+                    onChange={(e) => {
+                      setNewInstCount(e.target.value);
+                      const cur = parseInt(newCurrentInst) || 1;
+                      const n = Math.max(1, parseInt(e.target.value) || 1);
+                      if (cur > n) setNewCurrentInst(String(n));
+                    }}
+                  />
+                </Field>
+                <Field label="Parcela atual">
+                  <input
+                    type="number"
+                    min={1}
+                    max={nParsed}
+                    className={inputClass}
+                    value={newCurrentInst}
+                    onChange={(e) => setNewCurrentInst(e.target.value)}
+                  />
+                </Field>
+              </div>
               <Field label="Valor total">
                 <CurrencyInput value={newTotalAmount} onValueChange={setNewTotalAmount} />
               </Field>
+              <button
+                onClick={async () => {
+                  const n = Math.max(1, parseInt(newInstCount) || 0);
+                  const cur = Math.max(1, Math.min(n, parseInt(newCurrentInst) || 1));
+                  if (!n || newTotalAmount <= 0) return;
+                  if (
+                    n === inst.total &&
+                    newTotalAmount === inst.amount * inst.total &&
+                    cur === inst.number
+                  ) return;
+                  const ok = await confirm({
+                    title: "Alterar parcelamento",
+                    description: `Recriar como ${n}x de ${formatCurrency(newTotalAmount / n)}? A parcela ${cur}/${n} ficará no mês atual.`,
+                    confirmLabel: "Alterar",
+                  });
+                  if (!ok) return;
+                  await changeInstCount.mutateAsync({
+                    purchaseId: inst.parentId,
+                    newCount: n,
+                    totalAmount: newTotalAmount,
+                    newCurrentInstallmentNumber: cur,
+                    viewedInstallmentNumber: inst.number,
+                  });
+                  setManageView("none");
+                  onClose();
+                }}
+                disabled={changeInstCount.isPending}
+                className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {changeInstCount.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
+              </button>
             </div>
-            <button
-              onClick={async () => {
-                const n = Math.max(1, parseInt(newInstCount) || 0);
-                if (!n || newTotalAmount <= 0) return;
-                if (n === inst.total && newTotalAmount === inst.amount * inst.total) return;
-                const ok = await confirm({
-                  title: "Alterar parcelamento",
-                  description: `Recriar como ${n}x de ${formatCurrency(newTotalAmount / n)}?`,
-                  confirmLabel: "Alterar",
-                });
-                if (!ok) return;
-                await changeInstCount.mutateAsync({
-                  purchaseId: inst.parentId,
-                  newCount: n,
-                  totalAmount: newTotalAmount,
-                });
-                setManageView("none");
-                onClose();
-              }}
-              disabled={changeInstCount.isPending}
-              className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {changeInstCount.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
-            </button>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
 
       {parentSource && (

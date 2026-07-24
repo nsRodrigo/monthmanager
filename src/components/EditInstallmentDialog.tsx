@@ -124,6 +124,7 @@ export function EditInstallmentDialog({
   const [askDateScope, setAskDateScope] = useState(false);
   const [advanceCount, setAdvanceCount] = useState("");
   const [newInstCount, setNewInstCount] = useState("");
+  const [newCurrentInst, setNewCurrentInst] = useState("1");
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
   const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
   // Single-mode type conversion state

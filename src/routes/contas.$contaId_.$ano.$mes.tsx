@@ -423,9 +423,18 @@ function AccountMonth() {
           id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
         });
 
-  const incomesDefaultOrder: IncomeEntry[] = [
-    ...incomesRecurring.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
+  const incomesFixedMerged: IncomeEntry[] = [
+    ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
     ...incomesParcelled.map<IncomeEntry>((p) => ({ kind: "parcelled", entry: p })),
+  ].sort((a, b) => {
+    const da = a.kind === "single" ? a.income.date : a.entry.installment.dueDate;
+    const db = b.kind === "single" ? b.income.date : b.entry.installment.dueDate;
+    const ia = a.kind === "single" ? a.income.id : a.entry.installment.id;
+    const ib = b.kind === "single" ? b.income.id : b.entry.installment.id;
+    return da.localeCompare(db) || ia.localeCompare(ib);
+  });
+  const incomesDefaultOrder: IncomeEntry[] = [
+    ...incomesFixedMerged,
     ...incomesCash.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
   ];
   const incomesOrdered =

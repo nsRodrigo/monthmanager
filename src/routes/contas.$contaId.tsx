@@ -191,18 +191,20 @@ function AccountHome() {
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
 
+  const canPrevYear = yearList.length > 0 && yearList.indexOf(year) > 0;
+  const canNextYear =
+    yearList.length > 0 && yearList.indexOf(year) >= 0 && yearList.indexOf(year) < yearList.length - 1;
   const goPrevYear = () => {
+    if (!canPrevYear) return;
     const idx = yearList.indexOf(year);
-    const next = idx > 0 ? yearList[idx - 1] : yearList[0] - 1;
+    const next = yearList[idx - 1];
     setYear(next);
     sessionStorage.setItem(yearStorageKey, String(next));
   };
   const goNextYear = () => {
+    if (!canNextYear) return;
     const idx = yearList.indexOf(year);
-    const next =
-      idx >= 0 && idx < yearList.length - 1
-        ? yearList[idx + 1]
-        : yearList[yearList.length - 1] + 1;
+    const next = yearList[idx + 1];
     setYear(next);
     sessionStorage.setItem(yearStorageKey, String(next));
   };

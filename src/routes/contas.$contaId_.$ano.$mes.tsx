@@ -2000,7 +2000,7 @@ function PurchaseInstRow({
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors ${
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors ${
             inst.paid
               ? "bg-success/80 text-black"
               : "border border-border bg-background hover:bg-secondary"

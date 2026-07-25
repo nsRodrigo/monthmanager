@@ -2230,8 +2230,8 @@ export function useRemoveInvestment() {
 // Duplicate any item over a scope (month / period / all)
 // =======================
 export type DuplicateSource =
-  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean }
-  | { kind: "income"; accountId: string; description: string; amount: number; date: string }
+  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean; paid?: boolean; autoDebit?: boolean; autoDebitDay?: number | null }
+  | { kind: "income"; accountId: string; description: string; amount: number; date: string; received?: boolean }
   | { kind: "investment"; accountId: string; type: string; amount: number; percentage: number; date: string }
   | { kind: "purchase"; cardId: string; description: string; totalAmount: number; date: string };
 

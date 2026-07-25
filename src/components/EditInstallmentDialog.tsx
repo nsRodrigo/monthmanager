@@ -92,6 +92,7 @@ export function EditInstallmentDialog({
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
   const [askDuplicateParcelled, setAskDuplicateParcelled] = useState(false);
+  const [selectedDupIds, setSelectedDupIds] = useState<Set<string>>(new Set());
   const [askDelete, setAskDelete] = useState(false);
   const dupAnchorY = defaultYear ?? new Date().getFullYear();
   const dupAnchorM = defaultMonth ?? new Date().getMonth();

@@ -1031,7 +1031,6 @@ export function EditInstallmentDialog({
             </div>
           );
         })()}
-        </div>
       </Modal>
     </>
   );

@@ -18,6 +18,8 @@ import {
   useDuplicateOverScope,
   useDeleteOverScope,
   useDuplicateInstallmentSeries,
+  useDuplicateInstallmentsSelection,
+  useInstallments,
   usePurchases,
   useDebits,
   useIncomes,

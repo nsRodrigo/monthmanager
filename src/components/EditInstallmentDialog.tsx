@@ -446,9 +446,9 @@ export function EditInstallmentDialog({
         onConfirm={async (s: CardScope) => {
           const src =
             single.kind === "debit"
-              ? { kind: "debit" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date, required: false }
+              ? { kind: "debit" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date, required: false, paid: !!single.paid }
               : single.kind === "income"
-              ? { kind: "income" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date }
+              ? { kind: "income" as const, accountId: single.accountId, description: single.description, amount: single.amount, date: single.date, received: !!single.paid }
               : { kind: "investment" as const, accountId: single.accountId, type: single.description, amount: single.amount, percentage: 0, date: single.date };
           await duplicate.mutateAsync({ source: src, scope: s, anchorYear: dupAnchorY, anchorMonth: dupAnchorM });
           setAskDuplicate(false);

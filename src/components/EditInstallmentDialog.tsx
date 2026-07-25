@@ -677,12 +677,16 @@ export function EditInstallmentDialog({
             {(parentSource || inst.total > 1) && (
               <button
                 onClick={() => {
-                  // Parcelled → ask which kind of duplicate (this parcel only / whole series).
+                  // Parcelled → open checklist picker (pré-seleciona a parcela atual).
                   // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
-                  if (inst.total > 1) setAskDuplicateParcelled(true);
-                  else setAskDuplicate(true);
+                  if (inst.total > 1) {
+                    setSelectedDupIds(new Set([inst.id]));
+                    setAskDuplicateParcelled(true);
+                  } else {
+                    setAskDuplicate(true);
+                  }
                 }}
-                disabled={duplicate.isPending || duplicateSeries.isPending}
+                disabled={duplicate.isPending || duplicateSeries.isPending || duplicateSelection.isPending}
                 className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
                 title="Duplicar lançamento"
               >

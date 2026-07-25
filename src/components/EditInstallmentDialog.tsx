@@ -83,6 +83,8 @@ export function EditInstallmentDialog({
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const duplicateSeries = useDuplicateInstallmentSeries();
+  const duplicateSelection = useDuplicateInstallmentsSelection();
+  const { data: allInstallments = [] } = useInstallments();
   const { data: purchases = [] } = usePurchases();
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();

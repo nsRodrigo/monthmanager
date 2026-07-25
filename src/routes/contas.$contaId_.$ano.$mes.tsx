@@ -2152,7 +2152,7 @@ function IncomeRow({
           </p>
           {income.recurrenceGroupId && (
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
-              Obrig.
+              Rec.
             </span>
           )}
         </div>

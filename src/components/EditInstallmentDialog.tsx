@@ -30,7 +30,7 @@ import {
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
 import { Trash2, Copy, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";

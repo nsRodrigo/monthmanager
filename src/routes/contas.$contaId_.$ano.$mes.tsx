@@ -2061,13 +2061,13 @@ function DebitRow({
           </p>
           {debit.required && (
             <span className="rounded-full bg-debit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-debit">
-              Obrig.
+              Rec.
             </span>
           )}
           {debit.autoDebit && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
-              Auto{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
+              Aut.{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
           )}
         </div>

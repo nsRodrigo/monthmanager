@@ -928,84 +928,109 @@ export function EditInstallmentDialog({
         onClose={() => setAskDuplicateParcelled(false)}
         title={`Duplicar · ${parentLabel ?? "lançamento parcelado"}`}
       >
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Como deseja duplicar esse parcelamento?
-          </p>
-          <button
-            onClick={async () => {
-              // Duplicar somente esta parcela: cria um lançamento avulso (1x) no mesmo mês/ano da parcela.
-              const newDesc = (parentLabel ?? "").trim() || "Lançamento";
-              const anchorDate = inst.dueDate;
-              if (inst.parentType === "purchase" && parentSource && parentSource.kind === "purchase") {
-                // Duplica só esta parcela como uma compra 1x no mesmo mês da parcela.
-                await duplicate.mutateAsync({
-                  source: {
-                    kind: "purchase",
-                    cardId: parentSource.cardId,
-                    description: newDesc,
-                    totalAmount: inst.amount,
-                    date: anchorDate,
-                  },
-                  scope: { kind: "month", year: inst.year, month: inst.month },
-                  anchorYear: inst.year,
-                  anchorMonth: inst.month,
-                });
-              } else if (inst.parentType === "debit" && parentSource && parentSource.kind === "debit") {
-                await addDebit.mutateAsync({
-                  accountId: parentSource.accountId,
-                  description: newDesc,
-                  amount: inst.amount,
-                  date: anchorDate,
-                  required: false,
-                  referenceYear: inst.year,
-                  referenceMonth: inst.month,
-                });
-              } else if (inst.parentType === "income" && parentSource && parentSource.kind === "income") {
-                await addIncome.mutateAsync({
-                  accountId: parentSource.accountId,
-                  description: newDesc,
-                  amount: inst.amount,
-                  date: anchorDate,
-                  referenceYear: inst.year,
-                  referenceMonth: inst.month,
-                });
-              }
-              setAskDuplicateParcelled(false);
-              onClose();
-            }}
-            disabled={!parentSource || duplicate.isPending || addDebit.isPending || addIncome.isPending}
-            className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
-          >
-            <span className="font-semibold">Duplicar somente esta parcela</span>
-            <span className="text-xs text-muted-foreground">
-              Cria um lançamento novo e independente (1x) neste mesmo mês.
-            </span>
-          </button>
-          <button
-            onClick={async () => {
-              await duplicateSeries.mutateAsync({
-                parentId: inst.parentId,
-                parentType: inst.parentType,
-              });
-              setAskDuplicateParcelled(false);
-              onClose();
-            }}
-            disabled={duplicateSeries.isPending}
-            className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
-          >
-            <span className="font-semibold">Duplicar toda a compra parcelada</span>
-            <span className="text-xs text-muted-foreground">
-              Cria uma cópia fiel: {inst.total}x, cada parcela no mesmo mês da original.
-            </span>
-          </button>
-          <button
-            onClick={() => setAskDuplicateParcelled(false)}
-            disabled={duplicateSeries.isPending || addDebit.isPending || addIncome.isPending}
-            className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
-          >
-            Cancelar
-          </button>
+        {(() => {
+          const siblings = allInstallments
+            .filter((r) => r.parentId === inst.parentId && r.parentType === inst.parentType)
+            .slice()
+            .sort((a, b) => (a.year - b.year) || (a.month - b.month) || (a.number - b.number));
+          const allSelected = siblings.length > 0 && siblings.every((s) => selectedDupIds.has(s.id));
+          const toggle = (id: string) => {
+            setSelectedDupIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          };
+          const paidLabel = inst.parentType === "income" ? "Recebida" : "Paga";
+          return (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Selecione as parcelas que deseja duplicar. Cada uma será copiada no seu próprio mês, mantendo valor e status.
+              </p>
+
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background/50 px-3 py-2 text-xs">
+                <span className="text-muted-foreground">
+                  {selectedDupIds.size} de {siblings.length} selecionadas
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedDupIds(allSelected ? new Set() : new Set(siblings.map((s) => s.id)))
+                  }
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {allSelected ? "Limpar" : "Selecionar todas"}
+                </button>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto space-y-1.5">
+                {siblings.map((s) => {
+                  const checked = selectedDupIds.has(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-sm transition-colors cursor-pointer ${
+                        checked ? "border-primary bg-primary/5" : "border-border bg-background/50 hover:border-primary/60"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(s.id)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">
+                            {s.number}/{s.total}
+                          </span>
+                          <span className="text-muted-foreground">
+                            · {MONTHS[s.month]} de {s.year}
+                          </span>
+                          {s.paid && (
+                            <span className="ml-auto rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                              {paidLabel}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatCurrency(s.amount)}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setAskDuplicateParcelled(false)}
+                  disabled={duplicateSelection.isPending}
+                  className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    if (selectedDupIds.size === 0) return;
+                    await duplicateSelection.mutateAsync({
+                      parentId: inst.parentId,
+                      parentType: inst.parentType,
+                      installmentIds: Array.from(selectedDupIds),
+                    });
+                    setAskDuplicateParcelled(false);
+                    onClose();
+                  }}
+                  disabled={selectedDupIds.size === 0 || duplicateSelection.isPending}
+                  className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {duplicateSelection.isPending ? "Duplicando…" : `Duplicar ${selectedDupIds.size || ""}`}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         </div>
       </Modal>
     </>

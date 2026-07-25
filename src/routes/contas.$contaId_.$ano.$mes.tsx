@@ -2000,7 +2000,7 @@ function PurchaseInstRow({
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors ${
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors ${
             inst.paid
               ? "bg-success/80 text-black"
               : "border border-border bg-background hover:bg-secondary"
@@ -2061,13 +2061,13 @@ function DebitRow({
           </p>
           {debit.required && (
             <span className="rounded-full bg-debit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-debit">
-              Obrig.
+              Rec.
             </span>
           )}
           {debit.autoDebit && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
-              Auto{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
+              Aut.{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
           )}
         </div>
@@ -2152,7 +2152,7 @@ function IncomeRow({
           </p>
           {income.recurrenceGroupId && (
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
-              Obrig.
+              Rec.
             </span>
           )}
         </div>
@@ -2245,10 +2245,13 @@ function ParcelledRow({
           >
             {parent.description}
           </p>
+          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${badgeClass}`}>
+            PAR
+          </span>
           {auto && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
-              Auto
+              Aut.
             </span>
           )}
         </div>

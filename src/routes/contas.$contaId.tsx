@@ -191,18 +191,20 @@ function AccountHome() {
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
 
+  const canPrevYear = yearList.length > 0 && yearList.indexOf(year) > 0;
+  const canNextYear =
+    yearList.length > 0 && yearList.indexOf(year) >= 0 && yearList.indexOf(year) < yearList.length - 1;
   const goPrevYear = () => {
+    if (!canPrevYear) return;
     const idx = yearList.indexOf(year);
-    const next = idx > 0 ? yearList[idx - 1] : yearList[0] - 1;
+    const next = yearList[idx - 1];
     setYear(next);
     sessionStorage.setItem(yearStorageKey, String(next));
   };
   const goNextYear = () => {
+    if (!canNextYear) return;
     const idx = yearList.indexOf(year);
-    const next =
-      idx >= 0 && idx < yearList.length - 1
-        ? yearList[idx + 1]
-        : yearList[yearList.length - 1] + 1;
+    const next = yearList[idx + 1];
     setYear(next);
     sessionStorage.setItem(yearStorageKey, String(next));
   };
@@ -212,7 +214,8 @@ function AccountHome() {
       <button
         type="button"
         onClick={goPrevYear}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        disabled={!canPrevYear}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         aria-label="Ano anterior"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -256,7 +259,8 @@ function AccountHome() {
       <button
         type="button"
         onClick={goNextYear}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        disabled={!canNextYear}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         aria-label="Próximo ano"
       >
         <ChevronRight className="h-4 w-4" aria-hidden="true" />

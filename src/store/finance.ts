@@ -2230,8 +2230,8 @@ export function useRemoveInvestment() {
 // Duplicate any item over a scope (month / period / all)
 // =======================
 export type DuplicateSource =
-  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean }
-  | { kind: "income"; accountId: string; description: string; amount: number; date: string }
+  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean; paid?: boolean; autoDebit?: boolean; autoDebitDay?: number | null }
+  | { kind: "income"; accountId: string; description: string; amount: number; date: string; received?: boolean }
   | { kind: "investment"; accountId: string; type: string; amount: number; percentage: number; date: string }
   | { kind: "purchase"; cardId: string; description: string; totalAmount: number; date: string };
 
@@ -2281,7 +2281,9 @@ export function useDuplicateOverScope() {
           amount: src.amount,
           date: dateFor(t.year, t.month),
           required: src.required,
-          paid: false,
+          paid: !!src.paid,
+          auto_debit: !!src.autoDebit,
+          auto_debit_day: src.autoDebitDay ?? null,
           installments_count: 1,
           is_parent: false,
           reference_year: t.year,
@@ -2297,7 +2299,7 @@ export function useDuplicateOverScope() {
           description: src.description,
           amount: src.amount,
           date: dateFor(t.year, t.month),
-          received: false,
+          received: !!src.received,
           installments_count: 1,
           is_parent: false,
           reference_year: t.year,
@@ -2413,7 +2415,77 @@ export function useDuplicateInstallmentSeries() {
         due_date: r.due_date,
         year: r.year,
         month: r.month,
-        paid: false,
+        paid: !!r.paid,
+      }));
+      const { error: iei } = await supabase.from("installments").insert(newInsts);
+      if (iei) throw iei;
+      return { newParentId };
+    },
+    onSuccess: () => inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
+// =======================
+// Duplicate a SUBSET of a parcelled series: user picks which installments to
+// clone. Selected installments are copied AS-IS into their original months,
+// keeping their paid status. The new series is renumbered 1..N with total=N.
+// =======================
+export function useDuplicateInstallmentsSelection() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+      installmentIds: string[];
+    }) => {
+      const { parentId, parentType, installmentIds } = args;
+      if (!installmentIds.length) return;
+      const parentTable =
+        parentType === "purchase" ? "purchases" : parentType === "debit" ? "debits" : "incomes";
+      const { data: parent, error: pe } = await supabase
+        .from(parentTable)
+        .select("*")
+        .eq("id", parentId)
+        .maybeSingle();
+      if (pe) throw pe;
+      if (!parent) throw new Error("Lançamento original não encontrado.");
+      const { data: insts, error: ie } = await supabase
+        .from("installments")
+        .select("*")
+        .in("id", installmentIds);
+      if (ie) throw ie;
+      const picked = ((insts ?? []) as any[]).filter(
+        (r) => r.parent_id === parentId && r.parent_type === parentType,
+      );
+      if (!picked.length) throw new Error("Nenhuma parcela selecionada.");
+      picked.sort((a, b) => (a.year - b.year) || (a.month - b.month) || (a.number - b.number));
+
+      const newParentId = crypto.randomUUID();
+      const cloneRow: any = { ...(parent as any) };
+      delete cloneRow.id;
+      delete cloneRow.created_at;
+      delete cloneRow.updated_at;
+      cloneRow.id = newParentId;
+      cloneRow.user_id = user!.id;
+      cloneRow.installments_count = picked.length;
+      const { error: iep } = await supabase.from(parentTable).insert(cloneRow);
+      if (iep) throw iep;
+
+      const total = picked.length;
+      const newInsts = picked.map((r, idx) => ({
+        id: crypto.randomUUID(),
+        user_id: user!.id,
+        parent_id: newParentId,
+        parent_type: parentType,
+        purchase_id: parentType === "purchase" ? newParentId : null,
+        number: idx + 1,
+        total,
+        amount: r.amount,
+        due_date: r.due_date,
+        year: r.year,
+        month: r.month,
+        paid: !!r.paid,
       }));
       const { error: iei } = await supabase.from("installments").insert(newInsts);
       if (iei) throw iei;

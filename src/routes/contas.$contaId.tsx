@@ -259,7 +259,8 @@ function AccountHome() {
       <button
         type="button"
         onClick={goNextYear}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        disabled={!canNextYear}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         aria-label="Próximo ano"
       >
         <ChevronRight className="h-4 w-4" aria-hidden="true" />

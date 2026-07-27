@@ -60,16 +60,24 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
     // Debits single
     for (const d of debits) {
       if (d.accountId !== contaId || d.isParent) continue;
-      if (!d.date) continue;
-      const [y, m] = d.date.slice(0, 10).split("-").map(Number);
-      if (y && m) add(y, m - 1);
+      if (d.referenceYear != null && d.referenceMonth != null) {
+        add(d.referenceYear, d.referenceMonth);
+      } else {
+        if (!d.date) continue;
+        const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+        if (y && m) add(y, m - 1);
+      }
     }
     // Incomes single
     for (const inc of incomes) {
       if (inc.accountId !== contaId || inc.isParent) continue;
-      if (!inc.date) continue;
-      const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
-      if (y && m) add(y, m - 1);
+      if (inc.referenceYear != null && inc.referenceMonth != null) {
+        add(inc.referenceYear, inc.referenceMonth);
+      } else {
+        if (!inc.date) continue;
+        const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
+        if (y && m) add(y, m - 1);
+      }
     }
     // Investments
     for (const inv of investments) {
@@ -97,6 +105,21 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
   const [openMonth, setOpenMonth] = useState(false);
   const [openYear, setOpenYear] = useState(false);
 
+  // Mes anterior: determina se existe lancamento
+  const prevHasData = (() => {
+    const py = prev.y;
+    const pm = prev.m;
+    const months = yearMonthMap.get(py);
+    return months ? months.has(pm) : false;
+  })();
+
+  const nextHasData = (() => {
+    const ny = next.y;
+    const nm = next.m;
+    const months = yearMonthMap.get(ny);
+    return months ? months.has(nm) : false;
+  })();
+
   const go = (y: number, m: number) => {
     navigate({
       to: "/contas/$contaId/$ano/$mes",
@@ -109,7 +132,8 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
       <button
         type="button"
         onClick={() => go(prev.y, prev.m)}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        disabled={!prevHasData}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
         aria-label="Mês anterior"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -193,7 +217,8 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
       <button
         type="button"
         onClick={() => go(next.y, next.m)}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+        disabled={!nextHasData}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
         aria-label="Próximo mês"
       >
         <ChevronRight className="h-4 w-4" aria-hidden="true" />

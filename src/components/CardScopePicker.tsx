@@ -131,7 +131,7 @@ function ScopeOption({
         type="radio"
         checked={checked}
         onChange={onCheck}
-        className="mt-1 h-3.5 w-3.5 accent-primary"
+        className="mt-0.5 h-4 w-4 accent-primary"
       />
       <div className="text-xs">
         <p className="font-semibold text-foreground">{label}</p>

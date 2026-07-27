@@ -82,6 +82,7 @@ export function AddIncomeDialog({
       referenceYear: defaultYear,
       referenceMonth: defaultMonth,
       receivedNow: markReceived && !isInstallment && !isRecurring,
+      markCurrentPaid: markReceived && isInstallment,
     });
     onClose();
   };
@@ -104,7 +105,7 @@ export function AddIncomeDialog({
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
             <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
-          <Field label="Data">
+          <Field label="Data da compra">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
@@ -115,10 +116,7 @@ export function AddIncomeDialog({
             checked={isInstallment}
             onChange={(e) => {
               setIsInstallment(e.target.checked);
-              if (e.target.checked) {
-                setIsRecurring(false);
-                setMarkReceived(false);
-              }
+              if (e.target.checked) setIsRecurring(false);
             }}
             className="h-4 w-4 accent-primary"
           />
@@ -170,7 +168,7 @@ export function AddIncomeDialog({
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="text-sm">
-            <span className="font-medium">Recorrente</span>
+            <span className="font-medium">Recebível recorrente</span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
               Replicado automaticamente nos próximos meses, mantendo o dia.
             </span>
@@ -191,7 +189,7 @@ export function AddIncomeDialog({
           </Field>
         )}
 
-        {!isInstallment && !isRecurring && (
+        {!isRecurring && (
           <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
             <input
               type="checkbox"
@@ -199,7 +197,9 @@ export function AddIncomeDialog({
               onChange={(e) => setMarkReceived(e.target.checked)}
               className="h-4 w-4 accent-primary"
             />
-            <span className="text-sm font-medium">Marcar como recebida</span>
+            <span className="text-sm font-medium">
+              {isInstallment ? "Marcar esta parcela como recebida" : "Marcar como recebida"}
+            </span>
           </label>
         )}
 

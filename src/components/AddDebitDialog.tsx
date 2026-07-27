@@ -76,6 +76,7 @@ export function AddDebitDialog({
       referenceMonth: defaultMonth,
       recurrenceMonths: required && !isInstallment ? Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)) : undefined,
       paidNow: markPaid && !isInstallment && !required,
+      markCurrentPaid: markPaid && isInstallment,
     });
     onClose();
   };
@@ -96,7 +97,7 @@ export function AddDebitDialog({
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
             <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
-          <Field label="Data">
+          <Field label="Data da compra">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
@@ -107,10 +108,7 @@ export function AddDebitDialog({
             checked={isInstallment}
             onChange={(e) => {
               setIsInstallment(e.target.checked);
-              if (e.target.checked) {
-                setRequired(false);
-                setMarkPaid(false);
-              }
+              if (e.target.checked) setRequired(false);
             }}
             className="h-4 w-4 accent-primary"
           />
@@ -194,7 +192,7 @@ export function AddDebitDialog({
           </Field>
         )}
 
-        {!isInstallment && !required && (
+        {!required && (
           <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
             <input
               type="checkbox"
@@ -202,7 +200,9 @@ export function AddDebitDialog({
               onChange={(e) => setMarkPaid(e.target.checked)}
               className="h-4 w-4 accent-primary"
             />
-            <span className="text-sm font-medium">Marcar como paga</span>
+            <span className="text-sm font-medium">
+              {isInstallment ? "Marcar esta parcela como paga" : "Marcar como paga"}
+            </span>
           </label>
         )}
 

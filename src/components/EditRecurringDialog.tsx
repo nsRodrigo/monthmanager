@@ -1,20 +1,39 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
-import { useUpdateRecurringSeries, useDeleteRecurringSeries, useDuplicateOverScope, useDeleteOverScope, type CardScope, type DeleteSource } from "@/store/finance";
+import {
+  useUpdateRecurringSeries,
+  useDeleteRecurringSeries,
+  useUpdateRecurringPurchaseSeries,
+  useDeleteRecurringPurchaseSeries,
+  useDuplicateOverScope,
+  useDeleteOverScope,
+  type CardScope,
+  type DeleteSource,
+} from "@/store/finance";
 import { useConfirm } from "@/store/confirm";
 import { Trash2, Copy } from "lucide-react";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 
-export type RecurringEditTarget = {
-  kind: "debit" | "income";
-  id: string;
-  groupId: string;
-  description: string;
-  amount: number;
-  date: string;
-  accountId: string;
-};
+export type RecurringEditTarget =
+  | {
+      kind: "debit" | "income";
+      id: string;
+      groupId: string;
+      description: string;
+      amount: number;
+      date: string;
+      accountId: string;
+    }
+  | {
+      kind: "purchase";
+      id: string;
+      groupId: string;
+      description: string;
+      amount: number;
+      date: string;
+      cardId: string;
+    };
 
 /**
  * Edit dialog for a single occurrence of a recurring series.
@@ -34,8 +53,10 @@ export function EditRecurringDialog({
   defaultYear?: number;
   defaultMonth?: number;
 }) {
-  const update = useUpdateRecurringSeries();
-  const remove = useDeleteRecurringSeries();
+  const updateDI = useUpdateRecurringSeries();
+  const removeDI = useDeleteRecurringSeries();
+  const updateP = useUpdateRecurringPurchaseSeries();
+  const removeP = useDeleteRecurringPurchaseSeries();
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const confirm = useConfirm();
@@ -45,6 +66,7 @@ export function EditRecurringDialog({
   const [askSaveScope, setAskSaveScope] = useState(false);
   const [askDuplicate, setAskDuplicate] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
+  const [askDeletePurchaseScope, setAskDeletePurchaseScope] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;
@@ -55,12 +77,15 @@ export function EditRecurringDialog({
 
   if (!target) return null;
 
+  const updating = updateDI.isPending || updateP.isPending;
+  const removing = removeDI.isPending || removeP.isPending || deleteScope.isPending;
+
   const dirty =
     description.trim() !== target.description ||
     amount !== target.amount ||
     date !== target.date;
 
-  const runUpdate = async (scope: "one" | "forward") => {
+  const runUpdate = async (scope: "one" | "forward" | "all") => {
     const patch: { description?: string; amount?: number; date?: string } = {};
     if (description.trim() !== target.description) patch.description = description.trim();
     if (amount !== target.amount) patch.amount = amount;
@@ -69,15 +94,37 @@ export function EditRecurringDialog({
       onClose();
       return;
     }
-    await update.mutateAsync({
-      kind: target.kind,
+    if (target.kind === "purchase") {
+      await updateP.mutateAsync({
+        id: target.id,
+        groupId: target.groupId,
+        anchorDate: target.date,
+        scope,
+        patch,
+      });
+    } else {
+      await updateDI.mutateAsync({
+        kind: target.kind,
+        id: target.id,
+        groupId: target.groupId,
+        anchorDate: target.date,
+        scope,
+        patch,
+      });
+    }
+    setAskSaveScope(false);
+    onClose();
+  };
+
+  const runDeletePurchase = async (scope: "one" | "forward" | "all") => {
+    if (target.kind !== "purchase") return;
+    await removeP.mutateAsync({
       id: target.id,
       groupId: target.groupId,
       anchorDate: target.date,
       scope,
-      patch,
     });
-    setAskSaveScope(false);
+    setAskDeletePurchaseScope(false);
     onClose();
   };
 
@@ -89,19 +136,28 @@ export function EditRecurringDialog({
   void confirm;
 
 
-
-
-
   return (
     <>
-    <Modal open={open && !askDuplicate && !askDelete && !askSaveScope} onClose={onClose} title="Editar lançamento">
+    <Modal
+      open={open && !askDuplicate && !askDelete && !askDeletePurchaseScope && !askSaveScope}
+      onClose={onClose}
+      title="Editar lançamento"
+    >
       <div className="space-y-4">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">Recorrente</span> · cada mês é um
           lançamento independente. Ao salvar você escolhe o escopo.
         </div>
 
-        <Field label={target.kind === "debit" ? "Descrição do débito" : "Descrição do recebimento"}>
+        <Field
+          label={
+            target.kind === "debit"
+              ? "Descrição do débito"
+              : target.kind === "income"
+                ? "Descrição do recebimento"
+                : "Descrição da compra"
+          }
+        >
           <input
             className={inputClass}
             value={description}
@@ -113,7 +169,7 @@ export function EditRecurringDialog({
           <Field label="Valor">
             <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
-          <Field label="Data">
+          <Field label="Data da compra">
             <input
               type="date"
               className={inputClass}
@@ -133,8 +189,8 @@ export function EditRecurringDialog({
             <Copy className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setAskDelete(true)}
-            disabled={deleteScope.isPending || remove.isPending}
+            onClick={() => (target.kind === "purchase" ? setAskDeletePurchaseScope(true) : setAskDelete(true))}
+            disabled={removing}
             className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
             title="Excluir lançamento"
           >
@@ -148,10 +204,10 @@ export function EditRecurringDialog({
           </button>
           <button
             onClick={handleSave}
-            disabled={update.isPending || !dirty || !description.trim() || amount === 0}
+            disabled={updating || !dirty || !description.trim() || amount === 0}
             className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {update.isPending ? "Salvando…" : "Salvar"}
+            {updating ? "Salvando…" : "Salvar"}
           </button>
         </div>
       </div>
@@ -164,7 +220,7 @@ export function EditRecurringDialog({
         </p>
         <button
           onClick={() => runUpdate("one")}
-          disabled={update.isPending}
+          disabled={updating}
           className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
         >
           <span className="font-semibold">Apenas este mês</span>
@@ -174,7 +230,7 @@ export function EditRecurringDialog({
         </button>
         <button
           onClick={() => runUpdate("forward")}
-          disabled={update.isPending}
+          disabled={updating}
           className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
         >
           <span className="font-semibold">Este e os próximos meses</span>
@@ -183,8 +239,67 @@ export function EditRecurringDialog({
           </span>
         </button>
         <button
+          onClick={() => runUpdate("all")}
+          disabled={updating}
+          className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+        >
+          <span className="font-semibold">Toda a conta</span>
+          <span className="text-xs text-muted-foreground">
+            Aplica em todos os meses da série, inclusive os passados.
+          </span>
+        </button>
+        <button
           onClick={() => setAskSaveScope(false)}
-          disabled={update.isPending}
+          disabled={updating}
+          className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+      </div>
+    </Modal>
+
+    <Modal
+      open={askDeletePurchaseScope}
+      onClose={() => setAskDeletePurchaseScope(false)}
+      title="Excluir · aplicar em…"
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Escolha o escopo da exclusão desta série recorrente.
+        </p>
+        <button
+          onClick={() => runDeletePurchase("one")}
+          disabled={removing}
+          className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-destructive disabled:opacity-50"
+        >
+          <span className="font-semibold">Apenas este mês</span>
+          <span className="text-xs text-muted-foreground">
+            Os demais meses da série não serão removidos.
+          </span>
+        </button>
+        <button
+          onClick={() => runDeletePurchase("forward")}
+          disabled={removing}
+          className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-destructive disabled:opacity-50"
+        >
+          <span className="font-semibold">Este e os próximos meses</span>
+          <span className="text-xs text-muted-foreground">
+            Remove também todos os meses futuros da mesma série.
+          </span>
+        </button>
+        <button
+          onClick={() => runDeletePurchase("all")}
+          disabled={removing}
+          className="flex w-full flex-col items-start gap-1 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-destructive disabled:opacity-50"
+        >
+          <span className="font-semibold">Toda a conta</span>
+          <span className="text-xs text-muted-foreground">
+            Remove todos os meses da série, inclusive os passados.
+          </span>
+        </button>
+        <button
+          onClick={() => setAskDeletePurchaseScope(false)}
+          disabled={removing}
           className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary disabled:opacity-50"
         >
           Cancelar
@@ -204,15 +319,33 @@ export function EditRecurringDialog({
       initialKind="month"
       loading={duplicate.isPending}
       onConfirm={async (s: CardScope) => {
+        const source =
+          target.kind === "purchase"
+            ? {
+                kind: "purchase" as const,
+                cardId: target.cardId,
+                description: target.description,
+                totalAmount: target.amount,
+                date: target.date,
+              }
+            : target.kind === "debit"
+              ? {
+                  kind: "debit" as const,
+                  accountId: target.accountId,
+                  description: target.description,
+                  amount: target.amount,
+                  date: target.date,
+                  required: true,
+                }
+              : {
+                  kind: "income" as const,
+                  accountId: target.accountId,
+                  description: target.description,
+                  amount: target.amount,
+                  date: target.date,
+                };
         await duplicate.mutateAsync({
-          source: {
-            kind: target.kind,
-            accountId: target.accountId,
-            description: target.description,
-            amount: target.amount,
-            date: target.date,
-            ...(target.kind === "debit" ? { required: true } : {}),
-          } as never,
+          source,
           scope: s,
           anchorYear: defaultYear ?? new Date().getFullYear(),
           anchorMonth: defaultMonth ?? new Date().getMonth(),
@@ -234,6 +367,7 @@ export function EditRecurringDialog({
       initialKind="month"
       loading={deleteScope.isPending}
       onConfirm={async (s: CardScope) => {
+        if (target.kind === "purchase") return;
         const src: DeleteSource = {
           kind: target.kind,
           accountId: target.accountId,

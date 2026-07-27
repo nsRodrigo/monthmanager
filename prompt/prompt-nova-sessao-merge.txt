@@ -1,0 +1,708 @@
+CONTEXTO
+========
+Voce tem acesso ao repositorio do projeto monthmanager em
+C:\Users\rodri\Desktop\Estudos\monthmanager
+
+Preciso que voce aplique uma serie de alteracoes nos arquivos do projeto.
+Leia cada instrucao com cuidado antes de editar qualquer arquivo. Aplique
+tudo e ao final rode:
+
+  cd C:\Users\rodri\Desktop\Estudos\monthmanager
+  npx tsc --noEmit
+
+Se o typecheck passar sem erros, o trabalho esta concluido.
+
+
+=======================================================================
+REGRAS DE NEGOCIO QUE GUIAM TODAS AS ALTERACOES
+=======================================================================
+
+REGRA PRINCIPAL: a data digitada pelo usuario e APENAS REFERENCIA VISUAL.
+Nunca define em qual mes um lancamento aparece. O que define o mes e:
+  - Para avulsos (debito/recebimento simples): o mes da PAGINA onde o
+    usuario estava quando criou.
+  - Para parcelados: o mes da PAGINA ancora a parcela atual; as anteriores
+    ficam em meses anteriores e as proximas em meses posteriores.
+  - Para recorrentes/debito automatico: o mes da PAGINA e o primeiro;
+    os meses seguintes sao gerados em sequencia.
+
+Editar a data NUNCA move o lancamento de mes. A data e corrigida
+visualmente mas o lancamento permanece onde estava.
+
+
+=======================================================================
+ARQUIVO 1: src/store/finance.ts
+=======================================================================
+
+--- 1A. Adicionar funcao buildRecurringMonthDates ---
+
+Localize a funcao fmtLocalDate (linha aproximada 1316) e adicione logo
+APOS o fechamento dessa funcao (apos a chave de fechamento e antes da
+funcao useUpdateInstallment):
+
+export function buildRecurringMonthDates(
+  anchorDateIso: string,
+  months: number,
+  startOffset: 0 | 1 = 0,
+): Array<{ dateStr: string; year: number; month: number }> {
+  const { y: sy, m: sm, d: sd } = parseLocalDate(anchorDateIso);
+  const start = new Date(sy, sm, sd);
+  const day = start.getDate();
+  const n = Math.max(1, Math.floor(months));
+  const dates: Array<{ dateStr: string; year: number; month: number }> = [];
+  for (let i = startOffset; i < startOffset + n; i++) {
+    const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    const lastDay = new Date(
+      target.getFullYear(), target.getMonth() + 1, 0,
+    ).getDate();
+    const dd = Math.min(day, lastDay);
+    dates.push({
+      dateStr: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
+      year: target.getFullYear(),
+      month: target.getMonth(),
+    });
+  }
+  return dates;
+}
+
+
+--- 1B. Corrigir useAddDebit: parcelados ancoram no mes da pagina ---
+
+Dentro de useAddDebit, no bloco "if (count > 1)", o codigo atual passa
+d.date como ancora para buildInstallmentsAnchored e buildInstallments.
+
+SUBSTITUIR o bloco "if (count > 1) {" e as chamadas de
+buildInstallmentsAnchored/buildInstallments por:
+
+      if (count > 1) {
+        // A ancora de mes e sempre o mes da PAGINA (refYear/refMonth),
+        // nao o mes da data digitada. So mantemos o DIA da data.
+        const [, , dd] = d.date.slice(0, 10).split("-").map(Number);
+        const anchorDay = Math.min(
+          dd || 1,
+          new Date(refYear, refMonth + 1, 0).getDate(),
+        );
+        const anchorIso =
+          `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+          `-${String(anchorDay).padStart(2, "0")}`;
+        const inst =
+          anchor > 1
+            ? buildInstallmentsAnchored(
+                debitId, user!.id, d.amount, count, anchor, anchorIso,
+                "debit", true,
+              )
+            : buildInstallments(
+                debitId, "debit", user!.id, d.amount, count, anchorIso,
+              );
+
+MANTER o restante do bloco (markPaid, insert no supabase) igual.
+
+
+--- 1C. Corrigir useAddDebit: recorrentes usam buildRecurringMonthDates ---
+
+Dentro de useAddDebit, no bloco "} else if (isRecurring) {", substituir
+o loop for (que hoje usa RECUR_MONTHS e faz parse manual da data) por:
+
+      } else if (isRecurring) {
+        const dates = buildRecurringMonthDates(
+          d.date, d.recurrenceMonths ?? 24, 1,
+        );
+        const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+          user_id: user!.id,
+          account_id: d.accountId,
+          description: d.description,
+          amount: d.amount,
+          date: dateStr,
+          required: true,
+          paid: false,
+          auto_debit: d.autoDebit ?? false,
+          auto_debit_day: d.autoDebitDay ?? null,
+          installments_count: 1,
+          is_parent: false,
+          recurrence_group_id: groupId,
+          reference_year: ry,
+          reference_month: rm,
+        }));
+        if (rows.length) {
+          const { error: e3 } = await supabase.from("debits").insert(rows);
+          if (e3) throw e3;
+        }
+      }
+
+
+--- 1D. Corrigir useAddIncome: parcelados ancoram no mes da pagina ---
+
+Mesma logica do 1B mas para useAddIncome. No bloco "if (count > 1) {",
+substituir a chamada de buildInstallmentsAnchored/buildInstallments para
+usar refYear/refMonth como ancora em vez de i.date:
+
+      if (count > 1) {
+        const [, , dd] = i.date.slice(0, 10).split("-").map(Number);
+        const anchorDay = Math.min(
+          dd || 1,
+          new Date(refYear, refMonth + 1, 0).getDate(),
+        );
+        const anchorIso =
+          `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+          `-${String(anchorDay).padStart(2, "0")}`;
+        const inst =
+          anchor > 1
+            ? buildInstallmentsAnchored(
+                incomeId, user!.id, i.amount, count, anchor, anchorIso,
+                "income", true,
+              )
+            : buildInstallments(
+                incomeId, "income", user!.id, i.amount, count, anchorIso,
+              );
+
+MANTER o restante do bloco (markPaid/receivedNow, insert) igual.
+
+
+--- 1E. Corrigir useAddIncome: recorrentes usam buildRecurringMonthDates ---
+
+Dentro de useAddIncome, no bloco "} else if (isRecurring) {", substituir
+o loop for por:
+
+      } else if (isRecurring) {
+        const dates = buildRecurringMonthDates(
+          i.date, i.recurrenceMonths ?? 24, 1,
+        );
+        const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+          user_id: user!.id,
+          account_id: i.accountId,
+          description: i.description,
+          amount: i.amount,
+          date: dateStr,
+          received: false,
+          installments_count: 1,
+          is_parent: false,
+          recurrence_group_id: groupId,
+          reference_year: ry,
+          reference_month: rm,
+        }));
+        if (rows.length) {
+          const { error: e3 } = await supabase.from("incomes").insert(rows);
+          if (e3) throw e3;
+        }
+      }
+
+
+--- 1F. Adicionar useChangeInstallmentSeries (generalizacao do useChangePurchaseInstallments) ---
+
+Logo APOS o fechamento de useChangePurchaseInstallments (mantenha o
+useChangePurchaseInstallments original, nao o remova pois pode ter outros
+usos), adicione:
+
+export function useChangeInstallmentSeries() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+      newCount: number;
+      totalAmount: number;
+    }) => {
+      if (!user) throw new Error("Nao autenticado.");
+      const newCount = Math.max(1, Math.floor(args.newCount));
+      const table =
+        args.parentType === "purchase" ? "purchases"
+        : args.parentType === "debit" ? "debits"
+        : "incomes";
+      const amountField =
+        args.parentType === "purchase" ? "total_amount" : "amount";
+
+      const { data: existing } = await supabase
+        .from("installments")
+        .select("number,due_date")
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType)
+        .order("number", { ascending: true })
+        .limit(1);
+      const firstDue =
+        existing && existing.length > 0
+          ? (existing[0] as { due_date: string }).due_date
+          : new Date().toISOString().slice(0, 10);
+
+      await supabase
+        .from("installments")
+        .delete()
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType);
+
+      await supabase
+        .from(table)
+        .update({ installments_count: newCount, [amountField]: args.totalAmount })
+        .eq("id", args.parentId);
+
+      const items = buildInstallmentsAnchored(
+        args.parentId, user.id, args.totalAmount,
+        newCount, 1, firstDue, args.parentType, false,
+      );
+      if (items.length > 0) {
+        const { error } = await supabase.from("installments").insert(items);
+        if (error) throw error;
+      }
+    },
+    onSettled: () => inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
+
+--- 1G. Adicionar useRenumberInstallment ---
+
+Logo apos useChangeInstallmentSeries, adicione:
+
+export function useRenumberInstallment() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+      installmentId: string;
+      oldNumber: number;
+      newNumber: number;
+      total: number;
+      includePrevious: boolean;
+    }) => {
+      const {
+        parentId, parentType, installmentId,
+        oldNumber, newNumber, total, includePrevious,
+      } = args;
+      if (oldNumber === newNumber) return;
+      const clampedNew = Math.max(1, Math.min(total, newNumber));
+
+      const { data: rows, error } = await supabase
+        .from("installments")
+        .select("id,number,due_date,year,month")
+        .eq("parent_id", parentId)
+        .eq("parent_type", parentType);
+      if (error) throw error;
+      const list = (rows ?? []) as Array<{
+        id: string; number: number;
+        due_date: string; year: number; month: number;
+      }>;
+
+      // Preserva a "vaga de mes" de cada posicao original
+      const dateByOldNumber = new Map<
+        number, { due_date: string; year: number; month: number }
+      >();
+      list.forEach((r) =>
+        dateByOldNumber.set(r.number, {
+          due_date: r.due_date, year: r.year, month: r.month,
+        }),
+      );
+
+      const nextNumber = new Map<string, number>();
+      list.forEach((r) => nextNumber.set(r.id, r.number));
+
+      if (clampedNew > oldNumber) {
+        list.forEach((r) => {
+          if (r.id === installmentId) return;
+          if (r.number > oldNumber && r.number <= clampedNew)
+            nextNumber.set(r.id, r.number - 1);
+        });
+      } else {
+        list.forEach((r) => {
+          if (r.id === installmentId) return;
+          if (r.number >= clampedNew && r.number < oldNumber)
+            nextNumber.set(r.id, r.number + 1);
+        });
+      }
+      nextNumber.set(installmentId, clampedNew);
+
+      if (includePrevious) {
+        const delta = clampedNew - oldNumber;
+        list.forEach((r) => {
+          if (r.id === installmentId) return;
+          if (
+            r.number < oldNumber &&
+            !(r.number >= clampedNew && r.number < oldNumber)
+          ) {
+            const current = nextNumber.get(r.id) ?? r.number;
+            nextNumber.set(
+              r.id,
+              Math.max(1, Math.min(total, current + delta)),
+            );
+          }
+        });
+      }
+
+      for (const r of list) {
+        const n = nextNumber.get(r.id);
+        if (n === undefined || n === r.number) continue;
+        const newDate = dateByOldNumber.get(n);
+        const patch: {
+          number: number;
+          due_date?: string; year?: number; month?: number;
+        } = { number: n };
+        if (newDate) {
+          patch.due_date = newDate.due_date;
+          patch.year = newDate.year;
+          patch.month = newDate.month;
+        }
+        const { error: eUpd } = await supabase
+          .from("installments")
+          .update(patch)
+          .eq("id", r.id);
+        if (eUpd) throw eUpd;
+      }
+    },
+    onSettled: () =>
+      inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
+
+=======================================================================
+ARQUIVO 2: src/components/EditInstallmentDialog.tsx
+=======================================================================
+
+--- 2A. Imports: adicionar useChangeInstallmentSeries e useRenumberInstallment ---
+
+No bloco de imports de finance, adicionar:
+  useChangeInstallmentSeries,
+  useRenumberInstallment,
+
+(manter useChangePurchaseInstallments se ja existir nos imports)
+
+
+--- 2B. Instanciar os novos hooks ---
+
+Apos a linha "const changeInstCount = useChangePurchaseInstallments();"
+adicionar:
+
+  const changeInstSeries = useChangeInstallmentSeries();
+  const renumberInstallment = useRenumberInstallment();
+
+
+--- 2C. Adicionar estado newCurrentNumber ---
+
+Apos a declaracao de "const [newTotalAmount, setNewTotalAmount]..."
+adicionar:
+
+  const [newCurrentNumber, setNewCurrentNumber] = useState("");
+
+E no useEffect onde sao inicializados newInstCount e newTotalAmount,
+adicionar:
+
+  setNewCurrentNumber(String(installment.number));
+
+
+--- 2D. Remover restricao de parentType === "purchase" no botao Alterar ---
+
+Localizar o bloco:
+  {inst.parentType === "purchase" && (
+    <button onClick={() => setManageView("change")} ...>
+      Alterar parcelamento
+    ...
+  )}
+
+Remover a condicional {inst.parentType === "purchase" && ...} deixando
+o botao visivel para todos os tipos de parcelamento.
+
+Tambem alterar:
+  const canManage = remaining > 0 || inst.parentType === "purchase";
+para:
+  const canManage = true;
+
+
+--- 2E. Atualizar a view "change" ---
+
+Substituir o conteudo do bloco {manageView === "change" && ...} pelo
+seguinte (mantenha o botao Voltar no topo):
+
+SECAO 1 — "Recriar parcelamento" (campos Num parcelas + Valor total)
+com dois sub-modos controlados por radio/toggle:
+  - "Recalcular valor por parcela" (mantém o total, divide pelo novo N)
+  - "Manter valor por parcela" (multiplica o valor atual por N, acrescenta ao total)
+
+O botao confirmar chama changeInstSeries.mutateAsync({
+  parentId: inst.parentId,
+  parentType: inst.parentType,
+  newCount: n,
+  totalAmount: calculadoConforme subModo escolhido,
+})
+
+SECAO 2 — "Renumerar parcela" (campo Parcela atual, valor inicial = inst.number)
+
+O botao "Aplicar so a renumeracao" quando clicado:
+1. Confirma a mudanca (useConfirm)
+2. Pergunta se deve incluir parcelas anteriores (useConfirm)
+3. Chama renumberInstallment.mutateAsync({
+     parentId: inst.parentId,
+     parentType: inst.parentType,
+     installmentId: inst.id,
+     oldNumber: inst.number,
+     newNumber: newNum,
+     total: inst.total,
+     includePrevious: resposta do segundo confirm,
+   })
+
+O botao fica disabled quando newCurrentNumber === String(inst.number).
+
+Separe as duas secoes com um divisor visual (linha + titulo).
+
+
+=======================================================================
+ARQUIVO 3: src/components/MonthYearPicker.tsx
+=======================================================================
+
+--- 3A. Travar setas < e > nos limites de mes com lancamentos ---
+
+O componente ja calcula yearMonthMap e yearList. Agora adicionar logica
+para travar os botoes de mes anterior e proximo:
+
+Adicionar antes do return:
+
+  // Mes anterior: determina se existe lancamento
+  const prevHasData = (() => {
+    const py = prev.y;
+    const pm = prev.m;
+    const months = yearMonthMap.get(py);
+    return months ? months.has(pm) : false;
+  })();
+
+  const nextHasData = (() => {
+    const ny = next.y;
+    const nm = next.m;
+    const months = yearMonthMap.get(ny);
+    return months ? months.has(nm) : false;
+  })();
+
+No botao ChevronLeft (mes anterior):
+  Adicionar: disabled={!prevHasData}
+  Adicionar na className: disabled:opacity-40 disabled:pointer-events-none
+
+No botao ChevronRight (proximo mes):
+  Adicionar: disabled={!nextHasData}
+  Adicionar na className: disabled:opacity-40 disabled:pointer-events-none
+
+ATENCAO: o mes atual (year/month) sempre e adicionado ao mapa no final
+do useMemo (linha "add(year, month)"), entao o mes visualizado nunca
+trava. So os meses adjacentes sem lancamentos ficam desabilitados.
+
+IMPORTANTE: tambem corrigir o calculo de yearMonthMap para usar
+reference_year/reference_month dos debits e incomes avulsos quando
+disponivel, em vez de fazer parse do campo date:
+
+No loop "Debits single" substituir:
+  const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+  if (y && m) add(y, m - 1);
+por:
+  if (d.referenceYear != null && d.referenceMonth != null) {
+    add(d.referenceYear, d.referenceMonth);
+  } else {
+    const [y, m] = d.date.slice(0, 10).split("-").map(Number);
+    if (y && m) add(y, m - 1);
+  }
+
+Fazer o mesmo para "Incomes single":
+  if (inc.referenceYear != null && inc.referenceMonth != null) {
+    add(inc.referenceYear, inc.referenceMonth);
+  } else {
+    const [y, m] = inc.date.slice(0, 10).split("-").map(Number);
+    if (y && m) add(y, m - 1);
+  }
+
+
+=======================================================================
+ARQUIVO 4: src/routes/contas.$contaId_.$ano.$mes.tsx
+=======================================================================
+
+--- 4A. Imports: adicionar resolveScopeMonths ---
+
+No import de finance, adicionar:
+  resolveScopeMonths,
+
+Se resolveScopeMonths nao for export no finance.ts, adicionar o export:
+Localizar "function resolveScopeMonths" em finance.ts e trocar para
+"export function resolveScopeMonths".
+
+
+--- 4B. Corrigir askDeleteSingle para debito automatico ---
+
+Localizar a funcao askDeleteSingle. Substituir a implementacao atual por:
+
+  const askDeleteSingle = (
+    id: string,
+    parentType: "purchase" | "debit" | "income",
+    label: string,
+    date: string,
+  ) => {
+    setScopeDelete({
+      title:
+        parentType === "debit" ? "Excluir debito"
+        : parentType === "income" ? "Excluir recebimento"
+        : "Excluir compra",
+      description: (
+        <>
+          Voce esta excluindo{" "}
+          <span className="font-semibold text-foreground">{label}</span>.
+        </>
+      ),
+      execute: async (scope) => {
+        const [iy, im] = date.slice(0, 10).split("-").map(Number);
+        const targets = resolveScopeMonths(scope, year, month);
+        const withinScope = targets.some(
+          (t) => t.year === iy && t.month === im - 1,
+        );
+        if (!withinScope) return;
+        if (parentType === "debit") await removeDebit.mutateAsync(id);
+        else if (parentType === "income")
+          await removeIncome.mutateAsync(id);
+        else await removePurchase.mutateAsync(id);
+      },
+    });
+  };
+
+
+--- 4C. Conectar askDeleteSingle ao onRemove do debito automatico ---
+
+Localizar o onRemove do DebitRow onde hoje so existe o ramo "isRecurring"
+e o ramo de confirmacao simples. Adicionar um ramo intermediario para
+d.autoDebit:
+
+  onRemove={
+    isRecurring
+      ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)
+      : d.autoDebit
+        ? () => askDeleteSingle(d.id, "debit", d.description, d.date)
+        : async () => {
+            const ok = await confirmDialog({
+              title: "Excluir debito",
+              description: `Excluir "${d.description}"?`,
+              variant: "destructive",
+              confirmLabel: "Excluir",
+            });
+            if (ok) removeDebit.mutate(d.id);
+          }
+  }
+
+
+--- 4D. Ordenacao padrao: parcelados + recorrentes + auto-debito por data, demais depois ---
+
+Localizar onde sao montados debitsDefaultOrder e incomesDefaultOrder.
+
+Para DEBITOS, o grupo prioritario deve conter:
+  1. debitos recorrentes (recurrenceGroupId != null)
+  2. debitos automaticos sem recorrencia (autoDebit === true && !recurrenceGroupId)
+  3. debitos parcelados (monthDebits.parcelled)
+Todos mesclados e ordenados por data entre si (usar due_date para
+parcelados e date para os demais).
+
+Os "demais" (debitsCash sem autoDebit, sem recorrencia) vem depois,
+ordenados por data.
+
+Para RECEBIMENTOS, o grupo prioritario:
+  1. recebimentos recorrentes (recurrenceGroupId != null)
+  2. recebimentos parcelados (monthIncomes.parcelled)
+Os "demais" vem depois.
+
+Esta ordenacao SO se aplica quando sort.option === "default". Quando o
+usuario escolheu ordenacao manual (Nome/Valor/Data), manter o
+comportamento existente (applySort).
+
+
+--- 4E. Tag PAR nos parcelados de debito e recebimento ---
+
+No componente que renderiza cada parcela de debito/recebimento (o
+ParcelledRow ou equivalente), adicionar a tag PAR ao lado da tag N/total
+ja existente:
+
+  <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+    PAR
+  </span>
+
+Adicionar ANTES da tag de numero (ex: "2/5"), no mesmo flex container.
+
+
+--- 4F. Tag Validado/Nao validado no card ---
+
+Na area do cartao, o botao de "revisado" hoje e um quadrado com checkbox
+visual. Substituir por uma pill/tag igual ao padrao dos debitos:
+
+  <button
+    onClick={guard(onToggle)}
+    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+      inst.paid
+        ? "bg-success/15 text-success hover:bg-success/25"
+        : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+    }`}
+    title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
+  >
+    {inst.paid ? (
+      <><Check className="h-3 w-3" /> Validado</>
+    ) : (
+      "Nao validado"
+    )}
+  </button>
+
+
+--- 4G. Botao Marcar recebido em massa na secao Recebimentos ---
+
+A secao de Debitos ja tem um botao de "Marcar pago" em massa. Adicionar
+o mesmo para Recebimentos. No GroupedSection de recebimentos, adicionar
+a prop paidControl com botao que:
+
+  - Texto: "Marcar recebido" / "Recebido" (quando todos ja estao marcados)
+  - Ao clicar: percorre monthIncomes.single e monthIncomes.parcelled,
+    alternando received/paid de todos para o estado oposto do atual
+  - Usar toggleIncome.mutate e toggleInst para cada item
+
+
+=======================================================================
+ARQUIVO 5: src/components/AddDebitDialog.tsx
+=======================================================================
+
+Verificar se ja existe o campo "Repetir por quantos meses?" quando
+"Debito recorrente" esta marcado. Se nao existir, adicionar um input
+number (min=1, max=120) controlado por estado recurrenceMonths (padrao
+"24") que aparece quando required === true && !isInstallment.
+
+Verificar se o submit ja passa referenceYear: defaultYear e
+referenceMonth: defaultMonth para addDebit.mutateAsync. Se nao passar,
+adicionar.
+
+
+=======================================================================
+ARQUIVO 6: src/components/AddIncomeDialog.tsx
+=======================================================================
+
+Mesmas verificacoes do arquivo 5, mas para incomes:
+- Campo "Repetir por quantos meses?" quando isRecurring === true
+- Submit deve passar referenceYear: defaultYear e referenceMonth: defaultMonth
+- Verificar se o label do checkbox recorrente esta como "Recebivel recorrente"
+  (e nao apenas "Recorrente")
+
+
+=======================================================================
+ARQUIVO 7: src/components/AddPurchaseDialog.tsx
+=======================================================================
+
+Verificar se ja existe o campo "Repetir por quantos meses?" quando
+isRecurring === true. Se nao existir, adicionar.
+
+Verificar se o submit passa referenceYear/referenceMonth. Para compras
+parceladas, o mecanismo e diferente (usa year/month das installments),
+mas para compras recorrentes o primeiro registro tambem deve receber
+reference_year/reference_month corretos.
+
+
+=======================================================================
+VERIFICACAO FINAL
+=======================================================================
+
+Apos todas as edicoes, rodar:
+  cd C:\Users\rodri\Desktop\Estudos\monthmanager
+  npx tsc --noEmit
+
+Se houver erro de tipo em qualquer funcao nova (ex: useChangeInstallmentSeries
+ou useRenumberInstallment nao sendo exportadas), verificar se o export
+foi adicionado corretamente em finance.ts.
+
+Se houver erro de tipo em ParentType, verificar se ParentType e importado
+corretamente nos novos hooks (deve ser o tipo "purchase" | "debit" |
+"income" | "investment" ja existente no arquivo).
+
+Nao commitar. So salvar os arquivos para o usuario testar localmente.

@@ -108,6 +108,12 @@ export type Installment = {
   total: number;
   amount: number;
   dueDate: string;
+  /**
+   * Override de data visual por parcela (P7-P9). `null` = usa a data
+   * compartilhada do parent (purchase.date/debit.date/income.date).
+   * NUNCA determina o mês — quem faz isso é year/month/dueDate.
+   */
+  referenceDate: string | null;
   year: number;
   month: number;
   paid: boolean;
@@ -235,7 +241,7 @@ export function buildInstallments(
   totalAmount: number,
   installmentsCount: number,
   startDate: string,
-  paid = false,
+  markAnchorPaid = false,
 ) {
   const count = Math.max(1, installmentsCount);
   const base = round2(totalAmount / count);
@@ -275,7 +281,7 @@ export function buildInstallments(
       due_date: fmtLocalDate(d.getFullYear(), d.getMonth(), d.getDate()),
       year: d.getFullYear(),
       month: d.getMonth(),
-      paid,
+      paid: i === 0 ? markAnchorPaid : false,
     });
   }
   return items;
@@ -356,6 +362,7 @@ export function buildInstallmentsAnchored(
   anchorDate: string,
   parentType: ParentType = "purchase",
   paidPast = true,
+  markAnchorPaid = false,
 ) {
   const count = Math.max(1, installmentsCount);
   const anchor = Math.min(Math.max(1, anchorNumber), count);
@@ -400,7 +407,7 @@ export function buildInstallmentsAnchored(
       due_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       year: d.getFullYear(),
       month: d.getMonth(),
-      paid: paidPast ? i < anchor : false,
+      paid: (paidPast && i < anchor) || (i === anchor && markAnchorPaid),
     });
   }
   return items;
@@ -512,6 +519,7 @@ export function useInstallments() {
         total: number;
         amount: number | string;
         due_date: string;
+        reference_date: string | null;
         year: number;
         month: number;
         paid: boolean;
@@ -519,7 +527,7 @@ export function useInstallments() {
         supabase
           .from("installments")
           .select(
-            "id,parent_type,parent_id,purchase_id,number,total,amount,due_date,year,month,paid",
+            "id,parent_type,parent_id,purchase_id,number,total,amount,due_date,reference_date,year,month,paid",
           )
           .order("year", { ascending: true })
           .order("month", { ascending: true })
@@ -540,6 +548,7 @@ export function useInstallments() {
         total: i.total,
         amount: num(i.amount as number | string),
         dueDate: i.due_date,
+        referenceDate: i.reference_date,
         year: i.year,
         month: i.month,
         paid: i.paid,
@@ -1128,6 +1137,8 @@ export function useAddPurchase() {
       recurrenceMonths?: number;
       /** Mark the just-created current-month item as paid (only for single, non-recurring, non-parcelled). */
       paidNow?: boolean;
+      /** Mark the parcela being created (installmentNumber) as paid. */
+      markCurrentPaid?: boolean;
     }) => {
       // Recurring purchase: N monthly purchases, each installments_count=1,
       // sharing the same recurrence_group_id. NO installment-style splitting —
@@ -1225,6 +1236,7 @@ export function useAddPurchase() {
         p.invoiceAnchorDate ?? p.date,
         "purchase",
         true,
+        p.markCurrentPaid ?? false,
       );
       // Optional: quick "mark as paid" for the current installment when it's a
       // single non-parcelled purchase created from the form.
@@ -1315,6 +1327,31 @@ function parseLocalDate(iso: string): { y: number; m: number; d: number } {
 }
 function fmtLocalDate(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+export function buildRecurringMonthDates(
+  anchorDateIso: string,
+  months: number,
+  startOffset: 0 | 1 = 0,
+): Array<{ dateStr: string; year: number; month: number }> {
+  const { y: sy, m: sm, d: sd } = parseLocalDate(anchorDateIso);
+  const start = new Date(sy, sm, sd);
+  const day = start.getDate();
+  const n = Math.max(1, Math.floor(months));
+  const dates: Array<{ dateStr: string; year: number; month: number }> = [];
+  for (let i = startOffset; i < startOffset + n; i++) {
+    const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    const lastDay = new Date(
+      target.getFullYear(), target.getMonth() + 1, 0,
+    ).getDate();
+    const dd = Math.min(day, lastDay);
+    dates.push({
+      dateStr: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
+      year: target.getFullYear(),
+      month: target.getMonth(),
+    });
+  }
+  return dates;
 }
 
 export function useUpdateInstallment() {
@@ -1426,10 +1463,86 @@ export function useShiftInstallmentDate() {
 }
 
 /**
+ * Edita a data "visual" (referência) de UMA parcela de uma série genuína
+ * (total > 1), por escopo — P7/P9 da spec. NUNCA toca due_date/year/month
+ * (isso continua definindo o mês, que não muda por causa da data):
+ *   - "current": grava `reference_date` só nesta parcela — as demais
+ *     continuam mostrando a data que já tinham (a compartilhada do parent,
+ *     ou seu próprio override anterior).
+ *   - "future": grava `reference_date` nesta parcela + todas com
+ *     number > esta (mesmo parent).
+ *   - "all": volta a data compartilhada do parent para o novo valor e
+ *     LIMPA todos os overrides por parcela da série (todas voltam a
+ *     exibir a data do parent, que agora é a nova).
+ */
+export function useUpdateInstallmentDateScope() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      installment: Installment;
+      newDate: string;
+      scope: InstallmentScope;
+    }) => {
+      const { installment, newDate, scope } = args;
+
+      if (scope === "all") {
+        if (installment.parentType === "purchase") {
+          const { error } = await supabase
+            .from("purchases")
+            .update({ purchase_date: newDate })
+            .eq("id", installment.parentId);
+          if (error) throw error;
+        } else if (installment.parentType === "debit") {
+          const { error } = await supabase
+            .from("debits")
+            .update({ date: newDate })
+            .eq("id", installment.parentId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("incomes")
+            .update({ date: newDate })
+            .eq("id", installment.parentId);
+          if (error) throw error;
+        }
+        const { error: eClear } = await (supabase.from("installments") as any)
+          .update({ reference_date: null })
+          .eq("parent_id", installment.parentId)
+          .eq("parent_type", installment.parentType);
+        if (eClear) throw eClear;
+        return;
+      }
+
+      const { error: eCur } = await (supabase.from("installments") as any)
+        .update({ reference_date: newDate })
+        .eq("id", installment.id);
+      if (eCur) throw eCur;
+
+      if (scope === "future") {
+        const { error } = await (supabase.from("installments") as any)
+          .update({ reference_date: newDate })
+          .eq("parent_id", installment.parentId)
+          .eq("parent_type", installment.parentType)
+          .gt("number", installment.number);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () =>
+      inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
+  });
+}
+
+/**
  * Atualiza o valor de uma parcela aplicando opcionalmente o mesmo valor às
  * demais parcelas do mesmo parent (apenas esta, esta+próximas, ou todas).
+ * Depois de aplicar, RECALCULA a soma real das parcelas e sincroniza o total
+ * do parent (debit.amount / income.amount / purchase.total_amount) — sem
+ * isso o "Total" mostrado nos subtítulos ficava desatualizado. Quando o
+ * total muda, grava uma entrada em `amount_adjustments` (histórico visível
+ * ao usuário, distinto do undo/redo de sessão).
  */
 export function useUpdateInstallmentAmountScope() {
+  const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -1437,23 +1550,126 @@ export function useUpdateInstallmentAmountScope() {
       amount: number;
       scope: InstallmentScope;
     }) => {
+      const { installment, amount, scope } = args;
       const { error: eCur } = await supabase
         .from("installments")
-        .update({ amount: args.amount })
-        .eq("id", args.installment.id);
+        .update({ amount })
+        .eq("id", installment.id);
       if (eCur) throw eCur;
-      if (args.scope === "current") return;
-      let q = supabase
+
+      if (scope !== "current") {
+        let q = supabase
+          .from("installments")
+          .update({ amount })
+          .eq("parent_id", installment.parentId)
+          .eq("parent_type", installment.parentType)
+          .neq("id", installment.id);
+        if (scope === "future") q = q.gt("number", installment.number);
+        const { error } = await q;
+        if (error) throw error;
+      }
+
+      const { data: rows, error: sErr } = await supabase
         .from("installments")
-        .update({ amount: args.amount })
-        .eq("parent_id", args.installment.parentId)
-        .eq("parent_type", args.installment.parentType)
-        .neq("id", args.installment.id);
-      if (args.scope === "future") q = q.gt("number", args.installment.number);
-      const { error } = await q;
-      if (error) throw error;
+        .select("amount")
+        .eq("parent_id", installment.parentId)
+        .eq("parent_type", installment.parentType);
+      if (sErr) throw sErr;
+      const newTotal = round2(
+        ((rows ?? []) as Array<{ amount: number }>).reduce((s, r) => s + num(r.amount), 0),
+      );
+
+      const parentTable =
+        installment.parentType === "purchase" ? "purchases"
+        : installment.parentType === "debit" ? "debits"
+        : "incomes";
+      const amountField = installment.parentType === "purchase" ? "total_amount" : "amount";
+      const { data: parentRow, error: pErr } = await supabase
+        .from(parentTable)
+        .select(amountField)
+        .eq("id", installment.parentId)
+        .maybeSingle();
+      if (pErr) throw pErr;
+      const previousTotal = round2(num((parentRow as Record<string, number> | null)?.[amountField] ?? 0));
+      if (previousTotal === newTotal) return;
+
+      if (installment.parentType === "purchase") {
+        const { error } = await supabase
+          .from("purchases")
+          .update({ total_amount: newTotal })
+          .eq("id", installment.parentId);
+        if (error) throw error;
+      } else if (installment.parentType === "debit") {
+        const { error } = await supabase
+          .from("debits")
+          .update({ amount: newTotal })
+          .eq("id", installment.parentId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("incomes")
+          .update({ amount: newTotal })
+          .eq("id", installment.parentId);
+        if (error) throw error;
+      }
+
+      if (user) {
+        await (supabase.from("amount_adjustments" as any) as any).insert({
+          user_id: user.id,
+          parent_type: installment.parentType,
+          parent_id: installment.parentId,
+          previous_total: previousTotal,
+          new_total: newTotal,
+        });
+      }
     },
-    onSuccess: () => inv(["installments", "card_payments"]),
+    onSuccess: () =>
+      inv(["installments", "card_payments", "purchases", "debits", "incomes", "amount_adjustments"]),
+  });
+}
+
+export type AmountAdjustment = {
+  id: string;
+  parentType: ParentType;
+  parentId: string;
+  previousTotal: number;
+  newTotal: number;
+  createdAt: string;
+};
+
+/**
+ * Último ajuste de valor registrado para um lançamento parcelado (histórico
+ * visível ao usuário — "valor original → ajustado para" —, distinto do
+ * undo/redo de sessão em `history.ts`). Retorna `null` quando o total nunca
+ * foi ajustado via edição de parcela com escopo.
+ */
+export function useLatestAmountAdjustment(
+  parentId: string | null | undefined,
+  parentType: ParentType | null | undefined,
+) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["amount_adjustments", parentType, parentId],
+    enabled: !!user?.id && !!parentId && !!parentType,
+    queryFn: async (): Promise<AmountAdjustment | null> => {
+      const { data, error } = await (supabase.from("amount_adjustments" as any) as any)
+        .select("id,parent_type,parent_id,previous_total,new_total,created_at")
+        .eq("parent_type", parentType)
+        .eq("parent_id", parentId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      const row = ((data ?? []) as Array<Record<string, unknown>>)[0];
+      if (!row) return null;
+      return {
+        id: String(row.id),
+        parentType: row.parent_type as ParentType,
+        parentId: String(row.parent_id),
+        previousTotal: num(row.previous_total as number),
+        newTotal: num(row.new_total as number),
+        createdAt: String(row.created_at),
+      };
+    },
   });
 }
 
@@ -1598,7 +1814,7 @@ export function useDeleteParcelledByScope() {
           .eq("parent_type", args.parentType);
         const { error } = await supabase.from(table).delete().eq("id", args.parentId);
         if (error) throw error;
-        return;
+        return { remainingCount: 0, hasGap: false };
       }
 
       const win =
@@ -1615,10 +1831,10 @@ export function useDeleteParcelledByScope() {
 
       const { data: insts } = await supabase
         .from("installments")
-        .select("id,year,month")
+        .select("id,year,month,number")
         .eq("parent_id", args.parentId)
         .eq("parent_type", args.parentType);
-      const rows = (insts ?? []) as { id: string; year: number; month: number }[];
+      const rows = (insts ?? []) as { id: string; year: number; month: number; number: number }[];
       const toDel = rows.filter((i) => {
         const ym = i.year * 12 + i.month;
         return ym >= sYM && ym <= eYM;
@@ -1632,13 +1848,60 @@ export function useDeleteParcelledByScope() {
             .in("id", ids.slice(i, i + 200));
         }
       }
-      const remaining = rows.length - toDel.length;
-      if (remaining === 0) {
+      const delIds = new Set(toDel.map((r) => r.id));
+      const remainingRows = rows.filter((r) => !delIds.has(r.id));
+      if (remainingRows.length === 0) {
         await supabase.from(table).delete().eq("id", args.parentId);
+        return { remainingCount: 0, hasGap: false };
       }
+      // "Buraco" = numeração restante não é mais 1..N contígua (parcelas do
+      // meio ou início foram removidas, deixando números faltando).
+      const nums = remainingRows.map((r) => r.number).sort((a, b) => a - b);
+      const hasGap = nums.some((n, idx) => n !== idx + 1);
+      return { remainingCount: remainingRows.length, hasGap };
     },
     onSuccess: () =>
       inv(["installments", "purchases", "debits", "incomes", "card_payments"]),
+  });
+}
+
+/**
+ * Renumera 1..N as parcelas restantes de um parent (mantendo a ordem
+ * cronológica pelo `number` atual), sem tocar devido_date/year/month de
+ * nenhuma — só o rótulo number/total. Usado após excluir um sub-conjunto de
+ * parcelas por período (P17), quando o usuário opta por "compactar" a
+ * numeração das que sobraram.
+ */
+export function useCompactInstallmentNumbering() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { parentId: string; parentType: ParentType }) => {
+      const { data, error } = await supabase
+        .from("installments")
+        .select("id,number")
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType)
+        .order("number", { ascending: true });
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ id: string; number: number }>;
+      const total = rows.length;
+      if (total === 0) return;
+      for (let idx = 0; idx < rows.length; idx++) {
+        const { error: eUpd } = await supabase
+          .from("installments")
+          .update({ number: idx + 1, total })
+          .eq("id", rows[idx].id);
+        if (eUpd) throw eUpd;
+      }
+      const parentTable =
+        args.parentType === "purchase" ? "purchases" : args.parentType === "debit" ? "debits" : "incomes";
+      const { error: eParent } = await supabase
+        .from(parentTable)
+        .update({ installments_count: total })
+        .eq("id", args.parentId);
+      if (eParent) throw eParent;
+    },
+    onSettled: () => inv(["purchases", "debits", "incomes", "installments"]),
   });
 }
 
@@ -1796,6 +2059,8 @@ export function useAddDebit() {
       recurrenceMonths?: number;
       /** Mark the just-created current-month item as paid. */
       paidNow?: boolean;
+      /** Mark the parcela being created (installmentNumber) as paid. */
+      markCurrentPaid?: boolean;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
@@ -1828,61 +2093,48 @@ export function useAddDebit() {
       const { error } = await supabase.from("debits").insert(baseRow);
       if (error) throw error;
       if (count > 1) {
+        // A ancora de mes e sempre o mes da PAGINA (refYear/refMonth),
+        // nao o mes da data digitada. So mantemos o DIA da data.
+        const [, , dd] = d.date.slice(0, 10).split("-").map(Number);
+        const anchorDay = Math.min(
+          dd || 1,
+          new Date(refYear, refMonth + 1, 0).getDate(),
+        );
+        const anchorIso =
+          `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+          `-${String(anchorDay).padStart(2, "0")}`;
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-              debitId,
-              user!.id,
-              d.amount,
-              count,
-              anchor,
-              d.date,
-              "debit",
-              true,
-            )
+                debitId, user!.id, d.amount, count, anchor, anchorIso,
+                "debit", true, d.markCurrentPaid ?? false,
+              )
             : buildInstallments(
-              debitId,
-              "debit",
-              user!.id,
-              d.amount,
-              count,
-              d.date,
-            );
+                debitId, "debit", user!.id, d.amount, count, anchorIso,
+                d.markCurrentPaid ?? false,
+              );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (isRecurring) {
-        // Replicar como série recorrente: 24 meses à frente, cada mês é um
-        // registro independente compartilhando recurrence_group_id. Sem
-        // installments — recorrência NÃO é parcelamento.
-        const RECUR_MONTHS = Math.max(1, Math.min(120, d.recurrenceMonths ?? 24));
-        // Parse local — evita shift de fuso ao replicar a série.
-        const [_sy, _sm, _sd] = d.date.slice(0, 10).split("-").map(Number);
-        const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
-        const day = start.getDate();
-        const rows = [];
-        for (let i = 1; i <= RECUR_MONTHS; i++) {
-          const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
-          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-          const dd = Math.min(day, lastDay);
-          const dateStr = fmtLocalDate(target.getFullYear(), target.getMonth(), dd);
-          rows.push({
-            user_id: user!.id,
-            account_id: d.accountId,
-            description: d.description,
-            amount: d.amount,
-            date: dateStr,
-            required: true,
-            paid: false,
-            auto_debit: d.autoDebit ?? false,
-            auto_debit_day: d.autoDebitDay ?? null,
-            installments_count: 1,
-            is_parent: false,
-            recurrence_group_id: groupId,
-            // Each recurring occurrence "belongs" to its own month.
-            reference_year: target.getFullYear(),
-            reference_month: target.getMonth(),
-          });
-        }
+        const dates = buildRecurringMonthDates(
+          d.date, d.recurrenceMonths ?? 24, 1,
+        );
+        const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+          user_id: user!.id,
+          account_id: d.accountId,
+          description: d.description,
+          amount: d.amount,
+          date: dateStr,
+          required: true,
+          paid: false,
+          auto_debit: d.autoDebit ?? false,
+          auto_debit_day: d.autoDebitDay ?? null,
+          installments_count: 1,
+          is_parent: false,
+          recurrence_group_id: groupId,
+          reference_year: ry,
+          reference_month: rm,
+        }));
         if (rows.length) {
           const { error: e3 } = await supabase.from("debits").insert(rows);
           if (e3) throw e3;
@@ -1999,6 +2251,8 @@ export function useAddIncome() {
       recurrenceMonths?: number;
       /** Mark the just-created current-month item as received. */
       receivedNow?: boolean;
+      /** Mark the parcela being created (installmentNumber) as paid. */
+      markCurrentPaid?: boolean;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
@@ -2026,55 +2280,43 @@ export function useAddIncome() {
       const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
       if (count > 1) {
+        const [, , dd] = i.date.slice(0, 10).split("-").map(Number);
+        const anchorDay = Math.min(
+          dd || 1,
+          new Date(refYear, refMonth + 1, 0).getDate(),
+        );
+        const anchorIso =
+          `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+          `-${String(anchorDay).padStart(2, "0")}`;
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-              incomeId,
-              user!.id,
-              i.amount,
-              count,
-              anchor,
-              i.date,
-              "income",
-              true,
-            )
+                incomeId, user!.id, i.amount, count, anchor, anchorIso,
+                "income", true, i.markCurrentPaid ?? false,
+              )
             : buildInstallments(
-              incomeId,
-              "income",
-              user!.id,
-              i.amount,
-              count,
-              i.date,
-            );
+                incomeId, "income", user!.id, i.amount, count, anchorIso,
+                i.markCurrentPaid ?? false,
+              );
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (isRecurring) {
-        // Série recorrente: 24 meses à frente, registros independentes
-        // compartilhando recurrence_group_id. Sem installments.
-        const RECUR_MONTHS = Math.max(1, Math.min(120, i.recurrenceMonths ?? 24));
-        // Parse local — evita shift de fuso ao replicar a série.
-        const [_sy, _sm, _sd] = i.date.slice(0, 10).split("-").map(Number);
-        const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
-        const day = start.getDate();
-        const rows = [];
-        for (let k = 1; k <= RECUR_MONTHS; k++) {
-          const target = new Date(start.getFullYear(), start.getMonth() + k, 1);
-          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-          const dd = Math.min(day, lastDay);
-          rows.push({
-            user_id: user!.id,
-            account_id: i.accountId,
-            description: i.description,
-            amount: i.amount,
-            date: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
-            received: false,
-            installments_count: 1,
-            is_parent: false,
-            recurrence_group_id: groupId,
-            reference_year: target.getFullYear(),
-            reference_month: target.getMonth(),
-          });
-        }
+        const dates = buildRecurringMonthDates(
+          i.date, i.recurrenceMonths ?? 24, 1,
+        );
+        const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+          user_id: user!.id,
+          account_id: i.accountId,
+          description: i.description,
+          amount: i.amount,
+          date: dateStr,
+          received: false,
+          installments_count: 1,
+          is_parent: false,
+          recurrence_group_id: groupId,
+          reference_year: ry,
+          reference_month: rm,
+        }));
         if (rows.length) {
           const { error: e3 } = await supabase.from("incomes").insert(rows);
           if (e3) throw e3;
@@ -2236,7 +2478,7 @@ export type DuplicateSource =
   | { kind: "purchase"; cardId: string; description: string; totalAmount: number; date: string };
 
 /** Resolve a CardScope into a list of {year, month} targets. */
-function resolveScopeMonths(scope: CardScope, anchorYear: number, anchorMonth: number): Array<{ year: number; month: number }> {
+export function resolveScopeMonths(scope: CardScope, anchorYear: number, anchorMonth: number): Array<{ year: number; month: number }> {
   if (scope.kind === "month") return [{ year: scope.year, month: scope.month }];
   if (scope.kind === "period") {
     const out: Array<{ year: number; month: number }> = [];
@@ -4142,6 +4384,188 @@ export function useChangePurchaseInstallments() {
   });
 }
 
+export function useChangeInstallmentSeries() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+      newCount: number;
+      totalAmount: number;
+    }) => {
+      if (!user) throw new Error("Nao autenticado.");
+      const newCount = Math.max(1, Math.floor(args.newCount));
+      const { data: existing } = await supabase
+        .from("installments")
+        .select("number,due_date")
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType)
+        .order("number", { ascending: true })
+        .limit(1);
+      const firstDue =
+        existing && existing.length > 0
+          ? (existing[0] as { due_date: string }).due_date
+          : new Date().toISOString().slice(0, 10);
+
+      await supabase
+        .from("installments")
+        .delete()
+        .eq("parent_id", args.parentId)
+        .eq("parent_type", args.parentType);
+
+      if (args.parentType === "purchase") {
+        await supabase
+          .from("purchases")
+          .update({ installments_count: newCount, total_amount: args.totalAmount })
+          .eq("id", args.parentId);
+      } else if (args.parentType === "debit") {
+        await supabase
+          .from("debits")
+          .update({ installments_count: newCount, amount: args.totalAmount })
+          .eq("id", args.parentId);
+      } else {
+        await supabase
+          .from("incomes")
+          .update({ installments_count: newCount, amount: args.totalAmount })
+          .eq("id", args.parentId);
+      }
+
+      const items = buildInstallmentsAnchored(
+        args.parentId, user.id, args.totalAmount,
+        newCount, 1, firstDue, args.parentType, false,
+      );
+      if (items.length > 0) {
+        const { error } = await supabase.from("installments").insert(items);
+        if (error) throw error;
+      }
+    },
+    onSettled: () => inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
+/**
+ * Renumera uma parcela para outra posição na série SEM mexer no mês de
+ * nenhuma parcela existente — mês é sempre "vaga fixa" por linha, número é
+ * só um rótulo.
+ *
+ * Regra (validada contra os cenários P14-P16 da spec):
+ *   - A parcela editada e todas as que vêm DEPOIS dela na numeração original
+ *     ("cauda") são deslocadas pelo mesmo delta (newNumber - oldNumber),
+ *     mantendo cada uma no seu próprio mês. As que caírem fora de [1,total]
+ *     após o deslocamento são descartadas (excluídas).
+ *   - Toda parcela ANTES da editada na numeração original ("cabeça") é
+ *     sempre descartada, independente da direção do movimento — ela deixou
+ *     de fazer parte da série renumerada.
+ *   - Os números que ficaram sem parcela (a cabeça descartada + o que
+ *     transbordou da cauda) podem ser recriados sob demanda (createMissing),
+ *     em meses consecutivos ancorados na própria parcela editada.
+ */
+export function useRenumberInstallment() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      parentId: string;
+      parentType: ParentType;
+      installmentId: string;
+      oldNumber: number;
+      newNumber: number;
+      total: number;
+      amount: number;
+      createMissing: boolean;
+    }) => {
+      const {
+        parentId, parentType, installmentId,
+        oldNumber, newNumber, total, amount, createMissing,
+      } = args;
+      if (oldNumber === newNumber) return;
+      const clampedNew = Math.max(1, Math.min(total, newNumber));
+      const shift = clampedNew - oldNumber;
+
+      const { data: rows, error } = await supabase
+        .from("installments")
+        .select("id,number,due_date,year,month")
+        .eq("parent_id", parentId)
+        .eq("parent_type", parentType);
+      if (error) throw error;
+      const list = (rows ?? []) as Array<{
+        id: string; number: number; due_date: string; year: number; month: number;
+      }>;
+      const anchor = list.find((r) => r.id === installmentId);
+      if (!anchor) return;
+
+      const toDelete: string[] = [];
+      const toRenumber: Array<{ id: string; number: number }> = [];
+      const covered = new Set<number>();
+
+      for (const r of list) {
+        if (r.number < oldNumber) {
+          // Cabeça: sempre descartada ao renumerar.
+          toDelete.push(r.id);
+          continue;
+        }
+        const n = r.number + shift;
+        if (n < 1 || n > total) {
+          toDelete.push(r.id);
+          continue;
+        }
+        toRenumber.push({ id: r.id, number: n });
+        covered.add(n);
+      }
+
+      for (let i = 0; i < toDelete.length; i += 200) {
+        const batch = toDelete.slice(i, i + 200);
+        if (batch.length === 0) continue;
+        const { error: eDel } = await supabase
+          .from("installments")
+          .delete()
+          .in("id", batch);
+        if (eDel) throw eDel;
+      }
+
+      for (const r of toRenumber) {
+        const { error: eUpd } = await supabase
+          .from("installments")
+          .update({ number: r.number })
+          .eq("id", r.id);
+        if (eUpd) throw eUpd;
+      }
+
+      if (createMissing) {
+        const missing: number[] = [];
+        for (let n = 1; n <= total; n++) if (!covered.has(n)) missing.push(n);
+        if (missing.length > 0) {
+          const { y: ay, m: am, d: ad } = parseLocalDate(anchor.due_date);
+          const newRows = missing.map((n) => {
+            const target = new Date(ay, am + (n - clampedNew), 1);
+            const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+            const dd = Math.min(ad, lastDay);
+            return {
+              id: crypto.randomUUID(),
+              user_id: user!.id,
+              parent_id: parentId,
+              parent_type: parentType,
+              purchase_id: parentType === "purchase" ? parentId : null,
+              number: n,
+              total,
+              amount,
+              due_date: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
+              year: target.getFullYear(),
+              month: target.getMonth(),
+              paid: false,
+            };
+          });
+          const { error: eIns } = await supabase.from("installments").insert(newRows);
+          if (eIns) throw eIns;
+        }
+      }
+    },
+    onSettled: () =>
+      inv(["purchases", "debits", "incomes", "installments"]),
+  });
+}
+
 // =======================
 // Effective "current" month — Day-27 rule
 // =======================
@@ -4221,6 +4645,7 @@ export function normalizeZero(n: number): number {
 //   - "one":     touch only the clicked row
 //   - "forward": touch the clicked row AND every future row in the same
 //                group (date >= the clicked row's date)
+//   - "all":     touch every row in the group, including past months
 //
 type RecurringKind = "debit" | "income";
 
@@ -4232,7 +4657,7 @@ export function useUpdateRecurringSeries() {
       id: string;
       groupId: string;
       anchorDate: string;
-      scope: "one" | "forward";
+      scope: "one" | "forward" | "all";
       patch: { description?: string; amount?: number; date?: string };
     }) => {
       const table = args.kind === "debit" ? "debits" : "incomes";
@@ -4248,24 +4673,22 @@ export function useUpdateRecurringSeries() {
         return;
       }
 
-      // forward: this row + all rows in the group with date >= anchorDate
+      // forward/all: this row + rows in the group (forward filters by
+      // date >= anchorDate; all touches every row, including past months).
       if (Object.keys(baseUpdate).length > 0) {
-        const { error } = await (supabase.from(table) as any)
-          .update(baseUpdate)
-          .eq("recurrence_group_id", args.groupId)
-          .gte("date", args.anchorDate);
+        let q = (supabase.from(table) as any).update(baseUpdate).eq("recurrence_group_id", args.groupId);
+        if (args.scope === "forward") q = q.gte("date", args.anchorDate);
+        const { error } = await q;
         if (error) throw error;
       }
 
-      // Date change with forward scope = shift each future row to use the
-      // NEW day-of-month (clamped to that month's last day).
+      // Date change = shift each targeted row to use the NEW day-of-month
+      // (clamped to that month's last day).
       if (args.patch.date !== undefined) {
         const newDay = parseInt(args.patch.date.slice(8, 10), 10);
-        const { data, error } = await supabase
-          .from(table)
-          .select("id,date")
-          .eq("recurrence_group_id", args.groupId)
-          .gte("date", args.anchorDate);
+        let q2 = supabase.from(table).select("id,date").eq("recurrence_group_id", args.groupId);
+        if (args.scope === "forward") q2 = q2.gte("date", args.anchorDate);
+        const { data, error } = await q2;
         if (error) throw error;
         for (const row of (data ?? []) as { id: string; date: string }[]) {
           const [y, m] = row.date.slice(0, 10).split("-").map(Number);
@@ -4305,6 +4728,122 @@ export function useDeleteRecurringSeries() {
       if (error) throw error;
     },
     onSettled: () => inv(["debits", "incomes"]),
+  });
+}
+
+// Recurring PURCHASES (credit card) are modeled differently from recurring
+// debits/incomes: each monthly occurrence is its own `purchases` row (sharing
+// `recurrence_group_id`) PAIRED with its own single `installments` row
+// (parent_type = "purchase", total = 1). Editing/deleting must keep both rows
+// in sync, and — per the core business rule — a date edit only updates the
+// visual `purchase_date`, never the installment's due_date/year/month (which
+// is what actually determines the month the item is grouped under).
+export function useUpdateRecurringPurchaseSeries() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      id: string;
+      groupId: string;
+      anchorDate: string;
+      scope: "one" | "forward" | "all";
+      patch: { description?: string; amount?: number; date?: string };
+    }) => {
+      const baseUpdate: { description?: string; total_amount?: number } = {};
+      if (args.patch.description !== undefined) baseUpdate.description = args.patch.description;
+      if (args.patch.amount !== undefined) baseUpdate.total_amount = args.patch.amount;
+
+      if (args.scope === "one") {
+        const update: { description?: string; total_amount?: number; purchase_date?: string } = {
+          ...baseUpdate,
+        };
+        if (args.patch.date !== undefined) update.purchase_date = args.patch.date;
+        const { error } = await supabase.from("purchases").update(update).eq("id", args.id);
+        if (error) throw error;
+        if (args.patch.amount !== undefined) {
+          const { error: eInst } = await supabase
+            .from("installments")
+            .update({ amount: args.patch.amount })
+            .eq("parent_id", args.id)
+            .eq("parent_type", "purchase");
+          if (eInst) throw eInst;
+        }
+        return;
+      }
+
+      // forward/all: this row + rows in the group (forward filters by
+      // purchase_date >= anchorDate; all touches every row, past included).
+      let groupQuery = supabase
+        .from("purchases")
+        .select("id,purchase_date")
+        .eq("recurrence_group_id", args.groupId);
+      if (args.scope === "forward") groupQuery = groupQuery.gte("purchase_date", args.anchorDate);
+      const { data: groupRows, error: gErr } = await groupQuery;
+      if (gErr) throw gErr;
+      const rows = (groupRows ?? []) as Array<{ id: string; purchase_date: string }>;
+      const ids = rows.map((r) => r.id);
+
+      if (Object.keys(baseUpdate).length > 0 && ids.length) {
+        const { error } = await supabase.from("purchases").update(baseUpdate).in("id", ids);
+        if (error) throw error;
+        if (args.patch.amount !== undefined) {
+          const { error: eInst } = await supabase
+            .from("installments")
+            .update({ amount: args.patch.amount })
+            .in("parent_id", ids)
+            .eq("parent_type", "purchase");
+          if (eInst) throw eInst;
+        }
+      }
+
+      // Date change with forward scope = shift each future row to use the
+      // NEW day-of-month (clamped). Only purchase_date moves — the paired
+      // installment's due_date/year/month is left untouched on purpose.
+      if (args.patch.date !== undefined) {
+        const newDay = parseInt(args.patch.date.slice(8, 10), 10);
+        for (const row of rows) {
+          const [y, m] = row.purchase_date.slice(0, 10).split("-").map(Number);
+          const last = new Date(y, m, 0).getDate();
+          const day = Math.min(newDay, last);
+          const newDate = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const { error: ue } = await supabase
+            .from("purchases")
+            .update({ purchase_date: newDate })
+            .eq("id", row.id);
+          if (ue) throw ue;
+        }
+      }
+    },
+    onSettled: () => inv(["purchases", "installments", "card_payments"]),
+  });
+}
+
+export function useDeleteRecurringPurchaseSeries() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      id: string;
+      groupId: string;
+      anchorDate: string;
+      scope: "one" | "forward" | "all";
+    }) => {
+      if (args.scope === "one") {
+        await supabase.from("installments").delete().eq("parent_id", args.id).eq("parent_type", "purchase");
+        const { error } = await supabase.from("purchases").delete().eq("id", args.id);
+        if (error) throw error;
+        return;
+      }
+      let q = supabase.from("purchases").select("id").eq("recurrence_group_id", args.groupId);
+      if (args.scope === "forward") q = q.gte("purchase_date", args.anchorDate);
+      const { data, error: sErr } = await q;
+      if (sErr) throw sErr;
+      const ids = (data ?? []).map((r: { id: string }) => r.id);
+      if (ids.length) {
+        await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
+        const { error } = await supabase.from("purchases").delete().in("id", ids);
+        if (error) throw error;
+      }
+    },
+    onSettled: () => inv(["purchases", "installments", "card_payments"]),
   });
 }
 

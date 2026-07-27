@@ -3,13 +3,15 @@ import { Modal, Field, inputClass } from "./Modal";
 import {
   useUpdateInstallment,
   useShiftInstallmentDate,
+  useUpdateInstallmentDateScope,
   useUpdateInstallmentAmountScope,
   useAdvanceInstallments,
   useUpdateDebit,
   useUpdateIncome,
   useUpdateInvestment,
   useUpdatePurchase,
-  useChangePurchaseInstallments,
+  useChangeInstallmentSeries,
+  useRenumberInstallment,
   useAddDebit,
   useAddIncome,
   useRemoveDebit,
@@ -23,6 +25,7 @@ import {
   usePurchases,
   useDebits,
   useIncomes,
+  useLatestAmountAdjustment,
   type Installment,
   type InstallmentScope,
   type CardScope,
@@ -69,13 +72,15 @@ export function EditInstallmentDialog({
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
+  const updateDateScope = useUpdateInstallmentDateScope();
   const updateAmountScope = useUpdateInstallmentAmountScope();
   const advance = useAdvanceInstallments();
   const updateDebit = useUpdateDebit();
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
-  const changeInstCount = useChangePurchaseInstallments();
+  const changeInstSeries = useChangeInstallmentSeries();
+  const renumberInstallment = useRenumberInstallment();
   const addDebit = useAddDebit();
   const addIncome = useAddIncome();
   const removeDebit = useRemoveDebit();
@@ -88,6 +93,10 @@ export function EditInstallmentDialog({
   const { data: purchases = [] } = usePurchases();
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
+  const latestAdjustment = useLatestAmountAdjustment(
+    installment?.parentId,
+    installment?.parentType,
+  );
 
   const confirm = useConfirm();
   const [askDuplicate, setAskDuplicate] = useState(false);
@@ -106,7 +115,9 @@ export function EditInstallmentDialog({
   const suggestions = useDescriptionSuggestions(suggestionKind);
 
   // For installments (parcelas), the editable date is the PARENT's date
-  // (purchase_date / debit.date / income.date), shared by all installments.
+  // (purchase_date / debit.date / income.date), shared by all installments —
+  // UNLESS this specific installment has its own `referenceDate` override
+  // (set via a "só esta"/"esta e as próximas" scoped date edit — P7/P8).
   // Installment.dueDate is the per-month invoice slot and is not touched here.
   const parentDate = (() => {
     if (!installment) return "";
@@ -121,6 +132,7 @@ export function EditInstallmentDialog({
     }
     return "";
   })();
+  const effectiveDate = installment?.referenceDate || parentDate;
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
@@ -129,8 +141,9 @@ export function EditInstallmentDialog({
   const [askDateScope, setAskDateScope] = useState(false);
   const [advanceCount, setAdvanceCount] = useState("");
   const [newInstCount, setNewInstCount] = useState("");
-  const [newCurrentInst, setNewCurrentInst] = useState("1");
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
+  const [newCurrentNumber, setNewCurrentNumber] = useState("");
+  const [recreateMode, setRecreateMode] = useState<"recalculate" | "keepPerInstallment">("recalculate");
   const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
   // Single-mode type conversion state
   const [singleType, setSingleType] = useState<"cash" | "parcelled" | "recurring">("cash");
@@ -143,11 +156,12 @@ export function EditInstallmentDialog({
     if (installment) {
       setDescription(parentLabel ?? "");
       setAmount(installment.amount);
-      setDueDate(parentDate || installment.dueDate);
+      setDueDate(effectiveDate || installment.dueDate);
       setPaid(installment.paid);
       setNewInstCount(String(installment.total));
-      setNewCurrentInst(String(installment.number));
       setNewTotalAmount(installment.amount * installment.total);
+      setNewCurrentNumber(String(installment.number));
+      setRecreateMode("recalculate");
     } else if (single) {
       setDescription(single.description);
       setAmount(single.amount);
@@ -161,7 +175,7 @@ export function EditInstallmentDialog({
     setAskDateScope(false);
     setAdvanceCount("");
     setManageView("none");
-  }, [open, installment, single, parentLabel, parentDate]);
+  }, [open, installment, single, parentLabel, parentDate, effectiveDate]);
 
   if (!installment && !single) return null;
 
@@ -275,7 +289,7 @@ export function EditInstallmentDialog({
             <Field label={singleType === "parcelled" && convMode === "perInstallment" ? "Valor por parcela" : "Valor"}>
               <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
-            <Field label="Data">
+            <Field label="Data da compra">
               <input
                 type="date"
                 className={inputClass}
@@ -492,7 +506,7 @@ export function EditInstallmentDialog({
 
   // ───── INSTALLMENT (parcela) ─────
   const inst = installment!;
-  const baselineDate = parentDate || inst.dueDate;
+  const baselineDate = effectiveDate || inst.dueDate;
   const dateChanged = dueDate !== baselineDate;
   const amountChanged = amount !== inst.amount;
   const paidChanged = paid !== inst.paid;
@@ -500,12 +514,20 @@ export function EditInstallmentDialog({
   const isSingleParcel = inst.total <= 1;
 
   async function commit(scope: InstallmentScope) {
-    // Date edit: for parcelled items with a real parent, update the parent's
-    // shared date (purchase_date / debit.date / income.date). Installments
-    // keep their own month/dueDate — the "data da compra" is shared.
-    // Fallback (no parent match, or investments): shift the installment date.
+    // Date edit: the typed date is ONLY a visual reference — it never
+    // touches the installment's own month/dueDate (that's a separate,
+    // explicit action — renumber/recreate — never a side effect of editing
+    // the date).
+    //   - Single occurrence (cash purchase / one month of a recurring
+    //     series, total=1): there's only one row, so it just updates the
+    //     parent's shared date field directly, no scope needed.
+    //   - Genuine multi-installment series (total>1): scoped per-parcela via
+    //     `reference_date` (só esta / esta e as próximas / toda a conta —
+    //     P7-P9), so different parcelas CAN show different dates.
+    //   - Fallback (no parent match, e.g. investments): shift the
+    //     installment date directly.
     if (dateChanged) {
-      if (!isSingleParcel && parentDate) {
+      if (isSingleParcel && parentDate) {
         if (inst.parentType === "purchase") {
           await updatePurchase.mutateAsync({ id: inst.parentId, date: dueDate });
         } else if (inst.parentType === "debit") {
@@ -513,6 +535,8 @@ export function EditInstallmentDialog({
         } else if (inst.parentType === "income") {
           await updateIncome.mutateAsync({ id: inst.parentId, date: dueDate });
         }
+      } else if (!isSingleParcel && parentDate) {
+        await updateDateScope.mutateAsync({ installment: inst, newDate: dueDate, scope });
       } else {
         await shift.mutateAsync({ installment: inst, newDate: dueDate, scope });
       }
@@ -538,9 +562,9 @@ export function EditInstallmentDialog({
   }
 
   const handleSave = async () => {
-    // Scope prompt only makes sense for amount edits now — date edits touch
-    // the shared parent date automatically.
-    if (amountChanged && !isSingleParcel) {
+    // Scope prompt is needed for both amount AND date edits on a genuine
+    // multi-installment series — each can differ per-parcela (P7-P12).
+    if ((amountChanged || dateChanged) && !isSingleParcel) {
       setAskDateScope(true);
       return;
     }
@@ -548,13 +572,15 @@ export function EditInstallmentDialog({
   };
 
   if (askDateScope) {
-    const dayLabel = Number(dueDate.slice(8, 10));
     const summary = (() => {
       const parts: string[] = [];
       if (dateChanged) parts.push(`nova data ${formatDate(dueDate)}`);
       if (amountChanged) parts.push(`novo valor ${formatCurrency(amount)}`);
       return parts.join(" e ");
     })();
+    const dateNote = dateChanged
+      ? " Nenhuma parcela muda de mês — só a data exibida."
+      : "";
     return (
       <Modal open={open} onClose={() => setAskDateScope(false)} title="Aplicar alterações para…">
         <div className="space-y-3">
@@ -567,7 +593,7 @@ export function EditInstallmentDialog({
           >
             <span className="font-semibold">Apenas esta parcela</span>
             <span className="text-xs text-muted-foreground">
-              Só a parcela {inst.number}/{inst.total} muda.
+              Só a parcela {inst.number}/{inst.total} muda.{dateNote}
             </span>
           </button>
           {remaining > 0 && (
@@ -577,8 +603,7 @@ export function EditInstallmentDialog({
             >
               <span className="font-semibold">Esta e as próximas parcelas</span>
               <span className="text-xs text-muted-foreground">
-                As {inst.total - inst.number + 1} parcelas a partir desta serão atualizadas
-                {dateChanged ? `, mantendo o dia ${dayLabel}` : ""}.
+                As {inst.total - inst.number + 1} parcelas a partir desta passam a exibir o mesmo valor{dateChanged ? "/data" : ""}.{dateNote}
               </span>
             </button>
           )}
@@ -588,8 +613,7 @@ export function EditInstallmentDialog({
           >
             <span className="font-semibold">Todas as parcelas</span>
             <span className="text-xs text-muted-foreground">
-              As {inst.total} parcelas serão atualizadas
-              {dateChanged ? `, mantendo o dia ${dayLabel}` : ""}.
+              As {inst.total} parcelas passam a exibir o mesmo valor{dateChanged ? "/data" : ""}.{dateNote}
             </span>
           </button>
           <button onClick={() => setAskDateScope(false)} className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary">
@@ -600,7 +624,7 @@ export function EditInstallmentDialog({
     );
   }
 
-  const canManage = remaining > 0 || inst.parentType === "purchase";
+  const canManage = true;
 
   return (
     <>
@@ -618,7 +642,7 @@ export function EditInstallmentDialog({
             <Field label="Valor">
               <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
             </Field>
-            <Field label={inst.parentType === "purchase" ? "Data da compra" : "Data"}>
+            <Field label="Data da compra">
               <input
                 type="date"
                 className={inputClass}
@@ -630,6 +654,11 @@ export function EditInstallmentDialog({
           <p className="-mt-2 text-[11px] text-muted-foreground">
             Valor atual da parcela: {formatCurrency(inst.amount)}.
           </p>
+          {latestAdjustment.data && (
+            <p className="-mt-2 text-[11px] text-amber-500/90">
+              Histórico: valor original {formatCurrency(latestAdjustment.data.previousTotal)} → ajustado para {formatCurrency(latestAdjustment.data.newTotal)}.
+            </p>
+          )}
 
           <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
             <input
@@ -751,21 +780,19 @@ export function EditInstallmentDialog({
                 <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
               </button>
             )}
-            {inst.parentType === "purchase" && (
-              <button
-                onClick={() => setManageView("change")}
-                className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
-              >
-                <RefreshCw className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="font-semibold">Alterar parcelamento</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Recriar todas as parcelas com novo nº ou valor total.
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-              </button>
-            )}
+            <button
+              onClick={() => setManageView("change")}
+              className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
+            >
+              <RefreshCw className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold">Alterar parcelamento</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Recriar todas as parcelas com novo nº ou valor total, ou renumerar esta parcela.
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+            </button>
             <button
               onClick={() => setManageView("none")}
               className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary"
@@ -822,78 +849,166 @@ export function EditInstallmentDialog({
 
         {manageView === "change" && (() => {
           const nParsed = Math.max(1, parseInt(newInstCount) || 1);
+          const perInstallmentFixed = inst.amount;
+          const computedTotal =
+            recreateMode === "keepPerInstallment"
+              ? perInstallmentFixed * nParsed
+              : newTotalAmount;
+          const computedPer = nParsed > 0 ? computedTotal / nParsed : 0;
+          const newNumParsed = Math.max(
+            1,
+            Math.min(inst.total, parseInt(newCurrentNumber) || inst.number),
+          );
           return (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <button
                 onClick={() => setManageView("menu")}
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Voltar
               </button>
-              <p className="text-[11px] text-muted-foreground">
-                Recria todas as parcelas. A parcela atual permanece no mês visualizado; as demais são recalculadas. Status de pagamento será resetado.
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Nº parcelas">
-                  <input
-                    type="number"
-                    min={1}
-                    max={120}
-                    className={inputClass}
-                    value={newInstCount}
-                    onChange={(e) => {
-                      setNewInstCount(e.target.value);
-                      const cur = parseInt(newCurrentInst) || 1;
-                      const n = Math.max(1, parseInt(e.target.value) || 1);
-                      if (cur > n) setNewCurrentInst(String(n));
-                    }}
-                  />
-                </Field>
+
+              {/* SECAO 1 — Recriar parcelamento */}
+              <div className="space-y-3">
+                <p className="text-[12px] font-semibold text-foreground">Recriar parcelamento</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Recria todas as parcelas a partir da data da primeira. Status de pagamento será resetado.
+                </p>
+                <div className="flex gap-1 rounded-full bg-secondary p-1">
+                  <button
+                    type="button"
+                    onClick={() => setRecreateMode("recalculate")}
+                    className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                      recreateMode === "recalculate" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    Recalcular valor por parcela
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecreateMode("keepPerInstallment")}
+                    className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                      recreateMode === "keepPerInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    Manter valor por parcela
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Nº parcelas">
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      className={inputClass}
+                      value={newInstCount}
+                      onChange={(e) => setNewInstCount(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Valor total">
+                    {recreateMode === "keepPerInstallment" ? (
+                      <input
+                        type="text"
+                        disabled
+                        className={inputClass}
+                        value={formatCurrency(computedTotal)}
+                      />
+                    ) : (
+                      <CurrencyInput value={newTotalAmount} onValueChange={setNewTotalAmount} />
+                    )}
+                  </Field>
+                </div>
+                {nParsed > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {nParsed}x de <span className="font-semibold text-foreground">{formatCurrency(computedPer)}</span> · total{" "}
+                    <span className="font-semibold text-foreground">{formatCurrency(computedTotal)}</span>
+                  </p>
+                )}
+                <button
+                  onClick={async () => {
+                    if (!nParsed || computedTotal <= 0) return;
+                    const ok = await confirm({
+                      title: "Alterar parcelamento",
+                      description: `Recriar como ${nParsed}x de ${formatCurrency(computedPer)}?`,
+                      confirmLabel: "Alterar",
+                    });
+                    if (!ok) return;
+                    await changeInstSeries.mutateAsync({
+                      parentId: inst.parentId,
+                      parentType: inst.parentType,
+                      newCount: nParsed,
+                      totalAmount: computedTotal,
+                    });
+                    setManageView("none");
+                    onClose();
+                  }}
+                  disabled={changeInstSeries.isPending}
+                  className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {changeInstSeries.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Renumerar
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* SECAO 2 — Renumerar parcela */}
+              <div className="space-y-3">
+                <p className="text-[12px] font-semibold text-foreground">Renumerar parcela</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Move esta parcela para outra posição na série, mantendo o mês de cada parcela
+                  restante. As parcelas anteriores a esta e as que não couberem no novo intervalo
+                  serão removidas.
+                </p>
                 <Field label="Parcela atual">
                   <input
                     type="number"
                     min={1}
-                    max={nParsed}
+                    max={inst.total}
                     className={inputClass}
-                    value={newCurrentInst}
-                    onChange={(e) => setNewCurrentInst(e.target.value)}
+                    value={newCurrentNumber}
+                    onChange={(e) => setNewCurrentNumber(e.target.value)}
                   />
                 </Field>
+                <button
+                  onClick={async () => {
+                    if (newNumParsed === inst.number) return;
+                    const ok = await confirm({
+                      title: "Renumerar parcela",
+                      description: `Mover a parcela ${inst.number}/${inst.total} para a posição ${newNumParsed}? As parcelas anteriores à ${inst.number}/${inst.total} e as que ficarem fora do intervalo 1-${inst.total} serão excluídas.`,
+                      confirmLabel: "Renumerar",
+                    });
+                    if (!ok) return;
+                    const createMissing = await confirm({
+                      title: "Criar parcelas faltantes?",
+                      description: "Algumas posições da série ficarão sem parcela. Deseja criá-las agora, em meses consecutivos a partir desta parcela?",
+                      confirmLabel: "Criar faltantes",
+                      cancelLabel: "Não criar",
+                    });
+                    await renumberInstallment.mutateAsync({
+                      parentId: inst.parentId,
+                      parentType: inst.parentType,
+                      installmentId: inst.id,
+                      oldNumber: inst.number,
+                      newNumber: newNumParsed,
+                      total: inst.total,
+                      amount: inst.amount,
+                      createMissing,
+                    });
+                    setManageView("none");
+                    onClose();
+                  }}
+                  disabled={renumberInstallment.isPending || newCurrentNumber === String(inst.number)}
+                  className="w-full rounded-lg border border-primary bg-primary/10 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {renumberInstallment.isPending ? "Renumerando…" : "Aplicar só a renumeração"}
+                </button>
               </div>
-              <Field label="Valor total">
-                <CurrencyInput value={newTotalAmount} onValueChange={setNewTotalAmount} />
-              </Field>
-              <button
-                onClick={async () => {
-                  const n = Math.max(1, parseInt(newInstCount) || 0);
-                  const cur = Math.max(1, Math.min(n, parseInt(newCurrentInst) || 1));
-                  if (!n || newTotalAmount <= 0) return;
-                  if (
-                    n === inst.total &&
-                    newTotalAmount === inst.amount * inst.total &&
-                    cur === inst.number
-                  ) return;
-                  const ok = await confirm({
-                    title: "Alterar parcelamento",
-                    description: `Recriar como ${n}x de ${formatCurrency(newTotalAmount / n)}? A parcela ${cur}/${n} ficará no mês atual.`,
-                    confirmLabel: "Alterar",
-                  });
-                  if (!ok) return;
-                  await changeInstCount.mutateAsync({
-                    purchaseId: inst.parentId,
-                    newCount: n,
-                    totalAmount: newTotalAmount,
-                    newCurrentInstallmentNumber: cur,
-                    viewedInstallmentNumber: inst.number,
-                  });
-                  setManageView("none");
-                  onClose();
-                }}
-                disabled={changeInstCount.isPending}
-                className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-              >
-                {changeInstCount.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
-              </button>
             </div>
           );
         })()}

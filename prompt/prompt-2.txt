@@ -1,0 +1,226 @@
+A tag PAR está posicionada no lugar errado, tem que estar posicionada ao lado do nome do item
+
+O nome das tags estão erradas, para débito automático tem que ser AUT, para Parcelado é PAR e para Recorrente o REC sem ponto no final
+
+Na lista de itens de cartão de crédito não aparece nenhuma TAG
+
+Quando clico para editar um item que está no cartão de crédito criado como recorrente, o modal de editar é diferente de um item recorrente de débito, precisa ser igual o que tem no débito
+
+para lista de itens, alem das regras que ja temos onde priorizam parcelados, recorrentes e automaticos e depois compras a vista, quero que ordene por ano, mes e depois dia, ou seja, compras mais antigas ficam no topo
+
+padronizar nomes, possuem campos com nome data e em outros modais "Data da compra", padronize todos para Data da compra
+
+Os checkbox do frame relacionado a recorrente estão menores que os demais checkbox
+
+A renumeração das parcelas não está funcionando, aqui alguns cenários que precisam ser atendidos:
+
+REGRA BASE — vale para todos os tipos (débito, crédito, recebimento) e todas as modalidades (avulso, parcelado, recorrente, débito automático):
+
+A data digitada é sempre referência visual — nunca define em qual mês o lançamento aparece.
+O mês da página onde você está criando é que define onde o lançamento vai morar.
+
+LANÇAMENTOS AVULSOS (débito, recebimento, compra à vista)
+
+Cenário A1 — criar em Julho com data 10/07/2026
+
+Aparece em: Julho/2026
+Data exibida: 10/07/2026
+
+Cenário A2 — criar em Julho com data 08/06/2026 (comprou em junho, lançou em julho)
+
+Aparece em: Julho/2026
+Data exibida: 08/06/2026
+
+Cenário A3 — editar a data de um avulso que está em Julho
+
+Você muda a data de 10/07 para 05/06
+Resultado: continua em Julho, data exibida muda para 05/06/2026
+Nunca muda de mês por causa da data
+LANÇAMENTOS PARCELADOS (débito, recebimento, crédito)
+CRIAÇÃO
+
+Cenário P1 — parcela 1 de 4, data 10/07/2026, criado em Julho
+
+Parcela 1/4 → Julho/2026, data: 10/07/2026
+Parcela 2/4 → Agosto/2026, data: 10/07/2026
+Parcela 3/4 → Setembro/2026, data: 10/07/2026
+Parcela 4/4 → Outubro/2026, data: 10/07/2026
+
+Cenário P2 — parcela 1 de 4, data 08/06/2026, criado em Julho
+
+Parcela 1/4 → Julho/2026, data: 08/06/2026
+Parcela 2/4 → Agosto/2026, data: 08/06/2026
+Parcela 3/4 → Setembro/2026, data: 08/06/2026
+Parcela 4/4 → Outubro/2026, data: 08/06/2026
+✅ Criado em Julho = começa em Julho, a data 08/06 é só referência visual
+
+Cenário P3 — parcela 2 de 4, data 08/06/2026, criado em Julho
+
+A parcela atual é a 2ª → a 1ª ficou no mês anterior ao mês da página
+Parcela 1/4 → Junho/2026, data: 08/06/2026
+Parcela 2/4 → Julho/2026, data: 08/06/2026
+Parcela 3/4 → Agosto/2026, data: 08/06/2026
+Parcela 4/4 → Setembro/2026, data: 08/06/2026
+
+Cenário P4 — parcela 3 de 6, data 15/05/2026, criado em Julho
+
+Parcela 1/6 → Maio/2026, data: 15/05/2026
+Parcela 2/6 → Junho/2026, data: 15/05/2026
+Parcela 3/6 → Julho/2026, data: 15/05/2026
+Parcela 4/6 → Agosto/2026, data: 15/05/2026
+Parcela 5/6 → Setembro/2026, data: 15/05/2026
+Parcela 6/6 → Outubro/2026, data: 15/05/2026
+
+Cenário P5 — parcela 1 de 4, "Marcar como paga", criado em Julho
+
+Parcela 1/4 → Julho, paga
+Parcelas 2/4, 3/4, 4/4 → não pagas
+
+Cenário P6 — parcela 2 de 4, "Marcar como paga", criado em Julho
+
+Parcela 1/4 → Junho, paga (anterior à atual, marcada automaticamente)
+Parcela 2/4 → Julho, paga (marcada pelo usuário)
+Parcelas 3/4, 4/4 → não pagas
+EDIÇÃO DE DATA
+
+Cenário P7 — editar data, escopo "Só esta parcela"
+
+Estado: 4 parcelas em Jul/Ago/Set/Out, data 10/07/2026
+Você muda a data da parcela 2/4 para 20/07/2026
+Resultado: só a 2/4 passa a exibir 20/07/2026, demais continuam 10/07/2026
+Nenhuma parcela muda de mês
+⚠️ Parcelas ficam com datas diferentes — aceitável se o usuário quis isso
+
+Cenário P8 — editar data, escopo "Esta e as próximas"
+
+Você muda a data da parcela 2/4 para 20/07/2026
+Parcela 1/4 → continua 10/07/2026
+Parcelas 2/4, 3/4, 4/4 → passam a exibir 20/07/2026
+Nenhuma muda de mês
+
+Cenário P9 — editar data, escopo "Todas as parcelas"
+
+Você muda a data de qualquer parcela para 20/07/2026
+Todas as 4 parcelas passam a exibir 20/07/2026
+Nenhuma muda de mês
+EDIÇÃO DE VALOR
+
+Cenário P10 — editar valor, escopo "Só esta parcela"
+
+Estado: 4x R$ 250 (total R$ 1.000)
+Você muda a parcela 2/4 para R$ 300
+Resultado: parcela 2/4 = R$ 300, demais = R$ 250
+O sistema registra o valor original (R$ 1.000) e atualiza o valor total para R$ 1.050
+O histórico mostra: "valor original: R$ 1.000 → ajustado para R$ 1.050"
+
+Cenário P11 — editar valor, escopo "Esta e as próximas"
+
+Estado: 4x R$ 250, você muda a 2/4 para R$ 300
+Parcela 1/4 = R$ 250, parcelas 2/4, 3/4, 4/4 = R$ 300
+Total atualizado para R$ 1.150, histórico registra valor anterior
+
+Cenário P12 — editar valor, escopo "Todas as parcelas"
+
+Você muda qualquer parcela para R$ 300
+Todas as 4 = R$ 300, total = R$ 1.200
+Histórico registra valor anterior (R$ 1.000)
+ALTERAR PARCELAMENTO (recriar)
+
+Cenário P13a — mudar quantidade recalculando valor por parcela
+
+Estado: 4x R$ 250 (total R$ 1.000), começando em Julho
+Você muda para 6x mantendo total R$ 1.000
+Resultado: 6 parcelas de R$ 166,67 cada, começando em Julho
+Parcela 1/6 → Jul, 2/6 → Ago, 3/6 → Set, 4/6 → Out, 5/6 → Nov, 6/6 → Dez
+Data em todas: 10/07/2026
+⚠️ Status de pagamento resetado para todas
+
+Cenário P13b — mudar quantidade mantendo valor por parcela (acrescenta parcelas)
+
+Estado: 4x R$ 250 (total R$ 1.000), começando em Julho
+Você muda para 6x mantendo R$ 250 por parcela → total passa a R$ 1.500
+Resultado: 6 parcelas de R$ 250, começando em Julho
+Parcela 1/6 → Jul, 2/6 → Ago, 3/6 → Set, 4/6 → Out, 5/6 → Nov, 6/6 → Dez
+⚠️ Status de pagamento resetado para todas
+
+O sistema pergunta ao usuário: "Deseja recalcular o valor por parcela mantendo o total atual (6x R$ 166,67) ou manter o valor por parcela acrescentando ao total (6x R$ 250)?"
+
+RENUMERAR PARCELA
+
+Cenário P14 — mover parcela 1/4 para posição 3 (para frente)
+
+Estado atual: 1/4 (Jul), 2/4 (Ago), 3/4 (Set), 4/4 (Out)
+Você abre a 1/4 e muda "Parcela atual" para 3
+As parcelas que existiam viram:
+A que era 1/4 (Jul) → passa a ser 3/4, fica em Julho
+A que era 2/4 (Ago) → passa a ser 4/4, fica em Agosto
+O sistema pergunta: "Deseja criar as parcelas anteriores (1/4 e 2/4) que ficaram faltando?"
+Se sim: cria parcela 1/4 → Maio/2026 e parcela 2/4 → Junho/2026 (meses anteriores ao Julho atual)
+Se não: mantém apenas 3/4 (Jul) e 4/4 (Ago), sem 1/4 e 2/4
+
+Cenário P15 — mover parcela 3/4 para posição 1 (para trás)
+
+Estado atual: 1/4 (Jul), 2/4 (Ago), 3/4 (Set), 4/4 (Out)
+Você abre a 3/4 e muda "Parcela atual" para 1
+As parcelas que existiam viram:
+A que era 3/4 (Set) → passa a ser 1/4, fica em Setembro
+A que era 4/4 (Out) → passa a ser 2/4, fica em Outubro
+O sistema pergunta: "Deseja criar as parcelas anteriores (3/4 e 4/4) que ficaram faltando?"
+Se sim: cria parcela 3/4 → Novembro e parcela 4/4 → Dezembro
+Se não: mantém apenas 1/4 (Set) e 2/4 (Out)
+
+Cenário P16 — mover parcela 2/6 para posição 5
+
+Estado atual: 1/6 (Jul), 2/6 (Ago), 3/6 (Set), 4/6 (Out), 5/6 (Nov), 6/6 (Dez)
+Você abre a 2/6 e muda para 5
+As parcelas que existiam viram:
+2/6 (Ago) → passa a ser 5/6, fica em Agosto
+3/6 (Set) → passa a ser 6/6, fica em Setembro
+As que eram 4/6, 5/6 e 6/6 desaparecem do range deslocado
+O sistema pergunta se quer criar as parcelas faltando (1/6 a 4/6 antes de Agosto)
+EXCLUIR POR PERÍODO
+
+Cenário P17 — excluir parcelas do meio
+
+Estado: 6 parcelas em Jul/Ago/Set/Out/Nov/Dez, data 10/07/2026
+Você exclui de Setembro a Novembro
+Parcelas de Set (3/6), Out (4/6) e Nov (5/6) são removidas
+Restam: Jul (1/6), Ago (2/6), Dez (6/6)
+O sistema pergunta: "Deseja renumerar as parcelas restantes automaticamente?"
+Se sim: Jul → 1/3, Ago → 2/3, Dez → 3/3
+Se não: mantém Jul como 1/6, Ago como 2/6, Dez como 6/6 (com "buracos")
+RECORRENTES E DÉBITO AUTOMÁTICO
+
+Seguem a mesma regra dos avulsos para o mês de criação, mas se replicam por N meses:
+
+Cenário R1 — criar recorrente em Julho, data 10/07/2026, por 4 meses
+
+Julho → data: 10/07/2026
+Agosto → data: 10/07/2026
+Setembro → data: 10/07/2026
+Outubro → data: 10/07/2026
+✅ A data da compra é a mesma em todos os meses
+
+Cenário R2 — criar recorrente em Julho, data 08/06/2026, por 4 meses
+
+Julho → data: 08/06/2026
+Agosto → data: 08/06/2026
+Setembro → data: 08/06/2026
+Outubro → data: 08/06/2026
+✅ Criado em Julho = começa em Julho, data 08/06 é só referência
+
+Cenário R3 — editar data de um recorrente, escopo "Só este mês"
+
+Lançamento em Julho com data 10/07/2026
+Você muda para 15/07/2026
+Só o de Julho muda, os outros meses continuam com 10/07/2026
+
+Cenário R4 — editar data de um recorrente, escopo "Este e os próximos"
+
+Você muda o de Julho para 15/07/2026
+Julho e todos os meses seguintes passam a exibir 15/07/2026
+Os meses anteriores a Julho não mudam
+
+Cenário R5 — editar data de um recorrente, escopo "Toda a conta"
+
+Todos os meses da série passam a exibir 15/07/2026

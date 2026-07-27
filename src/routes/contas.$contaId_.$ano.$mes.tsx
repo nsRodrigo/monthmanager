@@ -28,8 +28,10 @@ import {
   normalizeZero,
   useEnsureRecurringForMonth,
   useDeleteParcelledByScope,
+  useCompactInstallmentNumbering,
   useDeleteRecurringByScope,
   useReorderCards,
+  resolveScopeMonths,
   type CardScope,
   type Installment,
   type Debit,
@@ -151,6 +153,7 @@ function AccountMonth() {
   const [editingRecurring, setEditingRecurring] = useState<RecurringEditTarget | null>(null);
 
   const deleteParcelledScoped = useDeleteParcelledByScope();
+  const compactInstallments = useCompactInstallmentNumbering();
   const deleteRecurringScoped = useDeleteRecurringByScope();
 
   // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
@@ -182,8 +185,20 @@ function AccountMonth() {
           Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
         </>
       ),
-      execute: (scope) =>
-        deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+      execute: async (scope) => {
+        const result = await deleteParcelledScoped.mutateAsync({ parentId, parentType, scope });
+        if (result?.hasGap && result.remainingCount > 0) {
+          const renumber = await confirmDialog({
+            title: "Renumerar parcelas restantes?",
+            description: `Restaram ${result.remainingCount} parcela(s) com numeração fora de sequência. Deseja renumerá-las automaticamente (1..${result.remainingCount})?`,
+            confirmLabel: "Renumerar",
+            cancelLabel: "Manter como está",
+          });
+          if (renumber) {
+            await compactInstallments.mutateAsync({ parentId, parentType });
+          }
+        }
+      },
       availableMonths: months.length > 0 ? months : undefined,
     });
   };
@@ -206,26 +221,36 @@ function AccountMonth() {
     });
   };
 
-  /** Abre o "Aplicar em" para uma compra à vista (1x): só este mês ou tudo. */
+  /** Abre o "Aplicar em" para um lançamento avulso (ex.: débito automático): só este mês ou tudo. */
   const askDeleteSingle = (
-    parentId: string,
+    id: string,
     parentType: "purchase" | "debit" | "income",
     label: string,
+    date: string,
   ) => {
     setScopeDelete({
       title:
-        parentType === "purchase"
-          ? "Excluir compra"
-          : parentType === "debit"
-            ? "Excluir débito"
-            : "Excluir recebimento",
+        parentType === "debit" ? "Excluir débito"
+        : parentType === "income" ? "Excluir recebimento"
+        : "Excluir compra",
       description: (
         <>
-          Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
+          Você está excluindo{" "}
+          <span className="font-semibold text-foreground">{label}</span>.
         </>
       ),
-      execute: (scope) =>
-        deleteParcelledScoped.mutateAsync({ parentId, parentType, scope }),
+      execute: async (scope) => {
+        const [iy, im] = date.slice(0, 10).split("-").map(Number);
+        const targets = resolveScopeMonths(scope, year, month);
+        const withinScope = targets.some(
+          (t) => t.year === iy && t.month === im - 1,
+        );
+        if (!withinScope) return;
+        if (parentType === "debit") await removeDebit.mutateAsync(id);
+        else if (parentType === "income")
+          await removeIncome.mutateAsync(id);
+        else await removePurchase.mutateAsync(id);
+      },
     });
   };
 
@@ -923,15 +948,17 @@ function AccountMonth() {
                 onRemove={
                   isRecurring
                     ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)
-                    : async () => {
-                        const ok = await confirmDialog({
-                          title: "Excluir débito",
-                          description: `Excluir "${d.description}"?`,
-                          variant: "destructive",
-                          confirmLabel: "Excluir",
-                        });
-                        if (ok) removeDebit.mutate(d.id);
-                      }
+                    : d.autoDebit
+                      ? () => askDeleteSingle(d.id, "debit", d.description, d.date)
+                      : async () => {
+                          const ok = await confirmDialog({
+                            title: "Excluir débito",
+                            description: `Excluir "${d.description}"?`,
+                            variant: "destructive",
+                            confirmLabel: "Excluir",
+                          });
+                          if (ok) removeDebit.mutate(d.id);
+                        }
                 }
                 {...selProps("debits", d.id)}
               />
@@ -1126,6 +1153,18 @@ function AccountMonth() {
                         onEditInst={(inst) => {
                           const pur = purchasesList.find((p) => p.id === inst.parentId);
                           if (!pur) return;
+                          if (pur.recurrenceGroupId) {
+                            setEditingRecurring({
+                              kind: "purchase",
+                              id: pur.id,
+                              groupId: pur.recurrenceGroupId,
+                              description: pur.description,
+                              amount: pur.totalAmount,
+                              date: pur.date,
+                              cardId: c.id,
+                            });
+                            return;
+                          }
                           setEditing({
                             inst,
                             label: pur.description,
@@ -1852,8 +1891,10 @@ function CardRow({
                 .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
                 .sort((a, b) => {
                   if (sortedItems) return 0; // respect provided order
-                  const aParc = a.pur.installmentsCount > 1 ? 0 : 1;
-                  const bParc = b.pur.installmentsCount > 1 ? 0 : 1;
+                  // Prioriza parcelados + recorrentes (tier 0) sobre à-vista (tier 1),
+                  // igual à regra já aplicada em débitos/recebimentos.
+                  const aParc = a.pur.installmentsCount > 1 || !!a.pur.recurrenceGroupId ? 0 : 1;
+                  const bParc = b.pur.installmentsCount > 1 || !!b.pur.recurrenceGroupId ? 0 : 1;
                   return (
                     aParc - bParc ||
                     a.inst.dueDate.localeCompare(b.inst.dueDate) ||
@@ -1947,7 +1988,7 @@ function PurchaseInstRow({
   onLongPress,
 }: {
   inst: Installment;
-  purchase: { description: string; date: string; totalAmount: number; installmentsCount: number };
+  purchase: { description: string; date: string; totalAmount: number; installmentsCount: number; recurrenceGroupId?: string | null };
   cardColor: string;
   onToggle: () => void;
   onEdit: () => void;
@@ -1968,6 +2009,7 @@ function PurchaseInstRow({
     fn();
   };
   const isInstallment = inst.total > 1;
+  const isRecurring = !isInstallment && !!purchase.recurrenceGroupId;
   return (
     <div
       className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
@@ -1975,15 +2017,27 @@ function PurchaseInstRow({
     >
       {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            inst.paid ? "text-muted-foreground line-through" : ""
-          }`}
-        >
-          {purchase.description}
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p
+            className={`truncate text-sm font-semibold ${
+              inst.paid ? "text-muted-foreground line-through" : ""
+            }`}
+          >
+            {purchase.description}
+          </p>
+          {isInstallment && (
+            <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+              PAR
+            </span>
+          )}
+          {isRecurring && (
+            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-credit">
+              REC
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(purchase.date)} ·{" "}
+          {formatDate(inst.referenceDate || purchase.date)} ·{" "}
           {isInstallment
             ? `${formatCurrency(purchase.totalAmount)} em ${inst.total}x`
             : `${formatCurrency(purchase.totalAmount)} à vista`}
@@ -2000,14 +2054,20 @@ function PurchaseInstRow({
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
             inst.paid
-              ? "bg-success/80 text-black"
-              : "border border-border bg-background hover:bg-secondary"
+              ? "bg-success/15 text-success hover:bg-success/25"
+              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
           }`}
           title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
         >
-          {inst.paid && <Check className="h-3 w-3" />}
+          {inst.paid ? (
+            <>
+              <Check className="h-3 w-3" /> Validado
+            </>
+          ) : (
+            "Não validado"
+          )}
         </button>
       </div>
       {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} />}
@@ -2061,13 +2121,13 @@ function DebitRow({
           </p>
           {debit.required && (
             <span className="rounded-full bg-debit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-debit">
-              Rec.
+              REC
             </span>
           )}
           {debit.autoDebit && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
-              Aut.{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
+              AUT{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
           )}
         </div>
@@ -2152,7 +2212,7 @@ function IncomeRow({
           </p>
           {income.recurrenceGroupId && (
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
-              Rec.
+              REC
             </span>
           )}
         </div>
@@ -2245,18 +2305,18 @@ function ParcelledRow({
           >
             {parent.description}
           </p>
-          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${badgeClass}`}>
+          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
             PAR
           </span>
           {auto && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
-              Aut.
+              AUT
             </span>
           )}
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(parent.date)} · {formatCurrency(parent.amount)} em {installment.total}x
+          {formatDate(installment.referenceDate || parent.date)} · {formatCurrency(parent.amount)} em {installment.total}x
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">

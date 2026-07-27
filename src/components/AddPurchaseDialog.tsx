@@ -93,6 +93,7 @@ export function AddPurchaseDialog({
       installmentNumber: cur,
       invoiceAnchorDate,
       paidNow: markPaid && !isInstallment && !isRecurring,
+      markCurrentPaid: markPaid && isInstallment,
     });
     onClose();
   };
@@ -112,7 +113,7 @@ export function AddPurchaseDialog({
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
             <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
           </Field>
-          <Field label="Data">
+          <Field label="Data da compra">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
@@ -132,10 +133,7 @@ export function AddPurchaseDialog({
             checked={isInstallment}
             onChange={(e) => {
               setIsInstallment(e.target.checked);
-              if (e.target.checked) {
-                setIsRecurring(false);
-                setMarkPaid(false);
-              }
+              if (e.target.checked) setIsRecurring(false);
             }}
             className="h-4 w-4 accent-primary"
           />
@@ -205,7 +203,7 @@ export function AddPurchaseDialog({
           </Field>
         )}
 
-        {!isInstallment && !isRecurring && (
+        {!isRecurring && (
           <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
             <input
               type="checkbox"
@@ -213,7 +211,9 @@ export function AddPurchaseDialog({
               onChange={(e) => setMarkPaid(e.target.checked)}
               className="h-4 w-4 accent-primary"
             />
-            <span className="text-sm font-medium">Marcar como paga</span>
+            <span className="text-sm font-medium">
+              {isInstallment ? "Marcar esta parcela como paga" : "Marcar como paga"}
+            </span>
           </label>
         )}
 

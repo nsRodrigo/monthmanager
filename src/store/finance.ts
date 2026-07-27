@@ -168,7 +168,7 @@ export type Investment = {
 // =======================
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-async function fetchAllRows<T>(
+export async function fetchAllRows<T>(
   queryFactory: (signal?: AbortSignal) => any,
   pageSize = 1000,
   signal?: AbortSignal,

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/store/finance";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -42,9 +43,10 @@ export async function collectBackup(): Promise<BackupPayload> {
   if (!userId) throw new Error("Sessão expirada.");
   const data = {} as Record<BackupTable, any[]>;
   for (const t of BACKUP_TABLES) {
-    const { data: rows, error } = await supabase.from(t).select("*");
-    if (error) throw new Error(`Falha ao ler ${t}: ${error.message}`);
-    data[t] = rows ?? [];
+    // IMPORTANTE: o Supabase (PostgREST) limita cada request a 1000 linhas
+    // por padrão. Sem paginar, tabelas grandes (ex.: installments) ficam
+    // truncadas silenciosamente no backup. fetchAllRows pagina até acabar.
+    data[t] = await fetchAllRows<any>(() => supabase.from(t).select("*"));
   }
   return { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), userId, data };
 }

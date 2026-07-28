@@ -7,11 +7,16 @@ import type { Database } from './types';
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Lovable reserva o prefixo "SUPABASE_" pra secrets gerenciadas por ele —
+  // não deixa criar "SUPABASE_SERVICE_ROLE_KEY" manualmente no painel de
+  // Secrets. Por isso o nome em produção é SB_SERVICE_ROLE_KEY; mantemos o
+  // nome antigo como fallback pra não quebrar ambientes locais (.dev.vars).
+  const SUPABASE_SERVICE_ROLE_KEY =
+    process.env.SB_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error(
-      'Missing Supabase server environment variables. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.'
+      'Missing Supabase server environment variables. Ensure SUPABASE_URL and SB_SERVICE_ROLE_KEY are set.'
     );
   }
 

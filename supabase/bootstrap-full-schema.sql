@@ -1951,27 +1951,12 @@ COMMENT ON COLUMN public.debits.due_notified_at IS
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- Passo manual (fora deste arquivo): configurar URL do app e segredo do cron
--- via ALTER DATABASE, e o mesmo segredo em CRON_SECRET nas env vars do
--- deploy. Ver comentario completo em
+-- Passo manual (fora deste arquivo): projetos Supabase gerenciados nao
+-- permitem ALTER DATABASE ... SET app.settings.*, entao a URL/segredo do
+-- cron nao dao pra guardar como configuracao do banco. Rode o
+-- cron.schedule com os valores reais direto no SQL editor (nao commitar
+-- com os valores reais). Ver comentario completo em
 -- supabase/migrations/20260728000000_due_debit_notifications.sql.
-SELECT cron.unschedule('notify-due-debits-daily')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'notify-due-debits-daily');
-
-SELECT cron.schedule(
-  'notify-due-debits-daily',
-  '0 12 * * *',
-  $$
-  SELECT net.http_post(
-    url := current_setting('app.settings.cron_url', true),
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', current_setting('app.settings.cron_secret', true)
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
 
 
 

@@ -20,33 +20,29 @@ COMMENT ON COLUMN public.debits.due_notified_at IS
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- Guarda a URL do app e o segredo do cron como configuracao do banco, para
--- nao hardcodar segredo em texto plano dentro da migration (fica em
--- ALTER DATABASE ... SET, roda uma vez soh, fora do arquivo versionado).
--- IMPORTANTE (passo manual): antes/depois de aplicar esta migration, rode no
--- SQL editor do Supabase (substituindo pelos valores reais):
+-- IMPORTANTE (passo manual, fora deste arquivo): projetos Supabase
+-- gerenciados NAO permitem "ALTER DATABASE ... SET app.settings.*"
+-- (permission denied to set parameter), entao a URL/segredo do cron nao dao
+-- pra guardar como configuracao do banco. Em vez disso, rode o
+-- cron.schedule abaixo direto no SQL editor, com os valores reais
+-- (URL de producao e o mesmo CRON_SECRET configurado nas env vars do
+-- deploy) substituindo os placeholders — NAO commite essa versao com os
+-- valores reais.
 --
---   ALTER DATABASE postgres SET app.settings.cron_url = 'https://SEU-DOMINIO/api/cron/notify-due-debits';
---   ALTER DATABASE postgres SET app.settings.cron_secret = 'UM-SEGREDO-LONGO-ALEATORIO';
+--   SELECT cron.unschedule('notify-due-debits-daily')
+--   WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'notify-due-debits-daily');
 --
--- E configure a mesma string em CRON_SECRET nas variaveis de ambiente do
--- deploy do app (mesmo lugar onde SUPABASE_SERVICE_ROLE_KEY/VAPID_* estao
--- configurados hoje).
-
-SELECT cron.unschedule('notify-due-debits-daily')
-WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'notify-due-debits-daily');
-
-SELECT cron.schedule(
-  'notify-due-debits-daily',
-  '0 12 * * *', -- 12:00 UTC todo dia — ajuste o horario conforme preferir
-  $$
-  SELECT net.http_post(
-    url := current_setting('app.settings.cron_url', true),
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', current_setting('app.settings.cron_secret', true)
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
+--   SELECT cron.schedule(
+--     'notify-due-debits-daily',
+--     '0 12 * * *', -- 12:00 UTC todo dia — ajuste o horario conforme preferir
+--     $cron$
+--     SELECT net.http_post(
+--       url := 'https://SEU-DOMINIO/api/cron/notify-due-debits',
+--       headers := jsonb_build_object(
+--         'Content-Type', 'application/json',
+--         'x-cron-secret', 'MESMO-VALOR-DO-CRON_SECRET'
+--       ),
+--       body := '{}'::jsonb
+--     );
+--     $cron$
+--   );

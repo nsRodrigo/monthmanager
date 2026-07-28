@@ -53,6 +53,35 @@ export const listUsers = createServerFn({ method: "GET" })
     }));
   });
 
+export const setUserAdmin = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .inputValidator((data) =>
+    z.object({ userId: z.string().uuid(), isAdmin: z.boolean() }).parse(data),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.userId);
+
+    if (data.userId === context.userId && !data.isAdmin) {
+      throw new Error("Você não pode remover seu próprio acesso de admin.");
+    }
+
+    if (data.isAdmin) {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: data.userId, role: "admin" }, { onConflict: "user_id,role" });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", data.userId)
+        .eq("role", "admin");
+      if (error) throw new Error(error.message);
+    }
+
+    return { ok: true };
+  });
+
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((data) =>

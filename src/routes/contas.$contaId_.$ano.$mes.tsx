@@ -58,6 +58,7 @@ import {
   ArrowUp,
   ArrowDown,
   GripVertical,
+  ShoppingBag,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -137,8 +138,8 @@ function AccountMonth() {
   const [openInvest, setOpenInvest] = useState(false);
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openCard, setOpenCard] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [purchaseFor, setPurchaseFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     inst: Installment;
     label: string;
@@ -598,8 +599,6 @@ function AccountMonth() {
           title="RECEBIMENTOS"
           description="Entradas de dinheiro na conta"
           tone="income"
-          onAdd={() => setOpenIncome(true)}
-          addLabel="Novo recebimento"
           total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
           paidState={incomesAllReceived ? "paid" : null}
@@ -760,8 +759,6 @@ function AccountMonth() {
           title="INVESTIMENTOS"
           description="Aplicações e resgates"
           tone="primary"
-          onAdd={() => setOpenInvest(true)}
-          addLabel="Novo investimento"
           total={totalInvested}
           count={investments.length}
           defaultOpen={false}
@@ -823,8 +820,6 @@ function AccountMonth() {
           title="DÉBITOS"
           description="Gastos diretos da conta corrente"
           tone="debit"
-          onAdd={() => setOpenDebit(true)}
-          addLabel="Novo débito"
           total={totalDebitsNet}
           count={monthDebits.single.length + monthDebits.parcelled.length}
           paidState={
@@ -929,6 +924,7 @@ function AccountMonth() {
                       amount: d.amount,
                       date: d.date,
                       accountId: d.accountId,
+                      notifyDaysBefore: d.notifyDaysBefore,
                     });
                   } else {
                     setEditingSingle({
@@ -940,6 +936,7 @@ function AccountMonth() {
                         amount: d.amount,
                         date: d.date,
                         paid: d.paid,
+                        notifyDaysBefore: d.notifyDaysBefore,
                       },
                       onDeleteParent: () => removeDebit.mutate(d.id),
                     });
@@ -977,14 +974,19 @@ function AccountMonth() {
                   .filter(Boolean) as typeof allAccountCards)
               : allAccountCards;
 
-          const cardsAll = accountCards.map((c) => {
-            const items = monthInst.filter((i) => {
-              if (i.parentType !== "purchase") return false;
-              const pur = purchasesList.find((p) => p.id === i.parentId);
-              return pur?.cardId === c.id;
-            });
-            return { card: c, items };
-          });
+          const cardsAll = accountCards
+            .map((c) => {
+              const items = monthInst.filter((i) => {
+                if (i.parentType !== "purchase") return false;
+                const pur = purchasesList.find((p) => p.id === i.parentId);
+                return pur?.cardId === c.id;
+              });
+              return { card: c, items };
+            })
+            // Cartão sem nenhum item/fatura neste mês some da lista — mas
+            // continua selecionável ao lançar uma nova compra (e volta a
+            // aparecer automaticamente no mês em que tiver movimento).
+            .filter(({ items }) => items.length > 0);
 
           const moveCard = (idx: number, dir: -1 | 1) => {
             setReorderIds((prev) => {
@@ -1102,7 +1104,9 @@ function AccountMonth() {
                 )
               ) : cardsAll.length === 0 ? (
                 <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
-                  Nenhum cartão vinculado a esta conta.
+                  {accountCards.length === 0
+                    ? "Nenhum cartão vinculado a esta conta."
+                    : "Nenhum cartão com movimento neste mês."}
                 </p>
               ) : (
                 cardsAll.map(({ card: c, items: cardInst }) => {
@@ -1146,7 +1150,6 @@ function AccountMonth() {
                             }
                           }
                         }}
-                        onAdd={() => setPurchaseFor(c.id)}
                         onEditCard={() => setEditingCardId(c.id)}
                         onRequestReorder={enterReorder}
                         onToggleInst={(id, p) => toggleInst(id, p)}
@@ -1204,18 +1207,79 @@ function AccountMonth() {
                   );
                 })
               )}
-
-              {!reorderMode && (
-                <button
-                  onClick={() => setOpenCard(true)}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border bg-card px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-secondary"
-                >
-                  <Plus className="h-4 w-4" /> Novo cartão
-                </button>
-              )}
             </section>
           );
         })()}
+      </div>
+
+      {fabOpen && (
+        <div
+          className="fixed inset-0 z-30"
+          onClick={() => setFabOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <div className="fixed bottom-6 right-4 z-40 flex flex-col items-end gap-3 md:right-8">
+        {fabOpen && (
+          <div className="flex flex-col items-end gap-2.5">
+            <FabAction
+              icon={CreditCard}
+              label="Novo cartão"
+              tone="credit"
+              onClick={() => {
+                setOpenCard(true);
+                setFabOpen(false);
+              }}
+            />
+            <FabAction
+              icon={ShoppingBag}
+              label="Nova compra"
+              tone="credit"
+              onClick={() => {
+                setOpenPurchase(true);
+                setFabOpen(false);
+              }}
+            />
+            <FabAction
+              icon={ArrowDownRight}
+              label="Novo débito"
+              tone="debit"
+              onClick={() => {
+                setOpenDebit(true);
+                setFabOpen(false);
+              }}
+            />
+            <FabAction
+              icon={TrendingUp}
+              label="Novo investimento"
+              tone="primary"
+              onClick={() => {
+                setOpenInvest(true);
+                setFabOpen(false);
+              }}
+            />
+            <FabAction
+              icon={Download}
+              label="Novo recebimento"
+              tone="income"
+              onClick={() => {
+                setOpenIncome(true);
+                setFabOpen(false);
+              }}
+            />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setFabOpen((v) => !v)}
+          aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
+          aria-expanded={fabOpen}
+          className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${
+            fabOpen ? "rotate-45" : ""
+          }`}
+        >
+          <Plus className="h-6 w-6" />
+        </button>
       </div>
 
       <AddDebitDialog
@@ -1231,13 +1295,6 @@ function AccountMonth() {
         defaultYear={year}
         defaultMonth={month}
         fixedAccountId={contaId}
-      />
-      <AddPurchaseDialog
-        open={!!purchaseFor}
-        onClose={() => setPurchaseFor(null)}
-        defaultYear={year}
-        defaultMonth={month}
-        fixedCardId={purchaseFor ?? undefined}
       />
       <AddPurchaseDialog
         open={openPurchase}
@@ -1365,6 +1422,31 @@ const toneBg: Record<Tone, string> = {
   primary: "bg-primary/15",
 };
 
+
+function FabAction({
+  icon: Icon,
+  label,
+  tone,
+  onClick,
+}: {
+  icon: typeof Plus;
+  label: string;
+  tone: Tone;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2.5 rounded-full border border-border bg-card py-1.5 pl-4 pr-1.5 shadow-elevated transition-colors hover:border-primary/50"
+    >
+      <span className="whitespace-nowrap text-xs font-semibold">{label}</span>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}>
+        <Icon className="h-4 w-4" />
+      </span>
+    </button>
+  );
+}
 
 /* ───────── GROUPED SECTION (collapsible category accordion) ───────── */
 
@@ -1558,7 +1640,6 @@ function CardRowSorted({
   paymentPending,
   dueLabel,
   onTogglePaid,
-  onAdd,
   onEditCard,
   onToggleInst,
   onEditInst,
@@ -1577,7 +1658,6 @@ function CardRowSorted({
   paymentPending?: boolean;
   dueLabel: string;
   onTogglePaid: () => void;
-  onAdd: () => void;
   onEditCard?: () => void;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
@@ -1611,7 +1691,6 @@ function CardRowSorted({
       count={cardInst.length}
       dueLabel={dueLabel}
       onTogglePaid={onTogglePaid}
-      onAdd={onAdd}
       onEditCard={onEditCard}
       items={cardInst}
       purchases={purchases}
@@ -1641,7 +1720,6 @@ function CardRow({
   count,
   dueLabel,
   onTogglePaid,
-  onAdd,
   onEditCard,
   onHideMonth,
   items,
@@ -1665,7 +1743,6 @@ function CardRow({
   count: number;
   dueLabel: string;
   onTogglePaid: () => void;
-  onAdd: () => void;
   onEditCard?: () => void;
   onHideMonth?: () => void;
   items: Installment[];
@@ -1920,19 +1997,6 @@ function CardRow({
                 ))}
             </div>
           )}
-
-          <div className="border-t border-border p-3 md:p-4">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdd();
-              }}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-xs font-semibold text-credit transition-colors hover:bg-secondary"
-            >
-              <Plus className="h-3.5 w-3.5" /> Nova compra
-            </button>
-          </div>
         </div>
       )}
     </div>
@@ -2020,7 +2084,7 @@ function PurchaseInstRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
-              inst.paid ? "text-muted-foreground line-through" : ""
+              inst.paid ? "text-muted-foreground" : ""
             }`}
           >
             {purchase.description}
@@ -2114,7 +2178,7 @@ function DebitRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
-              debit.paid ? "text-muted-foreground line-through" : ""
+              debit.paid ? "text-muted-foreground" : ""
             }`}
           >
             {debit.description}
@@ -2300,7 +2364,7 @@ function ParcelledRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <p
             className={`truncate text-sm font-semibold ${
-              installment.paid ? "text-muted-foreground line-through" : ""
+              installment.paid ? "text-muted-foreground" : ""
             }`}
           >
             {parent.description}

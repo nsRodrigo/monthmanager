@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // Public key (VAPID). Pode ser exposta no client.
 export const VAPID_PUBLIC_KEY =
-  "BMKPIjyDWhEIU1Nndkq6PNuULhAQ7N94qdd79lfou_nLOhHG6T3TcF5h_STkNbDY2MvJXmiA1JvIyvcabIGw1ag";
+  "BLMTt8gfhIwowJGrkaJJjxEBRqZFUSaALl9P7J6xPcGsNCMClCDkOTrn1fn7YtGvaRtSBZhj0sutqLO0bBp_Tcg";
 
 let configured = false;
 function ensureConfigured() {
@@ -24,11 +24,18 @@ export async function notifyAdmins(payload: { title: string; body: string; url?:
     .eq("role", "admin");
   const ids = (admins ?? []).map((a) => a.user_id);
   if (!ids.length) return { sent: 0 };
+  return notifyUsers(ids, payload);
+}
+
+/** Envia push para as inscrições de um conjunto de usuários (não só admins). */
+export async function notifyUsers(userIds: string[], payload: { title: string; body: string; url?: string }) {
+  ensureConfigured();
+  if (!userIds.length) return { sent: 0 };
 
   const { data: subs } = await supabaseAdmin
     .from("push_subscriptions")
     .select("id,endpoint,p256dh,auth")
-    .in("user_id", ids);
+    .in("user_id", userIds);
 
   let sent = 0;
   for (const s of subs ?? []) {

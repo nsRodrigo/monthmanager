@@ -12,12 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as IrpfRouteImport } from './routes/irpf'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
-import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as BackupRouteImport } from './routes/backup'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
 import { Route as AdminWhitelistRouteImport } from './routes/admin.whitelist'
+import { Route as ApiCronNotifyDueDebitsRouteImport } from './routes/api.cron.notify-due-debits'
 import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaId_.$ano.$mes'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -33,11 +33,6 @@ const IrpfRoute = IrpfRouteImport.update({
 const ImportarHistoricoRoute = ImportarHistoricoRouteImport.update({
   id: '/importar-historico',
   path: '/importar-historico',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ImportarRoute = ImportarRouteImport.update({
-  id: '/importar',
-  path: '/importar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BackupRoute = BackupRouteImport.update({
@@ -65,6 +60,11 @@ const AdminWhitelistRoute = AdminWhitelistRouteImport.update({
   path: '/admin/whitelist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronNotifyDueDebitsRoute = ApiCronNotifyDueDebitsRouteImport.update({
+  id: '/api/cron/notify-due-debits',
+  path: '/api/cron/notify-due-debits',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContasContaIdAnoMesRoute = ContasContaIdAnoMesRouteImport.update({
   id: '/contas/$contaId_/$ano/$mes',
   path: '/contas/$contaId/$ano/$mes',
@@ -75,24 +75,24 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
-  '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/irpf': typeof IrpfRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
+  '/api/cron/notify-due-debits': typeof ApiCronNotifyDueDebitsRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
-  '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/irpf': typeof IrpfRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
+  '/api/cron/notify-due-debits': typeof ApiCronNotifyDueDebitsRoute
   '/contas/$contaId/$ano/$mes': typeof ContasContaIdAnoMesRoute
 }
 export interface FileRoutesById {
@@ -100,12 +100,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
-  '/importar': typeof ImportarRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/irpf': typeof IrpfRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
+  '/api/cron/notify-due-debits': typeof ApiCronNotifyDueDebitsRoute
   '/contas/$contaId_/$ano/$mes': typeof ContasContaIdAnoMesRoute
 }
 export interface FileRouteTypes {
@@ -114,36 +114,36 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/backup'
-    | '/importar'
     | '/importar-historico'
     | '/irpf'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
+    | '/api/cron/notify-due-debits'
     | '/contas/$contaId/$ano/$mes'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/backup'
-    | '/importar'
     | '/importar-historico'
     | '/irpf'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
+    | '/api/cron/notify-due-debits'
     | '/contas/$contaId/$ano/$mes'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/backup'
-    | '/importar'
     | '/importar-historico'
     | '/irpf'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
+    | '/api/cron/notify-due-debits'
     | '/contas/$contaId_/$ano/$mes'
   fileRoutesById: FileRoutesById
 }
@@ -151,12 +151,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   BackupRoute: typeof BackupRoute
-  ImportarRoute: typeof ImportarRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   IrpfRoute: typeof IrpfRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
+  ApiCronNotifyDueDebitsRoute: typeof ApiCronNotifyDueDebitsRoute
   ContasContaIdAnoMesRoute: typeof ContasContaIdAnoMesRoute
 }
 
@@ -181,13 +181,6 @@ declare module '@tanstack/react-router' {
       path: '/importar-historico'
       fullPath: '/importar-historico'
       preLoaderRoute: typeof ImportarHistoricoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/importar': {
-      id: '/importar'
-      path: '/importar'
-      fullPath: '/importar'
-      preLoaderRoute: typeof ImportarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/backup': {
@@ -225,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWhitelistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/notify-due-debits': {
+      id: '/api/cron/notify-due-debits'
+      path: '/api/cron/notify-due-debits'
+      fullPath: '/api/cron/notify-due-debits'
+      preLoaderRoute: typeof ApiCronNotifyDueDebitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contas/$contaId_/$ano/$mes': {
       id: '/contas/$contaId_/$ano/$mes'
       path: '/contas/$contaId/$ano/$mes'
@@ -239,12 +239,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   BackupRoute: BackupRoute,
-  ImportarRoute: ImportarRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
   IrpfRoute: IrpfRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,
   ContasContaIdRoute: ContasContaIdRoute,
+  ApiCronNotifyDueDebitsRoute: ApiCronNotifyDueDebitsRoute,
   ContasContaIdAnoMesRoute: ContasContaIdAnoMesRoute,
 }
 export const routeTree = rootRouteImport

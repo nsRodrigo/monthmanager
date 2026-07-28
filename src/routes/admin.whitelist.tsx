@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Trash2, Plus, ShieldCheck, UserX, Users, Check, X, Bell, Clock } from "lucide-react";
+import { ChevronLeft, Trash2, Plus, ShieldCheck, ShieldOff, UserX, Users, Check, X, Bell, Clock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useIsAdmin, useMyRoles, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
-import { listUsers, deleteUser, type AdminUser } from "@/lib/admin-users.functions";
+import { listUsers, deleteUser, setUserAdmin, type AdminUser } from "@/lib/admin-users.functions";
 import {
   listPendingRequests,
   approveRequest,
@@ -25,7 +25,8 @@ function WhitelistAdmin() {
   const { isLoading } = useMyRoles();
   const isAdmin = useIsAdmin();
   const navigate = useNavigate();
-  const { data: list = [], isLoading: loadingList } = useWhitelist();
+  const { data: whitelistData, isLoading: loadingList } = useWhitelist();
+  const list = Array.isArray(whitelistData) ? whitelistData : [];
   const addMut = useAddToWhitelist();
   const removeMut = useRemoveFromWhitelist();
   const [email, setEmail] = useState("");
@@ -33,6 +34,7 @@ function WhitelistAdmin() {
 
   const listUsersFn = useServerFn(listUsers);
   const deleteUserFn = useServerFn(deleteUser);
+  const setUserAdminFn = useServerFn(setUserAdmin);
   const qc = useQueryClient();
 
   const usersQ = useQuery({
@@ -40,6 +42,9 @@ function WhitelistAdmin() {
     enabled: isAdmin,
     queryFn: () => listUsersFn(),
   });
+  // Defesa extra: nunca deixa a lista quebrar o .map() caso o servidor
+  // devolva algo que não seja um array (ex.: erro serializado como objeto).
+  const usersList = Array.isArray(usersQ.data) ? usersQ.data : [];
 
   const revokeMut = useMutation({
     mutationFn: (vars: { userId: string; alsoRemoveWhitelist: boolean }) =>
@@ -48,6 +53,11 @@ function WhitelistAdmin() {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       qc.invalidateQueries({ queryKey: ["whitelist"] });
     },
+  });
+
+  const setAdminMut = useMutation({
+    mutationFn: (vars: { userId: string; isAdmin: boolean }) => setUserAdminFn({ data: vars }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
   // Pending requests
@@ -60,6 +70,7 @@ function WhitelistAdmin() {
     queryFn: () => listPendingFn(),
     refetchInterval: 30000,
   });
+  const pendingList = Array.isArray(pendingQ.data) ? pendingQ.data : [];
   const approveMut = useMutation({
     mutationFn: (id: string) => approveFn({ data: { id } }),
     onSuccess: () => {
@@ -156,6 +167,20 @@ function WhitelistAdmin() {
     revokeMut.mutate({ userId: u.id, alsoRemoveWhitelist: true });
   };
 
+  const onToggleAdmin = async (u: AdminUser) => {
+    const nextIsAdmin = !u.is_admin;
+    const ok = await confirmDialog({
+      title: nextIsAdmin ? "Conceder admin" : "Remover admin",
+      description: nextIsAdmin
+        ? `Dar acesso de administrador para ${u.email}? A pessoa poderá gerenciar a whitelist, usuários e permissões de admin.`
+        : `Remover o acesso de administrador de ${u.email}?`,
+      variant: nextIsAdmin ? "default" : "destructive",
+      confirmLabel: nextIsAdmin ? "Conceder" : "Remover",
+    });
+    if (!ok) return;
+    setAdminMut.mutate({ userId: u.id, isAdmin: nextIsAdmin });
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-5 py-8 md:py-12">
       <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
@@ -197,21 +222,25 @@ function WhitelistAdmin() {
       <section className="mb-8">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           <Clock className="h-4 w-4" /> Solicitações pendentes
-          {(pendingQ.data?.length ?? 0) > 0 && (
+          {pendingList.length > 0 && (
             <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-              {pendingQ.data!.length}
+              {pendingList.length}
             </span>
           )}
         </h2>
         {pendingQ.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : (pendingQ.data ?? []).length === 0 ? (
+        ) : pendingQ.error ? (
+          <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+            Erro ao carregar solicitações: {(pendingQ.error as Error).message}
+          </p>
+        ) : pendingList.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
             Nenhuma solicitação pendente.
           </p>
         ) : (
           <div className="space-y-2">
-            {(pendingQ.data ?? []).map((r) => (
+            {pendingList.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.email}</p>
@@ -291,10 +320,16 @@ function WhitelistAdmin() {
         {usersQ.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando usuários…</p>
         ) : usersQ.error ? (
-          <p className="text-sm text-destructive">Erro: {(usersQ.error as Error).message}</p>
+          <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+            Erro ao carregar usuários: {(usersQ.error as Error).message}
+          </p>
+        ) : usersList.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+            Nenhum usuário cadastrado ainda.
+          </p>
         ) : (
           <div className="space-y-2">
-            {(usersQ.data ?? []).map((u) => (
+            {usersList.map((u) => (
               <div key={u.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -309,6 +344,18 @@ function WhitelistAdmin() {
                     Último acesso: {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString("pt-BR") : "nunca"}
                   </p>
                 </div>
+                <button
+                  onClick={() => onToggleAdmin(u)}
+                  disabled={setAdminMut.isPending}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${
+                    u.is_admin
+                      ? "border-border text-muted-foreground hover:bg-secondary"
+                      : "border-primary/30 text-primary hover:bg-primary/10"
+                  }`}
+                >
+                  {u.is_admin ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                  {u.is_admin ? "Remover admin" : "Tornar admin"}
+                </button>
                 <button
                   onClick={() => onRevoke(u)}
                   disabled={revokeMut.isPending}

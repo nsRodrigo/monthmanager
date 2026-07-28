@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Modal, Field, inputClass } from "./Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff } from "lucide-react";
+import { useIsAdmin } from "@/store/roles";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { PasskeyManager } from "./PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -12,6 +14,8 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
+  const isAdmin = useIsAdmin();
+  const navigate = useNavigate();
 
 
   const [name, setName] = useState("");
@@ -150,6 +154,28 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
             })}
           </div>
         </div>
+
+        {/* Administração (apenas admins) */}
+        {isAdmin && (
+          <div className="border-t border-border pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Administração
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate({ to: "/admin/whitelist" });
+              }}
+              className="flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 text-left hover:bg-secondary/50"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <ShieldCheck className="h-4 w-4 text-primary" /> Whitelist e usuários
+              </span>
+              <span className="text-xs text-muted-foreground">Abrir</span>
+            </button>
+          </div>
+        )}
 
         {/* Segurança / Biometria */}
         <div className="border-t border-border pt-4">

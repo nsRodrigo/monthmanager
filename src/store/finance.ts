@@ -136,6 +136,8 @@ export type Debit = {
   /** Month the entry belongs to (set on creation, never touched by date edits). */
   referenceYear: number | null;
   referenceMonth: number | null;
+  /** Dias de antecedência para notificação push de vencimento. null = desativado. */
+  notifyDaysBefore: number | null;
 };
 
 export type Income = {
@@ -580,12 +582,13 @@ export function useDebits() {
         recurrence_group_id: string | null;
         reference_year: number | null;
         reference_month: number | null;
+        notify_days_before: number | null;
       }>(
         (abortSignal) => {
           const query = supabase
             .from("debits")
             .select(
-              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
+              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before",
             )
             .order("date", { ascending: true })
             .order("id", { ascending: true });
@@ -610,6 +613,7 @@ export function useDebits() {
           recurrenceGroupId: d.recurrence_group_id ?? null,
           referenceYear: d.reference_year ?? null,
           referenceMonth: d.reference_month ?? null,
+          notifyDaysBefore: d.notify_days_before ?? null,
         })),
       );
     },
@@ -1728,6 +1732,50 @@ export function useAdvanceInstallments() {
   });
 }
 
+/**
+ * Postega uma parcela: move a parcela âncora para o mês da PRÓXIMA parcela
+ * da série (number+1), juntando as duas no mesmo mês (ex.: "vou pagar 2
+ * parcelas no mês seguinte"). Se for a última parcela da série, empurra 1
+ * mês além da sua própria data. Não mexe em nenhuma outra parcela — é o
+ * espelho de `useAdvanceInstallments`, só que para trás.
+ */
+export function usePostponeInstallment() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { installment: Installment }) => {
+      const anchor = args.installment;
+      const { data: rows, error } = await supabase
+        .from("installments")
+        .select("due_date,year,month")
+        .eq("parent_id", anchor.parentId)
+        .eq("parent_type", anchor.parentType)
+        .eq("number", anchor.number + 1)
+        .limit(1);
+      if (error) throw error;
+      const next = (rows ?? [])[0] as { due_date: string; year: number; month: number } | undefined;
+      let dueDate: string, year: number, month: number;
+      if (next) {
+        dueDate = next.due_date;
+        year = next.year;
+        month = next.month;
+      } else {
+        const target = new Date(anchor.year, anchor.month + 1, 1);
+        const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+        const day = Math.min(parseInt(anchor.dueDate.slice(8, 10), 10) || 1, lastDay);
+        year = target.getFullYear();
+        month = target.getMonth();
+        dueDate = fmtLocalDate(year, month, day);
+      }
+      const { error: eUpd } = await supabase
+        .from("installments")
+        .update({ due_date: dueDate, year, month })
+        .eq("id", anchor.id);
+      if (eUpd) throw eUpd;
+    },
+    onSuccess: () => inv(["installments", "card_payments"]),
+  });
+}
+
 export function useToggleInstallmentPaid() {
   const upd = useUpdateInstallment();
   return (id: string, paid: boolean) => upd.mutate({ id, paid });
@@ -2061,6 +2109,8 @@ export function useAddDebit() {
       paidNow?: boolean;
       /** Mark the parcela being created (installmentNumber) as paid. */
       markCurrentPaid?: boolean;
+      /** Dias de antecedência para notificação push de vencimento (null/undefined = desativado). */
+      notifyDaysBefore?: number | null;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
@@ -2089,6 +2139,7 @@ export function useAddDebit() {
         recurrence_group_id: groupId,
         reference_year: refYear,
         reference_month: refMonth,
+        notify_days_before: d.notifyDaysBefore ?? null,
       };
       const { error } = await supabase.from("debits").insert(baseRow);
       if (error) throw error;
@@ -2134,6 +2185,7 @@ export function useAddDebit() {
           recurrence_group_id: groupId,
           reference_year: ry,
           reference_month: rm,
+          notify_days_before: d.notifyDaysBefore ?? null,
         }));
         if (rows.length) {
           const { error: e3 } = await supabase.from("debits").insert(rows);
@@ -2747,7 +2799,8 @@ export function useDuplicateInstallmentsSelection() {
 export type DeleteSource =
   | { kind: "debit"; accountId: string; description: string; amount: number; groupId?: string | null }
   | { kind: "income"; accountId: string; description: string; amount: number; groupId?: string | null }
-  | { kind: "investment"; accountId: string; type: string; amount: number };
+  | { kind: "investment"; accountId: string; type: string; amount: number }
+  | { kind: "purchase"; cardId: string; description: string; amount: number; groupId?: string | null };
 
 export function useDeleteOverScope() {
   const inv = useInvalidate();
@@ -2804,7 +2857,7 @@ export function useDeleteOverScope() {
             const { error: e2 } = await supabase.from("incomes").delete().in("id", ids);
             if (e2) throw e2;
           }
-        } else {
+        } else if (src.kind === "investment") {
           const { data, error } = await supabase
             .from("investments")
             .select("id")
@@ -2819,6 +2872,28 @@ export function useDeleteOverScope() {
             const { error: e2 } = await supabase.from("investments").delete().in("id", ids);
             if (e2) throw e2;
           }
+        } else {
+          // purchase
+          let q = supabase
+            .from("purchases")
+            .select("id")
+            .eq("card_id", src.cardId)
+            .gte("purchase_date", start)
+            .lte("purchase_date", end)
+            .eq("installments_count", 1);
+          if (src.groupId) {
+            q = q.eq("recurrence_group_id", src.groupId);
+          } else {
+            q = q.eq("description", src.description).eq("total_amount", src.amount);
+          }
+          const { data, error } = await q;
+          if (error) throw error;
+          const ids = (data ?? []).map((r: { id: string }) => r.id);
+          if (ids.length) {
+            await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
+            const { error: e2 } = await supabase.from("purchases").delete().in("id", ids);
+            if (e2) throw e2;
+          }
         }
       }
 
@@ -2827,7 +2902,7 @@ export function useDeleteOverScope() {
       // does not silently recreate the row when the user revisits the month.
       // Scope "all" wipes the whole series → nothing to tombstone.
       if (
-        (src.kind === "debit" || src.kind === "income") &&
+        (src.kind === "debit" || src.kind === "income" || src.kind === "purchase") &&
         src.groupId &&
         args.scope.kind !== "all"
       ) {
@@ -2845,7 +2920,7 @@ export function useDeleteOverScope() {
         }
       }
 
-      inv(["debits", "incomes", "investments", "installments"]);
+      inv(["debits", "incomes", "investments", "purchases", "installments"]);
     },
   });
 }
@@ -2854,100 +2929,6 @@ export function useDeleteOverScope() {
 
 
 
-
-// =======================
-// Importer (cards live inside an account, so card already carries account)
-// =======================
-export type ImportedRow = {
-  description: string;
-  purchaseDate: string;
-  totalAmount: number;
-  installmentsCount: number;
-  cardId: string;
-  installmentNumber?: number;
-  installmentAmount?: number;
-  installmentDueDate?: string;
-  paid?: boolean;
-};
-
-export function useImportPurchases() {
-  const { user } = useAuth();
-  const inv = useInvalidate();
-  return useMutation({
-    mutationFn: async (rows: ImportedRow[]) => {
-      // Cache de cartões para evitar fetch repetido
-      const cardCache = new Map<string, { closing_day: number; due_day: number }>();
-      const getCard = async (cardId: string) => {
-        if (cardCache.has(cardId)) return cardCache.get(cardId)!;
-        const { data } = await supabase
-          .from("cards")
-          .select("closing_day,due_day")
-          .eq("id", cardId)
-          .single();
-        const c = {
-          closing_day: (data as { closing_day?: number } | null)?.closing_day ?? 25,
-          due_day: (data as { due_day?: number } | null)?.due_day ?? 5,
-        };
-        cardCache.set(cardId, c);
-        return c;
-      };
-
-      // Cada linha = 1 compra completa (modo linha-âncora)
-      for (const r of rows) {
-        const { data: pIns, error: e1 } = await supabase
-          .from("purchases")
-          .insert({
-            user_id: user!.id,
-            card_id: r.cardId,
-            description: r.description,
-            total_amount: r.totalAmount,
-            purchase_date: r.purchaseDate,
-            installments_count: r.installmentsCount,
-          })
-          .select("id")
-          .single();
-        if (e1) throw e1;
-        const purchaseId = (pIns as { id: string }).id;
-
-        if (r.installmentNumber && r.installmentsCount > 1) {
-          // Modo âncora: usa data_vencimento (preferida) ou data_compra
-          const anchorDate = r.installmentDueDate ?? r.purchaseDate;
-          const inst = buildInstallmentsAnchored(
-            purchaseId,
-            user!.id,
-            r.totalAmount,
-            r.installmentsCount,
-            r.installmentNumber,
-            anchorDate,
-          );
-          // Se o status do CSV indica "pago", aplica à parcela âncora
-          if (r.paid) {
-            const a = inst.find((x) => x.number === r.installmentNumber);
-            if (a) a.paid = true;
-          }
-          const { error: e2 } = await supabase.from("installments").insert(inst);
-          if (e2) throw e2;
-        } else {
-          // Sem numero_parcela ou compra à vista: usa cálculo clássico do cartão
-          const { closing_day, due_day } = await getCard(r.cardId);
-          const inst = buildInstallmentsForPurchase(
-            purchaseId,
-            user!.id,
-            r.totalAmount,
-            r.installmentsCount,
-            r.purchaseDate,
-            closing_day,
-            due_day,
-          );
-          if (r.paid) inst.forEach((i) => (i.paid = true));
-          const { error: e2 } = await supabase.from("installments").insert(inst);
-          if (e2) throw e2;
-        }
-      }
-    },
-    onSuccess: () => inv(["purchases", "installments", "card_payments"]),
-  });
-}
 
 // =======================
 // Purge — apaga TODAS as movimentações (mantém contas e cartões)
@@ -4068,12 +4049,23 @@ export function useUpdateDebit() {
       amount?: number;
       date?: string;
       paid?: boolean;
+      notifyDaysBefore?: number | null;
     }) => {
-      const patch: { description?: string; amount?: number; date?: string; paid?: boolean } = {};
+      const patch: {
+        description?: string;
+        amount?: number;
+        date?: string;
+        paid?: boolean;
+        notify_days_before?: number | null;
+        due_notified_at?: null;
+      } = {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.date !== undefined) patch.date = args.date;
       if (args.paid !== undefined) patch.paid = args.paid;
+      if (args.notifyDaysBefore !== undefined) patch.notify_days_before = args.notifyDaysBefore;
+      // Muda a data ou a antecedência → reabre a janela de notificação.
+      if (args.date !== undefined || args.notifyDaysBefore !== undefined) patch.due_notified_at = null;
       const { error } = await supabase.from("debits").update(patch).eq("id", args.id);
       if (error) throw error;
     },
@@ -4090,6 +4082,7 @@ export function useUpdateDebit() {
                 amount: args.amount ?? d.amount,
                 date: args.date ?? d.date,
                 paid: args.paid ?? d.paid,
+                notifyDaysBefore: args.notifyDaysBefore !== undefined ? args.notifyDaysBefore : d.notifyDaysBefore,
               }
               : d,
           )
@@ -4658,12 +4651,16 @@ export function useUpdateRecurringSeries() {
       groupId: string;
       anchorDate: string;
       scope: "one" | "forward" | "all";
-      patch: { description?: string; amount?: number; date?: string };
+      patch: { description?: string; amount?: number; date?: string; notifyDaysBefore?: number | null };
     }) => {
       const table = args.kind === "debit" ? "debits" : "incomes";
       const baseUpdate: any = {};
       if (args.patch.description !== undefined) baseUpdate.description = args.patch.description;
       if (args.patch.amount !== undefined) baseUpdate.amount = args.patch.amount;
+      if (args.kind === "debit" && args.patch.notifyDaysBefore !== undefined) {
+        baseUpdate.notify_days_before = args.patch.notifyDaysBefore;
+        baseUpdate.due_notified_at = null;
+      }
 
       if (args.scope === "one") {
         const update: any = { ...baseUpdate };
@@ -4817,33 +4814,63 @@ export function useUpdateRecurringPurchaseSeries() {
   });
 }
 
-export function useDeleteRecurringPurchaseSeries() {
+/**
+ * Antecipa o pagamento de uma série recorrente (débito/recebível/compra):
+ * marca a ocorrência âncora e as próximas `count` ocorrências futuras (mesmo
+ * `recurrence_group_id`, data > âncora) como pagas/recebidas — SEM mover suas
+ * datas, já que cada ocorrência recorrente é um lançamento independente com
+ * seu próprio mês (diferente de uma parcela de cartão, que é "comprimida"
+ * para o mês atual). Espelha `useAdvanceInstallments`, mas para recorrência.
+ */
+export function useAdvanceRecurring() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
+      kind: "debit" | "income" | "purchase";
       id: string;
       groupId: string;
       anchorDate: string;
-      scope: "one" | "forward" | "all";
+      count: number;
     }) => {
-      if (args.scope === "one") {
-        await supabase.from("installments").delete().eq("parent_id", args.id).eq("parent_type", "purchase");
-        const { error } = await supabase.from("purchases").delete().eq("id", args.id);
+      const count = Math.max(0, Math.floor(args.count));
+
+      if (args.kind === "purchase") {
+        const { data: rows, error } = await supabase
+          .from("purchases")
+          .select("id")
+          .eq("recurrence_group_id", args.groupId)
+          .gt("purchase_date", args.anchorDate)
+          .order("purchase_date", { ascending: true })
+          .limit(count);
         if (error) throw error;
-        return;
+        const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+        const { error: eInst } = await supabase
+          .from("installments")
+          .update({ paid: true })
+          .in("parent_id", [...ids, args.id])
+          .eq("parent_type", "purchase");
+        if (eInst) throw eInst;
+        return ids.length;
       }
-      let q = supabase.from("purchases").select("id").eq("recurrence_group_id", args.groupId);
-      if (args.scope === "forward") q = q.gte("purchase_date", args.anchorDate);
-      const { data, error: sErr } = await q;
-      if (sErr) throw sErr;
-      const ids = (data ?? []).map((r: { id: string }) => r.id);
-      if (ids.length) {
-        await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "purchase");
-        const { error } = await supabase.from("purchases").delete().in("id", ids);
-        if (error) throw error;
-      }
+
+      const table = args.kind === "debit" ? "debits" : "incomes";
+      const paidField = args.kind === "debit" ? "paid" : "received";
+      const { data: rows, error } = await supabase
+        .from(table)
+        .select("id")
+        .eq("recurrence_group_id", args.groupId)
+        .gt("date", args.anchorDate)
+        .order("date", { ascending: true })
+        .limit(count);
+      if (error) throw error;
+      const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+      const { error: eUpd } = await (supabase.from(table) as any)
+        .update({ [paidField]: true })
+        .in("id", [...ids, args.id]);
+      if (eUpd) throw eUpd;
+      return ids.length;
     },
-    onSettled: () => inv(["purchases", "installments", "card_payments"]),
+    onSettled: () => inv(["debits", "incomes", "purchases", "installments", "card_payments"]),
   });
 }
 
@@ -4980,6 +5007,8 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               row.paid = false;
               row.auto_debit = t.auto_debit ?? false;
               row.auto_debit_day = t.auto_debit_day ?? null;
+              row.notify_days_before = t.notify_days_before ?? null;
+              row.due_notified_at = null;
             } else {
               row.received = false;
             }

@@ -1924,3 +1924,74 @@ CREATE POLICY "Users can delete their own amount adjustments"
 -- `has_role` e usada dentro das policies de RLS de user_roles/whitelist.
 GRANT EXECUTE ON FUNCTION public.is_email_whitelisted(text) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, anon;
+
+
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260728000000_due_debit_notifications.sql
+-- ──────────────────────────────────────────────────────────
+-- Notificacoes push de debitos a vencer. Cada debito pode ter sua propria
+-- antecedencia de aviso (em dias), definida pelo usuario ao criar/editar o
+-- lancamento. NULL = sem notificacao para esse item. `due_notified_at` evita
+-- reenviar a mesma notificacao todo dia enquanto o debito continuar nao pago
+-- dentro da janela.
+ALTER TABLE public.debits
+  ADD COLUMN IF NOT EXISTS notify_days_before integer,
+  ADD COLUMN IF NOT EXISTS due_notified_at timestamptz;
+
+COMMENT ON COLUMN public.debits.notify_days_before IS
+  'Quantos dias antes do vencimento (date) o app deve enviar push notification. NULL = desativado para este lancamento.';
+COMMENT ON COLUMN public.debits.due_notified_at IS
+  'Timestamp da ultima push notification de vencimento enviada para este debito. Usado para nao notificar 2x.';
+
+-- Extensoes necessarias para o cron chamar o endpoint HTTP do app. Em alguns
+-- planos/projetos Supabase, pg_cron so pode ser habilitado pelo Dashboard
+-- (Database > Extensions) -- se o CREATE EXTENSION abaixo falhar com
+-- "permission denied", habilite por la e rode soh a parte do cron.schedule.
+CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+
+-- Passo manual (fora deste arquivo): configurar URL do app e segredo do cron
+-- via ALTER DATABASE, e o mesmo segredo em CRON_SECRET nas env vars do
+-- deploy. Ver comentario completo em
+-- supabase/migrations/20260728000000_due_debit_notifications.sql.
+SELECT cron.unschedule('notify-due-debits-daily')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'notify-due-debits-daily');
+
+SELECT cron.schedule(
+  'notify-due-debits-daily',
+  '0 12 * * *',
+  $$
+  SELECT net.http_post(
+    url := current_setting('app.settings.cron_url', true),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', current_setting('app.settings.cron_secret', true)
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+
+
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260728010000_backfill_orphan_recurring_debits.sql
+-- ──────────────────────────────────────────────────────────
+-- Corrige débitos "recorrentes órfãos": required = true (tag "REC" na
+-- lista) mas sem recurrence_group_id. Agrupa por (user_id, account_id,
+-- description) e atribui um group id novo compartilhado. Em um projeto
+-- recém-provisionado (sem dados) isso é um no-op.
+WITH orphan_groups AS (
+  SELECT DISTINCT user_id, account_id, description, gen_random_uuid() AS new_gid
+  FROM public.debits
+  WHERE required = true AND recurrence_group_id IS NULL
+)
+UPDATE public.debits d
+SET recurrence_group_id = og.new_gid
+FROM orphan_groups og
+WHERE d.required = true
+  AND d.recurrence_group_id IS NULL
+  AND d.user_id = og.user_id
+  AND d.account_id = og.account_id
+  AND d.description = og.description;

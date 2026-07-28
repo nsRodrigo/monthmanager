@@ -228,9 +228,11 @@ export type Database = {
           created_at: string
           date: string
           description: string
+          due_notified_at: string | null
           id: string
           installments_count: number
           is_parent: boolean
+          notify_days_before: number | null
           paid: boolean
           recurrence_group_id: string | null
           reference_month: number | null
@@ -246,9 +248,11 @@ export type Database = {
           created_at?: string
           date: string
           description: string
+          due_notified_at?: string | null
           id?: string
           installments_count?: number
           is_parent?: boolean
+          notify_days_before?: number | null
           paid?: boolean
           recurrence_group_id?: string | null
           reference_month?: number | null
@@ -264,9 +268,11 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string
+          due_notified_at?: string | null
           id?: string
           installments_count?: number
           is_parent?: boolean
+          notify_days_before?: number | null
           paid?: boolean
           recurrence_group_id?: string | null
           reference_month?: number | null

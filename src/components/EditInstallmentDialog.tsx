@@ -6,6 +6,7 @@ import {
   useUpdateInstallmentDateScope,
   useUpdateInstallmentAmountScope,
   useAdvanceInstallments,
+  usePostponeInstallment,
   useUpdateDebit,
   useUpdateIncome,
   useUpdateInvestment,
@@ -34,13 +35,13 @@ import {
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
 import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
-import { Trash2, Copy, FastForward, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
+import { Trash2, Copy, FastForward, Rewind, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 
 
 export type SingleEditTarget =
-  | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean; notifyDaysBefore?: number | null }
   | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
   | { kind: "investment"; id: string; accountId: string; description: string; amount: number; date: string };
 
@@ -75,6 +76,7 @@ export function EditInstallmentDialog({
   const updateDateScope = useUpdateInstallmentDateScope();
   const updateAmountScope = useUpdateInstallmentAmountScope();
   const advance = useAdvanceInstallments();
+  const postpone = usePostponeInstallment();
   const updateDebit = useUpdateDebit();
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
@@ -150,6 +152,8 @@ export function EditInstallmentDialog({
   const [convInstallments, setConvInstallments] = useState("2");
   const [convInstNumber, setConvInstNumber] = useState("1");
   const [convMode, setConvMode] = useState<"total" | "perInstallment">("total");
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -171,6 +175,9 @@ export function EditInstallmentDialog({
       setConvInstallments("2");
       setConvInstNumber("1");
       setConvMode("total");
+      const singleNotify = single.kind === "debit" ? single.notifyDaysBefore ?? null : null;
+      setNotifyEnabled(singleNotify != null);
+      setNotifyDaysBefore(singleNotify != null ? String(singleNotify) : "");
     }
     setAskDateScope(false);
     setAdvanceCount("");
@@ -247,6 +254,7 @@ export function EditInstallmentDialog({
           amount,
           date: dueDate,
           paid,
+          notifyDaysBefore: notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
         });
       } else if (single.kind === "income") {
         await updateIncome.mutateAsync({
@@ -298,6 +306,37 @@ export function EditInstallmentDialog({
               />
             </Field>
           </div>
+
+          {single.kind === "debit" && singleType === "cash" && (
+            <div className="rounded-lg border border-border bg-background/50 p-3">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={notifyEnabled}
+                  onChange={(e) => {
+                    setNotifyEnabled(e.target.checked);
+                    if (e.target.checked && !notifyDaysBefore) setNotifyDaysBefore("1");
+                  }}
+                  className="h-4 w-4 accent-primary"
+                />
+                <span className="text-sm font-medium">Notificar antes do vencimento</span>
+              </label>
+              {notifyEnabled && (
+                <div className="mt-3">
+                  <Field label="Quantos dias antes?">
+                    <input
+                      type="number"
+                      min={0}
+                      max={30}
+                      className={inputClass}
+                      value={notifyDaysBefore}
+                      onChange={(e) => setNotifyDaysBefore(e.target.value)}
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
+          )}
 
           {canConvert && (
             <>
@@ -371,7 +410,7 @@ export function EditInstallmentDialog({
                   type="checkbox"
                   checked={singleType === "recurring"}
                   onChange={(e) => setSingleType(e.target.checked ? "recurring" : "cash")}
-                  className="mt-0.5 h-4 w-4 accent-primary"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                 />
                 <span className="text-sm">
                   <span className="font-medium">Recorrente</span>
@@ -780,6 +819,29 @@ export function EditInstallmentDialog({
                 <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
               </button>
             )}
+            <button
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Postergar parcela",
+                  description: `A parcela ${inst.number}/${inst.total} vai se juntar à parcela seguinte no mesmo mês. As demais parcelas não mudam.`,
+                  confirmLabel: "Postergar",
+                });
+                if (!ok) return;
+                await postpone.mutateAsync({ installment: inst });
+                setManageView("none");
+                onClose();
+              }}
+              disabled={postpone.isPending}
+              className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
+            >
+              <Rewind className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold">Postergar parcela</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Empurra esta parcela para o mês seguinte, juntando com a próxima.
+                </p>
+              </div>
+            </button>
             <button
               onClick={() => setManageView("change")}
               className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"

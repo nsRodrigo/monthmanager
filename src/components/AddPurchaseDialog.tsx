@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { Plus } from "lucide-react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useCards, useAddPurchase, useDescriptionSuggestions } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
@@ -40,25 +41,30 @@ export function AddPurchaseDialog({
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [markPaid, setMarkPaid] = useState(false);
 
+  const resetFields = (preserveCard = false) => {
+    const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
+    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    if (!preserveCard) setCardId(fixedCardId ?? selectableCards[0]?.id ?? "");
+    setDescription("");
+    setAmount(0);
+    setInstallments("2");
+    setInstallmentNumber("1");
+    setIsInstallment(false);
+    setIsRecurring(false);
+    setRecurrenceMonths("24");
+    setMode("total");
+    setMarkPaid(false);
+  };
+
   useEffect(() => {
-    if (open) {
-      const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
-      setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-      setCardId(fixedCardId ?? selectableCards[0]?.id ?? "");
-      setDescription("");
-      setAmount(0);
-      setInstallments("2");
-      setInstallmentNumber("1");
-      setIsInstallment(false);
-      setIsRecurring(false);
-      setRecurrenceMonths("24");
-      setMode("total");
-      setMarkPaid(false);
-    }
+    if (open) resetFields();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
-  const submit = async () => {
-    if (!description.trim() || amount === 0 || !cardId) return;
+  const isValid = description.trim() !== "" && amount !== 0 && !!cardId;
+
+  const submit = async (addAnother = false) => {
+    if (!isValid) return;
     // When adding inside a specific invoice month (fixedCardId), pin the
     // installment to that month while keeping the user-entered purchase date.
     const invoiceAnchorDate = fixedCardId
@@ -78,7 +84,8 @@ export function AddPurchaseDialog({
         recurring: true,
         recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
       });
-      onClose();
+      if (addAnother) resetFields(true);
+      else onClose();
       return;
     }
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
@@ -95,7 +102,8 @@ export function AddPurchaseDialog({
       paidNow: markPaid && !isInstallment && !isRecurring,
       markCurrentPaid: markPaid && isInstallment,
     });
-    onClose();
+    if (addAnother) resetFields(true);
+    else onClose();
   };
 
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
@@ -106,6 +114,15 @@ export function AddPurchaseDialog({
   return (
     <Modal open={open} onClose={onClose} title={fixedCardId ? "Adicionar à fatura" : "Nova compra no cartão"}>
       <div className="space-y-4">
+        {!fixedCardId && (
+          <Field label="Cartão">
+            <select className={inputClass} value={cardId} onChange={(e) => setCardId(e.target.value)}>
+              {selectableCards.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Descrição">
           <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Tênis novo" />
         </Field>
@@ -117,15 +134,6 @@ export function AddPurchaseDialog({
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
-        {!fixedCardId && (
-          <Field label="Cartão">
-            <select className={inputClass} value={cardId} onChange={(e) => setCardId(e.target.value)}>
-              {selectableCards.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </Field>
-        )}
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input
@@ -179,7 +187,7 @@ export function AddPurchaseDialog({
                 setMarkPaid(false);
               }
             }}
-            className="mt-0.5 h-4 w-4 accent-primary"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Compra recorrente</span>
@@ -223,11 +231,21 @@ export function AddPurchaseDialog({
             Cancelar
           </button>
           <button
-            onClick={submit}
-            disabled={addPurchase.isPending}
+            onClick={() => submit(false)}
+            disabled={addPurchase.isPending || !isValid}
             className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {addPurchase.isPending ? "Salvando…" : "Adicionar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={addPurchase.isPending || !isValid}
+            title="Salvar e adicionar outra compra"
+            aria-label="Salvar e adicionar outra compra"
+            className="inline-flex items-center justify-center rounded-lg bg-orange-700 px-3 py-2.5 text-white hover:bg-orange-800 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useAddIncome, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
@@ -35,25 +36,30 @@ export function AddIncomeDialog({
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [markReceived, setMarkReceived] = useState(false);
 
+  const resetFields = () => {
+    const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
+    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
+    setDescription("");
+    setAmount(0);
+    setIsInstallment(false);
+    setIsRecurring(false);
+    setRecurrenceMonths("24");
+    setInstallments("2");
+    setInstallmentNumber("1");
+    setMode("total");
+    setMarkReceived(false);
+  };
+
   useEffect(() => {
-    if (open) {
-      const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
-      setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-      setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
-      setDescription("");
-      setAmount(0);
-      setIsInstallment(false);
-      setIsRecurring(false);
-      setRecurrenceMonths("24");
-      setInstallments("2");
-      setInstallmentNumber("1");
-      setMode("total");
-      setMarkReceived(false);
-    }
+    if (open) resetFields();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
-  const submit = async () => {
-    if (!description.trim() || amount === 0 || !accountId) return;
+  const isValid = description.trim() !== "" && amount !== 0 && !!accountId;
+
+  const submit = async (addAnother = false) => {
+    if (!isValid) return;
     if (isRecurring && !isInstallment) {
       await addIncome.mutateAsync({
         accountId,
@@ -65,7 +71,8 @@ export function AddIncomeDialog({
         referenceMonth: defaultMonth,
         recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
       });
-      onClose();
+      if (addAnother) resetFields();
+      else onClose();
       return;
     }
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
@@ -84,7 +91,8 @@ export function AddIncomeDialog({
       receivedNow: markReceived && !isInstallment && !isRecurring,
       markCurrentPaid: markReceived && isInstallment,
     });
-    onClose();
+    if (addAnother) resetFields();
+    else onClose();
   };
 
   const value = amount || 0;
@@ -165,7 +173,7 @@ export function AddIncomeDialog({
                 setMarkReceived(false);
               }
             }}
-            className="mt-0.5 h-4 w-4 accent-primary"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Recebível recorrente</span>
@@ -206,8 +214,18 @@ export function AddIncomeDialog({
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>
-          <button onClick={submit} disabled={addIncome.isPending || !accountId} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+          <button onClick={() => submit(false)} disabled={addIncome.isPending || !isValid} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             {addIncome.isPending ? "Salvando…" : "Adicionar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={addIncome.isPending || !isValid}
+            title="Salvar e adicionar outro recebimento"
+            aria-label="Salvar e adicionar outro recebimento"
+            className="inline-flex items-center justify-center rounded-lg bg-orange-700 px-3 py-2.5 text-white hover:bg-orange-800 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>

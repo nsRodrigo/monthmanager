@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Plus } from "lucide-react";
 import { Modal, Field, inputClass } from "./Modal";
 import { useAddDebit, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
@@ -36,28 +37,37 @@ export function AddDebitDialog({
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [markPaid, setMarkPaid] = useState(false);
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
+
+  const resetFields = () => {
+    const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
+    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
+    setDescription("");
+    setAmount(0);
+    setRequired(false);
+    setRecurrenceMonths("24");
+    setAutoDebit(false);
+    setAutoDebitDay("");
+    setIsInstallment(false);
+    setInstallments("2");
+    setInstallmentNumber("1");
+    setMode("total");
+    setMarkPaid(false);
+    setNotifyEnabled(false);
+    setNotifyDaysBefore("");
+  };
 
   useEffect(() => {
-    if (open) {
-      const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
-      setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-      setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
-      setDescription("");
-      setAmount(0);
-      setRequired(false);
-      setRecurrenceMonths("24");
-      setAutoDebit(false);
-      setAutoDebitDay("");
-      setIsInstallment(false);
-      setInstallments("2");
-      setInstallmentNumber("1");
-      setMode("total");
-      setMarkPaid(false);
-    }
+    if (open) resetFields();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
-  const submit = async () => {
-    if (!description.trim() || amount === 0 || !accountId) return;
+  const isValid = description.trim() !== "" && amount !== 0 && !!accountId;
+
+  const submit = async (addAnother = false) => {
+    if (!isValid) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = amount;
@@ -77,8 +87,11 @@ export function AddDebitDialog({
       recurrenceMonths: required && !isInstallment ? Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)) : undefined,
       paidNow: markPaid && !isInstallment && !required,
       markCurrentPaid: markPaid && isInstallment,
+      notifyDaysBefore:
+        !isInstallment && notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
     });
-    onClose();
+    if (addAnother) resetFields();
+    else onClose();
   };
 
   const value = amount || 0;
@@ -101,6 +114,37 @@ export function AddDebitDialog({
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
+
+        {!isInstallment && (
+          <div className="rounded-lg border border-border bg-background/50 p-3">
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={notifyEnabled}
+                onChange={(e) => {
+                  setNotifyEnabled(e.target.checked);
+                  if (e.target.checked && !notifyDaysBefore) setNotifyDaysBefore("1");
+                }}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="text-sm font-medium">Notificar antes do vencimento</span>
+            </label>
+            {notifyEnabled && (
+              <div className="mt-3">
+                <Field label="Quantos dias antes?">
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    className={inputClass}
+                    value={notifyDaysBefore}
+                    onChange={(e) => setNotifyDaysBefore(e.target.value)}
+                  />
+                </Field>
+              </div>
+            )}
+          </div>
+        )}
 
         <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
           <input
@@ -158,7 +202,7 @@ export function AddDebitDialog({
                 setMarkPaid(false);
               }
             }}
-            className="mt-0.5 h-4 w-4 accent-primary"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
           />
           <span className="text-sm">
             <span className="font-medium">Débito recorrente</span>
@@ -209,8 +253,18 @@ export function AddDebitDialog({
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>
-          <button onClick={submit} disabled={addDebit.isPending || !accountId} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+          <button onClick={() => submit(false)} disabled={addDebit.isPending || !isValid} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             {addDebit.isPending ? "Salvando…" : "Adicionar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={addDebit.isPending || !isValid}
+            title="Salvar e adicionar outro débito"
+            aria-label="Salvar e adicionar outro débito"
+            className="inline-flex items-center justify-center rounded-lg bg-orange-700 px-3 py-2.5 text-white hover:bg-orange-800 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>

@@ -4585,6 +4585,55 @@ export function getEffectiveCurrentMonth(today: Date = new Date()): {
  * "saldo atual" = initialBalance + sum(rec - deb - fat - inv) for each past
  * month (ignoring paid status).
  */
+function balanceAtCutoff(
+  monthly: Map<string, MonthlyBalance>,
+  initialBalance: number,
+  cutoffYear: number,
+  cutoffMonth: number,
+): number {
+  let result = initialBalance;
+  const keys = Array.from(monthly.keys()).sort((a, b) => {
+    const [ay, am] = a.split("-").map(Number);
+    const [by, bm] = b.split("-").map(Number);
+    return ay !== by ? ay - by : am - bm;
+  });
+  for (const k of keys) {
+    const [y, m] = k.split("-").map(Number);
+    if (y > cutoffYear || (y === cutoffYear && m > cutoffMonth)) break;
+    result = monthly.get(k)!.saldoEmConta;
+  }
+  return result;
+}
+
+/**
+ * Balance at the end of an arbitrary (year, month), using the same
+ * cumulative running balance as computeAccountBalanceUntilNow. Useful for
+ * plotting a historical trend (e.g. the last N months) with a single
+ * consistent definition of "saldo ao fim do mês".
+ */
+export function computeAccountBalanceAtMonth(
+  account: Account,
+  cards: Card[],
+  purchases: Purchase[],
+  installments: Installment[],
+  debits: Debit[],
+  incomes: Income[],
+  investments: Investment[],
+  year: number,
+  month: number,
+): number {
+  const monthly = computeMonthlyAccountBalance(
+    account,
+    cards,
+    purchases,
+    installments,
+    debits,
+    incomes,
+    investments,
+  );
+  return balanceAtCutoff(monthly, account.initialBalance, year, month);
+}
+
 export function computeAccountBalanceUntilNow(
   account: Account,
   cards: Card[],
@@ -4596,7 +4645,7 @@ export function computeAccountBalanceUntilNow(
   today: Date = new Date(),
 ): number {
   const eff = getEffectiveCurrentMonth(today);
-  const monthly = computeMonthlyAccountBalance(
+  return computeAccountBalanceAtMonth(
     account,
     cards,
     purchases,
@@ -4604,20 +4653,9 @@ export function computeAccountBalanceUntilNow(
     debits,
     incomes,
     investments,
+    eff.year,
+    eff.month,
   );
-  // Find the latest key <= effective current month
-  let result = account.initialBalance;
-  const keys = Array.from(monthly.keys()).sort((a, b) => {
-    const [ay, am] = a.split("-").map(Number);
-    const [by, bm] = b.split("-").map(Number);
-    return ay !== by ? ay - by : am - bm;
-  });
-  for (const k of keys) {
-    const [y, m] = k.split("-").map(Number);
-    if (y > eff.year || (y === eff.year && m > eff.month)) break;
-    result = monthly.get(k)!.saldoEmConta;
-  }
-  return result;
 }
 
 /** Normalize -0 to 0 and clamp tiny float noise so no "-R$ 0,00" leaks out. */

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   useAccounts,
   useCards,
@@ -9,6 +9,7 @@ import {
   useIncomes,
   useInvestments,
   computeAccountBalanceUntilNow,
+  computeAccountBalanceAtMonth,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
@@ -18,6 +19,7 @@ import {
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
+import { AreaChart, Area, CartesianGrid, ResponsiveContainer } from "recharts";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -86,6 +88,34 @@ function Consolidated() {
   );
   const expected = normalizeZero(accountBalance + totalIncome - totalDebits - totalCredit);
 
+  // Tendência dos últimos 6 meses: saldo real acumulado ao fim de cada mês
+  // passado, terminando no saldo previsto do mês corrente (mesma métrica do
+  // card principal, para o ponto mais recente do gráfico bater com o número
+  // em destaque).
+  const trend = useMemo(() => {
+    const points: number[] = [];
+    for (let i = 5; i >= 1; i--) {
+      const d = new Date(year, month - i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      const value = accounts.reduce(
+        (s, a) =>
+          s + computeAccountBalanceAtMonth(a, cards, purchases, installments, debits, incomes, investments, y, m),
+        0,
+      );
+      points.push(normalizeZero(value));
+    }
+    points.push(expected);
+    return points;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, cards, purchases, installments, debits, incomes, investments, year, month, expected]);
+
+  const prevMonthValue = trend[trend.length - 2];
+  const trendPct =
+    prevMonthValue && Math.abs(prevMonthValue) > 0.005
+      ? ((expected - prevMonthValue) / Math.abs(prevMonthValue)) * 100
+      : null;
+
   if (accounts.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-16 text-center">
@@ -116,7 +146,7 @@ function Consolidated() {
         </p>
       </header>
 
-      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-hero p-4 shadow-elegant sm:p-6">
         <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
         <p
           className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
@@ -125,6 +155,21 @@ function Consolidated() {
         >
           {formatCurrency(expected)}
         </p>
+        {trendPct !== null && (
+          <span
+            className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+              trendPct >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {trendPct >= 0 ? (
+              <ArrowUpRight className="h-3 w-3" />
+            ) : (
+              <ArrowDownRight className="h-3 w-3" />
+            )}
+            {Math.abs(trendPct).toFixed(1)}% vs. mês passado
+          </span>
+        )}
+        <Sparkline points={trend} className="mt-3" />
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
           <Stat
             label="A receber"
@@ -200,8 +245,13 @@ function Consolidated() {
                 key={a.id}
                 to="/contas/$contaId"
                 params={{ contaId: a.id }}
-                className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5"
+                className="group relative flex h-full flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-5 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 sm:pl-6"
               >
+                <span
+                  className="absolute inset-y-0 left-0 w-1"
+                  style={{ backgroundColor: a.color }}
+                  aria-hidden="true"
+                />
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2.5 sm:gap-4">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12"
@@ -229,13 +279,14 @@ function Consolidated() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 lg:grid-cols-4">
-                  <MiniStat label="A receber" value={accIncomesTotal} tone="success" />
-                  <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
-                  <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
+                  <MiniStat label="A receber" value={accIncomesTotal} tone="success" icon={ArrowUpRight} />
+                  <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" icon={ArrowDownRight} />
+                  <MiniStat label="Faturas" value={accCardsTotal} tone="credit" icon={CreditCard} />
                   <MiniStat
                     label="Balanço do mês"
                     value={accMonthBalance}
                     tone={accMonthBalance >= 0 ? "success" : "debit"}
+                    icon={TrendingUp}
                   />
                 </div>
                 {accInvested > 0 && (
@@ -256,20 +307,32 @@ function MiniStat({
   label,
   value,
   tone,
+  icon: Icon,
 }: {
   label: string;
   value: number;
   tone: "success" | "debit" | "credit";
+  icon: typeof Wallet;
 }) {
   const c =
     tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
   return (
     <div className="min-w-0 rounded-lg bg-background/40 px-2 py-1.5">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`flex items-center gap-1 text-[10px] uppercase tracking-wider ${c}`}>
+        <Icon className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{label}</span>
+      </p>
       <p className={`truncate text-xs font-bold ${c}`}>{formatCurrency(value)}</p>
     </div>
   );
 }
+
+const STAT_TONE_STYLES = {
+  success: { text: "text-success", bg: "bg-success/10", border: "border-success/20" },
+  debit: { text: "text-debit", bg: "bg-debit/10", border: "border-debit/20" },
+  credit: { text: "text-credit", bg: "bg-credit/10", border: "border-credit/20" },
+  primary: { text: "text-primary", bg: "bg-primary/10", border: "border-primary/20" },
+  default: { text: "text-foreground", bg: "bg-background/40", border: "border-border" },
+} as const;
 
 function Stat({
   label,
@@ -282,22 +345,49 @@ function Stat({
   icon: typeof Wallet;
   tone?: "default" | "success" | "debit" | "credit" | "primary";
 }) {
-  const c =
-    tone === "success"
-      ? "text-success"
-      : tone === "debit"
-        ? "text-debit"
-        : tone === "credit"
-          ? "text-credit"
-          : tone === "primary"
-            ? "text-primary"
-            : "text-foreground";
+  const s = STAT_TONE_STYLES[tone];
   return (
-    <div className="rounded-xl border border-border bg-background/40 p-3">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+    <div className={`rounded-xl border p-3 ${s.bg} ${s.border}`}>
+      <div className={`flex items-center gap-1.5 text-[11px] ${s.text}`}>
         <Icon className="h-3 w-3" /> {label}
       </div>
-      <p className={`mt-1 text-base font-bold ${c}`}>{value}</p>
+      <p className={`mt-1 text-base font-bold ${s.text}`}>{value}</p>
+    </div>
+  );
+}
+
+/** Sparkline dos últimos 6 meses de saldo, com área preenchida e ponto final em destaque. */
+function Sparkline({ points, className = "" }: { points: number[]; className?: string }) {
+  const data = points.map((value, i) => ({ i, value }));
+  const lastIndex = data.length - 1;
+  return (
+    <div className={`h-11 w-full ${className}`}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 4, right: 3, bottom: 2, left: 3 }}>
+          <defs>
+            <linearGradient id="home-trend-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.5} />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="var(--color-primary)"
+            strokeWidth={2}
+            fill="url(#home-trend-fill)"
+            isAnimationActive={false}
+            dot={({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) =>
+              index === lastIndex ? (
+                <circle key="trend-end" cx={cx} cy={cy} r={3.5} fill="var(--color-primary)" />
+              ) : (
+                <circle key={`trend-${index}`} cx={cx} cy={cy} r={0} />
+              )
+            }
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

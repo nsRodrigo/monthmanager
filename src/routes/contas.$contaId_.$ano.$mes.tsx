@@ -48,6 +48,7 @@ import {
   Plus,
   CreditCard,
   ArrowDownRight,
+  ArrowUpRight,
   TrendingUp,
   Trash2,
   Check,
@@ -1121,13 +1122,14 @@ function AccountMonth() {
                   return (
                     <div
                       key={c.id}
-                      className={`rounded-2xl border bg-card transition-colors ${
+                      className={`rounded-2xl border border-l-4 bg-card transition-colors ${
                         cardState === "paid"
                           ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
                           : cardState === "allChecked"
-                          ? "border-blue-500/50 shadow-[0_4px_18px_-6px_rgba(59,130,246,0.3)]"
+                          ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
                           : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
                       }`}
+                      style={{ borderLeftColor: c.color }}
                     >
                       <CardRowSorted
                         card={c}
@@ -1373,9 +1375,12 @@ function MonthSummaryFrame({
   saldoAtual: number;
   gastosTotais: number;
 }) {
+  const saldoFinal = saldoAtual - gastosTotais;
   return (
     <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
-      <div className="rounded-xl bg-background/40 p-3">
+      <div
+        className={`rounded-xl border p-3 ${saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10"}`}
+      >
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Inicial
         </p>
@@ -1383,16 +1388,18 @@ function MonthSummaryFrame({
           {formatCurrency(saldoAtual)}
         </p>
       </div>
-      <div className="rounded-xl bg-background/40 p-3">
+      <div
+        className={`rounded-xl border p-3 ${saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10"}`}
+      >
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Saldo Final
         </p>
-        <p className={`mt-1 text-base font-bold sm:text-lg ${(saldoAtual - gastosTotais) >= 0 ? "text-foreground" : "text-destructive"}`}>
-          {formatCurrency(saldoAtual - gastosTotais)}
+        <p className={`mt-1 text-base font-bold sm:text-lg ${saldoFinal >= 0 ? "text-foreground" : "text-destructive"}`}>
+          {formatCurrency(saldoFinal)}
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
       </div>
-      <div className="col-span-2 rounded-xl bg-background/40 p-3">
+      <div className="col-span-2 rounded-xl border border-debit/20 bg-debit/10 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Gastos Totais
         </p>
@@ -1420,6 +1427,13 @@ const toneBg: Record<Tone, string> = {
   income: "bg-success/15",
   credit: "bg-credit/15",
   primary: "bg-primary/15",
+};
+/** Leve lavagem de cor para o cabeçalho da seção (mais sutil que toneBg, usado nos chips). */
+const toneWash: Record<Tone, string> = {
+  debit: "bg-debit/[0.06]",
+  income: "bg-success/[0.06]",
+  credit: "bg-credit/[0.06]",
+  primary: "bg-primary/[0.06]",
 };
 
 
@@ -1500,7 +1514,7 @@ function GroupedSection({
     <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
 
       {/* Header */}
-      <div className="flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5">
+      <div className={`flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5 ${toneWash[tone]}`}>
         {/* Linha 1: ícone + título (+ valor/controles no desktop) */}
         <div className="flex items-center gap-2.5 md:gap-3">
           <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
@@ -1839,7 +1853,7 @@ function CardRow({
               cardState === "paid"
                 ? "bg-success/15 text-success hover:bg-success/25"
                 : cardState === "allChecked"
-                ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
+                ? "bg-credit/15 text-credit hover:bg-credit/25"
                 : "bg-warning/15 text-warning hover:bg-warning/25"
             }`}
           >
@@ -2042,7 +2056,7 @@ function SelectCheckbox({
 function PurchaseInstRow({
   inst,
   purchase,
-  cardColor: _cardColor,
+  cardColor,
   onToggle,
   onEdit,
   onRemove,
@@ -2079,7 +2093,15 @@ function PurchaseInstRow({
       className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
       {...lp.handlers}
     >
-      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ backgroundColor: cardColor }}
+          aria-hidden="true"
+        />
+      )}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
@@ -2173,7 +2195,13 @@ function DebitRow({
       className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
       {...lp.handlers}
     >
-      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-debit/15 text-debit">
+          <ArrowDownRight className="h-3.5 w-3.5" />
+        </div>
+      )}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
@@ -2264,7 +2292,13 @@ function IncomeRow({
       className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
       {...lp.handlers}
     >
-      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </div>
+      )}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p
@@ -2359,7 +2393,21 @@ function ParcelledRow({
       className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
       {...lp.handlers}
     >
-      {selectionMode && <SelectCheckbox selected={selected} onClick={onSelectToggle} />}
+      {selectionMode ? (
+        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
+      ) : (
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+            kind === "debit" ? "bg-debit/15 text-debit" : "bg-success/15 text-success"
+          }`}
+        >
+          {kind === "debit" ? (
+            <ArrowDownRight className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          )}
+        </div>
+      )}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <div className="flex flex-wrap items-center gap-1.5">
           <p

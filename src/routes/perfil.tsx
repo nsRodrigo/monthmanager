@@ -1,15 +1,31 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Modal, Field, inputClass } from "./Modal";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, ShieldCheck } from "lucide-react";
-import { PasskeyManager } from "./PasskeyManager";
+import {
+  User,
+  Sun,
+  Moon,
+  Contrast,
+  Check,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  ChevronLeft,
+} from "lucide-react";
+import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 
-export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export const Route = createFileRoute("/perfil")({
+  head: () => ({ meta: [{ title: "Meu perfil — Finanças" }] }),
+  component: ProfilePage,
+});
+
+function ProfilePage() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
@@ -17,8 +33,10 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
   const isAdmin = useIsAdmin();
   const navigate = useNavigate();
 
-
-  const [name, setName] = useState("");
+  const [name, setName] = useState(profile?.displayName ?? "");
+  useEffect(() => {
+    setName(profile?.displayName ?? "");
+  }, [profile?.displayName]);
 
   // Identifica se o usuário tem login por email/senha (e não só OAuth Google)
   const identities = (user?.identities ?? []) as Array<{ provider: string }>;
@@ -33,20 +51,12 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
   const [pwdMsg, setPwdMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [pwdSaving, setPwdSaving] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      setName(profile?.displayName ?? "");
-      setShowPwd(false);
-      setNewPwd("");
-      setConfirmPwd("");
-      setPwdMsg(null);
-    }
-  }, [open, profile]);
+  const goBack = () => navigate({ to: "/" });
 
   const save = () => {
     update.mutate(
       { displayName: name.trim() || null },
-      { onSuccess: () => onClose() },
+      { onSuccess: goBack },
     );
   };
 
@@ -88,8 +98,21 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
   ];
 
   return (
-    <Modal open={open} onClose={onClose} title="Meu perfil">
-      <div className="space-y-5">
+    <div className="mx-auto max-w-2xl px-5 py-8 md:py-12">
+      <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Home
+      </Link>
+      <header className="mb-6 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <User className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Meu perfil</h1>
+          <p className="text-sm text-muted-foreground">Dados pessoais, tema e segurança.</p>
+        </div>
+      </header>
+
+      <div className="space-y-5 pb-20">
         {/* Avatar + email */}
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
@@ -161,19 +184,15 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Administração
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                navigate({ to: "/admin/whitelist" });
-              }}
+            <Link
+              to="/admin/whitelist"
               className="flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 text-left hover:bg-secondary/50"
             >
               <span className="flex items-center gap-2 text-sm font-semibold">
                 <ShieldCheck className="h-4 w-4 text-primary" /> Whitelist e usuários
               </span>
               <span className="text-xs text-muted-foreground">Abrir</span>
-            </button>
+            </Link>
           </div>
         )}
 
@@ -256,9 +275,9 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 border-t border-border pt-4">
           <button
-            onClick={onClose}
+            onClick={goBack}
             className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
           >
             Cancelar
@@ -272,6 +291,6 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

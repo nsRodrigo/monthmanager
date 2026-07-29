@@ -11,7 +11,6 @@ import { AccountFilterProvider } from "@/store/account-filter";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
-import { ProfileDialog } from "@/components/ProfileDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
@@ -182,7 +181,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
   const [manageOpen, setManageOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   const isConsolidated = loc.pathname === "/";
 
@@ -296,8 +294,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="mt-4 border-t border-border pt-4">
-        <button
-          onClick={() => setProfileOpen(true)}
+        <Link
+          to="/perfil"
+          onClick={onNavigate}
           className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-secondary"
           aria-label="Abrir meu perfil"
         >
@@ -317,7 +316,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <p className="truncate text-xs font-semibold">{displayName}</p>
             <p className="truncate text-[10px] text-muted-foreground">{user?.email}</p>
           </div>
-        </button>
+        </Link>
         <button
           onClick={() => signOut()}
           className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -327,7 +326,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
     </>
   );
 }

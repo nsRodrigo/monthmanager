@@ -19,7 +19,7 @@ import {
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
-import { AreaChart, Area, CartesianGrid, ResponsiveContainer } from "recharts";
+import { Sparkline } from "@/components/Sparkline";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -107,7 +107,6 @@ function Consolidated() {
     }
     points.push(expected);
     return points;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts, cards, purchases, installments, debits, incomes, investments, year, month, expected]);
 
   const prevMonthValue = trend[trend.length - 2];
@@ -356,38 +355,3 @@ function Stat({
   );
 }
 
-/** Sparkline dos últimos 6 meses de saldo, com área preenchida e ponto final em destaque. */
-function Sparkline({ points, className = "" }: { points: number[]; className?: string }) {
-  const data = points.map((value, i) => ({ i, value }));
-  const lastIndex = data.length - 1;
-  return (
-    <div className={`h-11 w-full ${className}`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 3, bottom: 2, left: 3 }}>
-          <defs>
-            <linearGradient id="home-trend-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.5} />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke="var(--color-primary)"
-            strokeWidth={2}
-            fill="url(#home-trend-fill)"
-            isAnimationActive={false}
-            dot={({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) =>
-              index === lastIndex ? (
-                <circle key="trend-end" cx={cx} cy={cy} r={3.5} fill="var(--color-primary)" />
-              ) : (
-                <circle key={`trend-${index}`} cx={cx} cy={cy} r={0} />
-              )
-            }
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}

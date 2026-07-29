@@ -9,6 +9,7 @@ import {
   useIncomes,
   useInvestments,
   computeAccountBalanceUntilNow,
+  computeAccountBalanceAtMonth,
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
@@ -20,6 +21,7 @@ import {
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sparkline } from "@/components/Sparkline";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
@@ -27,6 +29,9 @@ import {
   ChevronLeft,
   Plus,
   ArrowLeftRight,
+  ArrowDownRight,
+  CreditCard,
+  TrendingUp,
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
@@ -175,6 +180,24 @@ function AccountHome() {
     return map;
   }, [account, cards, purchases, installments, debits, incomes, investments, yearMonthMap]);
 
+  // Tendência dos últimos 6 meses do saldo desta conta (mesma métrica e
+  // componente usados no Home, aqui restritos a uma única conta).
+  const trend = useMemo(() => {
+    if (!account) return [];
+    const points: number[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(eff.year, eff.month - i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      points.push(
+        normalizeZero(
+          computeAccountBalanceAtMonth(account, cards, purchases, installments, debits, incomes, investments, y, m),
+        ),
+      );
+    }
+    return points;
+  }, [account, cards, purchases, installments, debits, incomes, investments, eff.year, eff.month]);
+
   if (!account) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center">
@@ -311,6 +334,8 @@ function AccountHome() {
           </div>
         </div>
 
+        <Sparkline points={trend} className="mt-3" />
+
         <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
           <button
             type="button"
@@ -423,10 +448,10 @@ function AccountHome() {
                 </p>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 divide-x divide-border border-t border-border/60 pt-3 sm:mt-4">
-                <Mini label="Débitos" value={totalDebits} tone="debit" />
-                <Mini label="Faturas" value={totalFaturas} tone="credit" />
-                <Mini label="Investimentos" value={monthInv} tone="debit" />
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-3 sm:mt-4">
+                <Mini label="Débitos" value={totalDebits} tone="debit" icon={ArrowDownRight} />
+                <Mini label="Faturas" value={totalFaturas} tone="credit" icon={CreditCard} />
+                <Mini label="Invest." value={monthInv} tone="debit" icon={TrendingUp} />
               </div>
             </Link>
             );
@@ -493,12 +518,30 @@ function currentMonthSummary(
 
 
 
-function Mini({ label, value, tone }: { label: string; value: number; tone: "success" | "debit" | "credit" }) {
-  const c = tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
+const MINI_TONE_STYLES = {
+  success: { text: "text-success", bg: "bg-success/10" },
+  debit: { text: "text-debit", bg: "bg-debit/10" },
+  credit: { text: "text-credit", bg: "bg-credit/10" },
+} as const;
+
+function Mini({
+  label,
+  value,
+  tone,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  tone: "success" | "debit" | "credit";
+  icon: typeof Wallet;
+}) {
+  const s = MINI_TONE_STYLES[tone];
   return (
-    <div className="min-w-0 px-2 text-left first:pl-0 last:pr-0 sm:px-3">
-      <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`truncate text-xs font-semibold sm:text-sm ${c}`}>{formatCurrency(value)}</p>
+    <div className={`min-w-0 rounded-lg px-2 py-1.5 text-left ${s.bg}`}>
+      <p className={`flex items-center gap-1 text-[10px] uppercase tracking-wider ${s.text}`}>
+        <Icon className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{label}</span>
+      </p>
+      <p className={`truncate text-xs font-semibold sm:text-sm ${s.text}`}>{formatCurrency(value)}</p>
     </div>
   );
 }

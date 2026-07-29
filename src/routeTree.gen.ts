@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as IrpfRouteImport } from './routes/irpf'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as BackupRouteImport } from './routes/backup'
@@ -23,6 +24,11 @@ import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaI
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IrpfRoute = IrpfRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/irpf': typeof IrpfRoute
+  '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/irpf': typeof IrpfRoute
+  '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/irpf': typeof IrpfRoute
+  '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/irpf'
+    | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/irpf'
+    | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/irpf'
+    | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   BackupRoute: typeof BackupRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   IrpfRoute: typeof IrpfRoute
+  PerfilRoute: typeof PerfilRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
@@ -167,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/irpf': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   BackupRoute: BackupRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
   IrpfRoute: IrpfRoute,
+  PerfilRoute: PerfilRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,
   ContasContaIdRoute: ContasContaIdRoute,

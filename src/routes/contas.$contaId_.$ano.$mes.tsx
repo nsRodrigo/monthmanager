@@ -2103,14 +2103,15 @@ function PurchaseInstRow({
         />
       )}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p
-            className={`truncate text-sm font-semibold ${
-              inst.paid ? "text-muted-foreground" : ""
-            }`}
-          >
-            {purchase.description}
-          </p>
+        <p
+          className={`truncate text-sm font-semibold ${
+            inst.paid ? "text-muted-foreground" : ""
+          }`}
+        >
+          {purchase.description}
+        </p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{formatDate(inst.referenceDate || purchase.date)}</span>
           {isInstallment && (
             <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
               PAR
@@ -2121,12 +2122,6 @@ function PurchaseInstRow({
               REC
             </span>
           )}
-        </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(inst.referenceDate || purchase.date)} ·{" "}
-          {isInstallment
-            ? `${formatCurrency(purchase.totalAmount)} em ${inst.total}x`
-            : `${formatCurrency(purchase.totalAmount)} à vista`}
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -2203,14 +2198,15 @@ function DebitRow({
         </div>
       )}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p
-            className={`truncate text-sm font-semibold ${
-              debit.paid ? "text-muted-foreground" : ""
-            }`}
-          >
-            {debit.description}
-          </p>
+        <p
+          className={`truncate text-sm font-semibold ${
+            debit.paid ? "text-muted-foreground" : ""
+          }`}
+        >
+          {debit.description}
+        </p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{formatDate(debit.date)}</span>
           {debit.required && (
             <span className="rounded-full bg-debit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-debit">
               REC
@@ -2222,9 +2218,6 @@ function DebitRow({
               AUT{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
           )}
-        </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(debit.date)} · {formatCurrency(debit.amount)} à vista
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -2300,22 +2293,20 @@ function IncomeRow({
         </div>
       )}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p
-            className={`truncate text-sm font-semibold ${
-              income.received ? "text-muted-foreground" : ""
-            }`}
-          >
-            {income.description}
-          </p>
+        <p
+          className={`truncate text-sm font-semibold ${
+            income.received ? "text-muted-foreground" : ""
+          }`}
+        >
+          {income.description}
+        </p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{formatDate(income.date)}</span>
           {income.recurrenceGroupId && (
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
               REC
             </span>
           )}
-        </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(income.date)} · {formatCurrency(income.amount)} à vista
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
@@ -2409,14 +2400,15 @@ function ParcelledRow({
         </div>
       )}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p
-            className={`truncate text-sm font-semibold ${
-              installment.paid ? "text-muted-foreground" : ""
-            }`}
-          >
-            {parent.description}
-          </p>
+        <p
+          className={`truncate text-sm font-semibold ${
+            installment.paid ? "text-muted-foreground" : ""
+          }`}
+        >
+          {parent.description}
+        </p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{formatDate(installment.referenceDate || parent.date)}</span>
           <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
             PAR
           </span>
@@ -2426,9 +2418,6 @@ function ParcelledRow({
               AUT
             </span>
           )}
-        </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {formatDate(installment.referenceDate || parent.date)} · {formatCurrency(parent.amount)} em {installment.total}x
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">

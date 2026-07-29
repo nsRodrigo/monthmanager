@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Wallet, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
@@ -87,18 +86,22 @@ function AuthPage() {
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: normalizedEmail && normalizedEmail.includes("@")
-          ? { login_hint: normalizedEmail }
-          : {},
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+          queryParams:
+            normalizedEmail && normalizedEmail.includes("@")
+              ? { login_hint: normalizedEmail }
+              : undefined,
+        },
       });
-      if (result.error) {
-        setError((result.error as Error)?.message ?? "Erro ao entrar com Google");
+      if (err) {
+        setError(err.message ?? "Erro ao entrar com Google");
         setLoading(false);
         return;
       }
-      if (result.redirected) return;
+      // Sucesso: o navegador já foi redirecionado para o Google.
     } catch (err: any) {
       setError(err?.message ?? "Erro ao entrar com Google");
       setLoading(false);

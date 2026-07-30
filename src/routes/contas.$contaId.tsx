@@ -496,6 +496,12 @@ function AccountPane({
           </button>
         </div>
       )}
+      {view.type !== "month" && (
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-muted-foreground">Meses</p>
+          <YearPickerChip compact />
+        </div>
+      )}
       {/* HEADER + DASHBOARD */}
       <header className="relative overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
@@ -557,13 +563,8 @@ function AccountPane({
         </div>
       ) : (
         <>
-      <div className="mt-5 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-muted-foreground">Meses</p>
-        <YearPickerChip compact />
-      </div>
-
       {/* MONTHS LIST — only months that have any value */}
-      <div className="mt-2 space-y-2">
+      <div className="mt-5 space-y-2">
         {monthsForYear.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
             <p className="text-sm text-muted-foreground">

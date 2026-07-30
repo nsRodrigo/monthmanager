@@ -30,6 +30,7 @@ import {
   useDeleteParcelledByScope,
   useCompactInstallmentNumbering,
   useDeleteRecurringByScope,
+  useDeleteOverScope,
   useReorderCards,
   resolveScopeMonths,
   type CardScope,
@@ -188,6 +189,7 @@ export function MonthDetailPane({
   const deleteParcelledScoped = useDeleteParcelledByScope();
   const compactInstallments = useCompactInstallmentNumbering();
   const deleteRecurringScoped = useDeleteRecurringByScope();
+  const deleteOverScope = useDeleteOverScope();
 
   // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
   const [scopeDelete, setScopeDelete] = useState<{
@@ -238,19 +240,35 @@ export function MonthDetailPane({
 
   /** Abre o "Aplicar em" para uma série recorrente (débito/recebimento). */
   const askDeleteRecurring = (
-    kind: "debit" | "income",
+    kind: "debit" | "income" | "purchase",
     groupId: string,
     label: string,
+    cardId?: string,
   ) => {
     setScopeDelete({
-      title: kind === "debit" ? "Excluir débito recorrente" : "Excluir recebimento recorrente",
+      title:
+        kind === "debit"
+          ? "Excluir débito recorrente"
+          : kind === "income"
+            ? "Excluir recebimento recorrente"
+            : "Excluir compra recorrente",
       description: (
         <>
           Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>.
         </>
       ),
-      execute: (scope) =>
-        deleteRecurringScoped.mutateAsync({ kind, groupId, scope }),
+      execute: async (scope) => {
+        if (kind === "purchase") {
+          await deleteOverScope.mutateAsync({
+            source: { kind: "purchase", cardId: cardId!, description: label, amount: 0, groupId },
+            scope,
+            anchorYear: year,
+            anchorMonth: month,
+          });
+          return;
+        }
+        await deleteRecurringScoped.mutateAsync({ kind, groupId, scope });
+      },
     });
   };
 
@@ -355,9 +373,15 @@ export function MonthDetailPane({
    */
   const askDeletePurchase = async (pur: {
     id: string;
+    cardId: string;
     description: string;
     installmentsCount: number;
+    recurrenceGroupId?: string | null;
   }) => {
+    if (pur.recurrenceGroupId) {
+      askDeleteRecurring("purchase", pur.recurrenceGroupId, pur.description, pur.cardId);
+      return;
+    }
     if (pur.installmentsCount > 1) {
       askDeleteParcelled(pur.id, "purchase", pur.description);
       return;

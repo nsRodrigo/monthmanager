@@ -511,54 +511,51 @@ function AccountPane({
           <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
             Meses de {year}
           </h1>
+          {/* HEADER + DASHBOARD — só na lista de meses; a tela de lançamentos
+              (um mês específico) não repete o card da conta, já visto aqui. */}
+          <header className="relative animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: account.color + "30", color: account.color }}
+              >
+                <Wallet className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {account.type}
+                </p>
+                <h2 className="break-words text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
+                  {account.name}
+                </h2>
+              </div>
+              <div className="text-right">
+                <p
+                  className={`whitespace-nowrap text-sm font-bold sm:text-base ${
+                    balance >= 0 ? "text-foreground" : "text-destructive"
+                  }`}
+                >
+                  {formatCurrency(balance)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">saldo atual</p>
+              </div>
+            </div>
+
+            <Sparkline points={trend} className="mt-3" />
+
+            <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
+              <button
+                type="button"
+                onClick={() => setOpenReorganize(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Reorganizar dados
+              </button>
+            </div>
+          </header>
         </>
       )}
-      {/* HEADER + DASHBOARD */}
-      <header className="relative animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
-          <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: account.color + "30", color: account.color }}
-          >
-            <Wallet className="h-6 w-6" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {account.type}
-            </p>
-            <h1 className="break-words text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
-              {account.name}
-            </h1>
-          </div>
-          <div className="text-right">
-            <p
-              className={`whitespace-nowrap text-sm font-bold sm:text-base ${
-                balance >= 0 ? "text-foreground" : "text-destructive"
-              }`}
-            >
-              {formatCurrency(balance)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">saldo atual</p>
-          </div>
-        </div>
-
-        <Sparkline points={trend} className="mt-3" />
-
-        <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
-          <button
-            type="button"
-            onClick={() => setOpenReorganize(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            Reorganizar dados
-          </button>
-        </div>
-
-      </header>
-
-
-
 
       <div key={view.type === "month" ? `${view.year}-${view.month}` : "months"} className="animate-fade-slide-in">
       {view.type === "month" ? (

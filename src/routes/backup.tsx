@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
   BACKUP_TABLES,
   TABLE_LABELS,
@@ -17,16 +18,26 @@ import {
   readBackupFile,
   restoreBackup,
 } from "@/lib/backup";
+import {
+  connectGoogleDrive,
+  disconnectGoogleDrive,
+  getGoogleDriveStatus,
+  uploadBackupToGoogleDrive,
+} from "@/lib/google-drive.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/store/confirm";
 import {
+  Check,
   ChevronLeft,
   Cloud,
   Download,
   HardDriveDownload,
   History,
+  Link2,
   Loader2,
   RefreshCw,
   Trash2,
+  Unlink,
   Upload,
 } from "lucide-react";
 
@@ -279,6 +290,8 @@ function BackupPage() {
         </p>
       </section>
 
+      <GoogleDriveSection />
+
       <section className="rounded-xl border border-border bg-card/40 p-4">
         <div className="mb-3 flex items-center gap-2">
           <RefreshCw className="h-4 w-4 text-primary" />
@@ -395,6 +408,191 @@ function BackupPage() {
       )}
       </div>
     </div>
+  );
+}
+
+const GDRIVE_REDIRECT_FLAG = "gdrive_connecting";
+
+function GoogleDriveSection() {
+  const statusFn = useServerFn(getGoogleDriveStatus);
+  const connectFn = useServerFn(connectGoogleDrive);
+  const disconnectFn = useServerFn(disconnectGoogleDrive);
+  const uploadFn = useServerFn(uploadBackupToGoogleDrive);
+
+  const [status, setStatus] = useState<{
+    connected: boolean;
+    connectedAt: string | null;
+    lastSyncedAt: string | null;
+  } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const finishingRef = useRef(false);
+
+  async function refreshStatus() {
+    try {
+      setStatus(await statusFn());
+    } catch (e: any) {
+      setError(e.message ?? "Falha ao consultar status do Google Drive.");
+    }
+  }
+
+  useEffect(() => {
+    void refreshStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Completa a conexão depois do redirect do OAuth: se a URL tem o flag e a
+  // sessão atual já veio com um refresh token do Google (escopo drive.file),
+  // manda pro servidor guardar e limpa a URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(GDRIVE_REDIRECT_FLAG) !== "1" || finishingRef.current) return;
+    finishingRef.current = true;
+
+    void (async () => {
+      setBusy("connect");
+      setError(null);
+      const { data } = await supabase.auth.getSession();
+      const refreshToken = data.session?.provider_refresh_token;
+      url.searchParams.delete(GDRIVE_REDIRECT_FLAG);
+      window.history.replaceState({}, "", url.toString());
+      if (!refreshToken) {
+        setError(
+          "O Google não devolveu permissão de acesso ao Drive. Tente conectar de novo — na tela de consentimento, aceite o acesso aos arquivos do app.",
+        );
+        setBusy(null);
+        return;
+      }
+      try {
+        await connectFn({ data: { refreshToken } });
+        setInfo("Google Drive conectado.");
+        await refreshStatus();
+      } catch (e: any) {
+        setError(e.message ?? "Falha ao salvar a conexão com o Google Drive.");
+      } finally {
+        setBusy(null);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function onConnect() {
+    setError(null);
+    setInfo(null);
+    const redirectTo = new URL(window.location.href);
+    redirectTo.search = "";
+    redirectTo.searchParams.set(GDRIVE_REDIRECT_FLAG, "1");
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        scopes: "https://www.googleapis.com/auth/drive.file",
+        queryParams: { access_type: "offline", prompt: "consent" },
+        redirectTo: redirectTo.toString(),
+      },
+    });
+    if (err) setError(err.message ?? "Erro ao conectar com o Google.");
+  }
+
+  async function onDisconnect() {
+    setError(null);
+    setInfo(null);
+    setBusy("disconnect");
+    try {
+      await disconnectFn();
+      setInfo("Google Drive desconectado.");
+      await refreshStatus();
+    } catch (e: any) {
+      setError(e.message ?? "Falha ao desconectar.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onSyncNow() {
+    setError(null);
+    setInfo(null);
+    setBusy("sync");
+    try {
+      const payload = await collectBackup();
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, "0");
+      const fileName = `backup-financeiro-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
+      await uploadFn({ data: { fileName, payloadJson: JSON.stringify(payload, null, 2) } });
+      setInfo("Backup enviado para o Google Drive.");
+      await refreshStatus();
+    } catch (e: any) {
+      setError(e.message ?? "Falha ao enviar backup para o Google Drive.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-border bg-card/40 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Cloud className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-semibold">Google Drive</h2>
+      </div>
+
+      {error && (
+        <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+          {error}
+        </div>
+      )}
+      {info && (
+        <div className="mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+          {info}
+        </div>
+      )}
+
+      {!status ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : status.connected ? (
+        <>
+          <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Check className="h-3.5 w-3.5 text-success" /> Conectado
+            {status.lastSyncedAt && (
+              <> · último envio {new Date(status.lastSyncedAt).toLocaleString("pt-BR")}</>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onSyncNow}
+              disabled={busy === "sync"}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {busy === "sync" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
+              Enviar backup agora
+            </button>
+            <button
+              onClick={onDisconnect}
+              disabled={busy === "disconnect"}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:border-destructive/50 hover:text-destructive disabled:opacity-60"
+            >
+              {busy === "disconnect" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
+              Desconectar
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Envie uma cópia do backup pra uma pasta própria do app no seu Google Drive — sobrevive a
+            reinstalar o app ou trocar de aparelho.
+          </p>
+          <button
+            onClick={onConnect}
+            disabled={busy === "connect"}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            {busy === "connect" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+            Conectar Google Drive
+          </button>
+        </>
+      )}
+    </section>
   );
 }
 

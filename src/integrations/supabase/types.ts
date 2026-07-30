@@ -290,6 +290,27 @@ export type Database = {
           },
         ]
       }
+      google_drive_tokens: {
+        Row: {
+          connected_at: string
+          last_synced_at: string | null
+          refresh_token: string
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          last_synced_at?: string | null
+          refresh_token: string
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          last_synced_at?: string | null
+          refresh_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       incomes: {
         Row: {
           account_id: string

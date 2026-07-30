@@ -1,36 +1,88 @@
-import { createContext, useContext, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 
-/**
- * Ponte entre a sidebar (sempre montada em __root.tsx) e o PanesWorkspace
- * (montado só dentro de /contas/$contaId) — permite Ctrl/Cmd+clique numa
- * conta da sidebar abrir um painel novo ao lado, sem precisar do "+" da tira
- * de abas. Quando nenhum PanesWorkspace está montado (ex.: na Home), o
- * clique simplesmente segue a navegação normal do link.
- */
-type PanesRegistry = {
-  registerAddPane: (fn: ((accountId: string) => void) | null) => void;
-  addPaneIfActive: (accountId: string) => boolean;
-};
+export type PaneView = { type: "months" } | { type: "month"; year: number; month: number };
+export type PaneEntry = { contaId: string; view: PaneView; size: number };
 
-const Ctx = createContext<PanesRegistry | null>(null);
+const STORAGE_KEY = "panes-workspace-v1";
 
-export function PanesRegistryProvider({ children }: { children: ReactNode }) {
-  const addPaneRef = useRef<((accountId: string) => void) | null>(null);
-  const value: PanesRegistry = {
-    registerAddPane: (fn) => {
-      addPaneRef.current = fn;
-    },
-    addPaneIfActive: (accountId) => {
-      if (!addPaneRef.current) return false;
-      addPaneRef.current(accountId);
-      return true;
-    },
-  };
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+function loadInitialPanes(): PaneEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
-export function usePanesRegistry() {
+function persist(panes: PaneEntry[]) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(panes));
+  } catch {
+    // sessionStorage indisponível (ex.: modo privado) — a sessão simplesmente não é lembrada.
+  }
+}
+
+type PanesContextValue = {
+  panes: PaneEntry[];
+  setPanes: (updater: PaneEntry[] | ((prev: PaneEntry[]) => PaneEntry[])) => void;
+  addPane: (contaId: string) => void;
+  closePane: (contaId: string) => void;
+  setView: (contaId: string, view: PaneView) => void;
+};
+
+const Ctx = createContext<PanesContextValue | null>(null);
+
+/**
+ * Estado compartilhado dos painéis de conta abertos em /contas/$contaId —
+ * vive na raiz do app (nunca desmonta ao navegar) e é persistido em
+ * sessionStorage. Assim, ao sair pra uma tela qualquer (Backup, IRPF...) e
+ * voltar, os mesmos painéis reabrem no mesmo mês em que cada um estava.
+ */
+export function PanesRegistryProvider({ children }: { children: ReactNode }) {
+  const [panes, setPanesRaw] = useState<PaneEntry[]>(loadInitialPanes);
+
+  const setPanes = useCallback<PanesContextValue["setPanes"]>((updater) => {
+    setPanesRaw((prev) => {
+      const next = typeof updater === "function" ? (updater as (p: PaneEntry[]) => PaneEntry[])(prev) : updater;
+      persist(next);
+      return next;
+    });
+  }, []);
+
+  const addPane = useCallback(
+    (contaId: string) => {
+      setPanes((prev) =>
+        prev.some((p) => p.contaId === contaId)
+          ? prev
+          : [...prev, { contaId, view: { type: "months" }, size: 1 }],
+      );
+    },
+    [setPanes],
+  );
+
+  const closePane = useCallback(
+    (contaId: string) => {
+      setPanes((prev) => (prev.length <= 1 ? prev : prev.filter((p) => p.contaId !== contaId)));
+    },
+    [setPanes],
+  );
+
+  const setView = useCallback(
+    (contaId: string, view: PaneView) => {
+      setPanes((prev) => prev.map((p) => (p.contaId === contaId ? { ...p, view } : p)));
+    },
+    [setPanes],
+  );
+
+  return <Ctx.Provider value={{ panes, setPanes, addPane, closePane, setView }}>{children}</Ctx.Provider>;
+}
+
+export function usePanes() {
   const c = useContext(Ctx);
-  if (!c) throw new Error("usePanesRegistry must be inside PanesRegistryProvider");
+  if (!c) throw new Error("usePanes must be inside PanesRegistryProvider");
   return c;
 }

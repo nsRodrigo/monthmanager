@@ -8,7 +8,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
 import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
-import { PanesRegistryProvider, usePanesRegistry } from "@/store/panes";
+import { PanesRegistryProvider, usePanes } from "@/store/panes";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
@@ -167,7 +167,7 @@ function SidebarContent({
 }) {
   const loc = useLocation();
   const { signOut, user } = useAuth();
-  const panesRegistry = usePanesRegistry();
+  const panes = usePanes();
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
   const isAdmin = useIsAdmin();
@@ -227,13 +227,11 @@ function SidebarContent({
               params={{ contaId: a.id }}
               title="Ctrl/Cmd+clique abre ao lado da conta atual"
               onClick={(e) => {
-                if (e.ctrlKey || e.metaKey) {
-                  const handled = panesRegistry.addPaneIfActive(a.id);
-                  if (handled) {
-                    e.preventDefault();
-                    onNavigate?.();
-                    return;
-                  }
+                if ((e.ctrlKey || e.metaKey) && loc.pathname.startsWith("/contas/")) {
+                  panes.addPane(a.id);
+                  e.preventDefault();
+                  onNavigate?.();
+                  return;
                 }
                 onNavigate?.();
               }}
@@ -459,6 +457,45 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Faixa fixa no rodapé, visível em qualquer tela fora de /contas/*, mostrando
+ * as contas que ficaram com painel aberto — clicar num chip volta direto pra
+ * lá (o estado do painel foi preservado por `PanesRegistryProvider`).
+ */
+function PanesDock() {
+  const { panes } = usePanes();
+  const location = useRouterState({ select: (s) => s.location });
+  const { data: accounts = [] } = useAccounts();
+  const navigate = useNavigate();
+
+  if (panes.length === 0 || location.pathname.startsWith("/contas/")) return null;
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+      <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-border bg-card/95 px-3 py-2 shadow-elevated backdrop-blur-md">
+        <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Painéis abertos
+        </span>
+        {panes.map((p) => {
+          const a = accounts.find((x) => x.id === p.contaId);
+          if (!a) return null;
+          return (
+            <button
+              key={p.contaId}
+              type="button"
+              onClick={() => navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } })}
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors hover:border-primary"
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
+              <span className="max-w-[8rem] truncate">{a.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -475,6 +512,7 @@ function RootComponent() {
                 </AuthGate>
               </BiometricLock>
               <UndoRedoBar />
+              <PanesDock />
               <InstallPrompt />
             </ConfirmProvider>
           </PanesRegistryProvider>

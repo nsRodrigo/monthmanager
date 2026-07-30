@@ -20,7 +20,7 @@ import {
   type Account,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
-import { usePanesRegistry } from "@/store/panes";
+import { usePanes, type PaneView } from "@/store/panes";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sparkline } from "@/components/Sparkline";
@@ -55,15 +55,18 @@ export const Route = createFileRoute("/contas/$contaId")({
 function PanesWorkspace() {
   const { contaId } = Route.useParams();
   const { data: accounts = [] } = useAccounts();
-  const [paneIds, setPaneIds] = useState<string[]>([contaId]);
-  const [sizes, setSizes] = useState<number[]>([1]);
+  const { panes, setPanes, addPane, closePane, setView } = usePanes();
   const [maxPanes, setMaxPanes] = useState(3);
 
-  // Reabre do zero quando a URL muda pra uma conta diferente (navegação normal).
+  // Garante que a conta da URL esteja aberta. Se ela já estava aberta —
+  // voltando de outra tela (Home, Backup...) ou clicando numa conta já em
+  // painel — preserva tudo como estava, inclusive os painéis irmãos e o mês
+  // que cada um mostrava. Só reseta pra um painel único quando é conta nova.
   useEffect(() => {
-    setPaneIds([contaId]);
-    setSizes([1]);
-  }, [contaId]);
+    setPanes((prev) =>
+      prev.some((p) => p.contaId === contaId) ? prev : [{ contaId, view: { type: "months" }, size: 1 }],
+    );
+  }, [contaId, setPanes]);
 
   useEffect(() => {
     const update = () => {
@@ -76,61 +79,44 @@ function PanesWorkspace() {
   }, []);
 
   useEffect(() => {
-    setPaneIds((ids) => (ids.length > maxPanes ? ids.slice(0, maxPanes) : ids));
-  }, [maxPanes]);
+    setPanes((prev) => (prev.length > maxPanes ? prev.slice(0, maxPanes) : prev));
+  }, [maxPanes, setPanes]);
 
-  useEffect(() => {
-    setSizes((s) => (s.length === paneIds.length ? s : paneIds.map(() => 1)));
-  }, [paneIds]);
-
-  const addPane = (id: string) => {
-    setPaneIds((ids) => (ids.includes(id) || ids.length >= maxPanes ? ids : [...ids, id]));
-  };
-
-  // Registra addPane na ponte compartilhada, pra Ctrl/Cmd+clique numa conta
-  // da sidebar (fora deste componente) poder abrir um painel novo aqui.
-  const panesRegistry = usePanesRegistry();
-  useEffect(() => {
-    panesRegistry.registerAddPane(addPane);
-    return () => panesRegistry.registerAddPane(null);
-  });
-
-  const closePane = (id: string) => {
-    setPaneIds((ids) => (ids.length <= 1 ? ids : ids.filter((x) => x !== id)));
-  };
   const resizeAt = (index: number, deltaFraction: number) => {
-    setSizes((prev) => {
-      const total = prev.reduce((s, v) => s + v, 0);
-      const a = prev[index] + deltaFraction * total;
-      const b = prev[index + 1] - deltaFraction * total;
+    setPanes((prev) => {
+      const total = prev.reduce((s, p) => s + p.size, 0);
+      const a = prev[index].size + deltaFraction * total;
+      const b = prev[index + 1].size - deltaFraction * total;
       const min = total * 0.18;
       if (a < min || b < min) return prev;
       const next = [...prev];
-      next[index] = a;
-      next[index + 1] = b;
+      next[index] = { ...next[index], size: a };
+      next[index + 1] = { ...next[index + 1], size: b };
       return next;
     });
   };
 
-  const availableToAdd = accounts.filter((a) => !paneIds.includes(a.id));
+  const availableToAdd = accounts.filter((a) => !panes.some((p) => p.contaId === a.id));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <PaneTabs
         availableToAdd={availableToAdd}
-        canAdd={paneIds.length < maxPanes && availableToAdd.length > 0}
+        canAdd={panes.length < maxPanes && availableToAdd.length > 0}
         onAdd={addPane}
       />
       <div className="flex min-h-0 flex-1 flex-row">
-        {paneIds.map((id, i) => (
-          <Fragment key={id}>
-            <div style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }} className="min-w-0 min-h-0">
+        {panes.map((p, i) => (
+          <Fragment key={p.contaId}>
+            <div style={{ flexGrow: p.size, flexBasis: 0 }} className="min-w-0 min-h-0">
               <PaneSlot
-                contaId={id}
-                onClose={paneIds.length > 1 ? () => closePane(id) : undefined}
+                contaId={p.contaId}
+                view={p.view}
+                onViewChange={(v) => setView(p.contaId, v)}
+                onClose={panes.length > 1 ? () => closePane(p.contaId) : undefined}
               />
             </div>
-            {i < paneIds.length - 1 && (
+            {i < panes.length - 1 && (
               <PaneDivider onDrag={(delta) => resizeAt(i, delta)} />
             )}
           </Fragment>
@@ -148,16 +134,26 @@ function PanesWorkspace() {
  */
 function PaneSlot({
   contaId,
+  view,
+  onViewChange,
   onClose,
 }: {
   contaId: string;
+  view: PaneView;
+  onViewChange: (view: PaneView) => void;
   onClose?: () => void;
 }) {
   const [fabPortalTarget, setFabPortalTarget] = useState<HTMLDivElement | null>(null);
   return (
     <div className="relative h-full min-w-0 overflow-hidden">
       <div className="absolute inset-0 overflow-y-auto">
-        <AccountPane contaId={contaId} onClose={onClose} fabPortalTarget={fabPortalTarget} />
+        <AccountPane
+          contaId={contaId}
+          view={view}
+          onViewChange={onViewChange}
+          onClose={onClose}
+          fabPortalTarget={fabPortalTarget}
+        />
       </div>
       <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-40" aria-hidden="true" />
     </div>
@@ -258,10 +254,15 @@ function PaneDivider({ onDrag }: { onDrag: (deltaFraction: number) => void }) {
 
 function AccountPane({
   contaId,
+  view,
+  onViewChange,
   onClose,
   fabPortalTarget,
 }: {
   contaId: string;
+  /** Estado de navegação do painel (lista de meses, ou um mês aberto) — vem de cima para sobreviver à troca de tela. */
+  view: PaneView;
+  onViewChange: (view: PaneView) => void;
   /** Só passado quando há mais de 1 painel aberto — fecha este painel específico. */
   onClose?: () => void;
   fabPortalTarget?: HTMLDivElement | null;
@@ -292,13 +293,6 @@ function AccountPane({
     return stored ? parseInt(stored, 10) : eff.year;
   });
   const currentMonth = eff.month;
-
-  // Estado de navegação local do painel: lista de meses, ou um mês
-  // específico "aberto" dentro do próprio painel (sem navegar a URL da
-  // página inteira — o painel ao lado continua exatamente como estava).
-  const [view, setView] = useState<{ type: "months" } | { type: "month"; year: number; month: number }>({
-    type: "months",
-  });
 
   const accountCardIds = useMemo(
     () => new Set(cards.filter((c) => c.accountId === contaId).map((c) => c.id)),
@@ -517,10 +511,9 @@ function AccountPane({
             onClick={onClose}
             aria-label="Fechar este painel"
             title="Fechar este painel"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground hover:border-destructive/50 hover:text-destructive"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-destructive"
           >
-            <X className="h-3.5 w-3.5" />
-            Fechar painel
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -577,8 +570,8 @@ function AccountPane({
             contaId={contaId}
             year={view.year}
             month={view.month}
-            onBack={() => setView({ type: "months" })}
-            onMonthChange={(y, m) => setView({ type: "month", year: y, month: m })}
+            onBack={() => onViewChange({ type: "months" })}
+            onMonthChange={(y, m) => onViewChange({ type: "month", year: y, month: m })}
             embedded
             fabPortalTarget={fabPortalTarget}
           />
@@ -637,7 +630,7 @@ function AccountPane({
             <button
               key={m}
               type="button"
-              onClick={() => setView({ type: "month", year, month: m })}
+              onClick={() => onViewChange({ type: "month", year, month: m })}
               className={`group block w-full rounded-3xl border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}

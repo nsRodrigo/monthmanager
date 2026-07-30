@@ -497,7 +497,9 @@ function AccountPane({
       )}
       {view.type !== "month" && (
         <>
-          <div className="mb-2 flex items-center justify-between gap-2">
+          {/* Mesma barra sticky + traço inferior da tela de Lançamentos — os
+              dois "topos de tela" usam exatamente o mesmo componente visual. */}
+          <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6">
             <Link
               to="/"
               aria-label="Voltar para a Home"
@@ -559,7 +561,7 @@ function AccountPane({
 
       <div key={view.type === "month" ? `${view.year}-${view.month}` : "months"} className="animate-fade-slide-in">
       {view.type === "month" ? (
-        <div className="mt-4">
+        <div>
           <MonthDetailPane
             contaId={contaId}
             year={view.year}

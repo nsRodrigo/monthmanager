@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccounts,
@@ -85,14 +85,44 @@ export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
       },
     ],
   }),
-  component: AccountMonth,
+  component: AccountMonthRoute,
 });
 
-function AccountMonth() {
+/**
+ * Wrapper fino da rota: lê os params da URL e delega pro componente
+ * reutilizável `MonthDetailPane`, que também roda embutido dentro de um
+ * painel (ver PanesWorkspace em contas.$contaId.tsx) — nesse caso, "voltar"
+ * e "trocar de mês" viram troca de estado local em vez de navegação.
+ */
+function AccountMonthRoute() {
   const { contaId, ano, mes } = Route.useParams();
-  const year = Number(ano);
-  const month = Number(mes);
+  const navigate = useNavigate();
+  return (
+    <MonthDetailPane
+      contaId={contaId}
+      year={Number(ano)}
+      month={Number(mes)}
+      onBack={() => navigate({ to: "/contas/$contaId", params: { contaId } })}
+      onMonthChange={(y, m) =>
+        navigate({ to: "/contas/$contaId/$ano/$mes", params: { contaId, ano: String(y), mes: String(m) } })
+      }
+    />
+  );
+}
 
+export function MonthDetailPane({
+  contaId,
+  year,
+  month,
+  onBack,
+  onMonthChange,
+}: {
+  contaId: string;
+  year: number;
+  month: number;
+  onBack: () => void;
+  onMonthChange: (year: number, month: number) => void;
+}) {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases } = usePurchases();
@@ -562,20 +592,21 @@ function AccountMonth() {
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
       {/* Top nav — sticky so the year picker stays accessible while scrolling */}
       <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6">
-        <Link
-          to="/contas/$contaId"
-          params={{ contaId }}
+        <button
+          type="button"
+          onClick={onBack}
           className="inline-flex min-w-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4 shrink-0" />
           <span className="truncate">{account.name}</span>
-        </Link>
+        </button>
         <MonthYearPicker
           contaId={contaId}
           year={year}
           month={month}
           prev={prevMonth}
           next={nextMonth}
+          onNavigate={onMonthChange}
         />
       </div>
 

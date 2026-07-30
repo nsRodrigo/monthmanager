@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
+import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
   head: () => ({ meta: [{ title: "Conta — Finanças" }] }),
@@ -44,16 +45,17 @@ export const Route = createFileRoute("/contas/$contaId")({
 });
 
 /**
- * Gerencia os painéis de contas abertos em paralelo lado a lado (desktop/
- * tablet) ou empilhados (mobile). Clicar numa conta abre um painel; clicar
- * em "+" na tira de abas abre outro ao lado, sem fechar os existentes.
+ * Gerencia os painéis de contas abertos em paralelo lado a lado — só em
+ * desktop/tablet (>= 768px). No mobile é sempre 1 painel só, igual a uma
+ * conta por vez de sempre; o "+" pra abrir outro painel some sozinho porque
+ * `maxPanes` vira 1. Clicar numa conta abre um painel; clicar em "+" na tira
+ * de abas abre outro ao lado, sem fechar os existentes.
  */
 function PanesWorkspace() {
   const { contaId } = Route.useParams();
   const { data: accounts = [] } = useAccounts();
   const [paneIds, setPaneIds] = useState<string[]>([contaId]);
   const [sizes, setSizes] = useState<number[]>([1]);
-  const [stacked, setStacked] = useState(false);
   const [maxPanes, setMaxPanes] = useState(3);
 
   // Reabre do zero quando a URL muda pra uma conta diferente (navegação normal).
@@ -65,8 +67,7 @@ function PanesWorkspace() {
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
-      setStacked(w < 768);
-      setMaxPanes(w >= 1280 ? 3 : 2);
+      setMaxPanes(w < 768 ? 1 : w >= 1280 ? 3 : 2);
     };
     update();
     window.addEventListener("resize", update);
@@ -113,14 +114,14 @@ function PanesWorkspace() {
         onClose={closePane}
         onAdd={addPane}
       />
-      <div className={`flex min-h-0 flex-1 ${stacked ? "flex-col" : "flex-row"}`}>
+      <div className="flex min-h-0 flex-1 flex-row">
         {paneIds.map((id, i) => (
           <Fragment key={id}>
             <div style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }} className="min-w-0 min-h-0 overflow-y-auto">
               <AccountPane contaId={id} />
             </div>
             {i < paneIds.length - 1 && (
-              <PaneDivider stacked={stacked} onDrag={(delta) => resizeAt(i, delta)} />
+              <PaneDivider onDrag={(delta) => resizeAt(i, delta)} />
             )}
           </Fragment>
         ))}
@@ -206,24 +207,24 @@ function PaneTabs({
   );
 }
 
-function PaneDivider({ stacked, onDrag }: { stacked: boolean; onDrag: (deltaFraction: number) => void }) {
+/** Divisor arrastável entre painéis — só existe em desktop/tablet (mobile nunca tem mais de 1 painel). */
+function PaneDivider({ onDrag }: { onDrag: (deltaFraction: number) => void }) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const lastPosRef = useRef(0);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     draggingRef.current = true;
-    lastPosRef.current = stacked ? e.clientY : e.clientX;
+    lastPosRef.current = e.clientX;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current || !elRef.current?.parentElement) return;
-    const pos = stacked ? e.clientY : e.clientX;
+    const pos = e.clientX;
     const delta = pos - lastPosRef.current;
     lastPosRef.current = pos;
     const rect = elRef.current.parentElement.getBoundingClientRect();
-    const containerSize = stacked ? rect.height : rect.width;
-    if (containerSize > 0) onDrag(delta / containerSize);
+    if (rect.width > 0) onDrag(delta / rect.width);
   };
   const onPointerUp = () => {
     draggingRef.current = false;
@@ -233,15 +234,13 @@ function PaneDivider({ stacked, onDrag }: { stacked: boolean; onDrag: (deltaFrac
     <div
       ref={elRef}
       role="separator"
-      aria-orientation={stacked ? "horizontal" : "vertical"}
+      aria-orientation="vertical"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      className={`flex shrink-0 touch-none items-center justify-center bg-border text-muted-foreground hover:bg-primary/30 ${
-        stacked ? "h-3 w-full cursor-row-resize" : "w-3 cursor-col-resize"
-      }`}
+      className="flex w-3 shrink-0 cursor-col-resize touch-none items-center justify-center bg-border text-muted-foreground hover:bg-primary/30"
     >
-      <span className="select-none text-xs">{stacked ? "⋯" : "⋮"}</span>
+      <span className="select-none text-xs">⋮</span>
     </div>
   );
 }
@@ -273,6 +272,13 @@ function AccountPane({ contaId }: { contaId: string }) {
     return stored ? parseInt(stored, 10) : eff.year;
   });
   const currentMonth = eff.month;
+
+  // Estado de navegação local do painel: lista de meses, ou um mês
+  // específico "aberto" dentro do próprio painel (sem navegar a URL da
+  // página inteira — o painel ao lado continua exatamente como estava).
+  const [view, setView] = useState<{ type: "months" } | { type: "month"; year: number; month: number }>({
+    type: "months",
+  });
 
   const accountCardIds = useMemo(
     () => new Set(cards.filter((c) => c.accountId === contaId).map((c) => c.id)),
@@ -531,6 +537,18 @@ function AccountPane({ contaId }: { contaId: string }) {
 
 
 
+      {view.type === "month" ? (
+        <div className="mt-4">
+          <MonthDetailPane
+            contaId={contaId}
+            year={view.year}
+            month={view.month}
+            onBack={() => setView({ type: "months" })}
+            onMonthChange={(y, m) => setView({ type: "month", year: y, month: m })}
+          />
+        </div>
+      ) : (
+        <>
       <div className="mt-5 flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-muted-foreground">Meses</p>
         <YearPickerChip compact />
@@ -580,11 +598,11 @@ function AccountPane({ contaId }: { contaId: string }) {
 
 
             return (
-            <Link
+            <button
               key={m}
-              to="/contas/$contaId/$ano/$mes"
-              params={{ contaId: account.id, ano: String(year), mes: String(m) }}
-              className={`group block rounded-3xl border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
+              type="button"
+              onClick={() => setView({ type: "month", year, month: m })}
+              className={`group block w-full rounded-3xl border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
                 isCurrent ? "border-primary/50 shadow-glow" : "border-border"
               }`}
             >
@@ -637,7 +655,7 @@ function AccountPane({ contaId }: { contaId: string }) {
                 <Mini label="Faturas" value={totalFaturas} tone="credit" icon={CreditCard} />
                 <Mini label="Invest." value={monthInv} tone="debit" icon={TrendingUp} />
               </div>
-            </Link>
+            </button>
             );
           })
         )}
@@ -651,6 +669,8 @@ function AccountPane({ contaId }: { contaId: string }) {
           </button>
         )}
       </div>
+      </>
+      )}
 
       <AddMonthDialog
         open={openAddMonth}

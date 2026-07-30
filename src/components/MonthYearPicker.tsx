@@ -19,9 +19,11 @@ type Props = {
   month: number; // 0-11
   prev: { y: number; m: number };
   next: { y: number; m: number };
+  /** Quando informado, troca de mês sem navegar a URL (usado dentro de um painel). */
+  onNavigate?: (year: number, month: number) => void;
 };
 
-export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
+export function MonthYearPicker({ contaId, year, month, prev, next, onNavigate }: Props) {
   const navigate = useNavigate();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -121,6 +123,10 @@ export function MonthYearPicker({ contaId, year, month, prev, next }: Props) {
   })();
 
   const go = (y: number, m: number) => {
+    if (onNavigate) {
+      onNavigate(y, m);
+      return;
+    }
     navigate({
       to: "/contas/$contaId/$ano/$mes",
       params: { contaId, ano: String(y), mes: String(m) },

@@ -1,8 +1,8 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Receipt, Cloud, ShieldCheck, Plus } from "lucide-react";
+import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Receipt, Cloud, ShieldCheck, ChevronRight } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
@@ -17,7 +17,6 @@ import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
 import { ConfirmProvider } from "@/store/confirm";
 import { UndoRedoBar } from "@/components/UndoRedoBar";
-import { FabAction } from "@/components/FabAction";
 import { history } from "@/store/history";
 
 const queryClient = new QueryClient({
@@ -30,6 +29,54 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
   carteira: Wallet,
   investimento: TrendingUp,
 };
+
+const DRAWER_WIDTH = 288; // 18rem (w-72)
+
+/**
+ * Estado + gestos de arraste da gaveta mobile — abre/fecha tanto pela zona
+ * de borda (fechada) quanto arrastando a própria gaveta (aberta). Aciona por
+ * distância OU velocidade do gesto (um flick curto e rápido já abre/fecha),
+ * diferente da versão anterior que só considerava distância.
+ */
+function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
+  const [dragX, setDragX] = useState<number | null>(null);
+  const startRef = useRef<{ x: number; t: number; base: number } | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    const base = open ? DRAWER_WIDTH : 0;
+    startRef.current = { x: e.clientX, t: performance.now(), base };
+    setDragX(base);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    const start = startRef.current;
+    if (!start) return;
+    const delta = e.clientX - start.x;
+    setDragX(Math.max(0, Math.min(DRAWER_WIDTH, start.base + delta)));
+  };
+  const onPointerUp = () => {
+    const start = startRef.current;
+    if (!start) return;
+    const pos = dragX ?? start.base;
+    const dt = Math.max(1, performance.now() - start.t);
+    const delta = pos - start.base;
+    const velocity = delta / dt; // px/ms
+    startRef.current = null;
+    setDragX(null);
+    const shouldOpen = open
+      ? !(delta < -DRAWER_WIDTH * 0.22 || velocity < -0.35)
+      : delta > DRAWER_WIDTH * 0.22 || velocity > 0.35;
+    setOpen(shouldOpen);
+  };
+
+  const pos = dragX ?? (open ? DRAWER_WIDTH : 0);
+  const dragging = dragX !== null;
+  return {
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+    pos,
+    dragging,
+  };
+}
 
 function NotFoundComponent() {
   return (
@@ -104,146 +151,187 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Menu de navegação flutuante — substitui o antigo menu lateral em todos os
- * tamanhos de tela. Fica no canto inferior esquerdo (a tela de meses já usa
- * o canto inferior direito para o FAB de "adicionar lançamento").
+ * Conteúdo da navegação, compartilhado pelas duas apresentações:
+ * - "rail" (desktop/tablet): fica minimizada (só ícones) e expande no
+ *   hover/foco, via `group-hover`/`group-focus-within` no `<aside>` pai —
+ *   por isso os rótulos ficam em opacidade 0 por padrão.
+ * - "drawer" (mobile): sempre com os rótulos visíveis, sem fade.
  */
-function FloatingMenu() {
+function SidebarContent({
+  onNavigate,
+  labelClass = "",
+}: {
+  onNavigate?: () => void;
+  labelClass?: string;
+}) {
   const loc = useLocation();
-  const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
   const isAdmin = useIsAdmin();
-  const [open, setOpen] = useState(false);
-  const [showAccounts, setShowAccounts] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
-  useEffect(() => {
-    setOpen(false);
-    setShowAccounts(false);
-  }, [loc.pathname]);
+  const isConsolidated = loc.pathname === "/";
 
-  const close = () => {
-    setOpen(false);
-    setShowAccounts(false);
-  };
-
-  const go = (to: string) => {
-    close();
-    navigate({ to });
-  };
+  const displayName = profile?.displayName || user?.email?.split("@")[0] || "Você";
+  const initials = displayName
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <>
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
-          onClick={close}
-          aria-hidden="true"
-        />
-      )}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
+          <Wallet className="h-5 w-5 text-primary-foreground" />
+        </div>
+        <span className={`text-lg font-bold tracking-tight whitespace-nowrap ${labelClass}`}>
+          Gestão Financeira
+        </span>
+      </div>
 
-      <div className="fixed bottom-5 left-4 z-50 flex flex-col items-start gap-2.5 md:bottom-6 md:left-6">
-        {open && showAccounts && (
-          <div className="mb-1 max-h-[60vh] w-64 overflow-y-auto rounded-2xl border border-border bg-card p-2 shadow-elevated">
+      <Link
+        to="/"
+        onClick={onNavigate}
+        className={`mb-4 flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-all ${
+          isConsolidated
+            ? "bg-gradient-primary text-primary-foreground shadow-glow"
+            : "border border-border text-foreground hover:bg-secondary"
+        }`}
+      >
+        <LayoutDashboard className="h-4 w-4 shrink-0" />
+        <span className={`whitespace-nowrap ${labelClass}`}>Home</span>
+      </Link>
+
+      <p className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${labelClass}`}>
+        Contas
+      </p>
+      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
+        {accounts.length === 0 && (
+          <p className={`px-2 py-3 text-xs text-muted-foreground whitespace-nowrap ${labelClass}`}>
+            Nenhuma conta. Clique em <strong>Adicionar conta</strong>.
+          </p>
+        )}
+        {accounts.map((a) => {
+          const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
+          const active = loc.pathname.startsWith(`/contas/${a.id}`);
+          return (
             <Link
-              to="/"
-              onClick={close}
-              className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium ${
-                loc.pathname === "/" ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+              key={a.id}
+              to="/contas/$contaId"
+              params={{ contaId: a.id }}
+              onClick={onNavigate}
+              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all ${
+                active
+                  ? "bg-secondary text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
               }`}
             >
-              <LayoutDashboard className="h-4 w-4" /> Home
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: a.color + "25", color: a.color }}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </div>
+              <span className={`truncate whitespace-nowrap ${labelClass}`}>{a.name}</span>
             </Link>
-            <p className="mb-1 px-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Contas
-            </p>
-            {accounts.length === 0 && (
-              <p className="px-2 py-2 text-xs text-muted-foreground">Nenhuma conta ainda.</p>
-            )}
-            {accounts.map((a) => {
-              const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-              return (
-                <Link
-                  key={a.id}
-                  to="/contas/$contaId"
-                  params={{ contaId: a.id }}
-                  onClick={close}
-                  className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                >
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: a.color + "25", color: a.color }}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </div>
-                  <span className="truncate">{a.name}</span>
-                </Link>
-              );
-            })}
-            <button
-              onClick={() => {
-                setManageOpen(true);
-                close();
-              }}
-              className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-            >
-              <Settings className="h-3.5 w-3.5" /> Gerenciar contas
-            </button>
-          </div>
-        )}
-
-        {open && !showAccounts && (
-          <div className="flex flex-col items-start gap-2.5">
-            <FabAction icon={LogOut} label="Sair" tone="debit" onClick={() => signOut()} />
-            <FabAction icon={User} label="Meu perfil" tone="income" onClick={() => go("/perfil")} />
-            {isAdmin && (
-              <FabAction
-                icon={ShieldCheck}
-                label="Whitelist e usuários"
-                tone="primary"
-                onClick={() => go("/admin/whitelist")}
-              />
-            )}
-            <FabAction icon={Cloud} label="Backup e sync" tone="primary" onClick={() => go("/backup")} />
-            <FabAction icon={Receipt} label="Imposto de Renda" tone="primary" onClick={() => go("/irpf")} />
-            <FabAction
-              icon={FileSpreadsheet}
-              label="Importar planilha"
-              tone="primary"
-              onClick={() => go("/importar-historico")}
-            />
-            <FabAction
-              icon={Wallet}
-              label="Trocar de conta"
-              tone="income"
-              onClick={() => setShowAccounts(true)}
-            />
-          </div>
-        )}
-
+          );
+        })}
         <button
-          type="button"
-          onClick={() => (showAccounts ? close() : setOpen((v) => !v))}
-          aria-label={open ? "Fechar menu" : "Abrir menu"}
-          aria-expanded={open}
-          className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${
-            open ? "rotate-45" : ""
+          onClick={() => setManageOpen(true)}
+          className="mt-2 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+        >
+          <Settings className="h-3.5 w-3.5 shrink-0" />
+          <span className={`whitespace-nowrap ${labelClass}`}>Gerenciar Conta</span>
+        </button>
+      </nav>
+
+      <div className="mt-4 space-y-1 border-t border-border pt-4">
+        <Link
+          to="/importar-historico"
+          onClick={onNavigate}
+          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+            loc.pathname === "/importar-historico"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           }`}
         >
-          {open ? (
-            <Plus className="h-6 w-6" />
-          ) : profile?.avatarUrl ? (
-            <img
-              src={profile.avatarUrl}
-              alt=""
-              className="h-full w-full object-cover"
-              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-            />
-          ) : (
-            <Plus className="h-6 w-6" />
-          )}
+          <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+          <span className={`whitespace-nowrap ${labelClass}`}>Importar planilha</span>
+        </Link>
+        <Link
+          to="/irpf"
+          onClick={onNavigate}
+          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+            loc.pathname.startsWith("/irpf")
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <Receipt className="h-3.5 w-3.5 shrink-0" />
+          <span className={`whitespace-nowrap ${labelClass}`}>Imposto de Renda</span>
+        </Link>
+        <Link
+          to="/backup"
+          onClick={onNavigate}
+          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+            loc.pathname === "/backup"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <Cloud className="h-3.5 w-3.5 shrink-0" />
+          <span className={`whitespace-nowrap ${labelClass}`}>Backup e sync</span>
+        </Link>
+        {isAdmin && (
+          <Link
+            to="/admin/whitelist"
+            onClick={onNavigate}
+            className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+              loc.pathname === "/admin/whitelist"
+                ? "bg-secondary text-foreground"
+                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+            }`}
+          >
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span className={`whitespace-nowrap ${labelClass}`}>Whitelist e usuários</span>
+          </Link>
+        )}
+      </div>
+
+      <div className="mt-4 border-t border-border pt-4">
+        <Link
+          to="/perfil"
+          onClick={onNavigate}
+          className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-secondary"
+          aria-label="Abrir meu perfil"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground">
+            {profile?.avatarUrl ? (
+              <img
+                src={profile.avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+              />
+            ) : (
+              initials || <User className="h-4 w-4" aria-hidden="true" />
+            )}
+          </div>
+          <div className={`min-w-0 flex-1 ${labelClass}`}>
+            <p className="truncate text-xs font-semibold whitespace-nowrap">{displayName}</p>
+            <p className="truncate text-[10px] text-muted-foreground whitespace-nowrap">{user?.email}</p>
+          </div>
+        </Link>
+        <button
+          onClick={() => signOut()}
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+        >
+          <LogOut className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className={`whitespace-nowrap ${labelClass}`}>Sair</span>
         </button>
       </div>
 
@@ -257,6 +345,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { handlers: dragHandlers, pos: dragPos, dragging } = useSwipeDrawer(mobileOpen, setMobileOpen);
 
   const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
 
@@ -273,6 +363,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!user) history.clear();
   }, [user?.id]);
 
+  // Fecha a gaveta mobile ao trocar de rota.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -284,15 +379,69 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!user && !isPublic) return null;
   if (isPublic) return <>{children}</>;
 
+  const translatePx = dragPos - DRAWER_WIDTH;
+  const overlayOpacity = dragPos / DRAWER_WIDTH;
+  const transition = dragging ? "none" : "180ms ease-out";
+
   return (
-    <div className="min-h-screen bg-background">
-      <a href="#main-content" className="skip-link">
-        Pular para o conteúdo
-      </a>
-      <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
-        {children}
-      </main>
-      <FloatingMenu />
+    <div className="flex min-h-screen bg-background">
+      {/* Desktop/tablet: minimizada (64px, só ícones), expande no hover/foco */}
+      <aside
+        tabIndex={0}
+        className="group sticky top-0 hidden h-screen w-16 shrink-0 flex-col self-start overflow-hidden border-r border-border bg-card/40 p-3 transition-[width] duration-200 hover:w-60 focus-within:w-60 hover:p-5 focus-within:p-5 md:flex"
+      >
+        <SidebarContent labelClass="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity" />
+      </aside>
+
+      {/* Mobile: gaveta cheia, aberta por toque no ícone, arraste da borda, ou arrastando a própria gaveta */}
+      <div
+        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
+        style={{
+          opacity: overlayOpacity,
+          transition: `opacity ${transition}`,
+          pointerEvents: mobileOpen || dragging ? "auto" : "none",
+        }}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden={!mobileOpen && !dragging}
+      />
+      <aside
+        className="fixed inset-y-0 left-0 z-50 flex w-72 touch-none flex-col border-r border-border bg-card p-5 md:hidden"
+        style={{
+          transform: `translateX(${translatePx}px)`,
+          transition: `transform ${transition}`,
+          pointerEvents: mobileOpen || dragging ? "auto" : "none",
+        }}
+        aria-hidden={!mobileOpen && !dragging}
+        {...dragHandlers}
+      >
+        <SidebarContent onNavigate={() => setMobileOpen(false)} />
+      </aside>
+      {!mobileOpen && (
+        <div
+          className="fixed inset-y-0 left-0 z-40 flex w-8 touch-none items-center md:hidden"
+          {...dragHandlers}
+          aria-hidden="true"
+        >
+          <div className="ml-1.5 h-14 w-1.5 rounded-full bg-border/70" />
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir menu"
+            className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <a href="#main-content" className="skip-link">
+          Pular para o conteúdo
+        </a>
+        <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

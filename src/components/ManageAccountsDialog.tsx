@@ -46,6 +46,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editInitial, setEditInitial] = useState(0);
+  const [editColor, setEditColor] = useState("#8b5cf6");
 
   const submit = () => {
     if (!name.trim()) return;
@@ -93,6 +94,15 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                         className={inputClass}
                       />
                       <CurrencyInput value={editInitial} onValueChange={setEditInitial} placeholder="Saldo inicial" />
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        Cor
+                        <input
+                          type="color"
+                          value={editColor}
+                          onChange={(e) => setEditColor(e.target.value)}
+                          className="h-8 w-14 rounded-md border border-input bg-input"
+                        />
+                      </label>
                     </div>
                   ) : (
                     <>
@@ -122,6 +132,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                             id: a.id,
                             name: editName.trim(),
                             initialBalance: editInitial || 0,
+                            color: editColor,
                           });
                           setEditingId(null);
                         }}
@@ -143,6 +154,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                           setEditingId(a.id);
                           setEditName(a.name);
                           setEditInitial(a.initialBalance);
+                          setEditColor(a.color);
                         }}
                         className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
                       >

@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   useAccounts,
   useCards,
@@ -118,6 +119,7 @@ export function MonthDetailPane({
   onBack,
   onMonthChange,
   embedded = false,
+  fabPortalTarget = null,
 }: {
   contaId: string;
   year: number;
@@ -125,12 +127,14 @@ export function MonthDetailPane({
   onBack: () => void;
   onMonthChange: (year: number, month: number) => void;
   /**
-   * Quando true, roda dentro de um painel do PanesWorkspace: o FAB e seu
-   * scrim ficam `absolute` (presos ao painel, que é `position: relative` e
-   * tem seu próprio scroll) em vez de `fixed` (que ficaria preso à tela
-   * inteira e por cima de qualquer outro painel aberto ao lado).
+   * Quando true, roda dentro de um painel do PanesWorkspace — o FAB e seu
+   * scrim são renderizados via portal em `fabPortalTarget` (um elemento
+   * IRMÃO da área que rola, dentro do mesmo painel) em vez de inline, que
+   * usaria `fixed` (preso à tela inteira, por cima de qualquer outro painel).
    */
   embedded?: boolean;
+  /** Nó do DOM onde o FAB deve ser portado quando `embedded` — ver PaneSlot em contas.$contaId.tsx. */
+  fabPortalTarget?: HTMLDivElement | null;
 }) {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
@@ -1278,77 +1282,84 @@ export function MonthDetailPane({
         })()}
       </div>
 
-      {fabOpen && (
-        <div
-          className={`${embedded ? "absolute" : "fixed"} inset-0 z-30`}
-          onClick={() => setFabOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-      <div
-        className={`${embedded ? "absolute" : "fixed"} bottom-6 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
-      >
-        {fabOpen && (
-          <div className="flex flex-col items-end gap-2.5">
-            <FabAction
-              icon={CreditCard}
-              label="Novo cartão"
-              tone="credit"
-              onClick={() => {
-                setOpenCard(true);
-                setFabOpen(false);
-              }}
-            />
-            <FabAction
-              icon={ShoppingBag}
-              label="Nova compra"
-              tone="credit"
-              onClick={() => {
-                setOpenPurchase(true);
-                setFabOpen(false);
-              }}
-            />
-            <FabAction
-              icon={ArrowDownRight}
-              label="Novo débito"
-              tone="debit"
-              onClick={() => {
-                setOpenDebit(true);
-                setFabOpen(false);
-              }}
-            />
-            <FabAction
-              icon={TrendingUp}
-              label="Novo investimento"
-              tone="primary"
-              onClick={() => {
-                setOpenInvest(true);
-                setFabOpen(false);
-              }}
-            />
-            <FabAction
-              icon={Download}
-              label="Novo recebimento"
-              tone="income"
-              onClick={() => {
-                setOpenIncome(true);
-                setFabOpen(false);
-              }}
-            />
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setFabOpen((v) => !v)}
-          aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
-          aria-expanded={fabOpen}
-          className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${
-            fabOpen ? "rotate-45" : ""
-          }`}
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      </div>
+      {(() => {
+        const fabUi = (
+          <>
+            {fabOpen && (
+              <div
+                className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
+                onClick={() => setFabOpen(false)}
+                aria-hidden="true"
+              />
+            )}
+            <div
+              className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-6 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+            >
+              {fabOpen && (
+                <div className="flex flex-col items-end gap-2.5">
+                  <FabAction
+                    icon={CreditCard}
+                    label="Novo cartão"
+                    tone="credit"
+                    onClick={() => {
+                      setOpenCard(true);
+                      setFabOpen(false);
+                    }}
+                  />
+                  <FabAction
+                    icon={ShoppingBag}
+                    label="Nova compra"
+                    tone="credit"
+                    onClick={() => {
+                      setOpenPurchase(true);
+                      setFabOpen(false);
+                    }}
+                  />
+                  <FabAction
+                    icon={ArrowDownRight}
+                    label="Novo débito"
+                    tone="debit"
+                    onClick={() => {
+                      setOpenDebit(true);
+                      setFabOpen(false);
+                    }}
+                  />
+                  <FabAction
+                    icon={TrendingUp}
+                    label="Novo investimento"
+                    tone="primary"
+                    onClick={() => {
+                      setOpenInvest(true);
+                      setFabOpen(false);
+                    }}
+                  />
+                  <FabAction
+                    icon={Download}
+                    label="Novo recebimento"
+                    tone="income"
+                    onClick={() => {
+                      setOpenIncome(true);
+                      setFabOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setFabOpen((v) => !v)}
+                aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
+                aria-expanded={fabOpen}
+                className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${
+                  fabOpen ? "rotate-45" : ""
+                }`}
+              >
+                <Plus className="h-6 w-6" />
+              </button>
+            </div>
+          </>
+        );
+        return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;
+      })()}
 
       <AddDebitDialog
         open={openDebit}

@@ -8,6 +8,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
 import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
+import { PanesRegistryProvider, usePanesRegistry } from "@/store/panes";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
@@ -166,6 +167,7 @@ function SidebarContent({
 }) {
   const loc = useLocation();
   const { signOut, user } = useAuth();
+  const panesRegistry = usePanesRegistry();
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
   const isAdmin = useIsAdmin();
@@ -223,7 +225,18 @@ function SidebarContent({
               key={a.id}
               to="/contas/$contaId"
               params={{ contaId: a.id }}
-              onClick={onNavigate}
+              title="Ctrl/Cmd+clique abre ao lado da conta atual"
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  const handled = panesRegistry.addPaneIfActive(a.id);
+                  if (handled) {
+                    e.preventDefault();
+                    onNavigate?.();
+                    return;
+                  }
+                }
+                onNavigate?.();
+              }}
               className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all ${
                 active
                   ? "bg-secondary text-foreground shadow-sm"
@@ -452,6 +465,7 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <AccountFilterProvider>
+          <PanesRegistryProvider>
             <ConfirmProvider>
               <NavigationLoader />
               <RealtimeSync />
@@ -463,6 +477,7 @@ function RootComponent() {
               <UndoRedoBar />
               <InstallPrompt />
             </ConfirmProvider>
+          </PanesRegistryProvider>
           </AccountFilterProvider>
         </AuthProvider>
       </ThemeProvider>

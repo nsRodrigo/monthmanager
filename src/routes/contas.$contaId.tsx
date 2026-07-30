@@ -20,6 +20,7 @@ import {
   type Account,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
+import { usePanesRegistry } from "@/store/panes";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sparkline } from "@/components/Sparkline";
@@ -85,6 +86,15 @@ function PanesWorkspace() {
   const addPane = (id: string) => {
     setPaneIds((ids) => (ids.includes(id) || ids.length >= maxPanes ? ids : [...ids, id]));
   };
+
+  // Registra addPane na ponte compartilhada, pra Ctrl/Cmd+clique numa conta
+  // da sidebar (fora deste componente) poder abrir um painel novo aqui.
+  const panesRegistry = usePanesRegistry();
+  useEffect(() => {
+    panesRegistry.registerAddPane(addPane);
+    return () => panesRegistry.registerAddPane(null);
+  });
+
   const closePane = (id: string) => {
     setPaneIds((ids) => (ids.length <= 1 ? ids : ids.filter((x) => x !== id)));
   };
@@ -117,15 +127,11 @@ function PanesWorkspace() {
       <div className="flex min-h-0 flex-1 flex-row">
         {paneIds.map((id, i) => (
           <Fragment key={id}>
-            {/* `relative` + `overflow-y-auto` própria de cada painel: rola sozinho
-                (não a página inteira), e é a âncora do FAB "absolute" do painel
-                (embedded=true em AccountPane) — sem isso o FAB usaria `fixed` e
-                apareceria só 1x, por cima de tudo, na tela toda. */}
-            <div
-              style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }}
-              className="relative min-w-0 min-h-0 overflow-y-auto"
-            >
-              <AccountPane contaId={id} />
+            <div style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }} className="min-w-0 min-h-0">
+              <PaneSlot
+                contaId={id}
+                onClose={paneIds.length > 1 ? () => closePane(id) : undefined}
+              />
             </div>
             {i < paneIds.length - 1 && (
               <PaneDivider onDrag={(delta) => resizeAt(i, delta)} />
@@ -133,6 +139,30 @@ function PanesWorkspace() {
           </Fragment>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Área de um painel: a rolagem acontece num filho `absolute inset-0
+ * overflow-y-auto`, e o alvo do portal do FAB é um IRMÃO dele (não um
+ * ancestral em comum que role) — assim o FAB fica preso ao painel mesmo
+ * quando o conteúdo rola, em vez de "flutuar" junto com o scroll.
+ */
+function PaneSlot({
+  contaId,
+  onClose,
+}: {
+  contaId: string;
+  onClose?: () => void;
+}) {
+  const [fabPortalTarget, setFabPortalTarget] = useState<HTMLDivElement | null>(null);
+  return (
+    <div className="relative h-full min-w-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-y-auto">
+        <AccountPane contaId={contaId} onClose={onClose} fabPortalTarget={fabPortalTarget} />
+      </div>
+      <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-40" aria-hidden="true" />
     </div>
   );
 }
@@ -252,7 +282,16 @@ function PaneDivider({ onDrag }: { onDrag: (deltaFraction: number) => void }) {
   );
 }
 
-function AccountPane({ contaId }: { contaId: string }) {
+function AccountPane({
+  contaId,
+  onClose,
+  fabPortalTarget,
+}: {
+  contaId: string;
+  /** Só passado quando há mais de 1 painel aberto — fecha este painel específico. */
+  onClose?: () => void;
+  fabPortalTarget?: HTMLDivElement | null;
+}) {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -498,7 +537,18 @@ function AccountPane({ contaId }: { contaId: string }) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
       {/* HEADER + DASHBOARD */}
-      <header className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+      <header className="relative overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar este painel"
+            title="Fechar este painel"
+            className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -553,6 +603,7 @@ function AccountPane({ contaId }: { contaId: string }) {
             onBack={() => setView({ type: "months" })}
             onMonthChange={(y, m) => setView({ type: "month", year: y, month: m })}
             embedded
+            fabPortalTarget={fabPortalTarget}
           />
         </div>
       ) : (

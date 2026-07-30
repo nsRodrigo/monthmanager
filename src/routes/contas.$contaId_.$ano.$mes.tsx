@@ -625,8 +625,10 @@ export function MonthDetailPane({
   const nextMonth = month === 11 ? { y: year + 1, m: 0 } : { y: year, m: month + 1 };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
-      {/* Top nav — sticky so the year picker stays accessible while scrolling */}
+    <div className={embedded ? "" : "mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10"}>
+      {/* Top nav — sticky so the year picker stays accessible while scrolling.
+          Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
+          já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
       <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6">
         <button
           type="button"
@@ -634,7 +636,7 @@ export function MonthDetailPane({
           className="inline-flex min-w-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4 shrink-0" />
-          <span className="truncate">{account.name}</span>
+          {!embedded && <span className="truncate">{account.name}</span>}
         </button>
         <MonthYearPicker
           contaId={contaId}

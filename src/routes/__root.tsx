@@ -442,21 +442,28 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <SidebarContent onNavigate={() => setMobileOpen(false)} />
       </aside>
       {!mobileOpen && (
-        <div
-          className="fixed inset-y-0 left-0 z-40 flex w-8 touch-none items-center md:hidden"
-          {...dragHandlers}
-          aria-hidden="true"
-        >
-          <div className="ml-1.5 h-14 w-1.5 rounded-full bg-border/70" />
+        <>
+          {/* Zona de arraste (swipe) — só o gesto. Fica separada do botão de
+              baixo pra não competir com o clique: um toque parado nessa faixa
+              não é um arraste (delta/velocidade ~0), então o handler de
+              arraste tentava "fechar" no mesmo instante em que o onClick do
+              botão tentava abrir — corrida que fazia o toque falhar às vezes. */}
+          <div
+            className="fixed inset-y-0 left-0 z-40 w-6 touch-none md:hidden"
+            {...dragHandlers}
+            aria-hidden="true"
+          />
+          {/* Botão de abrir — elemento independente, alvo de toque de 44px
+              (mínimo recomendado), sem nenhum handler de arraste por cima. */}
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Abrir menu"
-            className="pointer-events-auto absolute top-1/2 left-1 -translate-y-1/2 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            className="fixed left-2 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-elegant backdrop-blur-sm transition-colors hover:text-foreground md:hidden"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-5 w-5" />
           </button>
-        </div>
+        </>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">

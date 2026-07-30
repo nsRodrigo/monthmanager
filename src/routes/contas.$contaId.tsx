@@ -117,11 +117,8 @@ function PanesWorkspace() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <PaneTabs
-        accounts={accounts}
-        paneIds={paneIds}
         availableToAdd={availableToAdd}
         canAdd={paneIds.length < maxPanes && availableToAdd.length > 0}
-        onClose={closePane}
         onAdd={addPane}
       />
       <div className="flex min-h-0 flex-1 flex-row">
@@ -167,19 +164,19 @@ function PaneSlot({
   );
 }
 
+/**
+ * Barra fina no topo: só a volta pra Home e o "+" pra abrir outra conta ao
+ * lado (quem prefere teclado usa Ctrl/Cmd+clique numa conta da sidebar —
+ * ver `src/store/panes.tsx`). Sem chips por conta: cada painel já mostra o
+ * próprio nome no cabeçalho e tem seu próprio botão de fechar acima do card.
+ */
 function PaneTabs({
-  accounts,
-  paneIds,
   availableToAdd,
   canAdd,
-  onClose,
   onAdd,
 }: {
-  accounts: Account[];
-  paneIds: string[];
   availableToAdd: Account[];
   canAdd: boolean;
-  onClose: (id: string) => void;
   onAdd: (id: string) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -188,29 +185,6 @@ function PaneTabs({
       <Link to="/" className="mr-1 inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" /> Home
       </Link>
-      {paneIds.map((id) => {
-        const a = accounts.find((x) => x.id === id);
-        if (!a) return null;
-        return (
-          <span
-            key={id}
-            className="inline-flex items-center gap-2 rounded-full border border-primary/50 bg-card px-3 py-1.5 text-xs font-semibold"
-          >
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
-            <span className="truncate max-w-[10rem]">{a.name}</span>
-            {paneIds.length > 1 && (
-              <button
-                type="button"
-                onClick={() => onClose(id)}
-                aria-label={`Fechar painel de ${a.name}`}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </span>
-        );
-      })}
       {canAdd && (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
@@ -536,19 +510,22 @@ function AccountPane({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
-      {/* HEADER + DASHBOARD */}
-      <header className="relative overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
-        {onClose && (
+      {onClose && (
+        <div className="mb-2 flex justify-end">
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar este painel"
             title="Fechar este painel"
-            className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground hover:border-destructive/50 hover:text-destructive"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
+            Fechar painel
           </button>
-        )}
+        </div>
+      )}
+      {/* HEADER + DASHBOARD */}
+      <header className="relative overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"

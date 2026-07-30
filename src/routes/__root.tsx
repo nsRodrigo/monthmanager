@@ -8,7 +8,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
 import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
-import { PanesRegistryProvider, usePanes } from "@/store/panes";
+import { PanesRegistryProvider, usePanes, useMaxPanes } from "@/store/panes";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
@@ -204,7 +204,9 @@ function SidebarContent({
             : "border border-border text-foreground hover:bg-secondary"
         }`}
       >
-        <LayoutDashboard className="h-4 w-4 shrink-0" />
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+          <LayoutDashboard className="h-4 w-4" />
+        </span>
         <span className={`whitespace-nowrap ${labelClass}`}>Home</span>
       </Link>
 
@@ -228,7 +230,7 @@ function SidebarContent({
               title="Ctrl/Cmd+clique abre ao lado da conta atual"
               onClick={(e) => {
                 if ((e.ctrlKey || e.metaKey) && loc.pathname.startsWith("/contas/")) {
-                  panes.addPane(a.id);
+                  panes.splitIn(a.id);
                   e.preventDefault();
                   onNavigate?.();
                   return;
@@ -255,7 +257,9 @@ function SidebarContent({
           onClick={() => setManageOpen(true)}
           className="mt-2 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
         >
-          <Settings className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <Settings className="h-3.5 w-3.5" />
+          </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Gerenciar Conta</span>
         </button>
       </nav>
@@ -270,7 +274,9 @@ function SidebarContent({
               : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           }`}
         >
-          <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+          </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Importar planilha</span>
         </Link>
         <Link
@@ -282,7 +288,9 @@ function SidebarContent({
               : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           }`}
         >
-          <Receipt className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <Receipt className="h-3.5 w-3.5" />
+          </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Imposto de Renda</span>
         </Link>
         <Link
@@ -294,7 +302,9 @@ function SidebarContent({
               : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
           }`}
         >
-          <Cloud className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <Cloud className="h-3.5 w-3.5" />
+          </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Backup e sync</span>
         </Link>
         {isAdmin && (
@@ -307,7 +317,9 @@ function SidebarContent({
                 : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
             }`}
           >
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+              <ShieldCheck className="h-3.5 w-3.5" />
+            </span>
             <span className={`whitespace-nowrap ${labelClass}`}>Whitelist e usuários</span>
           </Link>
         )}
@@ -341,7 +353,9 @@ function SidebarContent({
           onClick={() => signOut()}
           className="mt-1 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
         >
-          <LogOut className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Sair</span>
         </button>
       </div>
@@ -458,33 +472,51 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Faixa fixa no rodapé, visível em qualquer tela fora de /contas/*, mostrando
- * as contas que ficaram com painel aberto — clicar num chip volta direto pra
- * lá (o estado do painel foi preservado por `PanesRegistryProvider`).
+ * Faixa fixa no rodapé com as contas "em segundo plano" — que já tiveram
+ * painel aberto nesta sessão mas não estão visíveis agora. Fora de
+ * /contas/*, clicar num chip abre só aquela conta (não reabre as outras
+ * juntas). Já dentro de /contas/*, clicar divide a tela — adiciona aquela
+ * conta ao lado da(s) que já está(ão) visível(is), respeitando o limite de
+ * painéis do tamanho de tela atual.
  */
 function PanesDock() {
-  const { panes } = usePanes();
+  const { panes, activeIds, splitIn } = usePanes();
+  const maxPanes = useMaxPanes();
   const location = useRouterState({ select: (s) => s.location });
   const { data: accounts = [] } = useAccounts();
   const navigate = useNavigate();
 
-  if (panes.length === 0 || location.pathname.startsWith("/contas/")) return null;
+  const backgrounded = panes.filter((p) => !activeIds.includes(p.contaId));
+  if (backgrounded.length === 0) return null;
+
+  const onContasRoute = location.pathname.startsWith("/contas/");
+  const canSplit = activeIds.length < maxPanes;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
       <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-border bg-card/95 px-3 py-2 shadow-elevated backdrop-blur-md">
         <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Painéis abertos
+          {onContasRoute ? "Abrir ao lado" : "Painéis abertos"}
         </span>
-        {panes.map((p) => {
+        {backgrounded.map((p) => {
           const a = accounts.find((x) => x.id === p.contaId);
           if (!a) return null;
+          const disabled = onContasRoute && !canSplit;
           return (
             <button
               key={p.contaId}
               type="button"
-              onClick={() => navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } })}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors hover:border-primary"
+              disabled={disabled}
+              onClick={() => {
+                if (onContasRoute) {
+                  splitIn(p.contaId);
+                } else {
+                  navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } });
+                }
+              }}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors ${
+                disabled ? "cursor-not-allowed opacity-40" : "hover:border-primary"
+              }`}
             >
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
               <span className="max-w-[8rem] truncate">{a.name}</span>

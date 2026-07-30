@@ -20,7 +20,7 @@ import {
   type Account,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
-import { usePanes, type PaneView } from "@/store/panes";
+import { usePanes, useMaxPanes, type PaneView, type PaneEntry } from "@/store/panes";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sparkline } from "@/components/Sparkline";
@@ -55,68 +55,47 @@ export const Route = createFileRoute("/contas/$contaId")({
 function PanesWorkspace() {
   const { contaId } = Route.useParams();
   const { data: accounts = [] } = useAccounts();
-  const { panes, setPanes, addPane, closePane, setView } = usePanes();
-  const [maxPanes, setMaxPanes] = useState(3);
+  const { panes, activeIds, openSingle, splitIn, closePane, setView, resizeAt, capActive } = usePanes();
+  const maxPanes = useMaxPanes();
 
-  // Garante que a conta da URL esteja aberta. Se ela já estava aberta —
-  // voltando de outra tela (Home, Backup...) ou clicando numa conta já em
-  // painel — preserva tudo como estava, inclusive os painéis irmãos e o mês
-  // que cada um mostrava. Só reseta pra um painel único quando é conta nova.
+  // Navegação normal (clicar numa conta, colar/digitar a URL) sempre reabre
+  // só essa conta — o mês que ela estava mostrando é reaproveitado (fica
+  // lembrado em `panes`), mas os outros painéis não voltam sozinhos. Pra ver
+  // duas contas lado a lado de novo, use Ctrl+clique ou o dock ("em segundo
+  // plano") — ver src/store/panes.tsx.
   useEffect(() => {
-    setPanes((prev) =>
-      prev.some((p) => p.contaId === contaId) ? prev : [{ contaId, view: { type: "months" }, size: 1 }],
-    );
-  }, [contaId, setPanes]);
-
-  useEffect(() => {
-    const update = () => {
-      const w = window.innerWidth;
-      setMaxPanes(w < 768 ? 1 : w >= 1280 ? 3 : 2);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    openSingle(contaId);
+  }, [contaId, openSingle]);
 
   useEffect(() => {
-    setPanes((prev) => (prev.length > maxPanes ? prev.slice(0, maxPanes) : prev));
-  }, [maxPanes, setPanes]);
+    capActive(maxPanes);
+  }, [maxPanes, capActive]);
 
-  const resizeAt = (index: number, deltaFraction: number) => {
-    setPanes((prev) => {
-      const total = prev.reduce((s, p) => s + p.size, 0);
-      const a = prev[index].size + deltaFraction * total;
-      const b = prev[index + 1].size - deltaFraction * total;
-      const min = total * 0.18;
-      if (a < min || b < min) return prev;
-      const next = [...prev];
-      next[index] = { ...next[index], size: a };
-      next[index + 1] = { ...next[index + 1], size: b };
-      return next;
-    });
-  };
+  const activeEntries = activeIds
+    .map((id) => panes.find((p) => p.contaId === id))
+    .filter((p): p is PaneEntry => !!p);
 
-  const availableToAdd = accounts.filter((a) => !panes.some((p) => p.contaId === a.id));
+  const availableToAdd = accounts.filter((a) => !activeIds.includes(a.id));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <PaneTabs
         availableToAdd={availableToAdd}
-        canAdd={panes.length < maxPanes && availableToAdd.length > 0}
-        onAdd={addPane}
+        canAdd={activeIds.length < maxPanes && availableToAdd.length > 0}
+        onAdd={splitIn}
       />
       <div className="flex min-h-0 flex-1 flex-row">
-        {panes.map((p, i) => (
+        {activeEntries.map((p, i) => (
           <Fragment key={p.contaId}>
             <div style={{ flexGrow: p.size, flexBasis: 0 }} className="min-w-0 min-h-0">
               <PaneSlot
                 contaId={p.contaId}
                 view={p.view}
                 onViewChange={(v) => setView(p.contaId, v)}
-                onClose={panes.length > 1 ? () => closePane(p.contaId) : undefined}
+                onClose={activeEntries.length > 1 ? () => closePane(p.contaId) : undefined}
               />
             </div>
-            {i < panes.length - 1 && (
+            {i < activeEntries.length - 1 && (
               <PaneDivider onDrag={(delta) => resizeAt(i, delta)} />
             )}
           </Fragment>

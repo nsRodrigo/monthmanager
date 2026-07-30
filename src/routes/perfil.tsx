@@ -4,7 +4,6 @@ import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { useIsAdmin } from "@/store/roles";
 import {
   User,
   Sun,
@@ -14,7 +13,6 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  ShieldCheck,
   ChevronLeft,
 } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
@@ -30,7 +28,6 @@ function ProfilePage() {
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
-  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
 
   const [name, setName] = useState(profile?.displayName ?? "");
@@ -98,7 +95,7 @@ function ProfilePage() {
   ];
 
   return (
-    <div className="mx-auto max-w-2xl px-5 py-8 md:py-12">
+    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
       <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" /> Home
       </Link>
@@ -178,23 +175,6 @@ function ProfilePage() {
           </div>
         </div>
 
-        {/* Administração (apenas admins) */}
-        {isAdmin && (
-          <div className="border-t border-border pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Administração
-            </p>
-            <Link
-              to="/admin/whitelist"
-              className="flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 text-left hover:bg-secondary/50"
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <ShieldCheck className="h-4 w-4 text-primary" /> Whitelist e usuários
-              </span>
-              <span className="text-xs text-muted-foreground">Abrir</span>
-            </Link>
-          </div>
-        )}
 
         {/* Segurança / Biometria */}
         <div className="border-t border-border pt-4">

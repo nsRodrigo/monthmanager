@@ -48,18 +48,20 @@ export function UndoRedoBar() {
     return () => window.clearTimeout(t);
   }, [pushVersion]);
 
-  if (!visible) return null;
+  // A barra fica disponível enquanto houver algo pra desfazer/refazer — o
+  // timer de 6s (`visible`) é só o destaque temporário de "acabou de fazer
+  // X", não o que controla se os botões existem.
   if (!canUndo && !canRedo) return null;
 
   return (
     <div
-      className={`pointer-events-none fixed bottom-4 right-4 z-50 transition-all duration-200 ${
-        visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
-      }`}
+      className="pointer-events-none fixed bottom-4 right-4 z-50 translate-y-0 opacity-100 transition-all duration-200"
       onMouseEnter={() => setVisible(true)}
     >
       <div
-        className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur"
+        className={`pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur transition-shadow duration-300 ${
+          visible ? "ring-2 ring-primary/40" : ""
+        }`}
         role="toolbar"
         aria-label="Desfazer e refazer"
       >

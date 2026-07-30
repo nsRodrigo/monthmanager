@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import {
   useAccounts,
   useCards,
@@ -17,6 +17,7 @@ import {
   getEffectiveCurrentMonth,
   normalizeZero,
   isCardVisibleInMonth,
+  type Account,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
@@ -32,17 +33,220 @@ import {
   ArrowDownRight,
   CreditCard,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 
 export const Route = createFileRoute("/contas/$contaId")({
   head: () => ({ meta: [{ title: "Conta — Finanças" }] }),
-  component: AccountHome,
+  component: PanesWorkspace,
 });
 
-function AccountHome() {
+/**
+ * Gerencia os painéis de contas abertos em paralelo lado a lado (desktop/
+ * tablet) ou empilhados (mobile). Clicar numa conta abre um painel; clicar
+ * em "+" na tira de abas abre outro ao lado, sem fechar os existentes.
+ */
+function PanesWorkspace() {
   const { contaId } = Route.useParams();
+  const { data: accounts = [] } = useAccounts();
+  const [paneIds, setPaneIds] = useState<string[]>([contaId]);
+  const [sizes, setSizes] = useState<number[]>([1]);
+  const [stacked, setStacked] = useState(false);
+  const [maxPanes, setMaxPanes] = useState(3);
+
+  // Reabre do zero quando a URL muda pra uma conta diferente (navegação normal).
+  useEffect(() => {
+    setPaneIds([contaId]);
+    setSizes([1]);
+  }, [contaId]);
+
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      setStacked(w < 768);
+      setMaxPanes(w >= 1280 ? 3 : 2);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    setPaneIds((ids) => (ids.length > maxPanes ? ids.slice(0, maxPanes) : ids));
+  }, [maxPanes]);
+
+  useEffect(() => {
+    setSizes((s) => (s.length === paneIds.length ? s : paneIds.map(() => 1)));
+  }, [paneIds]);
+
+  const addPane = (id: string) => {
+    setPaneIds((ids) => (ids.includes(id) || ids.length >= maxPanes ? ids : [...ids, id]));
+  };
+  const closePane = (id: string) => {
+    setPaneIds((ids) => (ids.length <= 1 ? ids : ids.filter((x) => x !== id)));
+  };
+  const resizeAt = (index: number, deltaFraction: number) => {
+    setSizes((prev) => {
+      const total = prev.reduce((s, v) => s + v, 0);
+      const a = prev[index] + deltaFraction * total;
+      const b = prev[index + 1] - deltaFraction * total;
+      const min = total * 0.18;
+      if (a < min || b < min) return prev;
+      const next = [...prev];
+      next[index] = a;
+      next[index + 1] = b;
+      return next;
+    });
+  };
+
+  const availableToAdd = accounts.filter((a) => !paneIds.includes(a.id));
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <PaneTabs
+        accounts={accounts}
+        paneIds={paneIds}
+        availableToAdd={availableToAdd}
+        canAdd={paneIds.length < maxPanes && availableToAdd.length > 0}
+        onClose={closePane}
+        onAdd={addPane}
+      />
+      <div className={`flex min-h-0 flex-1 ${stacked ? "flex-col" : "flex-row"}`}>
+        {paneIds.map((id, i) => (
+          <Fragment key={id}>
+            <div style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }} className="min-w-0 min-h-0 overflow-y-auto">
+              <AccountPane contaId={id} />
+            </div>
+            {i < paneIds.length - 1 && (
+              <PaneDivider stacked={stacked} onDrag={(delta) => resizeAt(i, delta)} />
+            )}
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PaneTabs({
+  accounts,
+  paneIds,
+  availableToAdd,
+  canAdd,
+  onClose,
+  onAdd,
+}: {
+  accounts: Account[];
+  paneIds: string[];
+  availableToAdd: Account[];
+  canAdd: boolean;
+  onClose: (id: string) => void;
+  onAdd: (id: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <div className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border/60 bg-background/85 px-4 py-2.5 backdrop-blur-md md:px-6">
+      <Link to="/" className="mr-1 inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="h-4 w-4" /> Home
+      </Link>
+      {paneIds.map((id) => {
+        const a = accounts.find((x) => x.id === id);
+        if (!a) return null;
+        return (
+          <span
+            key={id}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/50 bg-card px-3 py-1.5 text-xs font-semibold"
+          >
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
+            <span className="truncate max-w-[10rem]">{a.name}</span>
+            {paneIds.length > 1 && (
+              <button
+                type="button"
+                onClick={() => onClose(id)}
+                aria-label={`Fechar painel de ${a.name}`}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </span>
+        );
+      })}
+      {canAdd && (
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Abrir outra conta ao lado"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-1.5">
+            {availableToAdd.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => {
+                  onAdd(a.id);
+                  setPickerOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-secondary"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
+                <span className="truncate">{a.name}</span>
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+      )}
+    </div>
+  );
+}
+
+function PaneDivider({ stacked, onDrag }: { stacked: boolean; onDrag: (deltaFraction: number) => void }) {
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const draggingRef = useRef(false);
+  const lastPosRef = useRef(0);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = true;
+    lastPosRef.current = stacked ? e.clientY : e.clientX;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current || !elRef.current?.parentElement) return;
+    const pos = stacked ? e.clientY : e.clientX;
+    const delta = pos - lastPosRef.current;
+    lastPosRef.current = pos;
+    const rect = elRef.current.parentElement.getBoundingClientRect();
+    const containerSize = stacked ? rect.height : rect.width;
+    if (containerSize > 0) onDrag(delta / containerSize);
+  };
+  const onPointerUp = () => {
+    draggingRef.current = false;
+  };
+
+  return (
+    <div
+      ref={elRef}
+      role="separator"
+      aria-orientation={stacked ? "horizontal" : "vertical"}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      className={`flex shrink-0 touch-none items-center justify-center bg-border text-muted-foreground hover:bg-primary/30 ${
+        stacked ? "h-3 w-full cursor-row-resize" : "w-3 cursor-col-resize"
+      }`}
+    >
+      <span className="select-none text-xs">{stacked ? "⋯" : "⋮"}</span>
+    </div>
+  );
+}
+
+function AccountPane({ contaId }: { contaId: string }) {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -139,19 +343,6 @@ function AccountHome() {
   const [openYear, setOpenYear] = useState(false);
   const [openAddMonth, setOpenAddMonth] = useState(false);
   const [openReorganize, setOpenReorganize] = useState(false);
-  const headerRef = useRef<HTMLElement | null>(null);
-  const [headerOut, setHeaderOut] = useState(false);
-
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => setHeaderOut(!entry.isIntersecting),
-      { threshold: 0, rootMargin: "-60px 0px 0px 0px" },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
 
   const monthlyBalances = useMemo(() => {
     if (!account) return new Map<string, number>();
@@ -293,20 +484,8 @@ function AccountHome() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
-      {/* Sticky top bar — breadcrumb + year picker */}
-      <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6" data-stuck={headerOut}>
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground shrink-0 min-w-0"
-        >
-          <ChevronLeft className="h-4 w-4 shrink-0" />
-          <span className="truncate">Consolidado</span>
-        </Link>
-        <YearPickerChip compact />
-      </div>
-
       {/* HEADER + DASHBOARD */}
-      <header ref={headerRef} className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+      <header className="overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -352,8 +531,13 @@ function AccountHome() {
 
 
 
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-muted-foreground">Meses</p>
+        <YearPickerChip compact />
+      </div>
+
       {/* MONTHS LIST — only months that have any value */}
-      <div className="mt-4 space-y-2">
+      <div className="mt-2 space-y-2">
         {monthsForYear.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
             <p className="text-sm text-muted-foreground">

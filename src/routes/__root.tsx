@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, X, User, Receipt, Cloud, ChevronRight } from "lucide-react";
+import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Receipt, Cloud, ShieldCheck, Plus } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -10,12 +10,14 @@ import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
+import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
 import { ConfirmProvider } from "@/store/confirm";
 import { UndoRedoBar } from "@/components/UndoRedoBar";
+import { FabAction } from "@/components/FabAction";
 import { history } from "@/store/history";
 
 const queryClient = new QueryClient({
@@ -28,80 +30,6 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
   carteira: Wallet,
   investimento: TrendingUp,
 };
-
-const DRAWER_WIDTH = 288; // 18rem (w-72)
-
-function SwipeEdge({
-  onOpen,
-  hidden,
-  onDrag,
-  onDragEnd,
-}: {
-  onOpen: () => void;
-  hidden: boolean;
-  onDrag: (dx: number) => void;
-  onDragEnd: (dx: number) => void;
-}) {
-  const stateRef = useState<{ x: number | null; y: number | null; active: boolean }>({
-    x: null,
-    y: null,
-    active: false,
-  })[0];
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    stateRef.x = t.clientX;
-    stateRef.y = t.clientY;
-    stateRef.active = false;
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (stateRef.x == null || stateRef.y == null) return;
-    const t = e.touches[0];
-    const dx = t.clientX - stateRef.x;
-    const dy = Math.abs(t.clientY - stateRef.y);
-    if (!stateRef.active && dx > 8 && dy < 40) {
-      stateRef.active = true;
-    }
-    if (stateRef.active) {
-      onDrag(Math.max(0, Math.min(dx, DRAWER_WIDTH)));
-    }
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (stateRef.x != null) {
-      const t = e.changedTouches[0];
-      const dx = t ? t.clientX - stateRef.x : 0;
-      if (stateRef.active) {
-        onDragEnd(Math.max(0, Math.min(dx, DRAWER_WIDTH)));
-      } else {
-        onDragEnd(0);
-      }
-    }
-    stateRef.x = null;
-    stateRef.y = null;
-    stateRef.active = false;
-  };
-
-  if (hidden) return null;
-  return (
-    <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchEnd}
-      className="fixed inset-y-0 left-0 z-40 w-6 md:hidden"
-      aria-hidden="true"
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label="Abrir menu"
-        className="pointer-events-auto absolute top-1/2 left-0 -translate-y-1/2 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
 
 function NotFoundComponent() {
   return (
@@ -175,153 +103,147 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * Menu de navegação flutuante — substitui o antigo menu lateral em todos os
+ * tamanhos de tela. Fica no canto inferior esquerdo (a tela de meses já usa
+ * o canto inferior direito para o FAB de "adicionar lançamento").
+ */
+function FloatingMenu() {
   const loc = useLocation();
+  const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
+  const isAdmin = useIsAdmin();
+  const [open, setOpen] = useState(false);
+  const [showAccounts, setShowAccounts] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
-  const isConsolidated = loc.pathname === "/";
+  useEffect(() => {
+    setOpen(false);
+    setShowAccounts(false);
+  }, [loc.pathname]);
 
-  const displayName = profile?.displayName || user?.email?.split("@")[0] || "Você";
-  const initials = displayName
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const close = () => {
+    setOpen(false);
+    setShowAccounts(false);
+  };
+
+  const go = (to: string) => {
+    close();
+    navigate({ to });
+  };
 
   return (
     <>
-      <div className="mb-6 flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-          <Wallet className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <span className="text-lg font-bold tracking-tight">Gestão Financeira</span>
-      </div>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+          onClick={close}
+          aria-hidden="true"
+        />
+      )}
 
-      <Link
-        to="/"
-        onClick={onNavigate}
-        className={`mb-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-          isConsolidated
-            ? "bg-gradient-primary text-primary-foreground shadow-glow"
-            : "border border-border text-foreground hover:bg-secondary"
-        }`}
-      >
-        <LayoutDashboard className="h-4 w-4" />
-        Home
-      </Link>
-
-      <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Contas
-      </p>
-      <nav className="flex-1 space-y-1 overflow-y-auto">
-        {accounts.length === 0 && (
-          <p className="px-2 py-3 text-xs text-muted-foreground">
-            Nenhuma conta. Clique em <strong>Adicionar conta</strong>.
-          </p>
-        )}
-        {accounts.map((a) => {
-          const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-          const active = loc.pathname.startsWith(`/contas/${a.id}`);
-          return (
+      <div className="fixed bottom-5 left-4 z-50 flex flex-col items-start gap-2.5 md:bottom-6 md:left-6">
+        {open && showAccounts && (
+          <div className="mb-1 max-h-[60vh] w-64 overflow-y-auto rounded-2xl border border-border bg-card p-2 shadow-elevated">
             <Link
-              key={a.id}
-              to="/contas/$contaId"
-              params={{ contaId: a.id }}
-              onClick={onNavigate}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                active
-                  ? "bg-secondary text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+              to="/"
+              onClick={close}
+              className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium ${
+                loc.pathname === "/" ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
               }`}
             >
-              <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                style={{ backgroundColor: a.color + "25", color: a.color }}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </div>
-              <span className="truncate">{a.name}</span>
+              <LayoutDashboard className="h-4 w-4" /> Home
             </Link>
-          );
-        })}
-        <button
-          onClick={() => setManageOpen(true)}
-          className="mt-2 flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-        >
-          <Settings className="h-3.5 w-3.5" /> Gerenciar Conta
-        </button>
-      </nav>
-
-      <div className="mt-4 space-y-1 border-t border-border pt-4">
-        <Link
-          to="/importar-historico"
-          onClick={onNavigate}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/importar-historico"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5" /> Importar planilha
-        </Link>
-        <Link
-          to="/irpf"
-          onClick={onNavigate}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-            loc.pathname.startsWith("/irpf")
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <Receipt className="h-3.5 w-3.5" /> Imposto de Renda
-        </Link>
-        <Link
-          to="/backup"
-          onClick={onNavigate}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/backup"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <Cloud className="h-3.5 w-3.5" /> Backup e sync
-        </Link>
-      </div>
-
-      <div className="mt-4 border-t border-border pt-4">
-        <Link
-          to="/perfil"
-          onClick={onNavigate}
-          className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-secondary"
-          aria-label="Abrir meu perfil"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground">
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-              />
-            ) : (
-              initials || <User className="h-4 w-4" aria-hidden="true" />
+            <p className="mb-1 px-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Contas
+            </p>
+            {accounts.length === 0 && (
+              <p className="px-2 py-2 text-xs text-muted-foreground">Nenhuma conta ainda.</p>
             )}
+            {accounts.map((a) => {
+              const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
+              return (
+                <Link
+                  key={a.id}
+                  to="/contas/$contaId"
+                  params={{ contaId: a.id }}
+                  onClick={close}
+                  className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                >
+                  <div
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: a.color + "25", color: a.color }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="truncate">{a.name}</span>
+                </Link>
+              );
+            })}
+            <button
+              onClick={() => {
+                setManageOpen(true);
+                close();
+              }}
+              className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-border px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            >
+              <Settings className="h-3.5 w-3.5" /> Gerenciar contas
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold">{displayName}</p>
-            <p className="truncate text-[10px] text-muted-foreground">{user?.email}</p>
+        )}
+
+        {open && !showAccounts && (
+          <div className="flex flex-col items-start gap-2.5">
+            <FabAction icon={LogOut} label="Sair" tone="debit" onClick={() => signOut()} />
+            <FabAction icon={User} label="Meu perfil" tone="income" onClick={() => go("/perfil")} />
+            {isAdmin && (
+              <FabAction
+                icon={ShieldCheck}
+                label="Whitelist e usuários"
+                tone="primary"
+                onClick={() => go("/admin/whitelist")}
+              />
+            )}
+            <FabAction icon={Cloud} label="Backup e sync" tone="primary" onClick={() => go("/backup")} />
+            <FabAction icon={Receipt} label="Imposto de Renda" tone="primary" onClick={() => go("/irpf")} />
+            <FabAction
+              icon={FileSpreadsheet}
+              label="Importar planilha"
+              tone="primary"
+              onClick={() => go("/importar-historico")}
+            />
+            <FabAction
+              icon={Wallet}
+              label="Trocar de conta"
+              tone="income"
+              onClick={() => setShowAccounts(true)}
+            />
           </div>
-        </Link>
+        )}
+
         <button
-          onClick={() => signOut()}
-          className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+          type="button"
+          onClick={() => (showAccounts ? close() : setOpen((v) => !v))}
+          aria-label={open ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={open}
+          className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${
+            open ? "rotate-45" : ""
+          }`}
         >
-          <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> Sair
+          {open ? (
+            <Plus className="h-6 w-6" />
+          ) : profile?.avatarUrl ? (
+            <img
+              src={profile.avatarUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+            />
+          ) : (
+            <Plus className="h-6 w-6" />
+          )}
         </button>
       </div>
 
@@ -335,8 +257,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [dragX, setDragX] = useState(0);
 
   const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
 
@@ -353,11 +273,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!user) history.clear();
   }, [user?.id]);
 
-  // close mobile drawer on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -369,65 +284,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!user && !isPublic) return null;
   if (isPublic) return <>{children}</>;
 
-  // Drag offset (0..DRAWER_WIDTH) for the swipe-to-open drawer animation.
-  const dragging = dragX > 0 && !mobileOpen;
-  const translatePx = mobileOpen ? 0 : dragX - DRAWER_WIDTH;
-  const overlayOpacity = mobileOpen ? 1 : dragX / DRAWER_WIDTH;
-
-  const handleDragEnd = (dx: number) => {
-    if (dx > DRAWER_WIDTH / 3) {
-      setMobileOpen(true);
-    }
-    setDragX(0);
-  };
-
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col self-start overflow-y-auto border-r border-border bg-card/40 p-5 md:flex">
-        <SidebarContent />
-      </aside>
-
-      {/* Mobile drawer (always mounted so open/close can animate smoothly) */}
-      <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
-        style={{
-          opacity: overlayOpacity,
-          transition: dragging ? "none" : "opacity 300ms ease-out",
-          pointerEvents: mobileOpen || dragging ? "auto" : "none",
-        }}
-        onClick={() => setMobileOpen(false)}
-        aria-hidden={!mobileOpen && !dragging}
-      />
-      <aside
-        className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card p-5 md:hidden"
-        style={{
-          transform: `translateX(${translatePx}px)`,
-          transition: dragging ? "none" : "transform 300ms ease-out",
-          pointerEvents: mobileOpen ? "auto" : "none",
-        }}
-        aria-hidden={!mobileOpen && !dragging}
-      >
-        <SidebarContent onNavigate={() => setMobileOpen(false)} />
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Swipe-from-left edge / tap-to-open menu (mobile) */}
-        <SwipeEdge
-          onOpen={() => setMobileOpen(true)}
-          hidden={mobileOpen}
-          onDrag={setDragX}
-          onDragEnd={handleDragEnd}
-        />
-
-
-        <a href="#main-content" className="skip-link">
-          Pular para o conteúdo
-        </a>
-        <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
-          {children}
-        </main>
-      </div>
+    <div className="min-h-screen bg-background">
+      <a href="#main-content" className="skip-link">
+        Pular para o conteúdo
+      </a>
+      <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
+        {children}
+      </main>
+      <FloatingMenu />
     </div>
   );
 }

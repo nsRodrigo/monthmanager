@@ -182,7 +182,7 @@ function WhitelistAdmin() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-5 py-8 md:py-12">
+    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
       <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-4 w-4" /> Home
       </Link>

@@ -1456,7 +1456,7 @@ function MonthSummaryFrame({
 }) {
   const saldoFinal = saldoAtual - gastosTotais;
   return (
-    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+    <div className="animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-gradient-card p-3 shadow-elegant sm:p-4">
       <div
         className={`rounded-xl border p-3 ${saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10"}`}
       >

@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Receipt, Cloud, ShieldCheck, ChevronRight } from "lucide-react";
+import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Receipt, Cloud, ShieldCheck } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -34,35 +34,66 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
 const DRAWER_WIDTH = 288; // 18rem (w-72)
 
 /**
- * Estado + gestos de arraste da gaveta mobile — abre/fecha tanto pela zona
- * de borda (fechada) quanto arrastando a própria gaveta (aberta). Aciona por
- * distância OU velocidade do gesto (um flick curto e rápido já abre/fecha),
- * diferente da versão anterior que só considerava distância.
+ * Estado + gestos de arraste da gaveta mobile. Dois modos, no mesmo hook:
+ * - Gaveta ABERTA: arrastar nela fecha de cara (é uma superfície pequena e
+ *   dedicada — qualquer arraste ali só pode significar "fechar").
+ * - Conteúdo FECHADO: o gesto é ambíguo (pode ser um toque num botão, uma
+ *   rolagem vertical, ou o swipe de abrir o menu), por isso só "assume" que é
+ *   swipe-de-abrir depois de confirmar movimento predominantemente horizontal
+ *   pra direita além de um limiar — só a partir daí mexe no estado. Um toque
+ *   parado ou uma rolagem normal nunca chegam a acionar nada aqui, então
+ *   cliques/scroll no resto da tela continuam funcionando por baixo.
  */
 function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
   const [dragX, setDragX] = useState<number | null>(null);
-  const startRef = useRef<{ x: number; t: number; base: number } | null>(null);
+  const startRef = useRef<{ x: number; y: number; t: number; base: number } | null>(null);
+  const committedRef = useRef(false);
 
   const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     const base = open ? DRAWER_WIDTH : 0;
-    startRef.current = { x: e.clientX, t: performance.now(), base };
-    setDragX(base);
-    e.currentTarget.setPointerCapture(e.pointerId);
+    startRef.current = { x: e.clientX, y: e.clientY, t: performance.now(), base };
+    if (open) {
+      committedRef.current = true;
+      setDragX(base);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } else {
+      committedRef.current = false;
+    }
   };
   const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
     const start = startRef.current;
     if (!start) return;
-    const delta = e.clientX - start.x;
-    setDragX(Math.max(0, Math.min(DRAWER_WIDTH, start.base + delta)));
+    const dx = e.clientX - start.x;
+    if (!committedRef.current) {
+      const dy = e.clientY - start.y;
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // ainda ambíguo — espera mais movimento
+      const horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
+      if (!horizontal || dx <= 0) {
+        startRef.current = null; // era rolagem vertical ou arraste pra esquerda — não é o gesto de abrir
+        return;
+      }
+      committedRef.current = true;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // alguns navegadores recusam capturar fora de um pointerdown — sem problema, o arraste ainda funciona.
+      }
+    }
+    setDragX(Math.max(0, Math.min(DRAWER_WIDTH, start.base + dx)));
   };
   const onPointerUp = () => {
     const start = startRef.current;
-    if (!start) return;
+    startRef.current = null;
+    if (!start || !committedRef.current) {
+      committedRef.current = false;
+      setDragX(null);
+      return;
+    }
+    committedRef.current = false;
     const pos = dragX ?? start.base;
     const dt = Math.max(1, performance.now() - start.t);
     const delta = pos - start.base;
     const velocity = delta / dt; // px/ms
-    startRef.current = null;
     setDragX(null);
     const shouldOpen = open
       ? !(delta < -DRAWER_WIDTH * 0.22 || velocity < -0.35)
@@ -441,32 +472,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       >
         <SidebarContent onNavigate={() => setMobileOpen(false)} />
       </aside>
-      {!mobileOpen && (
-        <>
-          {/* Zona de arraste (swipe) — só o gesto. Fica separada do botão de
-              baixo pra não competir com o clique: um toque parado nessa faixa
-              não é um arraste (delta/velocidade ~0), então o handler de
-              arraste tentava "fechar" no mesmo instante em que o onClick do
-              botão tentava abrir — corrida que fazia o toque falhar às vezes. */}
-          <div
-            className="fixed inset-y-0 left-0 z-40 w-6 touch-none md:hidden"
-            {...dragHandlers}
-            aria-hidden="true"
-          />
-          {/* Botão de abrir — elemento independente, alvo de toque de 44px
-              (mínimo recomendado), sem nenhum handler de arraste por cima. */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Abrir menu"
-            className="fixed left-2 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card/95 text-muted-foreground shadow-elegant backdrop-blur-sm transition-colors hover:text-foreground md:hidden"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </>
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div
+        className="flex min-w-0 flex-1 flex-col"
+        style={{ touchAction: "pan-y" }}
+        {...(!mobileOpen ? dragHandlers : {})}
+      >
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
         </a>

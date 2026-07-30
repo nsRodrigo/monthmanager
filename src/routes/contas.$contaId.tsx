@@ -140,10 +140,11 @@ function PaneSlot({
 }
 
 /**
- * Barra fina no topo: só a volta pra Home e o "+" pra abrir outra conta ao
- * lado (quem prefere teclado usa Ctrl/Cmd+clique numa conta da sidebar —
- * ver `src/store/panes.tsx`). Sem chips por conta: cada painel já mostra o
- * próprio nome no cabeçalho e tem seu próprio botão de fechar acima do card.
+ * Barra fina no topo: só o "+" pra abrir outra conta ao lado (quem prefere
+ * teclado usa Ctrl/Cmd+clique numa conta da sidebar — ver
+ * `src/store/panes.tsx`). Sem link de volta pra Home aqui — cada painel já
+ * tem sua própria seta de voltar no topo (ver `AccountPane`), e some
+ * totalmente quando não há conta disponível pra abrir ao lado.
  */
 function PaneTabs({
   availableToAdd,
@@ -155,11 +156,9 @@ function PaneTabs({
   onAdd: (id: string) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  if (!canAdd) return null;
   return (
-    <div className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border/60 bg-background/85 px-4 py-2.5 backdrop-blur-md md:px-6">
-      <Link to="/" className="mr-1 inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="h-4 w-4" /> Home
-      </Link>
+    <div className="sticky top-0 z-30 flex flex-wrap items-center justify-end gap-2 border-b border-border/60 bg-background/85 px-4 py-2.5 backdrop-blur-md md:px-6">
       {canAdd && (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
@@ -497,13 +496,25 @@ function AccountPane({
         </div>
       )}
       {view.type !== "month" && (
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-muted-foreground">Meses</p>
-          <YearPickerChip compact />
-        </div>
+        <>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <Link
+              to="/"
+              aria-label="Voltar para a Home"
+              title="Voltar para a Home"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Link>
+            <YearPickerChip compact />
+          </div>
+          <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
+            Meses de {year}
+          </h1>
+        </>
       )}
       {/* HEADER + DASHBOARD */}
-      <header className="relative overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+      <header className="relative animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -549,6 +560,7 @@ function AccountPane({
 
 
 
+      <div key={view.type === "month" ? `${view.year}-${view.month}` : "months"} className="animate-fade-slide-in">
       {view.type === "month" ? (
         <div className="mt-4">
           <MonthDetailPane
@@ -680,6 +692,7 @@ function AccountPane({
       </div>
       </>
       )}
+      </div>
 
       <AddMonthDialog
         open={openAddMonth}

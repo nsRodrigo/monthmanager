@@ -244,9 +244,34 @@
     color: var(--color-muted-foreground);
     font-weight: 500;
   }
+
+  /* Feedback tátil ao clicar em qualquer botão — sutil, some se o botão já
+     define sua própria transform (ex.: o FAB que gira 45°). */
+  button:not(:disabled) {
+    transition: transform 120ms ease;
+  }
+  button:not(:disabled):active {
+    transform: scale(0.96);
+  }
 }
 
 @layer utilities {
+  /* Entrada suave de cards/telas — usado ao trocar de mês/ano dentro de um
+     painel, ou quando uma lista de cards aparece pela primeira vez. */
+  @keyframes fade-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-fade-slide-in {
+    animation: fade-slide-in 0.28s ease both;
+  }
+
   .bg-gradient-primary { background-image: var(--gradient-primary); }
   .bg-gradient-credit { background-image: var(--gradient-credit); }
   .bg-gradient-debit { background-image: var(--gradient-debit); }

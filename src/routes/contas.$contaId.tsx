@@ -105,7 +105,7 @@ function PanesWorkspace() {
   const availableToAdd = accounts.filter((a) => !paneIds.includes(a.id));
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden">
       <PaneTabs
         accounts={accounts}
         paneIds={paneIds}
@@ -117,7 +117,14 @@ function PanesWorkspace() {
       <div className="flex min-h-0 flex-1 flex-row">
         {paneIds.map((id, i) => (
           <Fragment key={id}>
-            <div style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }} className="min-w-0 min-h-0 overflow-y-auto">
+            {/* `relative` + `overflow-y-auto` própria de cada painel: rola sozinho
+                (não a página inteira), e é a âncora do FAB "absolute" do painel
+                (embedded=true em AccountPane) — sem isso o FAB usaria `fixed` e
+                apareceria só 1x, por cima de tudo, na tela toda. */}
+            <div
+              style={{ flexGrow: sizes[i] ?? 1, flexBasis: 0 }}
+              className="relative min-w-0 min-h-0 overflow-y-auto"
+            >
               <AccountPane contaId={id} />
             </div>
             {i < paneIds.length - 1 && (
@@ -545,6 +552,7 @@ function AccountPane({ contaId }: { contaId: string }) {
             month={view.month}
             onBack={() => setView({ type: "months" })}
             onMonthChange={(y, m) => setView({ type: "month", year: y, month: m })}
+            embedded
           />
         </div>
       ) : (

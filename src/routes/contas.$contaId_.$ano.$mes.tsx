@@ -117,12 +117,20 @@ export function MonthDetailPane({
   month,
   onBack,
   onMonthChange,
+  embedded = false,
 }: {
   contaId: string;
   year: number;
   month: number;
   onBack: () => void;
   onMonthChange: (year: number, month: number) => void;
+  /**
+   * Quando true, roda dentro de um painel do PanesWorkspace: o FAB e seu
+   * scrim ficam `absolute` (presos ao painel, que é `position: relative` e
+   * tem seu próprio scroll) em vez de `fixed` (que ficaria preso à tela
+   * inteira e por cima de qualquer outro painel aberto ao lado).
+   */
+  embedded?: boolean;
 }) {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
@@ -1272,12 +1280,14 @@ export function MonthDetailPane({
 
       {fabOpen && (
         <div
-          className="fixed inset-0 z-30"
+          className={`${embedded ? "absolute" : "fixed"} inset-0 z-30`}
           onClick={() => setFabOpen(false)}
           aria-hidden="true"
         />
       )}
-      <div className="fixed bottom-6 right-4 z-40 flex flex-col items-end gap-3 md:right-8">
+      <div
+        className={`${embedded ? "absolute" : "fixed"} bottom-6 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+      >
         {fabOpen && (
           <div className="flex flex-col items-end gap-2.5">
             <FabAction

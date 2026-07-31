@@ -35,18 +35,22 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
 const DRAWER_WIDTH = 288; // 18rem (w-72)
 
 /**
- * Estado + gestos de arraste da gaveta mobile.
+ * Estado + gestos de arraste da gaveta mobile — a gaveta entra pela BORDA
+ * DIREITA (mesmo lado do ícone de menu, que também fica à direita em cada
+ * tela). `visible` é quantos px dela já estão à mostra, vindo da direita:
+ * 0 = escondida, DRAWER_WIDTH = totalmente aberta.
  * - Fechar (gaveta ABERTA): handlers JSX normais, presos só na própria
  *   `<aside>` — uma superfície pequena e dedicada, sem ambiguidade possível.
+ *   Arrastar pra DIREITA fecha (empurra de volta pra fora da tela).
  * - Abrir (conteúdo FECHADO): ouvido no `window` inteiro (não preso a nenhum
  *   elemento específico do layout, então funciona em qualquer parte da
  *   tela) e só "assume" o gesto depois de confirmar arraste horizontal pra
- *   direita além de um limiar — até lá, não mexe em nada, então toques e
+ *   ESQUERDA além de um limiar — até lá, não mexe em nada, então toques e
  *   rolagem normal continuam intactos por baixo. Sempre `passive`, nunca
  *   chama preventDefault — não compete com o scroll nativo.
  */
 function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
-  const [dragX, setDragX] = useState<number | null>(null);
+  const [dragVisible, setDragVisible] = useState<number | null>(null);
   const openRef = useRef(open);
   useEffect(() => {
     openRef.current = open;
@@ -55,24 +59,25 @@ function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
   const closeStartRef = useRef<{ x: number; t: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     closeStartRef.current = { x: e.clientX, t: performance.now() };
-    setDragX(DRAWER_WIDTH);
+    setDragVisible(DRAWER_WIDTH);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
     const start = closeStartRef.current;
     if (!start) return;
-    setDragX(Math.max(0, Math.min(DRAWER_WIDTH, DRAWER_WIDTH + (e.clientX - start.x))));
+    const dx = e.clientX - start.x; // positivo = arrastando pra direita (fechando)
+    setDragVisible(Math.max(0, Math.min(DRAWER_WIDTH, DRAWER_WIDTH - dx)));
   };
   const onPointerUp = () => {
     const start = closeStartRef.current;
     closeStartRef.current = null;
     if (!start) return;
-    const pos = dragX ?? DRAWER_WIDTH;
+    const visible = dragVisible ?? DRAWER_WIDTH;
     const dt = Math.max(1, performance.now() - start.t);
-    const delta = pos - DRAWER_WIDTH;
-    const velocity = delta / dt; // px/ms
-    setDragX(null);
-    setOpen(!(delta < -DRAWER_WIDTH * 0.22 || velocity < -0.35));
+    const hidden = DRAWER_WIDTH - visible; // quanto já escondeu
+    const velocityHide = hidden / dt; // px/ms, positivo = escondendo rápido
+    setDragVisible(null);
+    setOpen(!(hidden > DRAWER_WIDTH * 0.22 || velocityHide > 0.35));
   };
 
   useEffect(() => {
@@ -90,28 +95,28 @@ function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
       if (!committed) {
         const dy = e.clientY - start.y;
         if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // ainda ambíguo — espera mais movimento
-        if (Math.abs(dx) <= Math.abs(dy) * 1.3 || dx <= 0) {
-          start = null; // era rolagem vertical ou arraste pra esquerda — não é o gesto de abrir
+        if (Math.abs(dx) <= Math.abs(dy) * 1.3 || dx >= 0) {
+          start = null; // era rolagem vertical ou arraste pra direita — não é o gesto de abrir
           return;
         }
         committed = true;
       }
-      setDragX(Math.max(0, Math.min(DRAWER_WIDTH, dx)));
+      setDragVisible(Math.max(0, Math.min(DRAWER_WIDTH, -dx)));
     };
     const onUp = (e: PointerEvent) => {
       const s = start;
       start = null;
       if (!s || !committed) {
         committed = false;
-        setDragX(null);
+        setDragVisible(null);
         return;
       }
       committed = false;
       const dt = Math.max(1, performance.now() - s.t);
-      const dx = e.clientX - s.x;
-      const velocity = dx / dt;
-      setDragX(null);
-      setOpen(dx > DRAWER_WIDTH * 0.22 || velocity > 0.35);
+      const dx = e.clientX - s.x; // negativo (arrastou pra esquerda)
+      const velocity = -dx / dt; // positivo = abrindo rápido
+      setDragVisible(null);
+      setOpen(-dx > DRAWER_WIDTH * 0.22 || velocity > 0.35);
     };
 
     window.addEventListener("pointerdown", onDown, { passive: true });
@@ -126,11 +131,11 @@ function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
     };
   }, [setOpen]);
 
-  const pos = dragX ?? (open ? DRAWER_WIDTH : 0);
-  const dragging = dragX !== null;
+  const visible = dragVisible ?? (open ? DRAWER_WIDTH : 0);
+  const dragging = dragVisible !== null;
   return {
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
-    pos,
+    visible,
     dragging,
   };
 }
@@ -427,7 +432,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { handlers: dragHandlers, pos: dragPos, dragging } = useSwipeDrawer(mobileOpen, setMobileOpen);
+  const { handlers: dragHandlers, visible: dragVisible, dragging } = useSwipeDrawer(mobileOpen, setMobileOpen);
 
   const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
 
@@ -460,8 +465,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!user && !isPublic) return null;
   if (isPublic) return <>{children}</>;
 
-  const translatePx = dragPos - DRAWER_WIDTH;
-  const overlayOpacity = dragPos / DRAWER_WIDTH;
+  const translatePx = DRAWER_WIDTH - dragVisible;
+  const overlayOpacity = dragVisible / DRAWER_WIDTH;
   const transition = dragging ? "none" : "180ms ease-out";
 
   return (
@@ -474,7 +479,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <SidebarContent labelClass="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity" />
       </aside>
 
-      {/* Mobile: gaveta cheia, aberta por toque no ícone, arraste da borda, ou arrastando a própria gaveta */}
+      {/* Mobile: gaveta cheia, entra pela direita — aberta pelo ícone ☰ de cada
+          tela, arrastando pra esquerda em qualquer ponto, ou arrastando a
+          própria gaveta pra direita pra fechar. */}
       <div
         className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
         style={{
@@ -486,7 +493,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         aria-hidden={!mobileOpen && !dragging}
       />
       <aside
-        className="fixed inset-y-0 left-0 z-50 flex w-72 touch-none flex-col border-r border-border bg-card p-5 md:hidden"
+        className="fixed inset-y-0 right-0 z-50 flex w-72 touch-none flex-col border-l border-border bg-card p-5 md:hidden"
         style={{
           transform: `translateX(${translatePx}px)`,
           transition: `transform ${transition}`,

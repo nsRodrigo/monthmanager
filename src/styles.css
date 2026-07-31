@@ -272,36 +272,21 @@
     animation: fade-slide-in 0.28s ease both;
   }
 
-  /* Modal/diálogo: sobe grudado na borda de baixo (bottom sheet) no mobile —
-     no desktop/tablet (onde o diálogo já aparece centralizado), só uma
-     subida leve + fade, sem vir de fora da tela. */
-  @keyframes sheet-up-mobile {
-    from {
-      transform: translateY(100%);
-    }
-    to {
-      transform: translateY(0);
-    }
-  }
-  @keyframes sheet-up-desktop {
+  /* Modal/diálogo: sempre centralizado na tela (mobile e desktop), com leve
+     zoom + fade — nunca vindo de fora da área visível, então não depende de
+     onde a página estava rolada quando o diálogo abriu. */
+  @keyframes modal-pop {
     from {
       opacity: 0;
-      transform: translateY(16px);
+      transform: scale(0.92);
     }
     to {
       opacity: 1;
-      transform: none;
+      transform: scale(1);
     }
   }
-  .animate-sheet-up {
-    animation: sheet-up-mobile 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  @media (min-width: 640px) {
-    .animate-sheet-up {
-      animation-name: sheet-up-desktop;
-      animation-duration: 0.22s;
-      animation-timing-function: ease-out;
-    }
+  .animate-modal-pop {
+    animation: modal-pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
   .bg-gradient-primary { background-image: var(--gradient-primary); }

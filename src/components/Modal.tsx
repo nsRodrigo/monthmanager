@@ -27,20 +27,20 @@ export function Modal({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
         className="absolute inset-0"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="animate-sheet-up relative z-10 w-full max-w-lg overflow-hidden rounded-t-3xl border border-border bg-card shadow-elevated sm:rounded-3xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <div className="animate-modal-pop relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-elevated">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h3 className="text-base font-semibold">{title}</h3>
           <button onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );

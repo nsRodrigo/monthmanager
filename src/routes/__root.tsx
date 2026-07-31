@@ -34,72 +34,96 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
 const DRAWER_WIDTH = 288; // 18rem (w-72)
 
 /**
- * Estado + gestos de arraste da gaveta mobile. Dois modos, no mesmo hook:
- * - Gaveta ABERTA: arrastar nela fecha de cara (é uma superfície pequena e
- *   dedicada — qualquer arraste ali só pode significar "fechar").
- * - Conteúdo FECHADO: o gesto é ambíguo (pode ser um toque num botão, uma
- *   rolagem vertical, ou o swipe de abrir o menu), por isso só "assume" que é
- *   swipe-de-abrir depois de confirmar movimento predominantemente horizontal
- *   pra direita além de um limiar — só a partir daí mexe no estado. Um toque
- *   parado ou uma rolagem normal nunca chegam a acionar nada aqui, então
- *   cliques/scroll no resto da tela continuam funcionando por baixo.
+ * Estado + gestos de arraste da gaveta mobile.
+ * - Fechar (gaveta ABERTA): handlers JSX normais, presos só na própria
+ *   `<aside>` — uma superfície pequena e dedicada, sem ambiguidade possível.
+ * - Abrir (conteúdo FECHADO): ouvido no `window` inteiro (não preso a nenhum
+ *   elemento específico do layout, então funciona em qualquer parte da
+ *   tela) e só "assume" o gesto depois de confirmar arraste horizontal pra
+ *   direita além de um limiar — até lá, não mexe em nada, então toques e
+ *   rolagem normal continuam intactos por baixo. Sempre `passive`, nunca
+ *   chama preventDefault — não compete com o scroll nativo.
  */
 function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
   const [dragX, setDragX] = useState<number | null>(null);
-  const startRef = useRef<{ x: number; y: number; t: number; base: number } | null>(null);
-  const committedRef = useRef(false);
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
+  const closeStartRef = useRef<{ x: number; t: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
-    const base = open ? DRAWER_WIDTH : 0;
-    startRef.current = { x: e.clientX, y: e.clientY, t: performance.now(), base };
-    if (open) {
-      committedRef.current = true;
-      setDragX(base);
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } else {
-      committedRef.current = false;
-    }
+    closeStartRef.current = { x: e.clientX, t: performance.now() };
+    setDragX(DRAWER_WIDTH);
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
-    const start = startRef.current;
+    const start = closeStartRef.current;
     if (!start) return;
-    const dx = e.clientX - start.x;
-    if (!committedRef.current) {
-      const dy = e.clientY - start.y;
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // ainda ambíguo — espera mais movimento
-      const horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
-      if (!horizontal || dx <= 0) {
-        startRef.current = null; // era rolagem vertical ou arraste pra esquerda — não é o gesto de abrir
-        return;
-      }
-      committedRef.current = true;
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        // alguns navegadores recusam capturar fora de um pointerdown — sem problema, o arraste ainda funciona.
-      }
-    }
-    setDragX(Math.max(0, Math.min(DRAWER_WIDTH, start.base + dx)));
+    setDragX(Math.max(0, Math.min(DRAWER_WIDTH, DRAWER_WIDTH + (e.clientX - start.x))));
   };
   const onPointerUp = () => {
-    const start = startRef.current;
-    startRef.current = null;
-    if (!start || !committedRef.current) {
-      committedRef.current = false;
-      setDragX(null);
-      return;
-    }
-    committedRef.current = false;
-    const pos = dragX ?? start.base;
+    const start = closeStartRef.current;
+    closeStartRef.current = null;
+    if (!start) return;
+    const pos = dragX ?? DRAWER_WIDTH;
     const dt = Math.max(1, performance.now() - start.t);
-    const delta = pos - start.base;
+    const delta = pos - DRAWER_WIDTH;
     const velocity = delta / dt; // px/ms
     setDragX(null);
-    const shouldOpen = open
-      ? !(delta < -DRAWER_WIDTH * 0.22 || velocity < -0.35)
-      : delta > DRAWER_WIDTH * 0.22 || velocity > 0.35;
-    setOpen(shouldOpen);
+    setOpen(!(delta < -DRAWER_WIDTH * 0.22 || velocity < -0.35));
   };
+
+  useEffect(() => {
+    let start: { x: number; y: number; t: number } | null = null;
+    let committed = false;
+
+    const onDown = (e: PointerEvent) => {
+      if (openRef.current) return;
+      start = { x: e.clientX, y: e.clientY, t: performance.now() };
+      committed = false;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      if (!committed) {
+        const dy = e.clientY - start.y;
+        if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // ainda ambíguo — espera mais movimento
+        if (Math.abs(dx) <= Math.abs(dy) * 1.3 || dx <= 0) {
+          start = null; // era rolagem vertical ou arraste pra esquerda — não é o gesto de abrir
+          return;
+        }
+        committed = true;
+      }
+      setDragX(Math.max(0, Math.min(DRAWER_WIDTH, dx)));
+    };
+    const onUp = (e: PointerEvent) => {
+      const s = start;
+      start = null;
+      if (!s || !committed) {
+        committed = false;
+        setDragX(null);
+        return;
+      }
+      committed = false;
+      const dt = Math.max(1, performance.now() - s.t);
+      const dx = e.clientX - s.x;
+      const velocity = dx / dt;
+      setDragX(null);
+      setOpen(dx > DRAWER_WIDTH * 0.22 || velocity > 0.35);
+    };
+
+    window.addEventListener("pointerdown", onDown, { passive: true });
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onUp, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [setOpen]);
 
   const pos = dragX ?? (open ? DRAWER_WIDTH : 0);
   const dragging = dragX !== null;
@@ -472,11 +496,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       >
         <SidebarContent onNavigate={() => setMobileOpen(false)} />
       </aside>
-      <div
-        className="flex min-w-0 flex-1 flex-col"
-        style={{ touchAction: "pan-y" }}
-        {...(!mobileOpen ? dragHandlers : {})}
-      >
+      <div className="flex min-w-0 flex-1 flex-col">
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
         </a>
@@ -502,6 +522,10 @@ function PanesDock() {
   const location = useRouterState({ select: (s) => s.location });
   const { data: accounts = [] } = useAccounts();
   const navigate = useNavigate();
+
+  // "Abrir ao lado" não existe em telas pequenas (nunca há mais de 1 painel
+  // lado a lado ali) — o dock não aparece de jeito nenhum nesse tamanho.
+  if (maxPanes === 1) return null;
 
   const backgrounded = panes.filter((p) => !activeIds.includes(p.contaId));
   if (backgrounded.length === 0) return null;

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, CheckboxExpand } from "./Modal";
 import { useCards, useAddPurchase, useDescriptionSuggestions } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
@@ -135,69 +135,51 @@ export function AddPurchaseDialog({
           </Field>
         </div>
 
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input
-            type="checkbox"
-            checked={isInstallment}
-            onChange={(e) => {
-              setIsInstallment(e.target.checked);
-              if (e.target.checked) setIsRecurring(false);
-            }}
-            className="h-4 w-4 accent-primary"
-          />
-          <span className="text-sm font-medium">É parcelado?</span>
-        </label>
-
-        {isInstallment && (
-          <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
-            <div className="flex gap-1 rounded-full bg-secondary p-1">
-              <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-                Valor total
-              </button>
-              <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-                Valor por parcela
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Total de parcelas">
-                <input type="number" min="2" max="48" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
-              </Field>
-              <Field label="Parcela atual">
-                <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
-              </Field>
-            </div>
-            {total > 0 && n > 1 && (
-              <p className="text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
-                <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
-                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas e ${n - cur} futura(s) serão criadas nos próximos meses.`}
-              </p>
-            )}
+        <CheckboxExpand
+          checked={isInstallment}
+          onChange={(v) => {
+            setIsInstallment(v);
+            if (v) setIsRecurring(false);
+          }}
+          label="É parcelado?"
+        >
+          <div className="flex gap-1 rounded-full bg-secondary p-1">
+            <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+              Valor total
+            </button>
+            <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+              Valor por parcela
+            </button>
           </div>
-        )}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Total de parcelas">
+              <input type="number" min="2" max="48" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
+            </Field>
+            <Field label="Parcela atual">
+              <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
+            </Field>
+          </div>
+          {total > 0 && n > 1 && (
+            <p className="text-xs text-muted-foreground">
+              {n}x de <span className="font-semibold text-foreground">R$ {perInstallment.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
+              <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+              {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas e ${n - cur} futura(s) serão criadas nos próximos meses.`}
+            </p>
+          )}
+        </CheckboxExpand>
 
-        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
-          <input
-            type="checkbox"
-            checked={isRecurring}
-            onChange={(e) => {
-              setIsRecurring(e.target.checked);
-              if (e.target.checked) {
-                setIsInstallment(false);
-                setMarkPaid(false);
-              }
-            }}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-          />
-          <span className="text-sm">
-            <span className="font-medium">Compra recorrente</span>
-            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              Ideal para assinaturas (streaming etc). Será replicada nos próximos meses, mantendo o dia. Cada mês é independente.
-            </span>
-          </span>
-        </label>
-
-        {isRecurring && (
+        <CheckboxExpand
+          checked={isRecurring}
+          onChange={(v) => {
+            setIsRecurring(v);
+            if (v) {
+              setIsInstallment(false);
+              setMarkPaid(false);
+            }
+          }}
+          label="Compra recorrente"
+          description="Ideal para assinaturas (streaming etc). Será replicada nos próximos meses, mantendo o dia. Cada mês é independente."
+        >
           <Field label="Repetir por quantos meses?">
             <input
               type="number"
@@ -209,20 +191,14 @@ export function AddPurchaseDialog({
               placeholder="24"
             />
           </Field>
-        )}
+        </CheckboxExpand>
 
         {!isRecurring && (
-          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-            <input
-              type="checkbox"
-              checked={markPaid}
-              onChange={(e) => setMarkPaid(e.target.checked)}
-              className="h-4 w-4 accent-primary"
-            />
-            <span className="text-sm font-medium">
-              {isInstallment ? "Marcar esta parcela como paga" : "Marcar como paga"}
-            </span>
-          </label>
+          <CheckboxExpand
+            checked={markPaid}
+            onChange={setMarkPaid}
+            label={isInstallment ? "Marcar esta parcela como paga" : "Marcar como paga"}
+          />
         )}
 
 

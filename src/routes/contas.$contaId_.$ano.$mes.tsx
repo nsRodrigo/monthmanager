@@ -46,7 +46,6 @@ import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronLeft,
   ChevronDown,
-  ChevronUp,
   Plus,
   CreditCard,
   ArrowDownRight,
@@ -633,10 +632,11 @@ export function MonthDetailPane({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex min-w-0 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          aria-label="Voltar"
+          title="Voltar"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
-          <ChevronLeft className="h-4 w-4 shrink-0" />
-          {!embedded && <span className="truncate">{account.name}</span>}
+          <ChevronLeft className="h-5 w-5" />
         </button>
         <MonthYearPicker
           contaId={contaId}
@@ -664,6 +664,29 @@ export function MonthDetailPane({
 
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
       <div className="mt-4 space-y-4">
+        {/* CONTA CORRENTE header — recebimentos, débitos e investimentos são
+            todos movimentação da mesma conta corrente, por isso o cabeçalho
+            vem antes de recebimentos (não só entre investimentos/débitos). */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
+              CONTA CORRENTE
+            </h2>
+            <p className="truncate text-[11px] text-muted-foreground">
+              Recebimentos − débitos − investimentos
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p
+              className={`text-sm font-bold ${
+                totalIncomeNet - totalDebits - totalInvested >= 0 ? "text-foreground" : "text-destructive"
+              }`}
+            >
+              {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
+            </p>
+          </div>
+        </div>
+
         {/* INCOMES */}
         <GroupedSection
           icon={Download}
@@ -805,24 +828,6 @@ export function MonthDetailPane({
             );
           })}
         </GroupedSection>
-
-        {/* CONTA CORRENTE header */}
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-              CONTA CORRENTE
-            </h2>
-            <p className="truncate text-[11px] text-muted-foreground">
-              Débitos + investimentos
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className={`text-sm font-bold ${(totalDebits + totalInvested) >= 0 ? "text-foreground" : "text-destructive"}`}>
-              {formatCurrency(totalDebits + totalInvested)}
-            </p>
-          </div>
-        </div>
-
 
         {/* INVESTMENTS */}
         <GroupedSection
@@ -1285,6 +1290,10 @@ export function MonthDetailPane({
       </div>
 
       {(() => {
+        // Some enquanto qualquer diálogo aberto por ele estiver na tela — senão
+        // fica flutuando por cima dos botões do próprio diálogo (ex.: Cancelar/Adicionar).
+        const anyFabDialogOpen = openDebit || openIncome || openInvest || openPurchase || openCard;
+        if (anyFabDialogOpen) return null;
         const fabUi = (
           <>
             {fabOpen && (
@@ -1577,7 +1586,7 @@ function GroupedSection({
             aria-label={open ? "Recolher" : "Expandir"}
             className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
-            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
           </button>
         </div>
 
@@ -1602,27 +1611,32 @@ function GroupedSection({
         )}
       </div>
 
-      {/* Body */}
-      {open && (
-        <div className="border-t border-border">
-          {headerBar}
-          {empty ? (
-            <Empty text={emptyText} />
-          ) : (
-            <div className="divide-y divide-border">{children}</div>
-          )}
-          {onAdd && addLabel && (
-            <div className="border-t border-border bg-background/30 p-3 md:p-4">
-              <button
-                onClick={onAdd}
-                className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
-              >
-                <Plus className="h-3.5 w-3.5" /> {addLabel}
-              </button>
-            </div>
-          )}
+      {/* Body — grid-rows 0fr/1fr anima a altura sem precisar medir nada em JS. */}
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t border-border">
+            {headerBar}
+            {empty ? (
+              <Empty text={emptyText} />
+            ) : (
+              <div className="divide-y divide-border">{children}</div>
+            )}
+            {onAdd && addLabel && (
+              <div className="border-t border-border bg-background/30 p-3 md:p-4">
+                <button
+                  onClick={onAdd}
+                  className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-secondary ${toneText[tone]}`}
+                >
+                  <Plus className="h-3.5 w-3.5" /> {addLabel}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -1904,7 +1918,7 @@ function CardRow({
             aria-label={open ? "Recolher" : "Expandir"}
             className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
-            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
           </button>
         </div>
 
@@ -1979,7 +1993,11 @@ function CardRow({
         </div>
       )}
 
-      {open && (
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
         <div className="border-t border-border bg-background/30">
           {selectionBar}
 
@@ -2043,7 +2061,8 @@ function CardRow({
             </div>
           )}
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

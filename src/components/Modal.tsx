@@ -27,7 +27,7 @@ export function Modal({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-x-0 top-0 z-50 flex h-dvh items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <div
         className="absolute inset-0"
         onClick={onClose}
@@ -57,3 +57,57 @@ export function Field({ label, children }: { label: string; children: React.Reac
 
 export const inputClass =
   "w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary";
+
+/**
+ * Checkbox com opções que expandem DENTRO do mesmo frame ao marcar — em vez
+ * de um card de opções separado logo abaixo, como era antes (ex.: "É
+ * parcelado?", "Recorrente", "Débito automático"). Usa a mesma animação de
+ * altura (grid-rows 0fr/1fr) das seções de lançamentos.
+ */
+export function CheckboxExpand({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled,
+  children,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-background/50">
+      <label
+        className={`flex items-start gap-3 p-3 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+        />
+        <span className="text-sm">
+          <span className="font-medium">{label}</span>
+          {description && (
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">{description}</span>
+          )}
+        </span>
+      </label>
+      {children && (
+        <div
+          className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+          style={{ gridTemplateRows: checked ? "1fr" : "0fr" }}
+        >
+          <div className="overflow-hidden">
+            <div className="space-y-3 border-t border-border p-3">{children}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

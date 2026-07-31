@@ -75,6 +75,7 @@ import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
+import { MobileMenuButton } from "@/components/MobileMenuButton";
 
 type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 
@@ -638,14 +639,17 @@ export function MonthDetailPane({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <MonthYearPicker
-          contaId={contaId}
-          year={year}
-          month={month}
-          prev={prevMonth}
-          next={nextMonth}
-          onNavigate={onMonthChange}
-        />
+        <div className="flex items-center gap-2">
+          <MonthYearPicker
+            contaId={contaId}
+            year={year}
+            month={month}
+            prev={prevMonth}
+            next={nextMonth}
+            onNavigate={onMonthChange}
+          />
+          <MobileMenuButton />
+        </div>
       </div>
 
       {/* Header */}
@@ -662,8 +666,10 @@ export function MonthDetailPane({
       />
 
 
-      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões */}
-      <div className="mt-4 space-y-4">
+      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
+          pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
+          o último card ao rolar até embaixo. */}
+      <div className="mt-4 space-y-4 pb-24">
         {/* CONTA CORRENTE header — recebimentos, débitos e investimentos são
             todos movimentação da mesma conta corrente, por isso o cabeçalho
             vem antes de recebimentos (não só entre investimentos/débitos). */}

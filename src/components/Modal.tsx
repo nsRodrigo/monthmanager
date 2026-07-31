@@ -27,13 +27,13 @@ export function Modal({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-x-0 top-0 z-50 flex h-dvh items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <div
         className="absolute inset-0"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-t-3xl border border-border bg-card shadow-elevated sm:rounded-3xl">
+      <div className="animate-sheet-up relative z-10 w-full max-w-lg overflow-hidden rounded-t-3xl border border-border bg-card shadow-elevated sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h3 className="text-base font-semibold">{title}</h3>
           <button onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">

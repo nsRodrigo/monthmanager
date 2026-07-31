@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Field, inputClass } from "@/components/Modal";
+import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
@@ -96,9 +97,12 @@ function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
-      <Link to="/" className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="h-4 w-4" /> Home
-      </Link>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" /> Home
+        </Link>
+        <MobileMenuButton />
+      </div>
       <header className="mb-6 flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
           <User className="h-6 w-6" />

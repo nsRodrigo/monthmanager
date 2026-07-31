@@ -441,14 +441,14 @@ export function EditInstallmentDialog({
               </span>
             </label>
           )}
-          <div className="flex gap-2 pt-2">
+          <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
             <button
               onClick={() => setAskDuplicate(true)}
               disabled={duplicate.isPending}
-              className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
               title="Duplicar lançamento"
             >
-              <Copy className="h-4 w-4" />
+              <Copy className="h-3.5 w-3.5" /> Duplicar
             </button>
             {onDeleteParent && (
               <button
@@ -464,12 +464,14 @@ export function EditInstallmentDialog({
                     onClose();
                   }
                 }}
-                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10"
                 title="Excluir lançamento"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" /> Excluir
               </button>
             )}
+          </div>
+          <div className="flex gap-2">
             <button
               onClick={onClose}
               className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
@@ -741,38 +743,42 @@ export function EditInstallmentDialog({
             )
           )}
 
-          <div className="flex gap-2 pt-2">
-            {(parentSource || inst.total > 1) && (
-              <button
-                onClick={() => {
-                  // Parcelled → open checklist picker (pré-seleciona a parcela atual).
-                  // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
-                  if (inst.total > 1) {
-                    setSelectedDupIds(new Set([inst.id]));
-                    setAskDuplicateParcelled(true);
-                  } else {
-                    setAskDuplicate(true);
-                  }
-                }}
-                disabled={duplicate.isPending || duplicateSeries.isPending || duplicateSelection.isPending}
-                className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
-                title="Duplicar lançamento"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
-            )}
-            {onDeleteParent && (
-              <button
-                onClick={() => {
-                  onDeleteParent();
-                  onClose();
-                }}
-                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
-                title="Excluir lançamento parcelado"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
+          {(parentSource || inst.total > 1 || onDeleteParent) && (
+            <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+              {(parentSource || inst.total > 1) && (
+                <button
+                  onClick={() => {
+                    // Parcelled → open checklist picker (pré-seleciona a parcela atual).
+                    // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
+                    if (inst.total > 1) {
+                      setSelectedDupIds(new Set([inst.id]));
+                      setAskDuplicateParcelled(true);
+                    } else {
+                      setAskDuplicate(true);
+                    }
+                  }}
+                  disabled={duplicate.isPending || duplicateSeries.isPending || duplicateSelection.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  title="Duplicar lançamento"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Duplicar
+                </button>
+              )}
+              {onDeleteParent && (
+                <button
+                  onClick={() => {
+                    onDeleteParent();
+                    onClose();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                  title="Excluir lançamento parcelado"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Excluir
+                </button>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
               Cancelar
             </button>

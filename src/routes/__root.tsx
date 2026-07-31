@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/store/auth";
 import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
 import { PanesRegistryProvider, usePanes, useMaxPanes } from "@/store/panes";
+import { MobileMenuProvider } from "@/store/mobile-menu";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
@@ -501,7 +502,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           Pular para o conteúdo
         </a>
         <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
-          {children}
+          <MobileMenuProvider openMobileMenu={() => setMobileOpen(true)}>{children}</MobileMenuProvider>
         </main>
       </div>
     </div>

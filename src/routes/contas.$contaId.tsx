@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
+import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -508,7 +509,10 @@ function AccountPane({
             >
               <ChevronLeft className="h-5 w-5" />
             </Link>
-            <YearPickerChip compact />
+            <div className="flex items-center gap-2">
+              <YearPickerChip compact />
+              <MobileMenuButton />
+            </div>
           </div>
           <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
             Meses de {year}

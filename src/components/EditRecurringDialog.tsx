@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, CheckboxExpand } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
 import {
   useUpdateRecurringSeries,
@@ -185,34 +185,25 @@ export function EditRecurringDialog({
         </div>
 
         {target.kind === "debit" && (
-          <div className="rounded-lg border border-border bg-background/50 p-3">
-            <label className="flex items-center gap-3">
+          <CheckboxExpand
+            checked={notifyEnabled}
+            onChange={(v) => {
+              setNotifyEnabled(v);
+              if (v && !notifyDaysBefore) setNotifyDaysBefore("1");
+            }}
+            label="Notificar antes do vencimento"
+          >
+            <Field label="Quantos dias antes?">
               <input
-                type="checkbox"
-                checked={notifyEnabled}
-                onChange={(e) => {
-                  setNotifyEnabled(e.target.checked);
-                  if (e.target.checked && !notifyDaysBefore) setNotifyDaysBefore("1");
-                }}
-                className="h-4 w-4 accent-primary"
+                type="number"
+                min={0}
+                max={30}
+                className={inputClass}
+                value={notifyDaysBefore}
+                onChange={(e) => setNotifyDaysBefore(e.target.value)}
               />
-              <span className="text-sm font-medium">Notificar antes do vencimento</span>
-            </label>
-            {notifyEnabled && (
-              <div className="mt-3">
-                <Field label="Quantos dias antes?">
-                  <input
-                    type="number"
-                    min={0}
-                    max={30}
-                    className={inputClass}
-                    value={notifyDaysBefore}
-                    onChange={(e) => setNotifyDaysBefore(e.target.value)}
-                  />
-                </Field>
-              </div>
-            )}
-          </div>
+            </Field>
+          </CheckboxExpand>
         )}
 
         <button
@@ -228,23 +219,25 @@ export function EditRecurringDialog({
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         </button>
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
           <button
             onClick={() => setAskDuplicate(true)}
             disabled={duplicate.isPending}
-            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
             title="Duplicar lançamento"
           >
-            <Copy className="h-4 w-4" />
+            <Copy className="h-3.5 w-3.5" /> Duplicar
           </button>
           <button
             onClick={() => setAskDelete(true)}
             disabled={removing}
-            className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
             title="Excluir lançamento"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3.5 w-3.5" /> Excluir
           </button>
+        </div>
+        <div className="flex gap-2">
           <button
             onClick={onClose}
             className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"

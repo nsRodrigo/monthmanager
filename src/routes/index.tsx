@@ -20,6 +20,7 @@ import {
 import { useAccountFilter } from "@/store/account-filter";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Sparkline } from "@/components/Sparkline";
+import { MobileMenuButton } from "@/components/MobileMenuButton";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -135,14 +136,17 @@ function Consolidated() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">
-      <header className="mb-8">
-        <p className="text-sm font-medium text-primary capitalize">
-          {MONTHS[month]} {year}
-        </p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Home</h1>
-        <p className="mt-1 text-muted-foreground">
-          Visão geral de todas as suas contas.
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-primary capitalize">
+            {MONTHS[month]} {year}
+          </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Home</h1>
+          <p className="mt-1 text-muted-foreground">
+            Visão geral de todas as suas contas.
+          </p>
+        </div>
+        <MobileMenuButton />
       </header>
 
       <section className="overflow-hidden rounded-3xl border border-border bg-gradient-hero p-4 shadow-elegant sm:p-6">

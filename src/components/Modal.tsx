@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function Modal({
@@ -16,15 +17,12 @@ export function Modal({
 
   useLayoutEffect(() => {
     if (!open) return;
-
     scrollYRef.current = window.scrollY;
-
     const html = document.documentElement;
     html.style.overflow = "hidden";
     html.style.position = "fixed";
     html.style.top = `-${scrollYRef.current}px`;
     html.style.width = "100%";
-
     return () => {
       html.style.overflow = "";
       html.style.position = "";
@@ -36,8 +34,8 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="animate-modal-pop relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-elevated">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h3 className="text-base font-semibold">{title}</h3>
@@ -50,7 +48,8 @@ export function Modal({
         </div>
         <div className="overflow-y-auto p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

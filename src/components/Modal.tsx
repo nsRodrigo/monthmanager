@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 export function Modal({
@@ -12,31 +12,39 @@ export function Modal({
   title: string;
   children: React.ReactNode;
 }) {
-  useEffect(() => {
+  const scrollYRef = useRef(0);
+
+  useLayoutEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
+
+    scrollYRef.current = window.scrollY;
+
+    const html = document.documentElement;
+    html.style.overflow = "hidden";
+    html.style.position = "fixed";
+    html.style.top = `-${scrollYRef.current}px`;
+    html.style.width = "100%";
+
     return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      html.style.overflow = "";
+      html.style.position = "";
+      html.style.top = "";
+      html.style.width = "";
+      window.scrollTo(0, scrollYRef.current);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div
-        className="fixed inset-0"
-        onClick={onClose}
-        aria-hidden="true"
-      />
       <div className="animate-modal-pop relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-elevated">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h3 className="text-base font-semibold">{title}</h3>
-          <button onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>

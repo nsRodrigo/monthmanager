@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { Modal, Field, inputClass, CheckboxExpand } from "./Modal";
+import { Modal, Field, inputClass, Accordion, PaidToggle } from "./Modal";
 import { useAddDebit, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
+
+type PaymentType = "unico" | "parcelado" | "recorrente" | "automatico";
 
 export function AddDebitDialog({
   open,
@@ -28,11 +30,9 @@ export function AddDebitDialog({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
-  const [required, setRequired] = useState(false);
+  const [paymentType, setPaymentType] = useState<PaymentType>("unico");
   const [recurrenceMonths, setRecurrenceMonths] = useState("24");
-  const [autoDebit, setAutoDebit] = useState(false);
   const [autoDebitDay, setAutoDebitDay] = useState("");
-  const [isInstallment, setIsInstallment] = useState(false);
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
@@ -40,17 +40,19 @@ export function AddDebitDialog({
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
 
+  const isInstallment = paymentType === "parcelado";
+  const required = paymentType === "recorrente";
+  const autoDebit = paymentType === "automatico";
+
   const resetFields = () => {
     const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
     setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
     setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
     setDescription("");
     setAmount(0);
-    setRequired(false);
+    setPaymentType("unico");
     setRecurrenceMonths("24");
-    setAutoDebit(false);
     setAutoDebitDay("");
-    setIsInstallment(false);
     setInstallments("2");
     setInstallmentNumber("1");
     setMode("total");
@@ -100,7 +102,20 @@ export function AddDebitDialog({
   const per = n > 0 ? total / n : 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Novo débito">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Novo débito"
+      headerRight={
+        <PaidToggle
+          checked={markPaid}
+          onChange={setMarkPaid}
+          disabled={required}
+          offLabel="Marcar pago"
+          onLabel="Pago"
+        />
+      }
+    >
       <div className="space-y-4">
         {!fixedAccountId && <AccountSelect value={accountId} onChange={setAccountId} />}
         <Field label="Descrição">
@@ -115,10 +130,86 @@ export function AddDebitDialog({
           </Field>
         </div>
 
+        <div className="space-y-2">
+          <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
+          <select
+            className={inputClass}
+            value={paymentType}
+            onChange={(e) => {
+              const v = e.target.value as PaymentType;
+              setPaymentType(v);
+              if (v === "recorrente") setMarkPaid(false);
+            }}
+          >
+            <option value="unico">Único (à vista)</option>
+            <option value="parcelado">Parcelado</option>
+            <option value="recorrente">Recorrente</option>
+            <option value="automatico">Débito automático</option>
+          </select>
+
+          {isInstallment && (
+            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+              <div className="flex gap-1 rounded-full bg-secondary p-1">
+                <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  Valor total
+                </button>
+                <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  Valor por parcela
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Total de parcelas">
+                  <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
+                </Field>
+                <Field label="Parcela atual">
+                  <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
+                </Field>
+              </div>
+              {value > 0 && n > 1 && (() => {
+                const cur = Math.max(1, Math.min(n, parseInt(installmentNumber) || 1));
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
+                    <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                    {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas.`}
+                  </p>
+                );
+              })()}
+            </div>
+          )}
+
+          {required && (
+            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+              <Field label="Repetir por quantos meses?">
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  className={inputClass}
+                  value={recurrenceMonths}
+                  onChange={(e) => setRecurrenceMonths(e.target.value)}
+                  placeholder="24"
+                />
+              </Field>
+              <p className="text-[11px] text-muted-foreground">
+                Replicado automaticamente nos próximos meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento.
+              </p>
+            </div>
+          )}
+
+          {autoDebit && (
+            <div className="rounded-lg border border-border bg-background/50 p-3">
+              <Field label="Dia do débito (1-31)">
+                <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
+              </Field>
+            </div>
+          )}
+        </div>
+
         {!isInstallment && (
-          <CheckboxExpand
-            checked={notifyEnabled}
-            onChange={(v) => {
+          <Accordion
+            open={notifyEnabled}
+            onOpenChange={(v) => {
               setNotifyEnabled(v);
               if (v && !notifyDaysBefore) setNotifyDaysBefore("1");
             }}
@@ -134,84 +225,8 @@ export function AddDebitDialog({
                 onChange={(e) => setNotifyDaysBefore(e.target.value)}
               />
             </Field>
-          </CheckboxExpand>
+          </Accordion>
         )}
-
-        <CheckboxExpand
-          checked={isInstallment}
-          onChange={(v) => {
-            setIsInstallment(v);
-            if (v) setRequired(false);
-          }}
-          label="É parcelado?"
-        >
-          <div className="flex gap-1 rounded-full bg-secondary p-1">
-            <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-              Valor total
-            </button>
-            <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-              Valor por parcela
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Total de parcelas">
-              <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
-            </Field>
-            <Field label="Parcela atual">
-              <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
-            </Field>
-          </div>
-          {value > 0 && n > 1 && (() => {
-            const cur = Math.max(1, Math.min(n, parseInt(installmentNumber) || 1));
-            return (
-              <p className="text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
-                <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
-                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como pagas.`}
-              </p>
-            );
-          })()}
-        </CheckboxExpand>
-
-        <CheckboxExpand
-          checked={required}
-          onChange={(v) => {
-            setRequired(v);
-            if (v) {
-              setIsInstallment(false);
-              setMarkPaid(false);
-            }
-          }}
-          label="Débito recorrente"
-          description="Replicado automaticamente nos próximos meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento."
-        >
-          <Field label="Repetir por quantos meses?">
-            <input
-              type="number"
-              min="1"
-              max="120"
-              className={inputClass}
-              value={recurrenceMonths}
-              onChange={(e) => setRecurrenceMonths(e.target.value)}
-              placeholder="24"
-            />
-          </Field>
-        </CheckboxExpand>
-
-        <CheckboxExpand checked={autoDebit} onChange={setAutoDebit} label="Débito automático">
-          <Field label="Dia do débito (1-31)">
-            <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
-          </Field>
-        </CheckboxExpand>
-
-        {!required && (
-          <CheckboxExpand
-            checked={markPaid}
-            onChange={setMarkPaid}
-            label={isInstallment ? "Marcar esta parcela como paga" : "Marcar como paga"}
-          />
-        )}
-
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>

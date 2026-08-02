@@ -61,6 +61,7 @@ import {
   ArrowDown,
   GripVertical,
   ShoppingBag,
+  Wallet,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -294,8 +295,8 @@ export function MonthDetailPane({
     setScopeDelete({
       title:
         parentType === "debit" ? "Excluir débito"
-        : parentType === "income" ? "Excluir recebimento"
-        : "Excluir compra",
+          : parentType === "income" ? "Excluir recebimento"
+            : "Excluir compra",
       description: (
         <>
           Você está excluindo{" "}
@@ -511,11 +512,11 @@ export function MonthDetailPane({
     debitsSort.sort.option === "default"
       ? debitsDefaultOrder
       : applySort(debitsDefaultOrder, debitsSort.sort, {
-          name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
-          amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
-          date: (e) => (e.kind === "single" ? e.debit.date : e.entry.installment.dueDate),
-          id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
-        });
+        name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
+        amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
+        date: (e) => (e.kind === "single" ? e.debit.date : e.entry.installment.dueDate),
+        id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
+      });
 
   const incomesFixedMerged: IncomeEntry[] = [
     ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
@@ -535,21 +536,21 @@ export function MonthDetailPane({
     incomesSort.sort.option === "default"
       ? incomesDefaultOrder
       : applySort(incomesDefaultOrder, incomesSort.sort, {
-          name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
-          amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
-          date: (e) => (e.kind === "single" ? e.income.date : e.entry.installment.dueDate),
-          id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
-        });
+        name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
+        amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
+        date: (e) => (e.kind === "single" ? e.income.date : e.entry.installment.dueDate),
+        id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
+      });
 
   const investmentsOrdered =
     investmentsSort.sort.option === "default"
       ? investmentsSorted
       : applySort(investmentsSorted, investmentsSort.sort, {
-          name: (i) => i.type,
-          amount: (i) => i.amount,
-          date: (i) => i.date,
-          id: (i) => i.id,
-        });
+        name: (i) => i.type,
+        amount: (i) => i.amount,
+        date: (i) => i.date,
+        id: (i) => i.id,
+      });
 
 
   const totalDebits =
@@ -625,7 +626,7 @@ export function MonthDetailPane({
   const nextMonth = month === 11 ? { y: year + 1, m: 0 } : { y: year, m: month + 1 };
 
   return (
-    <div className={embedded ? "" : "mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10"}>
+    <div className={embedded ? "" : "mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10"}>
       {/* Top nav — sticky so the year picker stays accessible while scrolling.
           Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
@@ -654,7 +655,7 @@ export function MonthDetailPane({
 
       {/* Header */}
       <header className="mb-4">
-        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
           Lançamentos
         </h1>
       </header>
@@ -684,9 +685,8 @@ export function MonthDetailPane({
           </div>
           <div className="shrink-0 text-right">
             <p
-              className={`text-sm font-bold ${
-                totalIncomeNet - totalDebits - totalInvested >= 0 ? "text-foreground" : "text-destructive"
-              }`}
+              className={`text-sm font-bold ${totalIncomeNet - totalDebits - totalInvested >= 0 ? "text-foreground" : "text-destructive"
+                }`}
             >
               {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
             </p>
@@ -725,7 +725,7 @@ export function MonthDetailPane({
           }
           paidControl={
             !isSelMode("incomes") &&
-            monthIncomes.single.length + monthIncomes.parcelled.length > 0 ? (
+              monthIncomes.single.length + monthIncomes.parcelled.length > 0 ? (
               <button
                 type="button"
                 onClick={() => {
@@ -740,11 +740,10 @@ export function MonthDetailPane({
                     received: target,
                   });
                 }}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                  incomesAllReceived
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${incomesAllReceived
                     ? "bg-success/15 text-success hover:bg-success/25"
                     : "bg-warning/15 text-warning hover:bg-warning/25"
-                }`}
+                  }`}
               >
                 {incomesAllReceived ? "✓ Recebido" : "Marcar recebido"}
               </button>
@@ -820,14 +819,14 @@ export function MonthDetailPane({
                   isRecurring
                     ? () => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)
                     : async () => {
-                        const ok = await confirmDialog({
-                          title: "Excluir recebimento",
-                          description: `Excluir "${i.description}"?`,
-                          variant: "destructive",
-                          confirmLabel: "Excluir",
-                        });
-                        if (ok) removeIncome.mutate(i.id);
-                      }
+                      const ok = await confirmDialog({
+                        title: "Excluir recebimento",
+                        description: `Excluir "${i.description}"?`,
+                        variant: "destructive",
+                        confirmLabel: "Excluir",
+                      });
+                      if (ok) removeIncome.mutate(i.id);
+                    }
                 }
                 {...selProps("incomes", i.id)}
               />
@@ -933,7 +932,7 @@ export function MonthDetailPane({
           }
           paidControl={
             !isSelMode("debits") &&
-            monthDebits.single.length + monthDebits.parcelled.length > 0 ? (
+              monthDebits.single.length + monthDebits.parcelled.length > 0 ? (
               <button
                 type="button"
                 onClick={() => {
@@ -947,11 +946,10 @@ export function MonthDetailPane({
                       toggleInst(p.installment.id, target);
                   });
                 }}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                  debitsAllPaid
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${debitsAllPaid
                     ? "bg-success/15 text-success hover:bg-success/25"
                     : "bg-warning/15 text-warning hover:bg-warning/25"
-                }`}
+                  }`}
               >
                 {debitsAllPaid ? "✓ Pago" : "Marcar pago"}
               </button>
@@ -1030,14 +1028,14 @@ export function MonthDetailPane({
                     : d.autoDebit
                       ? () => askDeleteSingle(d.id, "debit", d.description, d.date)
                       : async () => {
-                          const ok = await confirmDialog({
-                            title: "Excluir débito",
-                            description: `Excluir "${d.description}"?`,
-                            variant: "destructive",
-                            confirmLabel: "Excluir",
-                          });
-                          if (ok) removeDebit.mutate(d.id);
-                        }
+                        const ok = await confirmDialog({
+                          title: "Excluir débito",
+                          description: `Excluir "${d.description}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeDebit.mutate(d.id);
+                      }
                 }
                 {...selProps("debits", d.id)}
               />
@@ -1052,8 +1050,8 @@ export function MonthDetailPane({
           const orderedAllCards =
             reorderMode && reorderIds
               ? (reorderIds
-                  .map((id) => allAccountCards.find((c) => c.id === id))
-                  .filter(Boolean) as typeof allAccountCards)
+                .map((id) => allAccountCards.find((c) => c.id === id))
+                .filter(Boolean) as typeof allAccountCards)
               : allAccountCards;
 
           const cardsAll = accountCards
@@ -1203,13 +1201,12 @@ export function MonthDetailPane({
                   return (
                     <div
                       key={c.id}
-                      className={`rounded-2xl border border-l-4 bg-card transition-colors ${
-                        cardState === "paid"
+                      className={`rounded-2xl border border-l-4 bg-card transition-colors ${cardState === "paid"
                           ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
                           : cardState === "allChecked"
-                          ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
-                          : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
-                      }`}
+                            ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
+                            : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
+                        }`}
                       style={{ borderLeftColor: c.color }}
                     >
                       <CardRowSorted
@@ -1254,9 +1251,8 @@ export function MonthDetailPane({
                           setEditing({
                             inst,
                             label: pur.description,
-                            subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
-                              pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
-                            }`,
+                            subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
+                              }`,
                             onDeleteParent: () => askDeletePurchase(pur),
                             parentSource: {
                               kind: "purchase",
@@ -1310,7 +1306,7 @@ export function MonthDetailPane({
               />
             )}
             <div
-              className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-6 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+              className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
             >
               {fabOpen && (
                 <div className="flex flex-col items-end gap-2.5">
@@ -1366,9 +1362,8 @@ export function MonthDetailPane({
                 onClick={() => setFabOpen((v) => !v)}
                 aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
                 aria-expanded={fabOpen}
-                className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${
-                  fabOpen ? "rotate-45" : ""
-                }`}
+                className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${fabOpen ? "rotate-45" : ""
+                  }`}
               >
                 <Plus className="h-6 w-6" />
               </button>
@@ -1470,40 +1465,39 @@ function MonthSummaryFrame({
   gastosTotais: number;
 }) {
   const saldoFinal = saldoAtual - gastosTotais;
+  const inicialTone = saldoAtual >= 0 ? "text-primary" : "text-destructive";
+  const inicialBg = saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
+  const finalTone = saldoFinal >= 0 ? "text-primary" : "text-destructive";
+  const finalBg = saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   return (
-    <div className="animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-gradient-card p-3 shadow-elegant sm:p-4">
-      <div
-        className={`rounded-xl border p-3 ${saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10"}`}
-      >
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Saldo Inicial
-        </p>
-        <p className={`mt-1 text-base font-bold sm:text-lg ${saldoAtual >= 0 ? "text-foreground" : "text-destructive"}`}>
+    <div className="animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-gradient-hero p-3 shadow-elegant sm:p-4">
+      <div className={`rounded-xl border p-3 ${inicialBg}`}>
+        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
+          <Wallet className="h-3 w-3" /> Saldo Inicial
+        </div>
+        <p className={`mt-1 text-base font-bold sm:text-lg ${inicialTone}`}>
           {formatCurrency(saldoAtual)}
         </p>
       </div>
-      <div
-        className={`rounded-xl border p-3 ${saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10"}`}
-      >
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Saldo Final
-        </p>
-        <p className={`mt-1 text-base font-bold sm:text-lg ${saldoFinal >= 0 ? "text-foreground" : "text-destructive"}`}>
+      <div className={`rounded-xl border p-3 ${finalBg}`}>
+        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${finalTone}`}>
+          <Check className="h-3 w-3" /> Saldo Final
+        </div>
+        <p className={`mt-1 text-base font-bold sm:text-lg ${finalTone}`}>
           {formatCurrency(saldoFinal)}
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
       </div>
       <div className="col-span-2 rounded-xl border border-debit/20 bg-debit/10 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Gastos Totais
-        </p>
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-debit">
+          <ArrowDownRight className="h-3 w-3" /> Gastos Totais
+        </div>
         <p className="mt-1 text-base font-bold text-debit sm:text-lg">
           {formatCurrency(gastosTotais)}
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
       </div>
     </div>
-
   );
 }
 
@@ -1684,14 +1678,14 @@ function SelectionBar({
 
 type PurchaseList = ReturnType<typeof usePurchases>["data"] extends infer T
   ? T extends Array<infer P>
-    ? P[]
-    : never
+  ? P[]
+  : never
   : never;
 type Purchase = PurchaseList[number];
 type Card = ReturnType<typeof useCards>["data"] extends infer T
   ? T extends Array<infer C>
-    ? C
-    : never
+  ? C
+  : never
   : never;
 
 function CardRowSorted({
@@ -1736,14 +1730,14 @@ function CardRowSorted({
     sort.option === "default"
       ? null
       : applySort(cardInst, sort, {
-          name: (i) => {
-            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
-            return pur?.description ?? "";
-          },
-          amount: (i) => i.amount,
-          date: (i) => i.dueDate,
-          id: (i) => i.id,
-        });
+        name: (i) => {
+          const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+          return pur?.description ?? "";
+        },
+        amount: (i) => i.amount,
+        date: (i) => i.dueDate,
+        id: (i) => i.id,
+      });
   return (
     <CardRow
       cardName={card.name}
@@ -1812,10 +1806,10 @@ function CardRow({
   onHideMonth?: () => void;
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T
-    ? T extends Array<infer P>
-      ? P[]
-      : never
-    : never;
+  ? T extends Array<infer P>
+  ? P[]
+  : never
+  : never;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
   onRemoveInst?: (inst: Installment) => void;
@@ -1889,8 +1883,8 @@ function CardRow({
               {cardState === "paid"
                 ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
                 : cardState === "allChecked"
-                ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
+                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
+                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
             </p>
           </div>
           <button
@@ -1900,13 +1894,12 @@ function CardRow({
               e.stopPropagation();
               if (!paymentPending) onTogglePaid();
             }}
-            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
-              cardState === "paid"
+            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${cardState === "paid"
                 ? "bg-success/15 text-success hover:bg-success/25"
                 : cardState === "allChecked"
-                ? "bg-credit/15 text-credit hover:bg-credit/25"
-                : "bg-warning/15 text-warning hover:bg-warning/25"
-            }`}
+                  ? "bg-credit/15 text-credit hover:bg-credit/25"
+                  : "bg-warning/15 text-warning hover:bg-warning/25"
+              }`}
           >
             {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
           </button>
@@ -1936,8 +1929,8 @@ function CardRow({
               {cardState === "paid"
                 ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
                 : cardState === "allChecked"
-                ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
+                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
+                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1948,13 +1941,12 @@ function CardRow({
                 e.stopPropagation();
                 if (!paymentPending) onTogglePaid();
               }}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                cardState === "paid"
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${cardState === "paid"
                   ? "bg-success/15 text-success hover:bg-success/25"
                   : cardState === "allChecked"
-                  ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
+                    ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
+                    : "bg-warning/15 text-warning hover:bg-warning/25"
+                }`}
             >
               {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
             </button>
@@ -2004,69 +1996,69 @@ function CardRow({
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
-        <div className="border-t border-border bg-background/30">
-          {selectionBar}
+          <div className="border-t border-border bg-background/30">
+            {selectionBar}
 
-          {items.length === 0 ? (
+            {items.length === 0 ? (
 
-            <div className="space-y-3 px-4 py-6 text-center">
-              <p className="text-xs text-muted-foreground">
-                Nenhum lançamento neste mês.
-              </p>
-              {onHideMonth && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onHideMonth();
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-3 py-1.5 text-[11px] font-semibold text-destructive transition-colors hover:bg-destructive/25"
-                >
-                  <Trash2 className="h-3 w-3" /> Remover deste mês
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {(sortedItems ?? items)
-                .slice()
-                .map((inst) => {
-                  const pur = purchases.find((p) => p.id === inst.parentId);
-                  return { inst, pur };
-                })
-                .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
-                .sort((a, b) => {
-                  if (sortedItems) return 0; // respect provided order
-                  // Prioriza parcelados + recorrentes (tier 0) sobre à-vista (tier 1),
-                  // igual à regra já aplicada em débitos/recebimentos.
-                  const aParc = a.pur.installmentsCount > 1 || !!a.pur.recurrenceGroupId ? 0 : 1;
-                  const bParc = b.pur.installmentsCount > 1 || !!b.pur.recurrenceGroupId ? 0 : 1;
-                  return (
-                    aParc - bParc ||
-                    a.inst.dueDate.localeCompare(b.inst.dueDate) ||
-                    (a.inst.purchaseId ?? "").localeCompare(b.inst.purchaseId ?? "") ||
-                    a.inst.number - b.inst.number ||
-                    a.inst.id.localeCompare(b.inst.id)
-                  );
-                })
-                .map(({ inst, pur }) => (
-                  <PurchaseInstRow
-                    key={inst.id}
-                    inst={inst}
-                    purchase={pur}
-                    cardColor={cardColor}
-                    onToggle={() => onToggleInst(inst.id, !inst.paid)}
-                    onEdit={() => onEditInst(inst)}
-                    onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
-                    {...itemSelProps(inst, inst.parentId)}
-                  />
+              <div className="space-y-3 px-4 py-6 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Nenhum lançamento neste mês.
+                </p>
+                {onHideMonth && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onHideMonth();
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-3 py-1.5 text-[11px] font-semibold text-destructive transition-colors hover:bg-destructive/25"
+                  >
+                    <Trash2 className="h-3 w-3" /> Remover deste mês
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {(sortedItems ?? items)
+                  .slice()
+                  .map((inst) => {
+                    const pur = purchases.find((p) => p.id === inst.parentId);
+                    return { inst, pur };
+                  })
+                  .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
+                  .sort((a, b) => {
+                    if (sortedItems) return 0; // respect provided order
+                    // Prioriza parcelados + recorrentes (tier 0) sobre à-vista (tier 1),
+                    // igual à regra já aplicada em débitos/recebimentos.
+                    const aParc = a.pur.installmentsCount > 1 || !!a.pur.recurrenceGroupId ? 0 : 1;
+                    const bParc = b.pur.installmentsCount > 1 || !!b.pur.recurrenceGroupId ? 0 : 1;
+                    return (
+                      aParc - bParc ||
+                      a.inst.dueDate.localeCompare(b.inst.dueDate) ||
+                      (a.inst.purchaseId ?? "").localeCompare(b.inst.purchaseId ?? "") ||
+                      a.inst.number - b.inst.number ||
+                      a.inst.id.localeCompare(b.inst.id)
+                    );
+                  })
+                  .map(({ inst, pur }) => (
+                    <PurchaseInstRow
+                      key={inst.id}
+                      inst={inst}
+                      purchase={pur}
+                      cardColor={cardColor}
+                      onToggle={() => onToggleInst(inst.id, !inst.paid)}
+                      onEdit={() => onEditInst(inst)}
+                      onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
+                      {...itemSelProps(inst, inst.parentId)}
+                    />
 
 
 
-                ))}
-            </div>
-          )}
-        </div>
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -2097,11 +2089,10 @@ function SelectCheckbox({
         e.stopPropagation();
         onClick();
       }}
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-        selected
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${selected
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border"
-      }`}
+        }`}
       aria-label={selected ? "Desmarcar" : "Marcar"}
     >
       {selected && <Check className="h-3.5 w-3.5" />}
@@ -2160,9 +2151,8 @@ function PurchaseInstRow({
       )}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
-          className={`truncate text-sm font-semibold ${
-            inst.paid ? "text-muted-foreground" : ""
-          }`}
+          className={`truncate text-sm font-semibold ${inst.paid ? "text-muted-foreground" : ""
+            }`}
         >
           {purchase.description}
         </p>
@@ -2171,6 +2161,11 @@ function PurchaseInstRow({
           {isInstallment && (
             <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
               PAR
+            </span>
+          )}
+          {isInstallment && (
+            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
+              {inst.number}/{inst.total}
             </span>
           )}
           {isRecurring && (
@@ -2183,19 +2178,13 @@ function PurchaseInstRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <div className="flex items-center gap-1.5">
           <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
-          {isInstallment && (
-            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
-              {inst.number}/{inst.total}
-            </span>
-          )}
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            inst.paid
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${inst.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
+            }`}
           title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
         >
           {inst.paid ? (
@@ -2255,9 +2244,8 @@ function DebitRow({
       )}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
-          className={`truncate text-sm font-semibold ${
-            debit.paid ? "text-muted-foreground" : ""
-          }`}
+          className={`truncate text-sm font-semibold ${debit.paid ? "text-muted-foreground" : ""
+            }`}
         >
           {debit.description}
         </p>
@@ -2280,11 +2268,10 @@ function DebitRow({
         <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            debit.paid
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${debit.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
+            }`}
         >
           {debit.paid ? (
             <>
@@ -2350,9 +2337,8 @@ function IncomeRow({
       )}
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
-          className={`truncate text-sm font-semibold ${
-            income.received ? "text-muted-foreground" : ""
-          }`}
+          className={`truncate text-sm font-semibold ${income.received ? "text-muted-foreground" : ""
+            }`}
         >
           {income.description}
         </p>
@@ -2369,11 +2355,10 @@ function IncomeRow({
         <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            income.received
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${income.received
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
+            }`}
         >
           {income.received ? (
             <>
@@ -2444,9 +2429,8 @@ function ParcelledRow({
         <SelectCheckbox selected={selected} onClick={onSelectToggle} />
       ) : (
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-            kind === "debit" ? "bg-debit/15 text-debit" : "bg-success/15 text-success"
-          }`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${kind === "debit" ? "bg-debit/15 text-debit" : "bg-success/15 text-success"
+            }`}
         >
           {kind === "debit" ? (
             <ArrowDownRight className="h-3.5 w-3.5" />
@@ -2457,9 +2441,8 @@ function ParcelledRow({
       )}
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
-          className={`truncate text-sm font-semibold ${
-            installment.paid ? "text-muted-foreground" : ""
-          }`}
+          className={`truncate text-sm font-semibold ${installment.paid ? "text-muted-foreground" : ""
+            }`}
         >
           {parent.description}
         </p>
@@ -2467,6 +2450,9 @@ function ParcelledRow({
           <span>{formatDate(installment.referenceDate || parent.date)}</span>
           <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
             PAR
+          </span>
+          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${badgeClass}`}>
+            {installment.number}/{installment.total}
           </span>
           {auto && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
@@ -2479,17 +2465,13 @@ function ParcelledRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <div className="flex items-center gap-1.5">
           <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
-          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${badgeClass}`}>
-            {installment.number}/{installment.total}
-          </span>
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            installment.paid
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${installment.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
+            }`}
         >
           {installment.paid ? (
             <>

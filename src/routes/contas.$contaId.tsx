@@ -482,7 +482,7 @@ function AccountPane({
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
+    <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
       {onClose && (
         <div className="mb-2 flex justify-end">
           <button
@@ -519,7 +519,7 @@ function AccountPane({
           </h1>
           {/* HEADER + DASHBOARD — só na lista de meses; a tela de lançamentos
               (um mês específico) não repete o card da conta, já visto aqui. */}
-          <header className="relative animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-card p-4 shadow-elegant sm:p-6">
+          <header className="relative animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-hero p-4 shadow-elegant sm:p-6">
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"

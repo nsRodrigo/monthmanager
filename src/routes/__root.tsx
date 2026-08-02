@@ -213,11 +213,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Conteúdo da navegação, compartilhado pelas duas apresentações:
- * - "rail" (desktop/tablet): fica minimizada (só ícones) e expande no
- *   hover/foco, via `group-hover`/`group-focus-within` no `<aside>` pai —
- *   por isso os rótulos ficam em opacidade 0 por padrão.
- * - "drawer" (mobile): sempre com os rótulos visíveis, sem fade.
+ * Conteúdo da navegação, compartilhado pelas duas apresentações — desktop
+ * (sidebar fixa, sempre expandida) e mobile (gaveta) — ambas sempre com os
+ * rótulos visíveis.
  */
 function SidebarContent({
   onNavigate,
@@ -471,12 +469,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop/tablet: minimizada (64px, só ícones), expande no hover/foco */}
+      {/* Desktop/tablet: sempre expandida (240px), sem recolher */}
       <aside
-        tabIndex={0}
-        className="group sticky top-0 hidden h-screen w-16 shrink-0 flex-col self-start overflow-hidden border-r border-border bg-card/40 p-3 transition-[width] duration-200 hover:w-60 focus-within:w-60 hover:p-5 focus-within:p-5 md:flex"
+        className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-border bg-card/40 p-5 md:flex"
       >
-        <SidebarContent labelClass="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity" />
+        <SidebarContent />
       </aside>
 
       {/* Mobile: gaveta cheia, entra pela direita — aberta pelo ícone ☰ de cada

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, Accordion, PaidToggle } from "./Modal";
 import {
   useUpdateInstallment,
   useShiftInstallmentDate,
@@ -284,7 +284,22 @@ export function EditInstallmentDialog({
       removeIncome.isPending;
     return (
       <>
-      <Modal open={open && !askDuplicate && !askDelete} onClose={onClose} title="Editar lançamento">
+      <Modal
+        open={open && !askDuplicate && !askDelete}
+        onClose={onClose}
+        title="Editar lançamento"
+        headerRight={
+          single.kind !== "investment" ? (
+            <PaidToggle
+              checked={paid}
+              onChange={setPaid}
+              disabled={singleType !== "cash"}
+              offLabel={single.kind === "debit" ? "Marcar pago" : "Marcar recebido"}
+              onLabel={single.kind === "debit" ? "Pago" : "Recebido"}
+            />
+          ) : undefined
+        }
+      >
         <div className="space-y-4">
           <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
             <AutocompleteInput
@@ -307,48 +322,18 @@ export function EditInstallmentDialog({
             </Field>
           </div>
 
-          {single.kind === "debit" && singleType === "cash" && (
-            <div className="rounded-lg border border-border bg-background/50 p-3">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={notifyEnabled}
-                  onChange={(e) => {
-                    setNotifyEnabled(e.target.checked);
-                    if (e.target.checked && !notifyDaysBefore) setNotifyDaysBefore("1");
-                  }}
-                  className="h-4 w-4 accent-primary"
-                />
-                <span className="text-sm font-medium">Notificar antes do vencimento</span>
-              </label>
-              {notifyEnabled && (
-                <div className="mt-3">
-                  <Field label="Quantos dias antes?">
-                    <input
-                      type="number"
-                      min={0}
-                      max={30}
-                      className={inputClass}
-                      value={notifyDaysBefore}
-                      onChange={(e) => setNotifyDaysBefore(e.target.value)}
-                    />
-                  </Field>
-                </div>
-              )}
-            </div>
-          )}
-
           {canConvert && (
-            <>
-              <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-                <input
-                  type="checkbox"
-                  checked={singleType === "parcelled"}
-                  onChange={(e) => setSingleType(e.target.checked ? "parcelled" : "cash")}
-                  className="h-4 w-4 accent-primary"
-                />
-                <span className="text-sm font-medium">É parcelado?</span>
-              </label>
+            <div className="space-y-2">
+              <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
+              <select
+                className={inputClass}
+                value={singleType}
+                onChange={(e) => setSingleType(e.target.value as "cash" | "parcelled" | "recurring")}
+              >
+                <option value="cash">À vista</option>
+                <option value="parcelled">Parcelado</option>
+                <option value="recurring">Recorrente</option>
+              </select>
 
               {singleType === "parcelled" && (
                 <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
@@ -405,42 +390,42 @@ export function EditInstallmentDialog({
                 </div>
               )}
 
-              <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
-                <input
-                  type="checkbox"
-                  checked={singleType === "recurring"}
-                  onChange={(e) => setSingleType(e.target.checked ? "recurring" : "cash")}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                />
-                <span className="text-sm">
-                  <span className="font-medium">Recorrente</span>
-                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                    Replicado automaticamente nos próximos 24 meses, mantendo o dia.
-                  </span>
-                </span>
-              </label>
+              {singleType === "recurring" && (
+                <p className="rounded-lg border border-border bg-background/30 p-3 text-[11px] text-muted-foreground">
+                  Replicado automaticamente nos próximos 24 meses, mantendo o dia.
+                </p>
+              )}
 
               {singleType !== "cash" && (
                 <p className="text-[11px] text-amber-500/90">
                   ⚠ Ao salvar, o lançamento atual será substituído pela nova série.
                 </p>
               )}
-            </>
+            </div>
           )}
 
-          {single.kind !== "investment" && singleType === "cash" && (
-            <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-              <input
-                type="checkbox"
-                checked={paid}
-                onChange={(e) => setPaid(e.target.checked)}
-                className="h-4 w-4 accent-primary"
-              />
-              <span className="text-sm font-medium">
-                {single.kind === "debit" ? "Marcado como pago" : "Marcado como recebido"}
-              </span>
-            </label>
+          {single.kind === "debit" && singleType === "cash" && (
+            <Accordion
+              open={notifyEnabled}
+              onOpenChange={(v) => {
+                setNotifyEnabled(v);
+                if (v && !notifyDaysBefore) setNotifyDaysBefore("1");
+              }}
+              label="Notificar antes do vencimento"
+            >
+              <Field label="Quantos dias antes?">
+                <input
+                  type="number"
+                  min={0}
+                  max={30}
+                  className={inputClass}
+                  value={notifyDaysBefore}
+                  onChange={(e) => setNotifyDaysBefore(e.target.value)}
+                />
+              </Field>
+            </Accordion>
           )}
+
           <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
             <button
               onClick={() => setAskDuplicate(true)}
@@ -669,7 +654,19 @@ export function EditInstallmentDialog({
 
   return (
     <>
-      <Modal open={open && !askDuplicate} onClose={onClose} title="Editar lançamento">
+      <Modal
+        open={open && !askDuplicate}
+        onClose={onClose}
+        title="Editar lançamento"
+        headerRight={
+          <PaidToggle
+            checked={paid}
+            onChange={setPaid}
+            offLabel={inst.parentType === "income" ? "Marcar recebido" : "Marcar pago"}
+            onLabel={inst.parentType === "income" ? "Recebido" : "Pago"}
+          />
+        }
+      >
         <div className="space-y-4">
           <Field label="Descrição">
             <AutocompleteInput
@@ -700,16 +697,6 @@ export function EditInstallmentDialog({
               Histórico: valor original {formatCurrency(latestAdjustment.data.previousTotal)} → ajustado para {formatCurrency(latestAdjustment.data.newTotal)}.
             </p>
           )}
-
-          <label className="flex items-center gap-3 rounded-lg border border-border bg-background/50 p-3">
-            <input
-              type="checkbox"
-              checked={paid}
-              onChange={(e) => setPaid(e.target.checked)}
-              className="h-4 w-4 accent-primary"
-            />
-            <span className="text-sm font-medium">Marcada como paga</span>
-          </label>
 
           {(inst.total > 1 || parentSubtitle) && (
             canManage ? (

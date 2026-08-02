@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { Modal, Field, inputClass, CheckboxExpand } from "./Modal";
+import { Modal, Field, inputClass, PaidToggle } from "./Modal";
 import { useAddIncome, useAccounts, useDescriptionSuggestions } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
+
+type PaymentType = "unico" | "parcelado" | "recorrente";
 
 export function AddIncomeDialog({
   open,
@@ -28,13 +30,15 @@ export function AddIncomeDialog({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
-  const [isInstallment, setIsInstallment] = useState(false);
-  const [isRecurring, setIsRecurring] = useState(false);
+  const [paymentType, setPaymentType] = useState<PaymentType>("unico");
   const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [markReceived, setMarkReceived] = useState(false);
+
+  const isInstallment = paymentType === "parcelado";
+  const isRecurring = paymentType === "recorrente";
 
   const resetFields = () => {
     const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
@@ -42,8 +46,7 @@ export function AddIncomeDialog({
     setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
     setDescription("");
     setAmount(0);
-    setIsInstallment(false);
-    setIsRecurring(false);
+    setPaymentType("unico");
     setRecurrenceMonths("24");
     setInstallments("2");
     setInstallmentNumber("1");
@@ -101,7 +104,20 @@ export function AddIncomeDialog({
   const per = n > 0 ? total / n : 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Novo recebimento">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Novo recebimento"
+      headerRight={
+        <PaidToggle
+          checked={markReceived}
+          onChange={setMarkReceived}
+          disabled={isRecurring}
+          offLabel="Marcar recebido"
+          onLabel="Recebido"
+        />
+      }
+    >
       <div className="space-y-4">
         {!fixedAccountId && (
           <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
@@ -118,74 +134,72 @@ export function AddIncomeDialog({
           </Field>
         </div>
 
-        <CheckboxExpand
-          checked={isInstallment}
-          onChange={(v) => {
-            setIsInstallment(v);
-            if (v) setIsRecurring(false);
-          }}
-          label="É Parcelado?"
-        >
-          <div className="flex gap-1 rounded-full bg-secondary p-1">
-            <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-              Valor total
-            </button>
-            <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-              Valor por parcela
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Total de parcelas">
-              <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
-            </Field>
-            <Field label="Parcela atual">
-              <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
-            </Field>
-          </div>
-          {value > 0 && n > 1 && (() => {
-            const cur = Math.max(1, Math.min(n, parseInt(installmentNumber) || 1));
-            return (
-              <p className="text-xs text-muted-foreground">
-                {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
-                <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
-                {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como recebidas.`}
+        <div className="space-y-2">
+          <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
+          <select
+            className={inputClass}
+            value={paymentType}
+            onChange={(e) => {
+              const v = e.target.value as PaymentType;
+              setPaymentType(v);
+              if (v === "recorrente") setMarkReceived(false);
+            }}
+          >
+            <option value="unico">Único</option>
+            <option value="parcelado">Parcelado</option>
+            <option value="recorrente">Recebível recorrente</option>
+          </select>
+
+          {isInstallment && (
+            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+              <div className="flex gap-1 rounded-full bg-secondary p-1">
+                <button type="button" onClick={() => setMode("total")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  Valor total
+                </button>
+                <button type="button" onClick={() => setMode("perInstallment")} className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  Valor por parcela
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Total de parcelas">
+                  <input type="number" min="2" max="60" className={inputClass} value={installments} onChange={(e) => setInstallments(e.target.value)} />
+                </Field>
+                <Field label="Parcela atual">
+                  <input type="number" min="1" max={n} className={inputClass} value={installmentNumber} onChange={(e) => setInstallmentNumber(e.target.value)} />
+                </Field>
+              </div>
+              {value > 0 && n > 1 && (() => {
+                const cur = Math.max(1, Math.min(n, parseInt(installmentNumber) || 1));
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    {n}x de <span className="font-semibold text-foreground">R$ {per.toFixed(2).replace(".", ",")}</span> · total <span className="font-semibold text-foreground">R$ {total.toFixed(2).replace(".", ",")}</span>
+                    <br />Esta é a parcela <span className="font-semibold text-foreground">{cur}/{n}</span>.
+                    {cur > 1 && ` ${cur - 1} parcela(s) anterior(es) serão criadas como recebidas.`}
+                  </p>
+                );
+              })()}
+            </div>
+          )}
+
+          {isRecurring && (
+            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+              <Field label="Repetir por quantos meses?">
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  className={inputClass}
+                  value={recurrenceMonths}
+                  onChange={(e) => setRecurrenceMonths(e.target.value)}
+                  placeholder="24"
+                />
+              </Field>
+              <p className="text-[11px] text-muted-foreground">
+                Replicado automaticamente nos próximos meses, mantendo o dia.
               </p>
-            );
-          })()}
-        </CheckboxExpand>
-
-        <CheckboxExpand
-          checked={isRecurring}
-          onChange={(v) => {
-            setIsRecurring(v);
-            if (v) {
-              setIsInstallment(false);
-              setMarkReceived(false);
-            }
-          }}
-          label="Recebível recorrente"
-          description="Replicado automaticamente nos próximos meses, mantendo o dia."
-        >
-          <Field label="Repetir por quantos meses?">
-            <input
-              type="number"
-              min="1"
-              max="120"
-              className={inputClass}
-              value={recurrenceMonths}
-              onChange={(e) => setRecurrenceMonths(e.target.value)}
-              placeholder="24"
-            />
-          </Field>
-        </CheckboxExpand>
-
-        {!isRecurring && (
-          <CheckboxExpand
-            checked={markReceived}
-            onChange={setMarkReceived}
-            label={isInstallment ? "Marcar esta parcela como recebida" : "Marcar como recebida"}
-          />
-        )}
+            </div>
+          )}
+        </div>
 
 
         <div className="flex gap-2 pt-2">

@@ -30,7 +30,6 @@ import {
   useEnsureRecurringForMonth,
   useDeleteParcelledByScope,
   useCompactInstallmentNumbering,
-  useDeleteRecurringByScope,
   useDeleteOverScope,
   useReorderCards,
   resolveScopeMonths,
@@ -201,7 +200,6 @@ export function MonthDetailPane({
 
   const deleteParcelledScoped = useDeleteParcelledByScope();
   const compactInstallments = useCompactInstallmentNumbering();
-  const deleteRecurringScoped = useDeleteRecurringByScope();
   const deleteOverScope = useDeleteOverScope();
 
   // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
@@ -251,12 +249,12 @@ export function MonthDetailPane({
     });
   };
 
-  /** Abre o "Aplicar em" para uma série recorrente (débito/recebimento). */
+  /** Abre o "Aplicar em" para uma série recorrente (débito/recebimento/compra). */
   const askDeleteRecurring = (
     kind: "debit" | "income" | "purchase",
     groupId: string,
     label: string,
-    cardId?: string,
+    target: { cardId?: string; accountId?: string; amount?: number },
   ) => {
     setScopeDelete({
       title:
@@ -270,17 +268,21 @@ export function MonthDetailPane({
           Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>.
         </>
       ),
+      // Usa sempre useDeleteOverScope: além de apagar as linhas, ele grava
+      // "tombstones" (recurring_deletions) para o(s) mês(es) excluído(s), o
+      // que impede useEnsureRecurringForMonth de recriar o lançamento
+      // (parcelado/recorrente/débito automático) ao reabrir o app.
       execute: async (scope) => {
-        if (kind === "purchase") {
-          await deleteOverScope.mutateAsync({
-            source: { kind: "purchase", cardId: cardId!, description: label, amount: 0, groupId },
-            scope,
-            anchorYear: year,
-            anchorMonth: month,
-          });
-          return;
-        }
-        await deleteRecurringScoped.mutateAsync({ kind, groupId, scope });
+        const source =
+          kind === "purchase"
+            ? { kind: "purchase" as const, cardId: target.cardId!, description: label, amount: 0, groupId }
+            : { kind, accountId: target.accountId!, description: label, amount: target.amount ?? 0, groupId };
+        await deleteOverScope.mutateAsync({
+          source,
+          scope,
+          anchorYear: year,
+          anchorMonth: month,
+        });
       },
     });
   };
@@ -392,7 +394,7 @@ export function MonthDetailPane({
     recurrenceGroupId?: string | null;
   }) => {
     if (pur.recurrenceGroupId) {
-      askDeleteRecurring("purchase", pur.recurrenceGroupId, pur.description, pur.cardId);
+      askDeleteRecurring("purchase", pur.recurrenceGroupId, pur.description, { cardId: pur.cardId });
       return;
     }
     if (pur.installmentsCount > 1) {
@@ -817,7 +819,7 @@ export function MonthDetailPane({
                 }}
                 onRemove={
                   isRecurring
-                    ? () => askDeleteRecurring("income", i.recurrenceGroupId!, i.description)
+                    ? () => askDeleteRecurring("income", i.recurrenceGroupId!, i.description, { accountId: i.accountId, amount: i.amount })
                     : async () => {
                       const ok = await confirmDialog({
                         title: "Excluir recebimento",
@@ -1024,7 +1026,7 @@ export function MonthDetailPane({
                 }}
                 onRemove={
                   isRecurring
-                    ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description)
+                    ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description, { accountId: d.accountId, amount: d.amount })
                     : d.autoDebit
                       ? () => askDeleteSingle(d.id, "debit", d.description, d.date)
                       : async () => {
@@ -1443,7 +1445,7 @@ export function MonthDetailPane({
         defaultYear={year}
         defaultMonth={month}
         initialKind="month"
-        loading={deleteParcelledScoped.isPending || deleteRecurringScoped.isPending}
+        loading={deleteParcelledScoped.isPending || deleteOverScope.isPending}
         availableMonths={scopeDelete?.availableMonths}
         onConfirm={async (scope) => {
           if (!scopeDelete) return;

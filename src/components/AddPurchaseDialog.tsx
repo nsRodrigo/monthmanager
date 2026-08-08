@@ -68,11 +68,12 @@ export function AddPurchaseDialog({
 
   const submit = async (addAnother = false) => {
     if (!isValid) return;
-    // When adding inside a specific invoice month (fixedCardId), pin the
-    // installment to that month while keeping the user-entered purchase date.
-    const invoiceAnchorDate = fixedCardId
-      ? `${defaultYear}-${String(defaultMonth + 1).padStart(2, "0")}-${String(Math.min(new Date(defaultYear, defaultMonth + 1, 0).getDate(), Number(date.slice(8, 10)) || 1)).padStart(2, "0")}`
-      : undefined;
+    // A âncora de mês/parcela é sempre o mês da PÁGINA (defaultYear/defaultMonth),
+    // nunca o mês da data de compra digitada — a data da compra é só um
+    // registro informativo e não pode decidir em qual mês/parcela o
+    // lançamento cai (mesma regra já aplicada a débitos e recebimentos).
+    // Mantemos apenas o DIA digitado, clampado ao tamanho do mês da página.
+    const invoiceAnchorDate = `${defaultYear}-${String(defaultMonth + 1).padStart(2, "0")}-${String(Math.min(new Date(defaultYear, defaultMonth + 1, 0).getDate(), Number(date.slice(8, 10)) || 1)).padStart(2, "0")}`;
     // Recurring purchase: same model as recurring debits — 24 monthly
     // purchases compartilhando recurrence_group_id. Cada mês é independente.
     if (isRecurring && !isInstallment) {

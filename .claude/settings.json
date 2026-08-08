@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(head -30 /tmp/out.txt)",
+      "Bash(curl -s \"http://localhost:8080/src/components/AddDebitDialog.tsx\" -o /tmp/debit.js -w \"%{http_code}\\\\n\"; grep -n \"Tipo de pagamento\\\\|Marcar pago\\\\|PaidToggle\" /tmp/debit.js | head -20)",
+      "Bash(curl -s \"http://localhost:8080/src/components/EditInstallmentDialog.tsx\" -o /tmp/edit.js -w \"%{http_code}\\\\n\"; grep -n \"Tipo de pagamento\\\\|PaidToggle\\\\|Marcar pago\\\\|Marcar recebido\" /tmp/edit.js | head -20)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

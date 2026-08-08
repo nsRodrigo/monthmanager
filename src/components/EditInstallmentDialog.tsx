@@ -15,8 +15,10 @@ import {
   useRenumberInstallment,
   useAddDebit,
   useAddIncome,
+  useAddPurchase,
   useRemoveDebit,
   useRemoveIncome,
+  useRemovePurchase,
   useDescriptionSuggestions,
   useDuplicateOverScope,
   useDeleteOverScope,
@@ -85,8 +87,10 @@ export function EditInstallmentDialog({
   const renumberInstallment = useRenumberInstallment();
   const addDebit = useAddDebit();
   const addIncome = useAddIncome();
+  const addPurchase = useAddPurchase();
   const removeDebit = useRemoveDebit();
   const removeIncome = useRemoveIncome();
+  const removePurchase = useRemovePurchase();
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const duplicateSeries = useDuplicateInstallmentSeries();
@@ -154,6 +158,11 @@ export function EditInstallmentDialog({
   const [convMode, setConvMode] = useState<"total" | "perInstallment">("total");
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
+  // Purchase (installment-view) type conversion state — cartão à vista → parcelado/recorrente.
+  const [purchType, setPurchType] = useState<"cash" | "parcelled" | "recurring">("cash");
+  const [purchInstallments, setPurchInstallments] = useState("2");
+  const [purchInstNumber, setPurchInstNumber] = useState("1");
+  const [purchMode, setPurchMode] = useState<"total" | "perInstallment">("total");
 
   useEffect(() => {
     if (!open) return;
@@ -166,6 +175,10 @@ export function EditInstallmentDialog({
       setNewTotalAmount(installment.amount * installment.total);
       setNewCurrentNumber(String(installment.number));
       setRecreateMode("recalculate");
+      setPurchType("cash");
+      setPurchInstallments("2");
+      setPurchInstNumber("1");
+      setPurchMode("total");
     } else if (single) {
       setDescription(single.description);
       setAmount(single.amount);
@@ -392,7 +405,7 @@ export function EditInstallmentDialog({
 
               {singleType === "recurring" && (
                 <p className="rounded-lg border border-border bg-background/30 p-3 text-[11px] text-muted-foreground">
-                  Replicado automaticamente nos próximos 24 meses, mantendo o dia.
+                  Replicado automaticamente todo mês, até o último mês que já existe nesta conta.
                 </p>
               )}
 
@@ -538,6 +551,14 @@ export function EditInstallmentDialog({
   const paidChanged = paid !== inst.paid;
   const remaining = Math.max(0, inst.total - inst.number);
   const isSingleParcel = inst.total <= 1;
+  // Only a plain cash (à vista) purchase can change payment type — a real
+  // multi-parcela series is edited via "Gerenciar parcelamento" instead.
+  const canConvertPurchase = inst.parentType === "purchase" && isSingleParcel;
+  const purchaseForInst = inst.parentType === "purchase" ? purchases.find((p) => p.id === inst.parentId) : undefined;
+  const purchN = purchType === "parcelled" ? Math.max(1, parseInt(purchInstallments) || 1) : 1;
+  const purchCur = purchType === "parcelled" ? Math.max(1, Math.min(purchN, parseInt(purchInstNumber) || 1)) : 1;
+  const purchTotal = purchMode === "perInstallment" && purchN > 1 ? amount * purchN : amount;
+  const purchPer = purchN > 0 ? purchTotal / purchN : 0;
 
   async function commit(scope: InstallmentScope) {
     // Date edit: the typed date is ONLY a visual reference — it never
@@ -588,6 +609,36 @@ export function EditInstallmentDialog({
   }
 
   const handleSave = async () => {
+    // Conversion: cash purchase → parcelado or recorrente. Remove the
+    // original single purchase and recreate it in the new shape (same
+    // pattern used for debit/income conversion in the "single" branch above).
+    if (canConvertPurchase && purchType !== "cash" && purchaseForInst) {
+      await removePurchase.mutateAsync(purchaseForInst.id);
+      if (purchType === "parcelled") {
+        await addPurchase.mutateAsync({
+          cardId: purchaseForInst.cardId,
+          description: description.trim(),
+          totalAmount: purchTotal,
+          date: dueDate,
+          installmentsCount: purchN,
+          installmentNumber: purchCur,
+          invoiceAnchorDate: dueDate,
+        });
+      } else {
+        await addPurchase.mutateAsync({
+          cardId: purchaseForInst.cardId,
+          description: description.trim(),
+          totalAmount: amount,
+          date: dueDate,
+          installmentsCount: 1,
+          installmentNumber: 1,
+          invoiceAnchorDate: dueDate,
+          recurring: true,
+        });
+      }
+      onClose();
+      return;
+    }
     // Scope prompt is needed for both amount AND date edits on a genuine
     // multi-installment series — each can differ per-parcela (P7-P12).
     if ((amountChanged || dateChanged) && !isSingleParcel) {
@@ -698,6 +749,88 @@ export function EditInstallmentDialog({
             </p>
           )}
 
+          {canConvertPurchase && (
+            <div className="space-y-2">
+              <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
+              <select
+                className={inputClass}
+                value={purchType}
+                onChange={(e) => setPurchType(e.target.value as "cash" | "parcelled" | "recurring")}
+              >
+                <option value="cash">À vista</option>
+                <option value="parcelled">Parcelado</option>
+                <option value="recurring">Recorrente</option>
+              </select>
+
+              {purchType === "parcelled" && (
+                <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
+                  <div className="flex gap-1 rounded-full bg-secondary p-1">
+                    <button
+                      type="button"
+                      onClick={() => setPurchMode("total")}
+                      className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        purchMode === "total" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Valor total
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPurchMode("perInstallment")}
+                      className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        purchMode === "perInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Valor por parcela
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Total de parcelas">
+                      <input
+                        type="number"
+                        min="2"
+                        max="48"
+                        className={inputClass}
+                        value={purchInstallments}
+                        onChange={(e) => setPurchInstallments(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Parcela atual">
+                      <input
+                        type="number"
+                        min="1"
+                        max={purchN}
+                        className={inputClass}
+                        value={purchInstNumber}
+                        onChange={(e) => setPurchInstNumber(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  {amount > 0 && purchN > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      {purchN}x de <span className="font-semibold text-foreground">{formatCurrency(purchPer)}</span> · total{" "}
+                      <span className="font-semibold text-foreground">{formatCurrency(purchTotal)}</span>
+                      <br />
+                      Esta é a parcela <span className="font-semibold text-foreground">{purchCur}/{purchN}</span>.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {purchType === "recurring" && (
+                <p className="rounded-lg border border-border bg-background/30 p-3 text-[11px] text-muted-foreground">
+                  Replicado automaticamente todo mês, até o último mês que já existe nesta conta.
+                </p>
+              )}
+
+              {purchType !== "cash" && (
+                <p className="text-[11px] text-amber-500/90">
+                  ⚠ Ao salvar, o lançamento atual será substituído pela nova série.
+                </p>
+              )}
+            </div>
+          )}
+
           {(inst.total > 1 || parentSubtitle) && (
             canManage ? (
               <button
@@ -771,10 +904,18 @@ export function EditInstallmentDialog({
             </button>
             <button
               onClick={handleSave}
-              disabled={update.isPending || shift.isPending || updateAmountScope.isPending}
+              disabled={
+                update.isPending ||
+                shift.isPending ||
+                updateAmountScope.isPending ||
+                addPurchase.isPending ||
+                removePurchase.isPending
+              }
               className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {update.isPending || shift.isPending || updateAmountScope.isPending ? "Salvando…" : "Salvar"}
+              {update.isPending || shift.isPending || updateAmountScope.isPending || addPurchase.isPending || removePurchase.isPending
+                ? "Salvando…"
+                : "Salvar"}
             </button>
           </div>
         </div>

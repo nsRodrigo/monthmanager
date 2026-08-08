@@ -31,7 +31,6 @@ export function AddIncomeDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [paymentType, setPaymentType] = useState<PaymentType>("unico");
-  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
@@ -47,7 +46,6 @@ export function AddIncomeDialog({
     setDescription("");
     setAmount(0);
     setPaymentType("unico");
-    setRecurrenceMonths("24");
     setInstallments("2");
     setInstallmentNumber("1");
     setMode("total");
@@ -63,21 +61,6 @@ export function AddIncomeDialog({
 
   const submit = async (addAnother = false) => {
     if (!isValid) return;
-    if (isRecurring && !isInstallment) {
-      await addIncome.mutateAsync({
-        accountId,
-        description: description.trim(),
-        amount,
-        date,
-        recurring: true,
-        referenceYear: defaultYear,
-        referenceMonth: defaultMonth,
-        recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
-      });
-      if (addAnother) resetFields();
-      else onClose();
-      return;
-    }
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const value = amount;
@@ -89,9 +72,10 @@ export function AddIncomeDialog({
       date,
       installmentsCount: n,
       installmentNumber: cur,
+      recurring: isRecurring,
       referenceYear: defaultYear,
       referenceMonth: defaultMonth,
-      receivedNow: markReceived && !isInstallment && !isRecurring,
+      receivedNow: markReceived && !isInstallment,
       markCurrentPaid: markReceived && isInstallment,
     });
     if (addAnother) resetFields();
@@ -112,7 +96,6 @@ export function AddIncomeDialog({
         <PaidToggle
           checked={markReceived}
           onChange={setMarkReceived}
-          disabled={isRecurring}
           offLabel="Marcar recebido"
           onLabel="Recebido"
         />
@@ -139,11 +122,7 @@ export function AddIncomeDialog({
           <select
             className={inputClass}
             value={paymentType}
-            onChange={(e) => {
-              const v = e.target.value as PaymentType;
-              setPaymentType(v);
-              if (v === "recorrente") setMarkReceived(false);
-            }}
+            onChange={(e) => setPaymentType(e.target.value as PaymentType)}
           >
             <option value="unico">Único</option>
             <option value="parcelado">Parcelado</option>
@@ -182,22 +161,9 @@ export function AddIncomeDialog({
           )}
 
           {isRecurring && (
-            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
-              <Field label="Repetir por quantos meses?">
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  className={inputClass}
-                  value={recurrenceMonths}
-                  onChange={(e) => setRecurrenceMonths(e.target.value)}
-                  placeholder="24"
-                />
-              </Field>
-              <p className="text-[11px] text-muted-foreground">
-                Replicado automaticamente nos próximos meses, mantendo o dia.
-              </p>
-            </div>
+            <p className="rounded-lg border border-border bg-background/50 p-3 text-[11px] text-muted-foreground">
+              Replicado automaticamente todo mês, até o último mês que já existe nesta conta — e continua acompanhando conforme a conta cresce. Cada mês é independente e pode ser editado ou excluído sem afetar os demais.
+            </p>
           )}
         </div>
 

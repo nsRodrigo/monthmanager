@@ -1136,87 +1136,15 @@ export function useAddPurchase() {
       installmentsCount: number;
       installmentNumber?: number;
       invoiceAnchorDate?: string;
+      /** "Compra recorrente": série real, replicada até o último mês que já existe na conta do cartão. */
       recurring?: boolean;
-      /** Number of months to replicate for recurring series (default 24). */
-      recurrenceMonths?: number;
-      /** Mark the just-created current-month item as paid (only for single, non-recurring, non-parcelled). */
+      /** Mark the just-created current-month item as paid (only for single, non-parcelled). */
       paidNow?: boolean;
       /** Mark the parcela being created (installmentNumber) as paid. */
       markCurrentPaid?: boolean;
     }) => {
-      // Recurring purchase: N monthly purchases, each installments_count=1,
-      // sharing the same recurrence_group_id. NO installment-style splitting —
-      // recorrência ≠ parcelamento. Mesmo comportamento dos débitos recorrentes.
       const isRecurring = !!p.recurring && p.installmentsCount === 1;
-      if (isRecurring) {
-        const RECUR_MONTHS = Math.max(1, Math.min(120, p.recurrenceMonths ?? 24));
-        const groupId = crypto.randomUUID();
-        const anchorIso = p.invoiceAnchorDate ?? p.date;
-        const [_sy, _sm, _sd] = anchorIso.slice(0, 10).split("-").map(Number);
-        const start = new Date(_sy, (_sm || 1) - 1, _sd || 1);
-        const day = start.getDate();
-        const purchaseRows: Array<{
-          id: string;
-          user_id: string;
-          card_id: string;
-          description: string;
-          total_amount: number;
-          purchase_date: string;
-          installments_count: number;
-          recurrence_group_id: string;
-        }> = [];
-        const installmentRows: Array<{
-          id: string;
-          user_id: string;
-          parent_id: string;
-          parent_type: ParentType;
-          purchase_id: string;
-          number: number;
-          total: number;
-          amount: number;
-          due_date: string;
-          year: number;
-          month: number;
-          paid: boolean;
-        }> = [];
-        for (let i = 0; i < RECUR_MONTHS; i++) {
-          const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
-          const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-          const dd = Math.min(day, lastDay);
-          const dateStr = fmtLocalDate(target.getFullYear(), target.getMonth(), dd);
-          const pid = crypto.randomUUID();
-          purchaseRows.push({
-            id: pid,
-            user_id: user!.id,
-            card_id: p.cardId,
-            description: p.description,
-            total_amount: p.totalAmount,
-            purchase_date: dateStr,
-            installments_count: 1,
-            recurrence_group_id: groupId,
-          });
-          installmentRows.push({
-            id: crypto.randomUUID(),
-            user_id: user!.id,
-            parent_id: pid,
-            parent_type: "purchase",
-            purchase_id: pid,
-            number: 1,
-            total: 1,
-            amount: p.totalAmount,
-            due_date: dateStr,
-            year: target.getFullYear(),
-            month: target.getMonth(),
-            paid: false,
-          });
-        }
-        const { error } = await supabase.from("purchases").insert(purchaseRows);
-        if (error) throw error;
-        const { error: e2 } = await supabase.from("installments").insert(installmentRows);
-        if (e2) throw e2;
-        return { purchaseId: purchaseRows[0].id, payload: p, installmentRows, recurring: true as const };
-      }
-
+      const groupId = isRecurring ? crypto.randomUUID() : null;
       const purchaseId = crypto.randomUUID();
       const { error } = await supabase
         .from("purchases")
@@ -1228,16 +1156,18 @@ export function useAddPurchase() {
           total_amount: p.totalAmount,
           purchase_date: p.date,
           installments_count: p.installmentsCount,
+          recurrence_group_id: groupId,
         });
       if (error) throw error;
       const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
+      const anchorDate = p.invoiceAnchorDate ?? p.date;
       const inst = buildInstallmentsAnchored(
         purchaseId,
         user!.id,
         p.totalAmount,
         p.installmentsCount,
         anchor,
-        p.invoiceAnchorDate ?? p.date,
+        anchorDate,
         "purchase",
         true,
         p.markCurrentPaid ?? false,
@@ -1249,11 +1179,54 @@ export function useAddPurchase() {
       }
       const { error: e2 } = await supabase.from("installments").insert(inst);
       if (e2) throw e2;
-      return { purchaseId, payload: p, installmentRows: inst, recurring: false as const };
+
+      if (isRecurring) {
+        const { data: cardRow } = await supabase.from("cards").select("account_id").eq("id", p.cardId).maybeSingle();
+        const [ay, am, ad] = anchorDate.slice(0, 10).split("-").map(Number);
+        const refYear = ay;
+        const refMonth = (am || 1) - 1;
+        const horizon = cardRow?.account_id
+          ? await computeAccountHorizon(cardRow.account_id, refYear, refMonth)
+          : { year: refYear, month: refMonth };
+        const totalMonths = monthSpan(refYear, refMonth, horizon.year, horizon.month);
+        const dates = stepMonthDates(anchorDate, totalMonths - 1, 1);
+        if (dates.length) {
+          const purchaseRows = dates.map(({ dateStr }) => ({
+            id: crypto.randomUUID(),
+            user_id: user!.id,
+            card_id: p.cardId,
+            description: p.description,
+            total_amount: p.totalAmount,
+            purchase_date: dateStr,
+            installments_count: 1,
+            recurrence_group_id: groupId,
+          }));
+          const installmentRows = dates.map(({ dateStr, year: ry, month: rm }, idx) => ({
+            id: crypto.randomUUID(),
+            user_id: user!.id,
+            parent_id: purchaseRows[idx].id,
+            parent_type: "purchase" as ParentType,
+            purchase_id: purchaseRows[idx].id,
+            number: 1,
+            total: 1,
+            amount: p.totalAmount,
+            due_date: dateStr,
+            year: ry,
+            month: rm,
+            paid: false,
+          }));
+          const { error: e3 } = await supabase.from("purchases").insert(purchaseRows);
+          if (e3) throw e3;
+          const { error: e4 } = await supabase.from("installments").insert(installmentRows);
+          if (e4) throw e4;
+        }
+      }
+
+      return { purchaseId, payload: p, installmentRows: inst, recurring: isRecurring };
     },
     onSuccess: (result, p) => {
       inv(["purchases", "installments", "card_payments"]);
-      if (result.recurring) return; // sem histórico para séries recorrentes
+      if (result.recurring) return; // série gerada em massa — sem histórico de undo item a item
       const { purchaseId, installmentRows } = result;
       const userId = user!.id;
       history.push({
@@ -1333,21 +1306,25 @@ function fmtLocalDate(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export function buildRecurringMonthDates(
+/**
+ * Gera `count` datas mensais consecutivas a partir de `anchorDateIso`,
+ * mantendo o dia (clampado ao tamanho de cada mês). `startOffset` desloca o
+ * primeiro mês gerado (1 = pula o mês âncora, útil pra gerar só os meses
+ * SEGUINTES ao lançamento já inserido separadamente).
+ */
+function stepMonthDates(
   anchorDateIso: string,
-  months: number,
-  startOffset: 0 | 1 = 0,
+  count: number,
+  startOffset: number,
 ): Array<{ dateStr: string; year: number; month: number }> {
+  if (count <= 0) return [];
   const { y: sy, m: sm, d: sd } = parseLocalDate(anchorDateIso);
   const start = new Date(sy, sm, sd);
   const day = start.getDate();
-  const n = Math.max(1, Math.floor(months));
   const dates: Array<{ dateStr: string; year: number; month: number }> = [];
-  for (let i = startOffset; i < startOffset + n; i++) {
+  for (let i = startOffset; i < startOffset + count; i++) {
     const target = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    const lastDay = new Date(
-      target.getFullYear(), target.getMonth() + 1, 0,
-    ).getDate();
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
     const dd = Math.min(day, lastDay);
     dates.push({
       dateStr: fmtLocalDate(target.getFullYear(), target.getMonth(), dd),
@@ -1356,6 +1333,80 @@ export function buildRecurringMonthDates(
     });
   }
   return dates;
+}
+
+/** Número de meses (inclusive) entre (fromYear,fromMonth) e (toYear,toMonth). Mínimo 1. */
+function monthSpan(fromYear: number, fromMonth: number, toYear: number, toMonth: number): number {
+  return Math.max(1, (toYear - fromYear) * 12 + (toMonth - fromMonth) + 1);
+}
+
+/**
+ * "Recorrente"/"débito automático" não pedem mais quantos meses replicar —
+ * são criados até o último mês que JÁ existe na conta (qualquer tipo de
+ * lançamento: débitos, recebimentos, compras no cartão, investimentos).
+ * Nunca retorna um mês anterior a `fallbackYear/fallbackMonth` (o mês onde o
+ * lançamento está sendo criado).
+ */
+async function computeAccountHorizon(
+  accountId: string,
+  fallbackYear: number,
+  fallbackMonth: number,
+): Promise<{ year: number; month: number }> {
+  let bestY = fallbackYear;
+  let bestM = fallbackMonth;
+  const consider = (y: number | null | undefined, m: number | null | undefined) => {
+    if (y == null || m == null) return;
+    if (y > bestY || (y === bestY && m > bestM)) {
+      bestY = y;
+      bestM = m;
+    }
+  };
+
+  const [debitsRes, incomesRes, investmentsRes, cardsRes] = await Promise.all([
+    supabase.from("debits").select("id,reference_year,reference_month").eq("account_id", accountId),
+    supabase.from("incomes").select("id,reference_year,reference_month").eq("account_id", accountId),
+    supabase.from("investments").select("date").eq("account_id", accountId),
+    supabase.from("cards").select("id").eq("account_id", accountId),
+  ]);
+
+  const debitIds = (debitsRes.data ?? []).map((r: any) => r.id as string);
+  const incomeIds = (incomesRes.data ?? []).map((r: any) => r.id as string);
+  for (const r of (debitsRes.data ?? []) as any[]) consider(r.reference_year, r.reference_month);
+  for (const r of (incomesRes.data ?? []) as any[]) consider(r.reference_year, r.reference_month);
+  for (const r of (investmentsRes.data ?? []) as any[]) {
+    if (!r.date) continue;
+    const [y, m] = String(r.date).slice(0, 10).split("-").map(Number);
+    consider(y, (m || 1) - 1);
+  }
+
+  const cardIds = (cardsRes.data ?? []).map((c: any) => c.id as string);
+  const purchasesRes = cardIds.length
+    ? await supabase.from("purchases").select("id").in("card_id", cardIds)
+    : { data: [] as { id: string }[] };
+  const purchaseIds = (purchasesRes.data ?? []).map((p: any) => p.id as string);
+
+  const instFetches: PromiseLike<{ data: { year: number; month: number }[] | null }>[] = [];
+  if (debitIds.length) {
+    instFetches.push(
+      supabase.from("installments").select("year,month").eq("parent_type", "debit").in("parent_id", debitIds),
+    );
+  }
+  if (incomeIds.length) {
+    instFetches.push(
+      supabase.from("installments").select("year,month").eq("parent_type", "income").in("parent_id", incomeIds),
+    );
+  }
+  if (purchaseIds.length) {
+    instFetches.push(
+      supabase.from("installments").select("year,month").eq("parent_type", "purchase").in("purchase_id", purchaseIds),
+    );
+  }
+  const instResults = await Promise.all(instFetches);
+  for (const res of instResults) {
+    for (const r of res.data ?? []) consider(r.year, r.month);
+  }
+
+  return { year: bestY, month: bestM };
 }
 
 export function useUpdateInstallment() {
@@ -2103,8 +2154,6 @@ export function useAddDebit() {
       /** Reference month/year "position" for this entry — set once on creation. */
       referenceYear?: number;
       referenceMonth?: number;
-      /** Number of months to replicate for recurring series (default 24). */
-      recurrenceMonths?: number;
       /** Mark the just-created current-month item as paid. */
       paidNow?: boolean;
       /** Mark the parcela being created (installmentNumber) as paid. */
@@ -2114,15 +2163,18 @@ export function useAddDebit() {
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
-      const isRecurring = d.required && count === 1;
+      // "Recorrente" ou "débito automático" (e não parcelado): série real,
+      // replicada até o último mês que já existe na conta.
+      const isRecurring = (d.required || !!d.autoDebit) && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
       const debitId = crypto.randomUUID();
       // Fallback to date when caller didn't pass a reference month.
       const [_by, _bm] = d.date.slice(0, 10).split("-").map(Number);
       const refYear = d.referenceYear ?? _by;
       const refMonth = d.referenceMonth ?? (_bm || 1) - 1;
-      // paidNow applies only to the simple case (single, non-recurring, non-parcelled).
-      const applyPaidNow = !!d.paidNow && count === 1 && !isRecurring;
+      // paidNow só se aplica ao mês âncora (este mês); os meses futuros da
+      // série sempre nascem em aberto.
+      const applyPaidNow = !!d.paidNow && count === 1;
       const baseRow = {
         id: debitId,
         user_id: user!.id,
@@ -2143,17 +2195,17 @@ export function useAddDebit() {
       };
       const { error } = await supabase.from("debits").insert(baseRow);
       if (error) throw error;
+      // A ancora de mes e sempre o mes da PAGINA (refYear/refMonth),
+      // nao o mes da data digitada. So mantemos o DIA da data.
+      const [, , dd] = d.date.slice(0, 10).split("-").map(Number);
+      const anchorDay = Math.min(
+        dd || 1,
+        new Date(refYear, refMonth + 1, 0).getDate(),
+      );
+      const anchorIso =
+        `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+        `-${String(anchorDay).padStart(2, "0")}`;
       if (count > 1) {
-        // A ancora de mes e sempre o mes da PAGINA (refYear/refMonth),
-        // nao o mes da data digitada. So mantemos o DIA da data.
-        const [, , dd] = d.date.slice(0, 10).split("-").map(Number);
-        const anchorDay = Math.min(
-          dd || 1,
-          new Date(refYear, refMonth + 1, 0).getDate(),
-        );
-        const anchorIso =
-          `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
-          `-${String(anchorDay).padStart(2, "0")}`;
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
@@ -2167,27 +2219,27 @@ export function useAddDebit() {
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (isRecurring) {
-        const dates = buildRecurringMonthDates(
-          d.date, d.recurrenceMonths ?? 24, 1,
-        );
-        const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
-          user_id: user!.id,
-          account_id: d.accountId,
-          description: d.description,
-          amount: d.amount,
-          date: dateStr,
-          required: true,
-          paid: false,
-          auto_debit: d.autoDebit ?? false,
-          auto_debit_day: d.autoDebitDay ?? null,
-          installments_count: 1,
-          is_parent: false,
-          recurrence_group_id: groupId,
-          reference_year: ry,
-          reference_month: rm,
-          notify_days_before: d.notifyDaysBefore ?? null,
-        }));
-        if (rows.length) {
+        const horizon = await computeAccountHorizon(d.accountId, refYear, refMonth);
+        const totalMonths = monthSpan(refYear, refMonth, horizon.year, horizon.month);
+        const dates = stepMonthDates(anchorIso, totalMonths - 1, 1);
+        if (dates.length) {
+          const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+            user_id: user!.id,
+            account_id: d.accountId,
+            description: d.description,
+            amount: d.amount,
+            date: dateStr,
+            required: d.required,
+            paid: false,
+            auto_debit: d.autoDebit ?? false,
+            auto_debit_day: d.autoDebitDay ?? null,
+            installments_count: 1,
+            is_parent: false,
+            recurrence_group_id: groupId,
+            reference_year: ry,
+            reference_month: rm,
+            notify_days_before: d.notifyDaysBefore ?? null,
+          }));
           const { error: e3 } = await supabase.from("debits").insert(rows);
           if (e3) throw e3;
         }
@@ -2295,12 +2347,11 @@ export function useAddIncome() {
       date: string;
       installmentsCount?: number;
       installmentNumber?: number;
+      /** "Recorrente" tag on a single-occurrence income — no series is generated. */
       recurring?: boolean;
       /** Reference month/year "position" for this entry — set once on creation. */
       referenceYear?: number;
       referenceMonth?: number;
-      /** Number of months to replicate for recurring series (default 24). */
-      recurrenceMonths?: number;
       /** Mark the just-created current-month item as received. */
       receivedNow?: boolean;
       /** Mark the parcela being created (installmentNumber) as paid. */
@@ -2314,7 +2365,7 @@ export function useAddIncome() {
       const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
       const refYear = i.referenceYear ?? _by;
       const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
-      const applyReceivedNow = !!i.receivedNow && count === 1 && !isRecurring;
+      const applyReceivedNow = !!i.receivedNow && count === 1;
       const baseRow = {
         id: incomeId,
         user_id: user!.id,
@@ -2331,15 +2382,15 @@ export function useAddIncome() {
       };
       const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
+      const [, , dd] = i.date.slice(0, 10).split("-").map(Number);
+      const anchorDay = Math.min(
+        dd || 1,
+        new Date(refYear, refMonth + 1, 0).getDate(),
+      );
+      const anchorIso =
+        `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+        `-${String(anchorDay).padStart(2, "0")}`;
       if (count > 1) {
-        const [, , dd] = i.date.slice(0, 10).split("-").map(Number);
-        const anchorDay = Math.min(
-          dd || 1,
-          new Date(refYear, refMonth + 1, 0).getDate(),
-        );
-        const anchorIso =
-          `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
-          `-${String(anchorDay).padStart(2, "0")}`;
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
@@ -2353,23 +2404,23 @@ export function useAddIncome() {
         const { error: e2 } = await supabase.from("installments").insert(inst);
         if (e2) throw e2;
       } else if (isRecurring) {
-        const dates = buildRecurringMonthDates(
-          i.date, i.recurrenceMonths ?? 24, 1,
-        );
-        const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
-          user_id: user!.id,
-          account_id: i.accountId,
-          description: i.description,
-          amount: i.amount,
-          date: dateStr,
-          received: false,
-          installments_count: 1,
-          is_parent: false,
-          recurrence_group_id: groupId,
-          reference_year: ry,
-          reference_month: rm,
-        }));
-        if (rows.length) {
+        const horizon = await computeAccountHorizon(i.accountId, refYear, refMonth);
+        const totalMonths = monthSpan(refYear, refMonth, horizon.year, horizon.month);
+        const dates = stepMonthDates(anchorIso, totalMonths - 1, 1);
+        if (dates.length) {
+          const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+            user_id: user!.id,
+            account_id: i.accountId,
+            description: i.description,
+            amount: i.amount,
+            date: dateStr,
+            received: false,
+            installments_count: 1,
+            is_parent: false,
+            recurrence_group_id: groupId,
+            reference_year: ry,
+            reference_month: rm,
+          }));
           const { error: e3 } = await supabase.from("incomes").insert(rows);
           if (e3) throw e3;
         }
@@ -5056,6 +5107,89 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
           }
         }
 
+        // Compras recorrentes usam o mesmo motor, mas cada ocorrência
+        // precisa também de uma linha em installments (ligada por
+        // purchase_id/parent_id) pra aparecer na fatura do mês.
+        {
+          const { data: groupRows, error } = await supabase
+            .from("purchases")
+            .select("recurrence_group_id")
+            .not("recurrence_group_id", "is", null);
+          if (!error && !cancelled) {
+            const groupIds = Array.from(
+              new Set((groupRows ?? []).map((g: any) => g.recurrence_group_id as string)),
+            ).filter(Boolean);
+
+            for (const gid of groupIds) {
+              if (cancelled) return;
+              if (tombstonedGroups.has(gid)) continue;
+              const { data: existing } = await supabase
+                .from("purchases")
+                .select("id")
+                .eq("recurrence_group_id", gid)
+                .gte("purchase_date", startStr)
+                .lte("purchase_date", endStr)
+                .limit(1);
+              if (existing && existing.length > 0) continue;
+
+              const { data: earliest } = await supabase
+                .from("purchases")
+                .select("purchase_date")
+                .eq("recurrence_group_id", gid)
+                .order("purchase_date", { ascending: true })
+                .limit(1);
+              if (!earliest || earliest.length === 0) continue;
+              const seriesStartDate = earliest[0].purchase_date as string;
+              const seriesYear = parseInt(seriesStartDate.slice(0, 4), 10);
+              const seriesMonth = parseInt(seriesStartDate.slice(5, 7), 10) - 1;
+              if (year < seriesYear || (year === seriesYear && month < seriesMonth)) continue;
+
+              const { data: latest } = await supabase
+                .from("purchases")
+                .select("*")
+                .eq("recurrence_group_id", gid)
+                .order("purchase_date", { ascending: false })
+                .limit(1);
+              if (!latest || latest.length === 0) continue;
+              const t = latest[0] as any;
+              const day = parseInt(String(t.purchase_date).slice(8, 10), 10);
+              const dd = Math.min(day, lastDay);
+              const newDate = `${year}-${monthStr}-${String(dd).padStart(2, "0")}`;
+
+              const newPurchaseId = await deterministicUuid(`recurring-purchase:${gid}:${year}:${month}`);
+              const purchaseRow: any = {
+                id: newPurchaseId,
+                user_id: user.id,
+                card_id: t.card_id,
+                description: t.description,
+                total_amount: t.total_amount,
+                purchase_date: newDate,
+                installments_count: 1,
+                recurrence_group_id: gid,
+              };
+              const { error: pe } = await supabase.from("purchases").insert(purchaseRow);
+              if (pe) continue;
+              const instRow: any = {
+                id: await deterministicUuid(`recurring-purchase-inst:${gid}:${year}:${month}`),
+                user_id: user.id,
+                parent_id: newPurchaseId,
+                parent_type: "purchase",
+                purchase_id: newPurchaseId,
+                number: 1,
+                total: 1,
+                amount: t.total_amount,
+                due_date: newDate,
+                year,
+                month,
+                paid: false,
+              };
+              const { error: ie2 } = await supabase.from("installments").insert(instRow);
+              if (ie2) continue;
+              inserted = true;
+            }
+          }
+        }
+
         if (cancelled || !inserted) return;
 
         // Wait for any in-flight mutations to settle before invalidating.
@@ -5071,6 +5205,8 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
         if (cancelled) return;
         qc.invalidateQueries({ queryKey: ["debits"], refetchType: "active" });
         qc.invalidateQueries({ queryKey: ["incomes"], refetchType: "active" });
+        qc.invalidateQueries({ queryKey: ["purchases"], refetchType: "active" });
+        qc.invalidateQueries({ queryKey: ["installments"], refetchType: "active" });
       } catch {
         // If anything threw, allow a future mount to retry.
         deleteEnsuredKey(key);

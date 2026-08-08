@@ -219,16 +219,11 @@ function BackupPage() {
         </Link>
         <MobileMenuButton />
       </div>
-      <header className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
-          <Cloud className="h-6 w-6" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Backup e Sincronização</h1>
-          <p className="text-sm text-muted-foreground">
-            Exporte, restaure e mantenha versões dos seus dados financeiros.
-          </p>
-        </div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Backup e Sincronização</h1>
+        <p className="text-sm text-muted-foreground">
+          Exporte, restaure e mantenha versões dos seus dados financeiros.
+        </p>
       </header>
       <div className="space-y-6 pb-20">
 

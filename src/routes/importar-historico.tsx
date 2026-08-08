@@ -181,32 +181,29 @@ function HistoricalImportPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8 md:py-12">
+    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
       <div className="mb-4 flex items-center justify-between gap-2">
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" /> Home
         </Link>
         <MobileMenuButton />
       </div>
-      <header className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
-          <Database className="h-6 w-6" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Importar planilha histórica</h1>
-          <p className="text-sm text-muted-foreground">
-            Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções.
-          </p>
-        </div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Importar planilha histórica</h1>
+        <p className="text-sm text-muted-foreground">
+          Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções.
+        </p>
       </header>
 
+      <div className="space-y-6 pb-20">
+
       {/* Zona perigosa */}
-      <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+      <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
         <div className="flex items-start gap-3">
           <Database className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
           <div className="flex-1">
-            <h2 className="font-semibold text-destructive">Antes de importar: limpe o banco</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h2 className="text-sm font-semibold text-destructive">Antes de importar: limpe o banco</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
               Apaga TODAS as compras, parcelas, débitos, recebimentos e investimentos. Mantém suas
               contas e cartões cadastrados. Use isso se você importou dados de teste e quer começar
               do zero.
@@ -239,10 +236,10 @@ function HistoricalImportPage() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Upload */}
-      <div className="rounded-2xl border border-border bg-card p-6">
+      <section className="rounded-xl border border-border bg-card/40 p-4">
         {/* Seletor de conta destino padrão */}
         <div className="mb-5 grid gap-3 rounded-xl border border-border bg-background/40 p-4 md:grid-cols-2">
           <div>
@@ -322,12 +319,12 @@ function HistoricalImportPage() {
             <p>{success}</p>
           </div>
         )}
-      </div>
+      </section>
 
       {/* Stats globais */}
       {results.length > 0 && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <StatCard label="Total de linhas" value={String(stats.count)} />
             <StatCard label="Compras (cartão)" value={String(stats.byKind.purchase)} />
             <StatCard label="Débitos" value={String(stats.byKind.debit)} />
@@ -337,8 +334,8 @@ function HistoricalImportPage() {
 
           {/* Plano de criação */}
           {plan && (
-            <div className="mt-6 rounded-2xl border border-border bg-card p-6">
-              <h2 className="text-lg font-semibold">O que será criado</h2>
+            <section className="rounded-xl border border-border bg-card/40 p-4">
+              <h2 className="text-sm font-semibold">O que será criado</h2>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -416,11 +413,11 @@ function HistoricalImportPage() {
                 Esta operação cria contas/cartões automaticamente e insere todas as linhas. Pode
                 levar alguns segundos.
               </p>
-            </div>
+            </section>
           )}
 
           {/* Árvore por ano > mês > seção */}
-          <div className="mt-6 rounded-2xl border border-border bg-card p-2">
+          <section className="rounded-xl border border-border bg-card/40 p-2">
             {byYear.map(([year, ents]) => {
               const open = expandedYears.has(year);
               const yearTotal = ents.reduce((s, e) => s + e.amount, 0);
@@ -445,9 +442,10 @@ function HistoricalImportPage() {
                 </div>
               );
             })}
-          </div>
+          </section>
         </>
       )}
+      </div>
     </div>
   );
 }

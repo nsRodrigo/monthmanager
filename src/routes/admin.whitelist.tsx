@@ -191,18 +191,15 @@ function WhitelistAdmin() {
         <MobileMenuButton />
       </div>
 
-      <header className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
-          <ShieldCheck className="h-6 w-6" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Administração</h1>
-          <p className="text-sm text-muted-foreground">Whitelist de cadastros e usuários ativos.</p>
-        </div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Administração</h1>
+        <p className="text-sm text-muted-foreground">Whitelist de cadastros e usuários ativos.</p>
       </header>
 
+      <div className="space-y-6 pb-20">
+
       {/* Push notifications */}
-      <section className="mb-6 rounded-2xl border border-border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card/40 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />
@@ -223,9 +220,9 @@ function WhitelistAdmin() {
       </section>
 
       {/* Pending requests */}
-      <section className="mb-8">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Clock className="h-4 w-4" /> Solicitações pendentes
+      <section className="rounded-xl border border-border bg-card/40 p-4">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <Clock className="h-4 w-4 text-primary" /> Solicitações pendentes
           {pendingList.length > 0 && (
             <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
               {pendingList.length}
@@ -235,17 +232,17 @@ function WhitelistAdmin() {
         {pendingQ.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
         ) : pendingQ.error ? (
-          <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             Erro ao carregar solicitações: {(pendingQ.error as Error).message}
           </p>
         ) : pendingList.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-lg border border-dashed border-border bg-background/50 p-6 text-center text-sm text-muted-foreground">
             Nenhuma solicitação pendente.
           </p>
         ) : (
           <div className="space-y-2">
             {pendingList.map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
+              <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.email}</p>
                   <p className="text-xs text-muted-foreground">
@@ -272,9 +269,9 @@ function WhitelistAdmin() {
         )}
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Whitelist</h2>
-        <form onSubmit={onAdd} className="flex gap-2 rounded-2xl border border-border bg-card p-3">
+      <section className="rounded-xl border border-border bg-card/40 p-4">
+        <h2 className="mb-3 text-sm font-semibold">Whitelist</h2>
+        <form onSubmit={onAdd} className="flex gap-2 rounded-lg border border-border bg-background p-2">
           <input
             type="email"
             value={email}
@@ -285,7 +282,7 @@ function WhitelistAdmin() {
           <button
             type="submit"
             disabled={addMut.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             <Plus className="h-4 w-4" /> Adicionar
           </button>
@@ -296,12 +293,12 @@ function WhitelistAdmin() {
           {loadingList ? (
             <p className="text-sm text-muted-foreground">Carregando…</p>
           ) : list.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+            <p className="rounded-lg border border-dashed border-border bg-background/50 p-6 text-center text-sm text-muted-foreground">
               Nenhum e-mail na whitelist ainda.
             </p>
           ) : (
             list.map((w) => (
-              <div key={w.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+              <div key={w.id} className="flex items-center justify-between rounded-lg border border-border bg-background p-3">
                 <span className="truncate text-sm">{w.email}</span>
                 <button
                   onClick={() => removeMut.mutate(w.id)}
@@ -316,25 +313,25 @@ function WhitelistAdmin() {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Users className="h-4 w-4" /> Usuários cadastrados
+      <section className="rounded-xl border border-border bg-card/40 p-4">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <Users className="h-4 w-4 text-primary" /> Usuários cadastrados
         </h2>
 
         {usersQ.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando usuários…</p>
         ) : usersQ.error ? (
-          <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             Erro ao carregar usuários: {(usersQ.error as Error).message}
           </p>
         ) : usersList.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-lg border border-dashed border-border bg-background/50 p-6 text-center text-sm text-muted-foreground">
             Nenhum usuário cadastrado ainda.
           </p>
         ) : (
           <div className="space-y-2">
             {usersList.map((u) => (
-              <div key={u.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+              <div key={u.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{u.email ?? "(sem email)"}</p>
@@ -373,6 +370,7 @@ function WhitelistAdmin() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

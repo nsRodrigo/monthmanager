@@ -441,25 +441,26 @@ export function MonthDetailPane({
   // Dentro de cada grupo, ordenar por data (asc) com desempate estável por id.
   const byDateAsc = <T extends { date: string; id: string }>(a: T, b: T) =>
     a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
-  const byInstDueAsc = <T extends { installment: { dueDate: string; parentId: string; number: number; id: string } }>(
-    a: T,
-    b: T,
-  ) =>
-    a.installment.dueDate.localeCompare(b.installment.dueDate) ||
+  // Ordena parcelas pela data da COMPRA original (parent.date) — não pela
+  // data da fatura (dueDate) — para que a ordem bata com o que é exibido.
+  const byParcelDateAsc = <T extends { installment: { parentId: string; number: number; id: string } }>(
+    dateOf: (t: T) => string,
+  ) => (a: T, b: T) =>
+    dateOf(a).localeCompare(dateOf(b)) ||
     a.installment.parentId.localeCompare(b.installment.parentId) ||
     a.installment.number - b.installment.number ||
     a.installment.id.localeCompare(b.installment.id);
 
   // "Fixos" = recorrentes + débito automático (nos débitos) e recorrentes (nos recebimentos).
   const debitsFixedSingle = monthDebits.single
-    .filter((d) => !!d.recurrenceGroupId || d.autoDebit)
+    .filter((d) => !!d.recurrenceGroupId || d.autoDebit || d.required)
     .slice()
     .sort(byDateAsc);
   const debitsCash = monthDebits.single
-    .filter((d) => !d.recurrenceGroupId && !d.autoDebit)
+    .filter((d) => !d.recurrenceGroupId && !d.autoDebit && !d.required)
     .slice()
     .sort(byDateAsc);
-  const debitsParcelled = monthDebits.parcelled.slice().sort(byInstDueAsc);
+  const debitsParcelled = monthDebits.parcelled.slice().sort(byParcelDateAsc((p) => p.debit.date));
   const debitsAllPaid =
     monthDebits.single.length + monthDebits.parcelled.length > 0 &&
     monthDebits.single.every((d) => d.paid) &&
@@ -477,7 +478,7 @@ export function MonthDetailPane({
     .filter((i) => !i.recurrenceGroupId)
     .slice()
     .sort(byDateAsc);
-  const incomesParcelled = monthIncomes.parcelled.slice().sort(byInstDueAsc);
+  const incomesParcelled = monthIncomes.parcelled.slice().sort(byParcelDateAsc((p) => p.income.date));
 
   const investmentsSorted = investments.slice().sort(byDateAsc);
 
@@ -500,8 +501,8 @@ export function MonthDetailPane({
     ...debitsFixedSingle.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
     ...debitsParcelled.map<DebitEntry>((p) => ({ kind: "parcelled", entry: p })),
   ].sort((a, b) => {
-    const da = a.kind === "single" ? a.debit.date : a.entry.installment.dueDate;
-    const db = b.kind === "single" ? b.debit.date : b.entry.installment.dueDate;
+    const da = a.kind === "single" ? a.debit.date : a.entry.debit.date;
+    const db = b.kind === "single" ? b.debit.date : b.entry.debit.date;
     const ia = a.kind === "single" ? a.debit.id : a.entry.installment.id;
     const ib = b.kind === "single" ? b.debit.id : b.entry.installment.id;
     return da.localeCompare(db) || ia.localeCompare(ib);
@@ -516,7 +517,7 @@ export function MonthDetailPane({
       : applySort(debitsDefaultOrder, debitsSort.sort, {
         name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
         amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
-        date: (e) => (e.kind === "single" ? e.debit.date : e.entry.installment.dueDate),
+        date: (e) => (e.kind === "single" ? e.debit.date : e.entry.debit.date),
         id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
       });
 
@@ -524,8 +525,8 @@ export function MonthDetailPane({
     ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
     ...incomesParcelled.map<IncomeEntry>((p) => ({ kind: "parcelled", entry: p })),
   ].sort((a, b) => {
-    const da = a.kind === "single" ? a.income.date : a.entry.installment.dueDate;
-    const db = b.kind === "single" ? b.income.date : b.entry.installment.dueDate;
+    const da = a.kind === "single" ? a.income.date : a.entry.income.date;
+    const db = b.kind === "single" ? b.income.date : b.entry.income.date;
     const ia = a.kind === "single" ? a.income.id : a.entry.installment.id;
     const ib = b.kind === "single" ? b.income.id : b.entry.installment.id;
     return da.localeCompare(db) || ia.localeCompare(ib);
@@ -540,7 +541,7 @@ export function MonthDetailPane({
       : applySort(incomesDefaultOrder, incomesSort.sort, {
         name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
         amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
-        date: (e) => (e.kind === "single" ? e.income.date : e.entry.installment.dueDate),
+        date: (e) => (e.kind === "single" ? e.income.date : e.entry.income.date),
         id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
       });
 
@@ -2037,7 +2038,9 @@ function CardRow({
                     const bParc = b.pur.installmentsCount > 1 || !!b.pur.recurrenceGroupId ? 0 : 1;
                     return (
                       aParc - bParc ||
-                      a.inst.dueDate.localeCompare(b.inst.dueDate) ||
+                      // Ordena pela data da COMPRA original (pur.date), não pela
+                      // fatura (dueDate) — mesma regra aplicada a débitos/recebimentos.
+                      a.pur.date.localeCompare(b.pur.date) ||
                       (a.inst.purchaseId ?? "").localeCompare(b.inst.purchaseId ?? "") ||
                       a.inst.number - b.inst.number ||
                       a.inst.id.localeCompare(b.inst.id)

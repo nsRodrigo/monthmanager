@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   ChevronLeft,
+  Palette,
 } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,54 +104,57 @@ function ProfilePage() {
         </Link>
         <MobileMenuButton />
       </div>
-      <header className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
-          <User className="h-6 w-6" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Meu perfil</h1>
-          <p className="text-sm text-muted-foreground">Dados pessoais, tema e segurança.</p>
-        </div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Meu perfil</h1>
+        <p className="text-sm text-muted-foreground">Dados pessoais, tema e segurança.</p>
       </header>
 
-      <div className="space-y-5 pb-20">
-        {/* Avatar + email */}
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
+      <div className="space-y-6 pb-20">
+        <section className="rounded-xl border border-border bg-card/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <User className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Dados pessoais</h2>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
+              {profile?.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                initials || <User className="h-7 w-7" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{profile?.displayName ?? "Sem nome"}</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Field label="Nome de exibição">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Como devemos te chamar?"
+                className={inputClass}
+                maxLength={80}
               />
-            ) : (
-              initials || <User className="h-7 w-7" />
-            )}
+            </Field>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{profile?.displayName ?? "Sem nome"}</p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Palette className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Tema do app</h2>
           </div>
-        </div>
-
-        <Field label="Nome de exibição">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Como devemos te chamar?"
-            className={inputClass}
-            maxLength={80}
-          />
-        </Field>
-
-        {/* Tema */}
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Tema do app
-          </p>
           <div role="radiogroup" aria-label="Tema do app" className="grid grid-cols-3 gap-2">
             {themes.map((t) => {
               const Icon = t.icon;
@@ -161,10 +165,10 @@ function ProfilePage() {
                   role="radio"
                   aria-checked={active}
                   onClick={() => setTheme(t.value)}
-                  className={`relative flex flex-col items-center gap-1.5 rounded-xl border p-3 text-xs font-medium transition-all ${
+                  className={`relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-all ${
                     active
                       ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
                   }`}
                 >
                   {active && (
@@ -177,89 +181,88 @@ function ProfilePage() {
               );
             })}
           </div>
-        </div>
+        </section>
 
+        <section className="rounded-xl border border-border bg-card/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Segurança</h2>
+          </div>
 
-        {/* Segurança / Biometria */}
-        <div className="border-t border-border pt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Segurança
-          </p>
           <PasskeyManager />
-        </div>
 
-        {/* Alterar senha (apenas se tiver login por senha) */}
-        {hasPasswordLogin && (
-          <div className="border-t border-border pt-4">
-            <button
-              type="button"
-              onClick={() => setShowPwd((v) => !v)}
-              className="flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 text-left hover:bg-secondary/50"
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <KeyRound className="h-4 w-4 text-primary" /> Alterar senha
-              </span>
-              <span className="text-xs text-muted-foreground">{showPwd ? "Fechar" : "Abrir"}</span>
-            </button>
+          {hasPasswordLogin && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                className="flex w-full items-center justify-between rounded-lg border border-border bg-background p-3 text-left hover:bg-secondary/50"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <KeyRound className="h-4 w-4 text-primary" /> Alterar senha
+                </span>
+                <span className="text-xs text-muted-foreground">{showPwd ? "Fechar" : "Abrir"}</span>
+              </button>
 
-            {showPwd && (
-              <div className="mt-3 space-y-2 rounded-lg border border-border bg-card p-3">
-                <Field label="Nova senha">
-                  <div className="relative">
+              {showPwd && (
+                <div className="mt-3 space-y-2 rounded-lg border border-border bg-background p-3">
+                  <Field label="Nova senha">
+                    <div className="relative">
+                      <input
+                        type={pwdVisible ? "text" : "password"}
+                        value={newPwd}
+                        onChange={(e) => setNewPwd(e.target.value)}
+                        className={inputClass}
+                        autoComplete="new-password"
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPwdVisible((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-secondary"
+                        aria-label={pwdVisible ? "Ocultar" : "Mostrar"}
+                      >
+                        {pwdVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </Field>
+                  <Field label="Confirmar nova senha">
                     <input
                       type={pwdVisible ? "text" : "password"}
-                      value={newPwd}
-                      onChange={(e) => setNewPwd(e.target.value)}
+                      value={confirmPwd}
+                      onChange={(e) => setConfirmPwd(e.target.value)}
                       className={inputClass}
                       autoComplete="new-password"
                       minLength={6}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setPwdVisible((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-secondary"
-                      aria-label={pwdVisible ? "Ocultar" : "Mostrar"}
+                  </Field>
+
+                  {pwdMsg && (
+                    <p
+                      className={`rounded-lg p-2 text-xs ${
+                        pwdMsg.type === "ok"
+                          ? "bg-success/10 text-success"
+                          : "bg-destructive/10 text-destructive"
+                      }`}
                     >
-                      {pwdVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </Field>
-                <Field label="Confirmar nova senha">
-                  <input
-                    type={pwdVisible ? "text" : "password"}
-                    value={confirmPwd}
-                    onChange={(e) => setConfirmPwd(e.target.value)}
-                    className={inputClass}
-                    autoComplete="new-password"
-                    minLength={6}
-                  />
-                </Field>
+                      {pwdMsg.text}
+                    </p>
+                  )}
 
-                {pwdMsg && (
-                  <p
-                    className={`rounded-lg p-2 text-xs ${
-                      pwdMsg.type === "ok"
-                        ? "bg-success/10 text-success"
-                        : "bg-destructive/10 text-destructive"
-                    }`}
+                  <button
+                    onClick={changePassword}
+                    disabled={pwdSaving || !newPwd || !confirmPwd}
+                    className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                   >
-                    {pwdMsg.text}
-                  </p>
-                )}
+                    {pwdSaving ? "Salvando…" : "Atualizar senha"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
-                <button
-                  onClick={changePassword}
-                  disabled={pwdSaving || !newPwd || !confirmPwd}
-                  className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                >
-                  {pwdSaving ? "Salvando…" : "Atualizar senha"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-2 border-t border-border pt-4">
+        <div className="flex gap-2">
           <button
             onClick={goBack}
             className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"

@@ -38,9 +38,8 @@ export function AddPurchaseDialog({
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [paymentType, setPaymentType] = useState<PaymentType>("unico");
-  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
-  const [markPaid, setMarkPaid] = useState(false);
+  const [markPaid, setMarkPaid] = useState(true);
 
   const isInstallment = paymentType === "parcelado";
   const isRecurring = paymentType === "recorrente";
@@ -54,9 +53,8 @@ export function AddPurchaseDialog({
     setInstallments("2");
     setInstallmentNumber("1");
     setPaymentType("unico");
-    setRecurrenceMonths("24");
     setMode("total");
-    setMarkPaid(false);
+    setMarkPaid(true);
   };
 
   useEffect(() => {
@@ -74,24 +72,6 @@ export function AddPurchaseDialog({
     // lançamento cai (mesma regra já aplicada a débitos e recebimentos).
     // Mantemos apenas o DIA digitado, clampado ao tamanho do mês da página.
     const invoiceAnchorDate = `${defaultYear}-${String(defaultMonth + 1).padStart(2, "0")}-${String(Math.min(new Date(defaultYear, defaultMonth + 1, 0).getDate(), Number(date.slice(8, 10)) || 1)).padStart(2, "0")}`;
-    // Recurring purchase: same model as recurring debits — 24 monthly
-    // purchases compartilhando recurrence_group_id. Cada mês é independente.
-    if (isRecurring && !isInstallment) {
-      await addPurchase.mutateAsync({
-        cardId,
-        description: description.trim(),
-        totalAmount: amount,
-        date,
-        installmentsCount: 1,
-        installmentNumber: 1,
-        invoiceAnchorDate,
-        recurring: true,
-        recurrenceMonths: Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)),
-      });
-      if (addAnother) resetFields(true);
-      else onClose();
-      return;
-    }
     const n = isInstallment ? Math.max(1, parseInt(installments)) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
     const totalAmount = mode === "perInstallment" && n > 1 ? amount * n : amount;
@@ -103,7 +83,8 @@ export function AddPurchaseDialog({
       installmentsCount: n,
       installmentNumber: cur,
       invoiceAnchorDate,
-      paidNow: markPaid && !isInstallment && !isRecurring,
+      recurring: isRecurring,
+      paidNow: markPaid && !isInstallment,
       markCurrentPaid: markPaid && isInstallment,
     });
     if (addAnother) resetFields(true);
@@ -124,7 +105,6 @@ export function AddPurchaseDialog({
         <PaidToggle
           checked={markPaid}
           onChange={setMarkPaid}
-          disabled={isRecurring}
           offLabel="Marcar pago"
           onLabel="Pago"
         />
@@ -157,11 +137,7 @@ export function AddPurchaseDialog({
           <select
             className={inputClass}
             value={paymentType}
-            onChange={(e) => {
-              const v = e.target.value as PaymentType;
-              setPaymentType(v);
-              if (v === "recorrente") setMarkPaid(false);
-            }}
+            onChange={(e) => setPaymentType(e.target.value as PaymentType)}
           >
             <option value="unico">Único (à vista)</option>
             <option value="parcelado">Parcelado</option>
@@ -197,22 +173,9 @@ export function AddPurchaseDialog({
           )}
 
           {isRecurring && (
-            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
-              <Field label="Repetir por quantos meses?">
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  className={inputClass}
-                  value={recurrenceMonths}
-                  onChange={(e) => setRecurrenceMonths(e.target.value)}
-                  placeholder="24"
-                />
-              </Field>
-              <p className="text-[11px] text-muted-foreground">
-                Ideal para assinaturas (streaming etc). Será replicada nos próximos meses, mantendo o dia. Cada mês é independente.
-              </p>
-            </div>
+            <p className="rounded-lg border border-border bg-background/50 p-3 text-[11px] text-muted-foreground">
+              Ideal para assinaturas (streaming etc). Replicada automaticamente todo mês, até o último mês que já existe nesta conta — e continua acompanhando conforme a conta cresce. Cada mês é independente.
+            </p>
           )}
         </div>
 

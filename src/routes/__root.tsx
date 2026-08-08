@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Receipt, Cloud, ShieldCheck } from "lucide-react";
+import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Cloud, ShieldCheck } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -337,20 +337,6 @@ function SidebarContent({
             <FileSpreadsheet className="h-3.5 w-3.5" />
           </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Importar planilha</span>
-        </Link>
-        <Link
-          to="/irpf"
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-            loc.pathname.startsWith("/irpf")
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <Receipt className="h-3.5 w-3.5" />
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Imposto de Renda</span>
         </Link>
         <Link
           to="/backup"

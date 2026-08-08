@@ -31,12 +31,11 @@ export function AddDebitDialog({
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
   const [paymentType, setPaymentType] = useState<PaymentType>("unico");
-  const [recurrenceMonths, setRecurrenceMonths] = useState("24");
   const [autoDebitDay, setAutoDebitDay] = useState("");
   const [mode, setMode] = useState<"total" | "perInstallment">("total");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
-  const [markPaid, setMarkPaid] = useState(false);
+  const [markPaid, setMarkPaid] = useState(true);
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
 
@@ -51,12 +50,11 @@ export function AddDebitDialog({
     setDescription("");
     setAmount(0);
     setPaymentType("unico");
-    setRecurrenceMonths("24");
     setAutoDebitDay("");
     setInstallments("2");
     setInstallmentNumber("1");
     setMode("total");
-    setMarkPaid(false);
+    setMarkPaid(true);
     setNotifyEnabled(false);
     setNotifyDaysBefore("");
   };
@@ -86,8 +84,7 @@ export function AddDebitDialog({
       installmentNumber: cur,
       referenceYear: defaultYear,
       referenceMonth: defaultMonth,
-      recurrenceMonths: required && !isInstallment ? Math.max(1, Math.min(120, parseInt(recurrenceMonths) || 24)) : undefined,
-      paidNow: markPaid && !isInstallment && !required,
+      paidNow: markPaid && !isInstallment,
       markCurrentPaid: markPaid && isInstallment,
       notifyDaysBefore:
         !isInstallment && notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
@@ -110,7 +107,6 @@ export function AddDebitDialog({
         <PaidToggle
           checked={markPaid}
           onChange={setMarkPaid}
-          disabled={required}
           offLabel="Marcar pago"
           onLabel="Pago"
         />
@@ -135,11 +131,7 @@ export function AddDebitDialog({
           <select
             className={inputClass}
             value={paymentType}
-            onChange={(e) => {
-              const v = e.target.value as PaymentType;
-              setPaymentType(v);
-              if (v === "recorrente") setMarkPaid(false);
-            }}
+            onChange={(e) => setPaymentType(e.target.value as PaymentType)}
           >
             <option value="unico">Único (à vista)</option>
             <option value="parcelado">Parcelado</option>
@@ -179,22 +171,9 @@ export function AddDebitDialog({
           )}
 
           {required && (
-            <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
-              <Field label="Repetir por quantos meses?">
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  className={inputClass}
-                  value={recurrenceMonths}
-                  onChange={(e) => setRecurrenceMonths(e.target.value)}
-                  placeholder="24"
-                />
-              </Field>
-              <p className="text-[11px] text-muted-foreground">
-                Replicado automaticamente nos próximos meses, mantendo o dia. Cada mês é independente e pode ser editado ou excluído. Recorrência ≠ parcelamento.
-              </p>
-            </div>
+            <p className="rounded-lg border border-border bg-background/50 p-3 text-[11px] text-muted-foreground">
+              Replicado automaticamente todo mês, até o último mês que já existe nesta conta — e continua acompanhando conforme a conta cresce. Cada mês é independente e pode ser editado ou excluído sem afetar os demais.
+            </p>
           )}
 
           {autoDebit && (
@@ -202,6 +181,9 @@ export function AddDebitDialog({
               <Field label="Dia do débito (1-31)">
                 <input type="number" min="1" max="31" className={inputClass} value={autoDebitDay} onChange={(e) => setAutoDebitDay(e.target.value)} placeholder="Ex: 10" />
               </Field>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Replicado automaticamente todo mês, até o último mês que já existe nesta conta — e continua acompanhando conforme a conta cresce.
+              </p>
             </div>
           )}
         </div>

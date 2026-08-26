@@ -500,12 +500,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Faixa fixa no rodapé com as contas "em segundo plano" — que já tiveram
- * painel aberto nesta sessão mas não estão visíveis agora. Fora de
- * /contas/*, clicar num chip abre só aquela conta (não reabre as outras
- * juntas). Já dentro de /contas/*, clicar divide a tela — adiciona aquela
- * conta ao lado da(s) que já está(ão) visível(is), respeitando o limite de
- * painéis do tamanho de tela atual.
+ * Faixa fixa no rodapé — funciona como uma sessão de abas com as contas que
+ * já tiveram painel aberto nesta sessão mas não estão visíveis agora.
+ * Clique normal num chip sempre ABRE só aquela conta, substituindo a(s)
+ * que estava(m) visível(is) — igual a clicar na conta na barra lateral.
+ * Ctrl/Cmd+clique (só faz sentido já dentro de /contas/*) divide a tela —
+ * adiciona aquela conta ao lado da(s) que já está(ão) visível(is),
+ * respeitando o limite de painéis do tamanho de tela atual. Fechar um
+ * painel pelo X (ver `closePane`) remove a conta tanto da tela quanto
+ * desta faixa.
  */
 function PanesDock() {
   const { panes, activeIds, splitIn } = usePanes();
@@ -528,27 +531,24 @@ function PanesDock() {
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
       <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-border bg-card/95 px-3 py-2 shadow-elevated backdrop-blur-md">
         <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {onContasRoute ? "Abrir ao lado" : "Painéis abertos"}
+          Abas
         </span>
         {backgrounded.map((p) => {
           const a = accounts.find((x) => x.id === p.contaId);
           if (!a) return null;
-          const disabled = onContasRoute && !canSplit;
           return (
             <button
               key={p.contaId}
               type="button"
-              disabled={disabled}
-              onClick={() => {
-                if (onContasRoute) {
-                  splitIn(p.contaId);
-                } else {
-                  navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } });
+              title="Clique para abrir · Ctrl/Cmd+clique para abrir ao lado"
+              onClick={(e) => {
+                if ((e.ctrlKey || e.metaKey) && onContasRoute) {
+                  if (canSplit) splitIn(p.contaId);
+                  return;
                 }
+                navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } });
               }}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors ${
-                disabled ? "cursor-not-allowed opacity-40" : "hover:border-primary"
-              }`}
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors hover:border-primary"
             >
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
               <span className="max-w-[8rem] truncate">{a.name}</span>

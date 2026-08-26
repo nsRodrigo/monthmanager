@@ -1450,7 +1450,7 @@ export function MonthDetailPane({
                   onClick={() => setBulkMenuOpen((v) => !v)}
                   aria-label="Ações da seleção"
                   aria-expanded={bulkMenuOpen}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-700 text-white shadow-glow transition-transform duration-200 hover:bg-orange-800"
                 >
                   <MoreHorizontal className="h-6 w-6" />
                 </button>

@@ -280,7 +280,7 @@ function SidebarContent({
         )}
         {accounts.map((a) => {
           const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-          const active = loc.pathname.startsWith(`/contas/${a.id}`);
+          const active = loc.pathname.startsWith("/contas/") && panes.panes.some((p) => p.contaId === a.id);
           return (
             <Link
               key={a.id}
@@ -294,6 +294,11 @@ function SidebarContent({
                   onNavigate?.();
                   return;
                 }
+                // Chama openSingle direto (não só via navegação): se a conta
+                // clicada já é a "principal" da URL atual mas há outras
+                // divididas ao lado, o router não dispara nada (mesma URL) —
+                // sem isso, as outras ficariam presas na tela.
+                panes.openSingle(a.id);
                 onNavigate?.();
               }}
               className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all ${
@@ -500,32 +505,30 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Faixa fixa no rodapé — funciona como uma sessão de abas com as contas que
- * já tiveram painel aberto nesta sessão mas não estão visíveis agora.
- * Clique normal num chip sempre ABRE só aquela conta, substituindo a(s)
- * que estava(m) visível(is) — igual a clicar na conta na barra lateral.
- * Ctrl/Cmd+clique (só faz sentido já dentro de /contas/*) divide a tela —
- * adiciona aquela conta ao lado da(s) que já está(ão) visível(is),
- * respeitando o limite de painéis do tamanho de tela atual. Fechar um
- * painel pelo X (ver `closePane`) remove a conta tanto da tela quanto
- * desta faixa.
+ * Faixa fixa no rodapé — como abas de navegador, espelha exatamente as
+ * contas visíveis na tela agora (`panes`), nesta ordem. Clique normal num
+ * chip abre só aquela conta, fechando as demais (`openSingle`) — igual a
+ * clicar na conta na barra lateral. Ctrl/Cmd+clique (só faz sentido já
+ * dentro de /contas/*) divide a tela — adiciona aquela conta ao lado da(s)
+ * que já está(ão) visível(is), respeitando o limite de painéis do tamanho
+ * de tela atual (nesse caso a conta já está entre as abas, então não muda
+ * nada). Fechar um painel pelo X (ver `closePane`) remove a conta tanto da
+ * tela quanto desta faixa — não fica lembrada em lugar nenhum.
  */
 function PanesDock() {
-  const { panes, activeIds, splitIn } = usePanes();
+  const { panes, splitIn, openSingle } = usePanes();
   const maxPanes = useMaxPanes();
   const location = useRouterState({ select: (s) => s.location });
   const { data: accounts = [] } = useAccounts();
   const navigate = useNavigate();
 
-  // "Abrir ao lado" não existe em telas pequenas (nunca há mais de 1 painel
-  // lado a lado ali) — o dock não aparece de jeito nenhum nesse tamanho.
+  // "Abas" não existe em telas pequenas (nunca há mais de 1 painel lado a
+  // lado ali) — o dock não aparece de jeito nenhum nesse tamanho.
   if (maxPanes === 1) return null;
-
-  const backgrounded = panes.filter((p) => !activeIds.includes(p.contaId));
-  if (backgrounded.length === 0) return null;
+  if (panes.length === 0) return null;
 
   const onContasRoute = location.pathname.startsWith("/contas/");
-  const canSplit = activeIds.length < maxPanes;
+  const canSplit = panes.length < maxPanes;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
@@ -533,19 +536,20 @@ function PanesDock() {
         <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Abas
         </span>
-        {backgrounded.map((p) => {
+        {panes.map((p) => {
           const a = accounts.find((x) => x.id === p.contaId);
           if (!a) return null;
           return (
             <button
               key={p.contaId}
               type="button"
-              title="Clique para abrir · Ctrl/Cmd+clique para abrir ao lado"
+              title="Clique para abrir sozinha · Ctrl/Cmd+clique para abrir ao lado"
               onClick={(e) => {
                 if ((e.ctrlKey || e.metaKey) && onContasRoute) {
                   if (canSplit) splitIn(p.contaId);
                   return;
                 }
+                openSingle(p.contaId);
                 navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } });
               }}
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors hover:border-primary"

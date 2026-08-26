@@ -20,7 +20,7 @@ import {
   type Account,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
-import { usePanes, useMaxPanes, type PaneView, type PaneEntry } from "@/store/panes";
+import { usePanes, useMaxPanes, type PaneView } from "@/store/panes";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sparkline } from "@/components/Sparkline";
@@ -56,14 +56,13 @@ export const Route = createFileRoute("/contas/$contaId")({
 function PanesWorkspace() {
   const { contaId } = Route.useParams();
   const { data: accounts = [] } = useAccounts();
-  const { panes, activeIds, openSingle, splitIn, closePane, setView, resizeAt, capActive } = usePanes();
+  const { panes, openSingle, splitIn, closePane, setView, resizeAt, capActive } = usePanes();
   const maxPanes = useMaxPanes();
 
   // Navegação normal (clicar numa conta, colar/digitar a URL) sempre reabre
-  // só essa conta — o mês que ela estava mostrando é reaproveitado (fica
-  // lembrado em `panes`), mas os outros painéis não voltam sozinhos. Pra ver
-  // duas contas lado a lado de novo, use Ctrl+clique ou o dock ("em segundo
-  // plano") — ver src/store/panes.tsx.
+  // só essa conta — fecha as demais que estavam visíveis, como uma aba de
+  // navegador (não ficam lembradas em lugar nenhum). Pra ver duas contas
+  // lado a lado, use Ctrl+clique ou o dock — ver src/store/panes.tsx.
   useEffect(() => {
     openSingle(contaId);
   }, [contaId, openSingle]);
@@ -72,31 +71,28 @@ function PanesWorkspace() {
     capActive(maxPanes);
   }, [maxPanes, capActive]);
 
-  const activeEntries = activeIds
-    .map((id) => panes.find((p) => p.contaId === id))
-    .filter((p): p is PaneEntry => !!p);
-
+  const activeIds = panes.map((p) => p.contaId);
   const availableToAdd = accounts.filter((a) => !activeIds.includes(a.id));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <PaneTabs
         availableToAdd={availableToAdd}
-        canAdd={activeIds.length < maxPanes && availableToAdd.length > 0}
+        canAdd={panes.length < maxPanes && availableToAdd.length > 0}
         onAdd={splitIn}
       />
       <div className="flex min-h-0 flex-1 flex-row">
-        {activeEntries.map((p, i) => (
+        {panes.map((p, i) => (
           <Fragment key={p.contaId}>
             <div style={{ flexGrow: p.size, flexBasis: 0 }} className="min-w-0 min-h-0">
               <PaneSlot
                 contaId={p.contaId}
                 view={p.view}
                 onViewChange={(v) => setView(p.contaId, v)}
-                onClose={activeEntries.length > 1 ? () => closePane(p.contaId) : undefined}
+                onClose={panes.length > 1 ? () => closePane(p.contaId) : undefined}
               />
             </div>
-            {i < activeEntries.length - 1 && (
+            {i < panes.length - 1 && (
               <PaneDivider onDrag={(delta) => resizeAt(i, delta)} />
             )}
           </Fragment>

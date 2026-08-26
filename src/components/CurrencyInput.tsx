@@ -6,10 +6,8 @@ import { inputClass } from "./Modal";
  * - Display: "R$ 1.234,56" (or "-R$ 1.234,56" when negative)
  * - Stores numeric value (e.g. 1234.56) via onValueChange.
  * - Progressive typing: digits build the value from cents up.
- * - When `allowNegative` is true:
- *    • Typing "-" anywhere preserves a negative sign.
- *    • A "±" toggle button appears inside the input to flip the sign.
- *    • Useful for refunds / ajustes negativos.
+ * - When `allowNegative` is true, typing "-" anywhere preserves a negative
+ *   sign — useful for refunds / ajustes negativos.
  */
 export function CurrencyInput({
   value,
@@ -40,52 +38,34 @@ export function CurrencyInput({
     lastEmitted.current = value;
   }, [value]);
 
-  const toggleSign = () => {
-    const cur = value ?? 0;
-    const next = -cur;
-    setText(next === 0 ? "" : formatBRL(next));
-    lastEmitted.current = next;
-    onValueChange(next);
-  };
-
   return (
-    <div className="relative">
-      {allowNegative && (
-        <button
-          type="button"
-          onClick={toggleSign}
-          aria-label="Alternar sinal"
-          title="Alternar sinal (positivo/negativo)"
-          className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2 rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[11px] font-bold text-foreground hover:bg-secondary/80"
-        >
-          ±
-        </button>
-      )}
-      <input
-        type="text"
-        inputMode="decimal"
-        autoFocus={autoFocus}
-        className={`${className ?? inputClass} ${allowNegative ? "pl-10" : ""}`}
-        placeholder={placeholder}
-        value={text}
-        onChange={(e) => {
-          const raw = e.target.value;
-          const isNeg = allowNegative && /-/.test(raw);
-          const digits = raw.replace(/\D/g, "");
-          if (!digits) {
-            setText(isNeg ? "-" : "");
-            lastEmitted.current = 0;
-            onValueChange(0);
-            return;
-          }
-          const cents = parseInt(digits, 10);
-          const num = (cents / 100) * (isNeg ? -1 : 1);
-          setText(formatBRL(num));
-          lastEmitted.current = num;
-          onValueChange(num);
-        }}
-      />
-    </div>
+    <input
+      type="text"
+      // "decimal" abre o teclado numérico no mobile, mas esse teclado não
+      // tem tecla de "-" em nenhuma plataforma — quando o campo aceita
+      // negativo, usamos "text" pra garantir acesso ao "-".
+      inputMode={allowNegative ? "text" : "decimal"}
+      autoFocus={autoFocus}
+      className={className ?? inputClass}
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        const isNeg = allowNegative && /-/.test(raw);
+        const digits = raw.replace(/\D/g, "");
+        if (!digits) {
+          setText(isNeg ? "-" : "");
+          lastEmitted.current = 0;
+          onValueChange(0);
+          return;
+        }
+        const cents = parseInt(digits, 10);
+        const num = (cents / 100) * (isNeg ? -1 : 1);
+        setText(formatBRL(num));
+        lastEmitted.current = num;
+        onValueChange(num);
+      }}
+    />
   );
 }
 

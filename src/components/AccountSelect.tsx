@@ -1,9 +1,9 @@
 import { useAccounts } from "@/store/finance";
-import { Field, inputClass } from "./Modal";
+import { Field, inputClass, Select } from "./Modal";
 
 /**
  * Reusable account picker. Shows a friendly empty state if the user
- * has no accounts yet, instead of a useless empty <select>.
+ * has no accounts yet, instead of a useless empty <Select>.
  */
 export function AccountSelect({
   value,
@@ -26,13 +26,13 @@ export function AccountSelect({
   }
   return (
     <Field label={label}>
-      <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+      <Select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
         {accounts.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name} · {a.type}
           </option>
         ))}
-      </select>
+      </Select>
     </Field>
   );
 }

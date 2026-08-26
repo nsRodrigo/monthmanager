@@ -55,7 +55,7 @@ export function UndoRedoBar() {
 
   return (
     <div
-      className="pointer-events-none fixed bottom-4 right-4 z-50 translate-y-0 opacity-100 transition-all duration-200"
+      className="pointer-events-none fixed bottom-4 left-4 z-50 translate-y-0 opacity-100 transition-all duration-200"
       onMouseEnter={() => setVisible(true)}
     >
       <div

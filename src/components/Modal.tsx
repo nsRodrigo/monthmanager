@@ -1,6 +1,9 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, X } from "lucide-react";
+
+const FOCUSABLE_FIELD_SELECTOR =
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):not([disabled]), textarea:not([disabled]), select:not([disabled])';
 
 export function Modal({
   open,
@@ -17,6 +20,7 @@ export function Modal({
   children: React.ReactNode;
 }) {
   const scrollYRef = useRef(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -33,6 +37,14 @@ export function Modal({
       html.style.width = "";
       window.scrollTo(0, scrollYRef.current);
     };
+  }, [open]);
+
+  // Leva o foco pro primeiro campo do formulário ao abrir, pra dar pra
+  // digitar direto sem precisar clicar dentro do modal antes.
+  useEffect(() => {
+    if (!open) return;
+    const field = bodyRef.current?.querySelector<HTMLElement>(FOCUSABLE_FIELD_SELECTOR);
+    field?.focus();
   }, [open]);
 
   if (!open) return null;
@@ -52,7 +64,7 @@ export function Modal({
             </button>
           </div>
         </div>
-        <div className="overflow-y-auto p-5">{children}</div>
+        <div ref={bodyRef} className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>,
     document.body
@@ -70,6 +82,26 @@ export function Field({ label, children }: { label: string; children: React.Reac
 
 export const inputClass =
   "w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary";
+
+/**
+ * Drop-in substituto de `<select className={inputClass}>` com seta
+ * customizada — a seta nativa do navegador não é posicionável via CSS, então
+ * escondemos ela (`appearance-none`) e desenhamos a nossa.
+ */
+export function Select({
+  className,
+  children,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <div className="relative">
+      <select {...props} className={`${className ?? inputClass} appearance-none pr-8`}>
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-[12px] top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  );
+}
 
 /**
  * Pill de status, usado no cabeçalho do Modal (headerRight) para marcar um

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, Accordion } from "./Modal";
 import {
   useUpdateCard,
   useRemoveCard,
@@ -34,6 +34,8 @@ export function EditCardDialog({
   const [closingDay, setClosingDay] = useState("25");
   const [dueDay, setDueDay] = useState("5");
   const [pending, setPending] = useState<PendingAction>(null);
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
 
   useEffect(() => {
     if (open && card) {
@@ -42,6 +44,8 @@ export function EditCardDialog({
       setClosingDay(String(card.closingDay));
       setDueDay(String(card.dueDay));
       setPending(null);
+      setNotifyEnabled(card.notifyDaysBefore != null);
+      setNotifyDaysBefore(card.notifyDaysBefore != null ? String(card.notifyDaysBefore) : "");
     }
   }, [open, card]);
 
@@ -55,6 +59,7 @@ export function EditCardDialog({
         color,
         closingDay: Math.min(31, Math.max(1, parseInt(closingDay) || card.closingDay)),
         dueDay: Math.min(31, Math.max(1, parseInt(dueDay) || card.dueDay)),
+        notifyDaysBefore: notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
         scope,
       });
     } else if (pending === "delete") {
@@ -115,6 +120,26 @@ export function EditCardDialog({
               <input type="number" min={1} max={31} className={inputClass} value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
             </Field>
           </div>
+
+          <Accordion
+            open={notifyEnabled}
+            onOpenChange={(v) => {
+              setNotifyEnabled(v);
+              if (v && !notifyDaysBefore) setNotifyDaysBefore("1");
+            }}
+            label="Notificar antes do vencimento da fatura"
+          >
+            <Field label="Quantos dias antes?">
+              <input
+                type="number"
+                min={0}
+                max={30}
+                className={inputClass}
+                value={notifyDaysBefore}
+                onChange={(e) => setNotifyDaysBefore(e.target.value)}
+              />
+            </Field>
+          </Accordion>
 
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button

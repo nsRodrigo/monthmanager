@@ -13,7 +13,7 @@ import {
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
-  getMonthInvestments,
+  sumMonthInvestments,
   getEffectiveCurrentMonth,
   normalizeZero,
   isCardVisibleInMonth,
@@ -363,7 +363,7 @@ function AccountPane({
       const tDebits =
         mDebits.single.reduce((acc, d) => acc + d.amount, 0) +
         mDebits.parcelled.reduce((acc, p) => acc + p.installment.amount, 0);
-      const inv = getMonthInvestments(accInvestments, y, m).reduce((acc, i) => acc + i.amount, 0);
+      const inv = sumMonthInvestments(accInvestments, installments, y, m);
       running = running + s.income - tDebits - s.cardsTotal - inv;
       map.set(`${y}-${m}`, Math.round(running * 100) / 100);
     }
@@ -611,7 +611,7 @@ function AccountPane({
               purchases,
               installments,
             );
-            const monthInv = getMonthInvestments(accountInvestments, year, m).reduce((s, i) => s + i.amount, 0);
+            const monthInv = sumMonthInvestments(accountInvestments, installments, year, m);
             const md = getMonthDebits(accountDebits, installments, year, m);
             const totalDebits = normalizeZero(md.single.reduce((s, d) => s + d.amount, 0) + md.parcelled.reduce((s, p) => s + p.installment.amount, 0));
             const totalIncome = normalizeZero(sum.income);

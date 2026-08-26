@@ -14,6 +14,7 @@ import {
   type HistoricalImportProgress,
 } from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
+import { Select } from "@/components/Modal";
 import { MobileMenuButton } from "@/components/MobileMenuButton";
 import {
   Upload,
@@ -246,7 +247,7 @@ function HistoricalImportPage() {
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Conta destino padrão
             </label>
-            <select
+            <Select
               value={defaultAccountChoice}
               onChange={(e) => setDefaultAccountChoice(e.target.value)}
               className="w-full rounded-lg border border-input bg-input px-3 py-2.5 text-sm outline-none focus:border-primary"
@@ -257,7 +258,7 @@ function HistoricalImportPage() {
                   {a.name} · {a.type}
                 </option>
               ))}
-            </select>
+            </Select>
             <p className="mt-1 text-[11px] text-muted-foreground">
               TODOS os lançamentos da planilha (débitos, recebimentos, investimentos) e TODOS os
               cartões serão associados a esta conta. Para separar por banco, cadastre as contas

@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
-import { Modal, Field, inputClass, PaidToggle } from "./Modal";
-import { useAddIncome, useAccounts, useDescriptionSuggestions } from "@/store/finance";
+import { Plus, Copy } from "lucide-react";
+import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal";
+import { useAddIncome, useAccounts, useDescriptionSuggestions, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
 
 type PaymentType = "unico" | "parcelado" | "recorrente";
+/** Recebimento não usa 'auto_debit' — esse meio é exclusivo de débitos. */
+const incomePaymentMethods = PAYMENT_METHOD_OPTIONS.filter((o) => o.value !== "auto_debit");
+type PaymentMethod = "none" | (typeof incomePaymentMethods)[number]["value"];
 
 export function AddIncomeDialog({
   open,
@@ -35,13 +38,15 @@ export function AddIncomeDialog({
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [markReceived, setMarkReceived] = useState(false);
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("none");
 
   const isInstallment = paymentType === "parcelado";
   const isRecurring = paymentType === "recorrente";
 
   const resetFields = () => {
-    const d = new Date(defaultYear, defaultMonth, Math.min(new Date().getDate(), 28));
-    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    setDate("");
     setAccountId(fixedAccountId ?? filterAccountId ?? accounts[0]?.id ?? "");
     setDescription("");
     setAmount(0);
@@ -50,6 +55,9 @@ export function AddIncomeDialog({
     setInstallmentNumber("1");
     setMode("total");
     setMarkReceived(false);
+    setNotifyEnabled(false);
+    setNotifyDaysBefore("");
+    setPaymentMethod("none");
   };
 
   useEffect(() => {
@@ -57,9 +65,9 @@ export function AddIncomeDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
-  const isValid = description.trim() !== "" && amount !== 0 && !!accountId;
+  const isValid = description.trim() !== "" && amount !== 0 && !!accountId && !!date;
 
-  const submit = async (addAnother = false) => {
+  const submit = async (after: "close" | "another" | "duplicate" = "close") => {
     if (!isValid) return;
     const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
     const cur = isInstallment ? Math.max(1, Math.min(n, parseInt(installmentNumber) || 1)) : 1;
@@ -77,9 +85,12 @@ export function AddIncomeDialog({
       referenceMonth: defaultMonth,
       receivedNow: markReceived && !isInstallment,
       markCurrentPaid: markReceived && isInstallment,
+      notifyDaysBefore:
+        !isInstallment && notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
+      paymentMethod: paymentMethod === "none" ? null : paymentMethod,
     });
-    if (addAnother) resetFields();
-    else onClose();
+    if (after === "another") resetFields();
+    else if (after === "close") onClose();
   };
 
   const value = amount || 0;
@@ -119,15 +130,15 @@ export function AddIncomeDialog({
 
         <div className="space-y-2">
           <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
-          <select
+          <Select
             className={inputClass}
             value={paymentType}
             onChange={(e) => setPaymentType(e.target.value as PaymentType)}
           >
-            <option value="unico">Único</option>
+            <option value="unico">À Vista</option>
             <option value="parcelado">Parcelado</option>
             <option value="recorrente">Recebível recorrente</option>
-          </select>
+          </Select>
 
           {isInstallment && (
             <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
@@ -167,21 +178,68 @@ export function AddIncomeDialog({
           )}
         </div>
 
+        <div className="space-y-2">
+          <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
+          <Select
+            className={inputClass}
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+          >
+            <option value="none">Nenhum</option>
+            {incomePaymentMethods.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {isRecurring && (
+          <Accordion
+            open={notifyEnabled}
+            onOpenChange={(v) => {
+              setNotifyEnabled(v);
+              if (v && !notifyDaysBefore) setNotifyDaysBefore("1");
+            }}
+            label="Notificar antes do vencimento"
+          >
+            <Field label="Quantos dias antes?">
+              <input
+                type="number"
+                min={0}
+                max={30}
+                className={inputClass}
+                value={notifyDaysBefore}
+                onChange={(e) => setNotifyDaysBefore(e.target.value)}
+              />
+            </Field>
+          </Accordion>
+        )}
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">Cancelar</button>
-          <button onClick={() => submit(false)} disabled={addIncome.isPending || !isValid} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+          <button onClick={() => submit("close")} disabled={addIncome.isPending || !isValid} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             {addIncome.isPending ? "Salvando…" : "Adicionar"}
           </button>
           <button
             type="button"
-            onClick={() => submit(true)}
+            onClick={() => submit("another")}
             disabled={addIncome.isPending || !isValid}
-            title="Salvar e adicionar outro recebimento"
+            title="Salvar e adicionar outro recebimento (limpa os campos)"
             aria-label="Salvar e adicionar outro recebimento"
             className="inline-flex items-center justify-center rounded-lg bg-orange-700 px-3 py-2.5 text-white hover:bg-orange-800 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => submit("duplicate")}
+            disabled={addIncome.isPending || !isValid}
+            title="Salvar e duplicar (mantém os campos preenchidos)"
+            aria-label="Salvar e duplicar este recebimento"
+            className="inline-flex items-center justify-center rounded-lg bg-secondary px-3 py-2.5 text-foreground hover:bg-secondary/70 disabled:opacity-50"
+          >
+            <Copy className="h-4 w-4" />
           </button>
         </div>
       </div>

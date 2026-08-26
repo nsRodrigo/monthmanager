@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, Select } from "./Modal";
 import { MONTHS } from "@/lib/format";
 import { useReorganizeData } from "@/store/finance";
 import { toast } from "sonner";
@@ -120,7 +120,7 @@ export function ReorganizeDataDialog({
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="">
-                    <select
+                    <Select
                       className={inputClass}
                       value={fromMonth}
                       onChange={(e) => setFromMonth(Number(e.target.value))}
@@ -128,7 +128,7 @@ export function ReorganizeDataDialog({
                       {MONTHS.map((name, idx) => (
                         <option key={idx} value={idx}>{name}</option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="">
                     <input
@@ -153,7 +153,7 @@ export function ReorganizeDataDialog({
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="">
-                    <select
+                    <Select
                       className={inputClass}
                       value={toMonth}
                       onChange={(e) => setToMonth(Number(e.target.value))}
@@ -161,10 +161,10 @@ export function ReorganizeDataDialog({
                       {MONTHS.map((name, idx) => (
                         <option key={idx} value={idx}>{name}</option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="">
-                    <select
+                    <Select
                       className={inputClass}
                       value={toYear}
                       onChange={(e) => setToYear(Number(e.target.value))}
@@ -172,7 +172,7 @@ export function ReorganizeDataDialog({
                       {[...new Set([...years, toYear])].sort().map((y) => (
                         <option key={y} value={y}>{y}</option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                 </div>
               </div>
@@ -180,7 +180,7 @@ export function ReorganizeDataDialog({
           ) : (
             <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
               <Field label="Ano de origem">
-                <select
+                <Select
                   className={inputClass}
                   value={fromYearOnly}
                   onChange={(e) => setFromYearOnly(Number(e.target.value))}
@@ -188,11 +188,11 @@ export function ReorganizeDataDialog({
                   {years.map((y) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <span className="pb-2 text-primary text-lg">→</span>
               <Field label="Ano de destino">
-                <select
+                <Select
                   className={inputClass}
                   value={toYearOnly}
                   onChange={(e) => setToYearOnly(Number(e.target.value))}
@@ -200,7 +200,7 @@ export function ReorganizeDataDialog({
                   {[...new Set([...years, toYearOnly])].sort().map((y) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
             </div>
           )}

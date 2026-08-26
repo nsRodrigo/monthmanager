@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Field, inputClass, CheckboxExpand } from "./Modal";
+import { Modal, Field, inputClass, Select, CheckboxExpand } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
 import {
   useUpdateRecurringSeries,
@@ -8,12 +8,18 @@ import {
   useAdvanceRecurring,
   useDuplicateOverScope,
   useDeleteOverScope,
+  PAYMENT_METHOD_OPTIONS,
   type CardScope,
   type DeleteSource,
+  type PaymentMethod,
 } from "@/store/finance";
 import { useConfirm } from "@/store/confirm";
 import { Trash2, Copy, Settings2, ChevronRight, FastForward, ArrowLeft } from "lucide-react";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
+
+/** Série recorrente já nasce com um mecanismo próprio — 'auto_debit' não se aplica aqui. */
+const recurringPaymentMethods = PAYMENT_METHOD_OPTIONS.filter((o) => o.value !== "auto_debit");
+type RecurringPaymentMethod = Exclude<PaymentMethod, "auto_debit">;
 
 export type RecurringEditTarget =
   | {
@@ -24,8 +30,19 @@ export type RecurringEditTarget =
       amount: number;
       date: string;
       accountId: string;
-      /** Só se aplica a kind "debit" — dias de antecedência da notificação push. */
+      /** Dias de antecedência da notificação push de vencimento. */
       notifyDaysBefore?: number | null;
+      paymentMethod?: RecurringPaymentMethod;
+    }
+  | {
+      kind: "investment";
+      id: string;
+      groupId: string;
+      description: string;
+      amount: number;
+      date: string;
+      accountId: string;
+      percentage: number;
     }
   | {
       kind: "purchase";
@@ -35,6 +52,8 @@ export type RecurringEditTarget =
       amount: number;
       date: string;
       cardId: string;
+      /** Dias de antecedência da notificação push de vencimento. */
+      notifyDaysBefore?: number | null;
     };
 
 /**
@@ -48,12 +67,15 @@ export function EditRecurringDialog({
   target,
   defaultYear,
   defaultMonth,
+  startAction,
 }: {
   open: boolean;
   onClose: () => void;
   target: RecurringEditTarget | null;
   defaultYear?: number;
   defaultMonth?: number;
+  /** Quando "duplicate", abre direto no fluxo de duplicar (menu de contexto de um item). */
+  startAction?: "duplicate";
 }) {
   const updateDI = useUpdateRecurringSeries();
   const removeDI = useDeleteRecurringSeries();
@@ -67,6 +89,9 @@ export function EditRecurringDialog({
   const [date, setDate] = useState("");
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"none" | Exclude<RecurringPaymentMethod, null>>(
+    "none",
+  );
   const [askSaveScope, setAskSaveScope] = useState(false);
   const [askDuplicate, setAskDuplicate] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
@@ -78,34 +103,55 @@ export function EditRecurringDialog({
     setDescription(target.description);
     setAmount(target.amount);
     setDate(target.date);
-    const targetNotify = target.kind === "debit" ? target.notifyDaysBefore ?? null : null;
+    const targetNotify = target.kind !== "investment" ? target.notifyDaysBefore ?? null : null;
     setNotifyEnabled(targetNotify != null);
     setNotifyDaysBefore(targetNotify != null ? String(targetNotify) : "");
+    setPaymentMethod(
+      (target.kind === "debit" || target.kind === "income") && target.paymentMethod
+        ? target.paymentMethod
+        : "none",
+    );
     setManageView("none");
     setAdvanceCount("");
   }, [open, target]);
+
+  // Menu de contexto de um item → pula direto pro fluxo de duplicar.
+  useEffect(() => {
+    if (!open || !target || startAction !== "duplicate") return;
+    setAskDuplicate(true);
+  }, [open, target, startAction]);
 
   if (!target) return null;
 
   const updating = updateDI.isPending || updateP.isPending;
   const removing = removeDI.isPending || deleteScope.isPending;
 
-  const targetNotifyDaysBefore = target.kind === "debit" ? (target.notifyDaysBefore ?? null) : null;
+  const canTag = target.kind === "debit" || target.kind === "income";
+  const canNotify = target.kind !== "investment";
+  const targetNotifyDaysBefore = canNotify ? (target.notifyDaysBefore ?? null) : null;
   const notifyDaysBeforeParsed = notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null;
+  const targetPaymentMethod =
+    (target.kind === "debit" || target.kind === "income") && target.paymentMethod
+      ? target.paymentMethod
+      : "none";
 
   const dirty =
     description.trim() !== target.description ||
     amount !== target.amount ||
     date !== target.date ||
-    (target.kind === "debit" && notifyDaysBeforeParsed !== targetNotifyDaysBefore);
+    (canNotify && notifyDaysBeforeParsed !== targetNotifyDaysBefore) ||
+    (canTag && paymentMethod !== targetPaymentMethod);
 
   const runUpdate = async (scope: "one" | "forward" | "all") => {
-    const patch: { description?: string; amount?: number; date?: string; notifyDaysBefore?: number | null } = {};
+    const patch: { description?: string; amount?: number; date?: string; notifyDaysBefore?: number | null; paymentMethod?: RecurringPaymentMethod } = {};
     if (description.trim() !== target.description) patch.description = description.trim();
     if (amount !== target.amount) patch.amount = amount;
     if (date !== target.date) patch.date = date;
-    if (target.kind === "debit" && notifyDaysBeforeParsed !== targetNotifyDaysBefore) {
+    if (canNotify && notifyDaysBeforeParsed !== targetNotifyDaysBefore) {
       patch.notifyDaysBefore = notifyDaysBeforeParsed;
+    }
+    if (canTag && paymentMethod !== targetPaymentMethod) {
+      patch.paymentMethod = paymentMethod === "none" ? null : paymentMethod;
     }
     if (Object.keys(patch).length === 0) {
       onClose();
@@ -160,7 +206,9 @@ export function EditRecurringDialog({
               ? "Descrição do débito"
               : target.kind === "income"
                 ? "Descrição do recebimento"
-                : "Descrição da compra"
+                : target.kind === "investment"
+                  ? "Tipo do investimento"
+                  : "Descrição da compra"
           }
         >
           <input
@@ -184,7 +232,27 @@ export function EditRecurringDialog({
           </Field>
         </div>
 
-        {target.kind === "debit" && (
+        {(target.kind === "debit" || target.kind === "income") && (
+          <div className="space-y-2">
+            <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
+            <Select
+              className={inputClass}
+              value={paymentMethod}
+              onChange={(e) =>
+                setPaymentMethod(e.target.value as "none" | Exclude<RecurringPaymentMethod, null>)
+              }
+            >
+              <option value="none">Nenhum</option>
+              {recurringPaymentMethods.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        {canNotify && (
           <CheckboxExpand
             checked={notifyEnabled}
             onChange={(v) => {
@@ -206,18 +274,20 @@ export function EditRecurringDialog({
           </CheckboxExpand>
         )}
 
-        <button
-          type="button"
-          onClick={() => setManageView("menu")}
-          className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5 text-left transition hover:border-primary/50 hover:bg-background"
-        >
-          <Settings2 className="h-4 w-4 text-primary shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold text-foreground">Gerenciar recorrência</p>
-            <p className="text-[11px] text-muted-foreground">Antecipar pagamentos futuros desta série</p>
-          </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-        </button>
+        {target.kind !== "investment" && (
+          <button
+            type="button"
+            onClick={() => setManageView("menu")}
+            className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5 text-left transition hover:border-primary/50 hover:bg-background"
+          >
+            <Settings2 className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-semibold text-foreground">Gerenciar recorrência</p>
+              <p className="text-[11px] text-muted-foreground">Antecipar pagamentos futuros desta série</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          </button>
+        )}
 
         <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
           <button
@@ -356,6 +426,7 @@ export function EditRecurringDialog({
             />
             <button
               onClick={async () => {
+                if (target.kind === "investment") return; // investimento não tem "gerenciar recorrência"
                 const n = Math.max(1, parseInt(advanceCount) || 0);
                 if (!n) return;
                 const ok = await confirm({
@@ -413,13 +484,22 @@ export function EditRecurringDialog({
                   date: target.date,
                   required: true,
                 }
-              : {
-                  kind: "income" as const,
-                  accountId: target.accountId,
-                  description: target.description,
-                  amount: target.amount,
-                  date: target.date,
-                };
+              : target.kind === "investment"
+                ? {
+                    kind: "investment" as const,
+                    accountId: target.accountId,
+                    type: target.description,
+                    amount: target.amount,
+                    percentage: target.percentage,
+                    date: target.date,
+                  }
+                : {
+                    kind: "income" as const,
+                    accountId: target.accountId,
+                    description: target.description,
+                    amount: target.amount,
+                    date: target.date,
+                  };
         await duplicate.mutateAsync({
           source,
           scope: s,
@@ -452,13 +532,21 @@ export function EditRecurringDialog({
                 amount: target.amount,
                 groupId: target.groupId,
               }
-            : {
-                kind: target.kind,
-                accountId: target.accountId,
-                description: target.description,
-                amount: target.amount,
-                groupId: target.groupId,
-              };
+            : target.kind === "investment"
+              ? {
+                  kind: "investment",
+                  accountId: target.accountId,
+                  type: target.description,
+                  amount: target.amount,
+                  groupId: target.groupId,
+                }
+              : {
+                  kind: target.kind,
+                  accountId: target.accountId,
+                  description: target.description,
+                  amount: target.amount,
+                  groupId: target.groupId,
+                };
         await deleteScope.mutateAsync({
           source: src,
           scope: s,

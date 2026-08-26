@@ -37,8 +37,12 @@ export function useLongPress(callback: () => void, ms = 450) {
     onPointerLeave: clear,
     onPointerCancel: clear,
     onContextMenu: (e: React.MouseEvent) => {
-      // Evita o menu de contexto nativo no mobile durante long-press
+      // Clique direito no desktop dispara o callback na hora — equivalente a
+      // um toque longo instantâneo — em vez de abrir o menu nativo do browser.
       e.preventDefault();
+      clear();
+      firedRef.current = true;
+      callback();
     },
   };
 

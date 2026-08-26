@@ -13,7 +13,7 @@ import {
   getMonthInstallments,
   getMonthDebits,
   getMonthIncomes,
-  getMonthInvestments,
+  sumMonthInvestments,
   getEffectiveCurrentMonth,
   normalizeZero,
 } from "@/store/finance";
@@ -81,7 +81,7 @@ function Consolidated() {
   const totalIncome =
     monthIncomes.single.reduce((s, i) => s + i.amount, 0) +
     monthIncomes.parcelled.reduce((s, p) => s + p.installment.amount, 0);
-  const totalInvested = getMonthInvestments(investments, year, month).reduce((s, i) => s + i.amount, 0);
+  const totalInvested = sumMonthInvestments(investments, installments, year, month);
 
   const accountBalance = accounts.reduce(
     (s, a) => s + computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
@@ -220,11 +220,12 @@ function Consolidated() {
             );
             const accDebits = debits.filter((d) => d.accountId === a.id);
             const accIncomes = incomes.filter((i) => i.accountId === a.id);
-            const accInvested = getMonthInvestments(
+            const accInvested = sumMonthInvestments(
               investments.filter((i) => i.accountId === a.id),
+              installments,
               year,
               month,
-            ).reduce((s, i) => s + i.amount, 0);
+            );
 
             const md = getMonthDebits(accDebits, installments, year, month);
             const mi = getMonthIncomes(accIncomes, installments, year, month);

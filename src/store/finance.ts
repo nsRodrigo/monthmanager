@@ -30,6 +30,8 @@ export type Card = {
   endMonth: number | null;
   excludedMonths: string[]; // ["YYYY-MM"]
   position: number;
+  /** Dias de antecedência para notificação push do vencimento da fatura. null = desativado. */
+  notifyDaysBefore: number | null;
 };
 
 /**
@@ -95,9 +97,19 @@ export type Purchase = {
   installmentsCount: number;
   /** Group id linking all monthly occurrences of a recurring purchase series. */
   recurrenceGroupId: string | null;
+  /** Dias de antecedência para notificação push de vencimento. Só usado em compras recorrentes. */
+  notifyDaysBefore: number | null;
 };
 
-export type ParentType = "purchase" | "debit" | "income";
+export type ParentType = "purchase" | "debit" | "income" | "investment";
+
+/** Nome da tabela correspondente a um ParentType. */
+function parentTypeTable(parentType: ParentType): "purchases" | "debits" | "incomes" | "investments" {
+  if (parentType === "purchase") return "purchases";
+  if (parentType === "debit") return "debits";
+  if (parentType === "investment") return "investments";
+  return "incomes";
+}
 
 export type Installment = {
   id: string;
@@ -119,6 +131,36 @@ export type Installment = {
   paid: boolean;
 };
 
+/** Meio/canal de pagamento — independente da frequência (à vista/parcelado/recorrente). */
+export type PaymentMethod =
+  | "pix"
+  | "auto_debit"
+  | "boleto"
+  | "transferencia"
+  | "dinheiro"
+  | "debit_card"
+  | null;
+
+/** Rótulo de cada meio de pagamento, na ordem exibida nos selects. */
+export const PAYMENT_METHOD_OPTIONS: { value: Exclude<PaymentMethod, null>; label: string }[] = [
+  { value: "pix", label: "Pix" },
+  { value: "auto_debit", label: "Débito automático" },
+  { value: "boleto", label: "Boleto" },
+  { value: "transferencia", label: "Transferência/TED" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "debit_card", label: "Cartão de débito" },
+];
+
+/** Badge curto (3 letras) exibido nas linhas de lançamento. */
+export const PAYMENT_METHOD_BADGES: Record<Exclude<PaymentMethod, null>, string> = {
+  pix: "PIX",
+  auto_debit: "AUT",
+  boleto: "BOL",
+  transferencia: "TED",
+  dinheiro: "DIN",
+  debit_card: "DEB",
+};
+
 export type Debit = {
   id: string;
   accountId: string;
@@ -127,7 +169,8 @@ export type Debit = {
   date: string;
   required: boolean;
   paid: boolean;
-  autoDebit: boolean;
+  /** 'auto_debit' | 'pix' | null (padrão/cartão de débito/dinheiro). */
+  paymentMethod: PaymentMethod;
   autoDebitDay: number | null;
   installmentsCount: number;
   isParent: boolean;
@@ -154,6 +197,9 @@ export type Income = {
   /** Month the entry belongs to (set on creation, never touched by date edits). */
   referenceYear: number | null;
   referenceMonth: number | null;
+  /** Dias de antecedência para notificação push de vencimento. null = desativado. */
+  notifyDaysBefore: number | null;
+  paymentMethod: PaymentMethod;
 };
 
 export type Investment = {
@@ -163,6 +209,13 @@ export type Investment = {
   amount: number;
   percentage: number;
   date: string;
+  installmentsCount: number;
+  isParent: boolean;
+  /** Group id linking all monthly occurrences of a recurring series. */
+  recurrenceGroupId: string | null;
+  /** Month the entry belongs to (set on creation, never touched by date edits). */
+  referenceYear: number | null;
+  referenceMonth: number | null;
 };
 
 // =======================
@@ -451,7 +504,7 @@ export function useCards() {
       const { data, error } = await supabase
         .from("cards")
         .select(
-          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months,position,created_at",
+          "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months,position,created_at,notify_days_before",
         )
         .order("position", { ascending: true })
         .order("created_at", { ascending: true });
@@ -469,6 +522,7 @@ export function useCards() {
         endMonth: c.end_month ?? null,
         excludedMonths: (c.excluded_months ?? []) as string[],
         position: (c.position as number) ?? 0,
+        notifyDaysBefore: c.notify_days_before ?? null,
       }));
     },
   });
@@ -488,10 +542,11 @@ export function usePurchases() {
         purchase_date: string;
         installments_count: number;
         recurrence_group_id: string | null;
+        notify_days_before: number | null;
       }>(() =>
         supabase
           .from("purchases")
-          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id"),
+          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id,notify_days_before"),
       );
       return data.map((p) => ({
         id: p.id,
@@ -501,6 +556,7 @@ export function usePurchases() {
         date: p.purchase_date,
         installmentsCount: p.installments_count,
         recurrenceGroupId: p.recurrence_group_id ?? null,
+        notifyDaysBefore: p.notify_days_before ?? null,
       }));
     },
   });
@@ -575,7 +631,7 @@ export function useDebits() {
         date: string;
         required: boolean;
         paid: boolean;
-        auto_debit: boolean;
+        payment_method: string | null;
         auto_debit_day: number | null;
         installments_count: number;
         is_parent: boolean;
@@ -588,7 +644,7 @@ export function useDebits() {
           const query = supabase
             .from("debits")
             .select(
-              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before",
+              "id,account_id,description,amount,date,required,paid,payment_method,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before",
             )
             .order("date", { ascending: true })
             .order("id", { ascending: true });
@@ -606,7 +662,7 @@ export function useDebits() {
           date: d.date,
           required: d.required,
           paid: d.paid,
-          autoDebit: d.auto_debit,
+          paymentMethod: (d.payment_method as PaymentMethod) ?? null,
           autoDebitDay: d.auto_debit_day,
           installmentsCount: d.installments_count,
           isParent: d.is_parent,
@@ -638,11 +694,13 @@ export function useIncomes() {
         recurrence_group_id: string | null;
         reference_year: number | null;
         reference_month: number | null;
+        notify_days_before: number | null;
+        payment_method: string | null;
       }>(() =>
         supabase
           .from("incomes")
           .select(
-            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
+            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before,payment_method",
           )
           .order("date", { ascending: true }),
       );
@@ -658,6 +716,8 @@ export function useIncomes() {
         recurrenceGroupId: d.recurrence_group_id ?? null,
         referenceYear: d.reference_year ?? null,
         referenceMonth: d.reference_month ?? null,
+        notifyDaysBefore: d.notify_days_before ?? null,
+        paymentMethod: (d.payment_method as PaymentMethod) ?? null,
       }));
     },
   });
@@ -676,7 +736,18 @@ export function useInvestments() {
         amount: number | string;
         percentage: number | string;
         date: string;
-      }>(() => supabase.from("investments").select("id,account_id,type,amount,percentage,date"));
+        installments_count: number;
+        is_parent: boolean;
+        recurrence_group_id: string | null;
+        reference_year: number | null;
+        reference_month: number | null;
+      }>(() =>
+        supabase
+          .from("investments")
+          .select(
+            "id,account_id,type,amount,percentage,date,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
+          ),
+      );
       return data.map((i) => ({
         id: i.id,
         accountId: i.account_id,
@@ -684,6 +755,11 @@ export function useInvestments() {
         amount: num(i.amount as number | string),
         percentage: num(i.percentage as number | string),
         date: i.date,
+        installmentsCount: i.installments_count,
+        isParent: i.is_parent,
+        recurrenceGroupId: i.recurrence_group_id ?? null,
+        referenceYear: i.reference_year ?? null,
+        referenceMonth: i.reference_month ?? null,
       }));
     },
   });
@@ -849,8 +925,9 @@ export function useAddCard() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (
-      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths" | "position"> & {
+      c: Omit<Card, "id" | "startYear" | "startMonth" | "endYear" | "endMonth" | "excludedMonths" | "position" | "notifyDaysBefore"> & {
         scope?: CardScope;
+        notifyDaysBefore?: number | null;
       },
     ) => {
       const win = scopeToWindow(c.scope ?? { kind: "all" });
@@ -869,6 +946,7 @@ export function useAddCard() {
         name: c.name,
         color: c.color,
         closing_day: c.closingDay,
+        notify_days_before: c.notifyDaysBefore ?? null,
         due_day: c.dueDay,
         position: nextPosition,
         ...win,
@@ -999,6 +1077,7 @@ export function useUpdateCard() {
       color?: string;
       closingDay?: number;
       dueDay?: number;
+      notifyDaysBefore?: number | null;
       scope?: CardScope;
     }) => {
       const patch: any = {};
@@ -1006,6 +1085,7 @@ export function useUpdateCard() {
       if (c.color !== undefined) patch.color = c.color;
       if (c.closingDay !== undefined) patch.closing_day = c.closingDay;
       if (c.dueDay !== undefined) patch.due_day = c.dueDay;
+      if (c.notifyDaysBefore !== undefined) patch.notify_days_before = c.notifyDaysBefore;
       if (c.scope) {
         const win = scopeToWindow(c.scope);
         patch.start_year = win.start_year;
@@ -1142,6 +1222,8 @@ export function useAddPurchase() {
       paidNow?: boolean;
       /** Mark the parcela being created (installmentNumber) as paid. */
       markCurrentPaid?: boolean;
+      /** Dias de antecedência para notificação push de vencimento (só se recurring). */
+      notifyDaysBefore?: number | null;
     }) => {
       const isRecurring = !!p.recurring && p.installmentsCount === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
@@ -1157,6 +1239,7 @@ export function useAddPurchase() {
           purchase_date: p.date,
           installments_count: p.installmentsCount,
           recurrence_group_id: groupId,
+          notify_days_before: isRecurring ? (p.notifyDaysBefore ?? null) : null,
         });
       if (error) throw error;
       const anchor = Math.max(1, Math.min(p.installmentsCount, p.installmentNumber ?? 1));
@@ -1200,6 +1283,7 @@ export function useAddPurchase() {
             purchase_date: dateStr,
             installments_count: 1,
             recurrence_group_id: groupId,
+            notify_days_before: p.notifyDaysBefore ?? null,
           }));
           const installmentRows = dates.map(({ dateStr, year: ry, month: rm }, idx) => ({
             id: crypto.randomUUID(),
@@ -1553,6 +1637,12 @@ export function useUpdateInstallmentDateScope() {
             .update({ date: newDate })
             .eq("id", installment.parentId);
           if (error) throw error;
+        } else if (installment.parentType === "investment") {
+          const { error } = await supabase
+            .from("investments")
+            .update({ date: newDate })
+            .eq("id", installment.parentId);
+          if (error) throw error;
         } else {
           const { error } = await supabase
             .from("incomes")
@@ -1637,6 +1727,7 @@ export function useUpdateInstallmentAmountScope() {
       const parentTable =
         installment.parentType === "purchase" ? "purchases"
         : installment.parentType === "debit" ? "debits"
+        : installment.parentType === "investment" ? "investments"
         : "incomes";
       const amountField = installment.parentType === "purchase" ? "total_amount" : "amount";
       const { data: parentRow, error: pErr } = await supabase
@@ -1657,6 +1748,12 @@ export function useUpdateInstallmentAmountScope() {
       } else if (installment.parentType === "debit") {
         const { error } = await supabase
           .from("debits")
+          .update({ amount: newTotal })
+          .eq("id", installment.parentId);
+        if (error) throw error;
+      } else if (installment.parentType === "investment") {
+        const { error } = await supabase
+          .from("investments")
           .update({ amount: newTotal })
           .eq("id", installment.parentId);
         if (error) throw error;
@@ -1895,7 +1992,7 @@ export function useDeleteParcelledByScope() {
   return useMutation({
     mutationFn: async (args: {
       parentId: string;
-      parentType: "purchase" | "debit" | "income";
+      parentType: "purchase" | "debit" | "income" | "investment";
       scope: CardScope;
     }) => {
       const table =
@@ -1903,7 +2000,9 @@ export function useDeleteParcelledByScope() {
           ? "purchases"
           : args.parentType === "debit"
             ? "debits"
-            : "incomes";
+            : args.parentType === "investment"
+              ? "investments"
+              : "incomes";
 
       if (args.scope.kind === "all") {
         await supabase
@@ -1992,8 +2091,7 @@ export function useCompactInstallmentNumbering() {
           .eq("id", rows[idx].id);
         if (eUpd) throw eUpd;
       }
-      const parentTable =
-        args.parentType === "purchase" ? "purchases" : args.parentType === "debit" ? "debits" : "incomes";
+      const parentTable = parentTypeTable(args.parentType);
       const { error: eParent } = await supabase
         .from(parentTable)
         .update({ installments_count: total })
@@ -2147,7 +2245,7 @@ export function useAddDebit() {
       amount: number;
       date: string;
       required: boolean;
-      autoDebit?: boolean;
+      paymentMethod?: PaymentMethod;
       autoDebitDay?: number | null;
       installmentsCount?: number;
       installmentNumber?: number;
@@ -2163,9 +2261,9 @@ export function useAddDebit() {
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
-      // "Recorrente" ou "débito automático" (e não parcelado): série real,
-      // replicada até o último mês que já existe na conta.
-      const isRecurring = (d.required || !!d.autoDebit) && count === 1;
+      // "Recorrente" ou meio "débito automático" (e não parcelado): série
+      // real, replicada até o último mês que já existe na conta.
+      const isRecurring = (d.required || d.paymentMethod === "auto_debit") && count === 1;
       const groupId = isRecurring ? crypto.randomUUID() : null;
       const debitId = crypto.randomUUID();
       // Fallback to date when caller didn't pass a reference month.
@@ -2184,7 +2282,7 @@ export function useAddDebit() {
         date: d.date,
         required: d.required,
         paid: applyPaidNow,
-        auto_debit: d.autoDebit ?? false,
+        payment_method: d.paymentMethod ?? null,
         auto_debit_day: d.autoDebitDay ?? null,
         installments_count: count,
         is_parent: count > 1,
@@ -2231,7 +2329,7 @@ export function useAddDebit() {
             date: dateStr,
             required: d.required,
             paid: false,
-            auto_debit: d.autoDebit ?? false,
+            payment_method: d.paymentMethod ?? null,
             auto_debit_day: d.autoDebitDay ?? null,
             installments_count: 1,
             is_parent: false,
@@ -2356,6 +2454,8 @@ export function useAddIncome() {
       receivedNow?: boolean;
       /** Mark the parcela being created (installmentNumber) as paid. */
       markCurrentPaid?: boolean;
+      notifyDaysBefore?: number | null;
+      paymentMethod?: PaymentMethod;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
@@ -2379,6 +2479,8 @@ export function useAddIncome() {
         recurrence_group_id: groupId,
         reference_year: refYear,
         reference_month: refMonth,
+        notify_days_before: !isRecurring && count === 1 ? (i.notifyDaysBefore ?? null) : null,
+        payment_method: i.paymentMethod ?? null,
       };
       const { error } = await supabase.from("incomes").insert(baseRow);
       if (error) throw error;
@@ -2420,6 +2522,7 @@ export function useAddIncome() {
             recurrence_group_id: groupId,
             reference_year: ry,
             reference_month: rm,
+            payment_method: i.paymentMethod ?? null,
           }));
           const { error: e3 } = await supabase.from("incomes").insert(rows);
           if (e3) throw e3;
@@ -2545,18 +2648,85 @@ export function useAddInvestment() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (i: Omit<Investment, "id">) => {
-      const { error } = await supabase.from("investments").insert({
+    mutationFn: async (i: {
+      accountId: string;
+      type: string;
+      amount: number;
+      percentage: number;
+      date: string;
+      installmentsCount?: number;
+      installmentNumber?: number;
+      /** "Recorrente" — série real, replicada até o último mês que já existe na conta. */
+      recurring?: boolean;
+      referenceYear?: number;
+      referenceMonth?: number;
+    }) => {
+      const count = Math.max(1, i.installmentsCount ?? 1);
+      const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
+      const isRecurring = !!i.recurring && count === 1;
+      const groupId = isRecurring ? crypto.randomUUID() : null;
+      const investmentId = crypto.randomUUID();
+      const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
+      const refYear = i.referenceYear ?? _by;
+      const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
+      const baseRow = {
+        id: investmentId,
         user_id: user!.id,
         account_id: i.accountId,
         type: i.type,
         amount: i.amount,
         percentage: i.percentage,
         date: i.date,
-      });
+        installments_count: count,
+        is_parent: count > 1,
+        recurrence_group_id: groupId,
+        reference_year: refYear,
+        reference_month: refMonth,
+      };
+      const { error } = await supabase.from("investments").insert(baseRow);
       if (error) throw error;
+      const [, , dd] = i.date.slice(0, 10).split("-").map(Number);
+      const anchorDay = Math.min(dd || 1, new Date(refYear, refMonth + 1, 0).getDate());
+      const anchorIso =
+        `${refYear}-${String(refMonth + 1).padStart(2, "0")}` +
+        `-${String(anchorDay).padStart(2, "0")}`;
+      if (count > 1) {
+        const inst =
+          anchor > 1
+            ? buildInstallmentsAnchored(
+                investmentId, user!.id, i.amount, count, anchor, anchorIso,
+                "investment", true, false,
+              )
+            : buildInstallments(
+                investmentId, "investment", user!.id, i.amount, count, anchorIso,
+                false,
+              );
+        const { error: e2 } = await supabase.from("installments").insert(inst);
+        if (e2) throw e2;
+      } else if (isRecurring) {
+        const horizon = await computeAccountHorizon(i.accountId, refYear, refMonth);
+        const totalMonths = monthSpan(refYear, refMonth, horizon.year, horizon.month);
+        const dates = stepMonthDates(anchorIso, totalMonths - 1, 1);
+        if (dates.length) {
+          const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
+            user_id: user!.id,
+            account_id: i.accountId,
+            type: i.type,
+            amount: i.amount,
+            percentage: i.percentage,
+            date: dateStr,
+            installments_count: 1,
+            is_parent: false,
+            recurrence_group_id: groupId,
+            reference_year: ry,
+            reference_month: rm,
+          }));
+          const { error: e3 } = await supabase.from("investments").insert(rows);
+          if (e3) throw e3;
+        }
+      }
     },
-    onSettled: () => inv(["investments"]),
+    onSettled: () => inv(["investments", "installments"]),
   });
 }
 
@@ -2575,8 +2745,8 @@ export function useRemoveInvestment() {
 // Duplicate any item over a scope (month / period / all)
 // =======================
 export type DuplicateSource =
-  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean; paid?: boolean; autoDebit?: boolean; autoDebitDay?: number | null }
-  | { kind: "income"; accountId: string; description: string; amount: number; date: string; received?: boolean }
+  | { kind: "debit"; accountId: string; description: string; amount: number; date: string; required: boolean; paid?: boolean; paymentMethod?: PaymentMethod; autoDebitDay?: number | null }
+  | { kind: "income"; accountId: string; description: string; amount: number; date: string; received?: boolean; paymentMethod?: PaymentMethod }
   | { kind: "investment"; accountId: string; type: string; amount: number; percentage: number; date: string }
   | { kind: "purchase"; cardId: string; description: string; totalAmount: number; date: string };
 
@@ -2627,7 +2797,7 @@ export function useDuplicateOverScope() {
           date: dateFor(t.year, t.month),
           required: src.required,
           paid: !!src.paid,
-          auto_debit: !!src.autoDebit,
+          payment_method: src.paymentMethod ?? null,
           auto_debit_day: src.autoDebitDay ?? null,
           installments_count: 1,
           is_parent: false,
@@ -2645,6 +2815,7 @@ export function useDuplicateOverScope() {
           amount: src.amount,
           date: dateFor(t.year, t.month),
           received: !!src.received,
+          payment_method: src.paymentMethod ?? null,
           installments_count: 1,
           is_parent: false,
           reference_year: t.year,
@@ -2661,6 +2832,10 @@ export function useDuplicateOverScope() {
           amount: src.amount,
           percentage: src.percentage,
           date: dateFor(t.year, t.month),
+          installments_count: 1,
+          is_parent: false,
+          reference_year: t.year,
+          reference_month: t.month,
         }));
         const { error } = await supabase.from("investments").insert(rows);
         if (error) throw error;
@@ -2719,8 +2894,7 @@ export function useDuplicateInstallmentSeries() {
     }) => {
       const { parentId, parentType } = args;
       // Load original parent row + installments.
-      const parentTable =
-        parentType === "purchase" ? "purchases" : parentType === "debit" ? "debits" : "incomes";
+      const parentTable = parentTypeTable(parentType);
       const { data: parent, error: pe } = await supabase
         .from(parentTable)
         .select("*")
@@ -2786,8 +2960,7 @@ export function useDuplicateInstallmentsSelection() {
     }) => {
       const { parentId, parentType, installmentIds } = args;
       if (!installmentIds.length) return;
-      const parentTable =
-        parentType === "purchase" ? "purchases" : parentType === "debit" ? "debits" : "incomes";
+      const parentTable = parentTypeTable(parentType);
       const { data: parent, error: pe } = await supabase
         .from(parentTable)
         .select("*")
@@ -2850,7 +3023,7 @@ export function useDuplicateInstallmentsSelection() {
 export type DeleteSource =
   | { kind: "debit"; accountId: string; description: string; amount: number; groupId?: string | null }
   | { kind: "income"; accountId: string; description: string; amount: number; groupId?: string | null }
-  | { kind: "investment"; accountId: string; type: string; amount: number }
+  | { kind: "investment"; accountId: string; type: string; amount: number; groupId?: string | null }
   | { kind: "purchase"; cardId: string; description: string; amount: number; groupId?: string | null };
 
 export function useDeleteOverScope() {
@@ -2909,17 +3082,24 @@ export function useDeleteOverScope() {
             if (e2) throw e2;
           }
         } else if (src.kind === "investment") {
-          const { data, error } = await supabase
+          let q = supabase
             .from("investments")
             .select("id")
             .eq("account_id", src.accountId)
-            .eq("type", src.type)
-            .eq("amount", src.amount)
             .gte("date", start)
-            .lte("date", end);
+            .lte("date", end)
+            .eq("installments_count", 1)
+            .eq("is_parent", false);
+          if (src.groupId) {
+            q = q.eq("recurrence_group_id", src.groupId);
+          } else {
+            q = q.eq("type", src.type).eq("amount", src.amount);
+          }
+          const { data, error } = await q;
           if (error) throw error;
           const ids = (data ?? []).map((r: { id: string }) => r.id);
           if (ids.length) {
+            await supabase.from("installments").delete().in("parent_id", ids).eq("parent_type", "investment");
             const { error: e2 } = await supabase.from("investments").delete().in("id", ids);
             if (e2) throw e2;
           }
@@ -3426,7 +3606,7 @@ export function useImportHistorical() {
             date: e.date,
             required: false,
             paid: e.paid,
-            auto_debit: false,
+            payment_method: null,
             auto_debit_day: null,
             installments_count: 1,
             is_parent: false,
@@ -3488,7 +3668,7 @@ export function useImportHistorical() {
           supabase
             .from("debits")
             .select(
-              "id,account_id,description,amount,date,required,paid,auto_debit,auto_debit_day,installments_count,is_parent",
+              "id,account_id,description,amount,date,required,paid,payment_method,auto_debit_day,installments_count,is_parent",
             )
             .eq("user_id", user.id),
         ),
@@ -3839,12 +4019,44 @@ export function getMonthInstallments(installments: Installment[], year: number, 
   return installments.filter((i) => i.year === year && i.month === month);
 }
 
-export function getMonthInvestments(invs: Investment[], year: number, month: number) {
-  return invs.filter((i) => {
-    if (!i.date) return false;
-    const [y, m] = i.date.slice(0, 10).split("-").map(Number);
-    return y === year && m - 1 === month;
-  });
+export function getMonthInvestments(
+  investments: Investment[],
+  installments: Installment[],
+  year: number,
+  month: number,
+) {
+  const single = investments
+    .filter((i) => !i.isParent)
+    .filter((i) => {
+      if (i.referenceYear != null && i.referenceMonth != null) {
+        return i.referenceYear === year && i.referenceMonth === month;
+      }
+      if (!i.date) return false;
+      const [y, m] = i.date.slice(0, 10).split("-").map(Number);
+      return y === year && m - 1 === month;
+    });
+  const parcelled = installments
+    .filter((i) => i.parentType === "investment" && i.year === year && i.month === month)
+    .map((i) => {
+      const parent = investments.find((v) => v.id === i.parentId);
+      return { installment: i, investment: parent };
+    })
+    .filter((x): x is { installment: Installment; investment: Investment } => !!x.investment);
+  return { single, parcelled };
+}
+
+/** Soma o total investido no mês (avulsos + parcelas), sem precisar da separação single/parcelled. */
+export function sumMonthInvestments(
+  investments: Investment[],
+  installments: Installment[],
+  year: number,
+  month: number,
+): number {
+  const { single, parcelled } = getMonthInvestments(investments, installments, year, month);
+  return (
+    single.reduce((s, i) => s + i.amount, 0) +
+    parcelled.reduce((s, p) => s + p.installment.amount, 0)
+  );
 }
 
 export function getMonthDebits(
@@ -4101,6 +4313,8 @@ export function useUpdateDebit() {
       date?: string;
       paid?: boolean;
       notifyDaysBefore?: number | null;
+      paymentMethod?: PaymentMethod;
+      autoDebitDay?: number | null;
     }) => {
       const patch: {
         description?: string;
@@ -4109,12 +4323,16 @@ export function useUpdateDebit() {
         paid?: boolean;
         notify_days_before?: number | null;
         due_notified_at?: null;
+        payment_method?: PaymentMethod;
+        auto_debit_day?: number | null;
       } = {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.date !== undefined) patch.date = args.date;
       if (args.paid !== undefined) patch.paid = args.paid;
       if (args.notifyDaysBefore !== undefined) patch.notify_days_before = args.notifyDaysBefore;
+      if (args.paymentMethod !== undefined) patch.payment_method = args.paymentMethod;
+      if (args.autoDebitDay !== undefined) patch.auto_debit_day = args.autoDebitDay;
       // Muda a data ou a antecedência → reabre a janela de notificação.
       if (args.date !== undefined || args.notifyDaysBefore !== undefined) patch.due_notified_at = null;
       const { error } = await supabase.from("debits").update(patch).eq("id", args.id);
@@ -4187,13 +4405,17 @@ export function useUpdateIncome() {
       amount?: number;
       date?: string;
       received?: boolean;
+      notifyDaysBefore?: number | null;
+      paymentMethod?: PaymentMethod;
     }) => {
-      const patch: { description?: string; amount?: number; date?: string; received?: boolean } =
+      const patch: { description?: string; amount?: number; date?: string; received?: boolean; notify_days_before?: number | null; payment_method?: PaymentMethod } =
         {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.amount !== undefined) patch.amount = args.amount;
       if (args.date !== undefined) patch.date = args.date;
       if (args.received !== undefined) patch.received = args.received;
+      if (args.notifyDaysBefore !== undefined) patch.notify_days_before = args.notifyDaysBefore;
+      if (args.paymentMethod !== undefined) patch.payment_method = args.paymentMethod;
       const { error } = await supabase.from("incomes").update(patch).eq("id", args.id);
       if (error) throw error;
     },
@@ -4468,6 +4690,11 @@ export function useChangeInstallmentSeries() {
           .from("debits")
           .update({ installments_count: newCount, amount: args.totalAmount })
           .eq("id", args.parentId);
+      } else if (args.parentType === "investment") {
+        await supabase
+          .from("investments")
+          .update({ installments_count: newCount, amount: args.totalAmount })
+          .eq("id", args.parentId);
       } else {
         await supabase
           .from("incomes")
@@ -4729,7 +4956,14 @@ export function normalizeZero(n: number): number {
 //                group (date >= the clicked row's date)
 //   - "all":     touch every row in the group, including past months
 //
-type RecurringKind = "debit" | "income";
+type RecurringKind = "debit" | "income" | "investment";
+
+/** Nome da tabela para um RecurringKind (nunca "purchase" — compras recorrentes usam outro motor). */
+function recurringKindTable(kind: RecurringKind): "debits" | "incomes" | "investments" {
+  if (kind === "debit") return "debits";
+  if (kind === "investment") return "investments";
+  return "incomes";
+}
 
 export function useUpdateRecurringSeries() {
   const inv = useInvalidate();
@@ -4740,16 +4974,19 @@ export function useUpdateRecurringSeries() {
       groupId: string;
       anchorDate: string;
       scope: "one" | "forward" | "all";
-      patch: { description?: string; amount?: number; date?: string; notifyDaysBefore?: number | null };
+      patch: { description?: string; amount?: number; date?: string; notifyDaysBefore?: number | null; paymentMethod?: PaymentMethod };
     }) => {
-      const table = args.kind === "debit" ? "debits" : "incomes";
+      const table = recurringKindTable(args.kind);
       const baseUpdate: any = {};
-      if (args.patch.description !== undefined) baseUpdate.description = args.patch.description;
+      if (args.patch.description !== undefined) {
+        baseUpdate[args.kind === "investment" ? "type" : "description"] = args.patch.description;
+      }
       if (args.patch.amount !== undefined) baseUpdate.amount = args.patch.amount;
-      if (args.kind === "debit" && args.patch.notifyDaysBefore !== undefined) {
+      if (args.patch.notifyDaysBefore !== undefined) {
         baseUpdate.notify_days_before = args.patch.notifyDaysBefore;
         baseUpdate.due_notified_at = null;
       }
+      if (args.patch.paymentMethod !== undefined) baseUpdate.payment_method = args.patch.paymentMethod;
 
       if (args.scope === "one") {
         const update: any = { ...baseUpdate };
@@ -4800,7 +5037,7 @@ export function useDeleteRecurringSeries() {
       anchorDate: string;
       scope: "one" | "forward";
     }) => {
-      const table = args.kind === "debit" ? "debits" : "incomes";
+      const table = recurringKindTable(args.kind);
       if (args.scope === "one") {
         const { error } = await supabase.from(table).delete().eq("id", args.id);
         if (error) throw error;
@@ -4832,11 +5069,12 @@ export function useUpdateRecurringPurchaseSeries() {
       groupId: string;
       anchorDate: string;
       scope: "one" | "forward" | "all";
-      patch: { description?: string; amount?: number; date?: string };
+      patch: { description?: string; amount?: number; date?: string; notifyDaysBefore?: number | null };
     }) => {
-      const baseUpdate: { description?: string; total_amount?: number } = {};
+      const baseUpdate: { description?: string; total_amount?: number; notify_days_before?: number | null } = {};
       if (args.patch.description !== undefined) baseUpdate.description = args.patch.description;
       if (args.patch.amount !== undefined) baseUpdate.total_amount = args.patch.amount;
+      if (args.patch.notifyDaysBefore !== undefined) baseUpdate.notify_days_before = args.patch.notifyDaysBefore;
 
       if (args.scope === "one") {
         const update: { description?: string; total_amount?: number; purchase_date?: string } = {
@@ -5029,7 +5267,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
           ),
         );
 
-        for (const table of ["debits", "incomes"] as const) {
+        for (const table of ["debits", "incomes", "investments"] as const) {
           const { data: groupRows, error } = await supabase
             .from(table)
             .select("recurrence_group_id")
@@ -5082,7 +5320,6 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               id: await deterministicUuid(`recurring:${table}:${gid}:${year}:${month}`),
               user_id: user.id,
               account_id: t.account_id,
-              description: t.description,
               amount: t.amount,
               date: newDate,
               installments_count: 1,
@@ -5092,13 +5329,18 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               reference_month: month,
             };
             if (table === "debits") {
+              row.description = t.description;
               row.required = true;
               row.paid = false;
-              row.auto_debit = t.auto_debit ?? false;
+              row.payment_method = t.payment_method ?? null;
               row.auto_debit_day = t.auto_debit_day ?? null;
               row.notify_days_before = t.notify_days_before ?? null;
               row.due_notified_at = null;
+            } else if (table === "investments") {
+              row.type = t.type;
+              row.percentage = t.percentage;
             } else {
+              row.description = t.description;
               row.received = false;
             }
             const { error: ie } = await (supabase.from(table) as any).insert(row);

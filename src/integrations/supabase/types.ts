@@ -167,11 +167,13 @@ export type Database = {
           color: string
           created_at: string
           due_day: number
+          due_notified_at: string | null
           end_month: number | null
           end_year: number | null
           excluded_months: string[]
           id: string
           name: string
+          notify_days_before: number | null
           position: number
           start_month: number | null
           start_year: number | null
@@ -183,11 +185,13 @@ export type Database = {
           color?: string
           created_at?: string
           due_day?: number
+          due_notified_at?: string | null
           end_month?: number | null
           end_year?: number | null
           excluded_months?: string[]
           id?: string
           name: string
+          notify_days_before?: number | null
           position?: number
           start_month?: number | null
           start_year?: number | null
@@ -199,11 +203,13 @@ export type Database = {
           color?: string
           created_at?: string
           due_day?: number
+          due_notified_at?: string | null
           end_month?: number | null
           end_year?: number | null
           excluded_months?: string[]
           id?: string
           name?: string
+          notify_days_before?: number | null
           position?: number
           start_month?: number | null
           start_year?: number | null
@@ -223,7 +229,6 @@ export type Database = {
         Row: {
           account_id: string
           amount: number
-          auto_debit: boolean
           auto_debit_day: number | null
           created_at: string
           date: string
@@ -234,6 +239,7 @@ export type Database = {
           is_parent: boolean
           notify_days_before: number | null
           paid: boolean
+          payment_method: string | null
           recurrence_group_id: string | null
           reference_month: number | null
           reference_year: number | null
@@ -243,7 +249,6 @@ export type Database = {
         Insert: {
           account_id: string
           amount: number
-          auto_debit?: boolean
           auto_debit_day?: number | null
           created_at?: string
           date: string
@@ -254,6 +259,7 @@ export type Database = {
           is_parent?: boolean
           notify_days_before?: number | null
           paid?: boolean
+          payment_method?: string | null
           recurrence_group_id?: string | null
           reference_month?: number | null
           reference_year?: number | null
@@ -263,7 +269,6 @@ export type Database = {
         Update: {
           account_id?: string
           amount?: number
-          auto_debit?: boolean
           auto_debit_day?: number | null
           created_at?: string
           date?: string
@@ -274,6 +279,7 @@ export type Database = {
           is_parent?: boolean
           notify_days_before?: number | null
           paid?: boolean
+          payment_method?: string | null
           recurrence_group_id?: string | null
           reference_month?: number | null
           reference_year?: number | null
@@ -318,9 +324,12 @@ export type Database = {
           created_at: string
           date: string
           description: string
+          due_notified_at: string | null
           id: string
           installments_count: number
           is_parent: boolean
+          notify_days_before: number | null
+          payment_method: string | null
           received: boolean
           recurrence_group_id: string | null
           reference_month: number | null
@@ -333,9 +342,12 @@ export type Database = {
           created_at?: string
           date: string
           description: string
+          due_notified_at?: string | null
           id?: string
           installments_count?: number
           is_parent?: boolean
+          notify_days_before?: number | null
+          payment_method?: string | null
           received?: boolean
           recurrence_group_id?: string | null
           reference_month?: number | null
@@ -348,9 +360,12 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string
+          due_notified_at?: string | null
           id?: string
           installments_count?: number
           is_parent?: boolean
+          notify_days_before?: number | null
+          payment_method?: string | null
           received?: boolean
           recurrence_group_id?: string | null
           reference_month?: number | null
@@ -430,7 +445,12 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          installments_count: number
+          is_parent: boolean
           percentage: number
+          recurrence_group_id: string | null
+          reference_month: number | null
+          reference_year: number | null
           type: string
           user_id: string
         }
@@ -440,7 +460,12 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          installments_count?: number
+          is_parent?: boolean
           percentage?: number
+          recurrence_group_id?: string | null
+          reference_month?: number | null
+          reference_year?: number | null
           type: string
           user_id: string
         }
@@ -450,7 +475,12 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          installments_count?: number
+          is_parent?: boolean
           percentage?: number
+          recurrence_group_id?: string | null
+          reference_month?: number | null
+          reference_year?: number | null
           type?: string
           user_id?: string
         }
@@ -621,8 +651,10 @@ export type Database = {
           card_id: string
           created_at: string
           description: string
+          due_notified_at: string | null
           id: string
           installments_count: number
+          notify_days_before: number | null
           purchase_date: string
           recurrence_group_id: string | null
           total_amount: number
@@ -632,8 +664,10 @@ export type Database = {
           card_id: string
           created_at?: string
           description: string
+          due_notified_at?: string | null
           id?: string
           installments_count?: number
+          notify_days_before?: number | null
           purchase_date: string
           recurrence_group_id?: string | null
           total_amount: number
@@ -643,8 +677,10 @@ export type Database = {
           card_id?: string
           created_at?: string
           description?: string
+          due_notified_at?: string | null
           id?: string
           installments_count?: number
+          notify_days_before?: number | null
           purchase_date?: string
           recurrence_group_id?: string | null
           total_amount?: number

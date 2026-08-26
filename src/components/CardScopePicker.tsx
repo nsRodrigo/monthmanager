@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Field, inputClass } from "./Modal";
+import { Field, inputClass, Select } from "./Modal";
 import { MONTHS } from "@/lib/format";
 import type { CardScope } from "@/store/finance";
 
@@ -78,30 +78,30 @@ export function CardScopePicker({
         <div className="space-y-2 pt-2">
           <div className="grid grid-cols-2 gap-2">
             <Field label="Mês inicial">
-              <select className={inputClass} value={sM} onChange={(e) => setSM(Number(e.target.value))}>
+              <Select className={inputClass} value={sM} onChange={(e) => setSM(Number(e.target.value))}>
                 {MONTHS.map((m, i) => (
                   <option key={i} value={i}>{m}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Ano inicial">
-              <select className={inputClass} value={sY} onChange={(e) => setSY(Number(e.target.value))}>
+              <Select className={inputClass} value={sY} onChange={(e) => setSY(Number(e.target.value))}>
                 {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
+              </Select>
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Mês final">
-              <select className={inputClass} value={eM} onChange={(e) => setEM(Number(e.target.value))}>
+              <Select className={inputClass} value={eM} onChange={(e) => setEM(Number(e.target.value))}>
                 {MONTHS.map((m, i) => (
                   <option key={i} value={i}>{m}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Ano final">
-              <select className={inputClass} value={eY} onChange={(e) => setEY(Number(e.target.value))}>
+              <Select className={inputClass} value={eY} onChange={(e) => setEY(Number(e.target.value))}>
                 {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
+              </Select>
             </Field>
           </div>
         </div>

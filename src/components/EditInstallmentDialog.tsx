@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Field, inputClass, Accordion, PaidToggle } from "./Modal";
+import { Modal, Field, inputClass, Select, Accordion, PaidToggle } from "./Modal";
 import {
   useUpdateInstallment,
   useShiftInstallmentDate,
@@ -16,9 +16,11 @@ import {
   useAddDebit,
   useAddIncome,
   useAddPurchase,
+  useAddInvestment,
   useRemoveDebit,
   useRemoveIncome,
   useRemovePurchase,
+  useRemoveInvestment,
   useDescriptionSuggestions,
   useDuplicateOverScope,
   useDeleteOverScope,
@@ -28,11 +30,14 @@ import {
   usePurchases,
   useDebits,
   useIncomes,
+  useInvestments,
   useLatestAmountAdjustment,
+  PAYMENT_METHOD_OPTIONS,
   type Installment,
   type InstallmentScope,
   type CardScope,
   type DeleteSource,
+  type PaymentMethod,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
 import { AutocompleteInput } from "./AutocompleteInput";
@@ -43,8 +48,8 @@ import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 
 
 export type SingleEditTarget =
-  | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean; notifyDaysBefore?: number | null }
-  | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean }
+  | { kind: "debit"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean; notifyDaysBefore?: number | null; paymentMethod?: PaymentMethod; autoDebitDay?: number | null }
+  | { kind: "income"; id: string; accountId: string; description: string; amount: number; date: string; paid: boolean; notifyDaysBefore?: number | null; paymentMethod?: PaymentMethod }
   | { kind: "investment"; id: string; accountId: string; description: string; amount: number; date: string };
 
 export function EditInstallmentDialog({
@@ -58,6 +63,7 @@ export function EditInstallmentDialog({
   parentSource,
   defaultYear,
   defaultMonth,
+  startAction,
 }: {
   open: boolean;
   onClose: () => void;
@@ -72,6 +78,8 @@ export function EditInstallmentDialog({
   parentSource?: import("@/store/finance").DuplicateSource;
   defaultYear?: number;
   defaultMonth?: number;
+  /** Quando "duplicate", abre direto no fluxo de duplicar (menu de contexto de um item). */
+  startAction?: "duplicate";
 }) {
   const update = useUpdateInstallment();
   const shift = useShiftInstallmentDate();
@@ -88,9 +96,11 @@ export function EditInstallmentDialog({
   const addDebit = useAddDebit();
   const addIncome = useAddIncome();
   const addPurchase = useAddPurchase();
+  const addInvestment = useAddInvestment();
   const removeDebit = useRemoveDebit();
   const removeIncome = useRemoveIncome();
   const removePurchase = useRemovePurchase();
+  const removeInvestment = useRemoveInvestment();
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const duplicateSeries = useDuplicateInstallmentSeries();
@@ -99,6 +109,7 @@ export function EditInstallmentDialog({
   const { data: purchases = [] } = usePurchases();
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
+  const { data: investments = [] } = useInvestments();
   const latestAdjustment = useLatestAmountAdjustment(
     installment?.parentId,
     installment?.parentType,
@@ -136,6 +147,9 @@ export function EditInstallmentDialog({
     if (installment.parentType === "income") {
       return incomes.find((i) => i.id === installment.parentId)?.date ?? "";
     }
+    if (installment.parentType === "investment") {
+      return investments.find((v) => v.id === installment.parentId)?.date ?? "";
+    }
     return "";
   })();
   const effectiveDate = installment?.referenceDate || parentDate;
@@ -158,6 +172,8 @@ export function EditInstallmentDialog({
   const [convMode, setConvMode] = useState<"total" | "perInstallment">("total");
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
+  const [autoDebitDay, setAutoDebitDay] = useState("");
   // Purchase (installment-view) type conversion state — cartão à vista → parcelado/recorrente.
   const [purchType, setPurchType] = useState<"cash" | "parcelled" | "recurring">("cash");
   const [purchInstallments, setPurchInstallments] = useState("2");
@@ -188,20 +204,38 @@ export function EditInstallmentDialog({
       setConvInstallments("2");
       setConvInstNumber("1");
       setConvMode("total");
-      const singleNotify = single.kind === "debit" ? single.notifyDaysBefore ?? null : null;
+      const singleNotify = single.kind !== "investment" ? single.notifyDaysBefore ?? null : null;
       setNotifyEnabled(singleNotify != null);
       setNotifyDaysBefore(singleNotify != null ? String(singleNotify) : "");
+      setPaymentMethod(single.kind !== "investment" ? single.paymentMethod ?? null : null);
+      setAutoDebitDay(single.kind === "debit" && single.autoDebitDay ? String(single.autoDebitDay) : "");
     }
     setAskDateScope(false);
     setAdvanceCount("");
     setManageView("none");
   }, [open, installment, single, parentLabel, parentDate, effectiveDate]);
 
+  // Menu de contexto de um item → pula direto pro fluxo de duplicar.
+  useEffect(() => {
+    if (!open || startAction !== "duplicate") return;
+    if (installment) {
+      if (installment.total > 1) {
+        setSelectedDupIds(new Set([installment.id]));
+        setAskDuplicateParcelled(true);
+      } else {
+        setAskDuplicate(true);
+      }
+    } else if (single) {
+      setAskDuplicate(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, startAction, installment, single]);
+
   if (!installment && !single) return null;
 
   // ───── SINGLE (Debit / Income / Investment) ─────
   if (single) {
-    const canConvert = single.kind === "debit" || single.kind === "income";
+    const canConvert = single.kind === "debit" || single.kind === "income" || single.kind === "investment";
     const convN = singleType === "parcelled" ? Math.max(1, parseInt(convInstallments) || 1) : 1;
     const convCur = singleType === "parcelled"
       ? Math.max(1, Math.min(convN, parseInt(convInstNumber) || 1))
@@ -210,7 +244,7 @@ export function EditInstallmentDialog({
     const convPer = convN > 0 ? convTotal / convN : 0;
 
     const handleSave = async () => {
-      // ── Conversion: cash → parcelled or cash → recurring (debit/income only)
+      // ── Conversion: cash → parcelled or cash → recurring
       if (canConvert && singleType !== "cash") {
         // Remove the original single, then create the new shape using the
         // existing add hooks (same code path as the "Add" dialogs).
@@ -235,7 +269,7 @@ export function EditInstallmentDialog({
               required: true,
             });
           }
-        } else {
+        } else if (single.kind === "income") {
           await removeIncome.mutateAsync(single.id);
           if (singleType === "parcelled") {
             await addIncome.mutateAsync({
@@ -255,6 +289,29 @@ export function EditInstallmentDialog({
               recurring: true,
             });
           }
+        } else {
+          const currentPercentage = investments.find((v) => v.id === single.id)?.percentage ?? 0;
+          await removeInvestment.mutateAsync(single.id);
+          if (singleType === "parcelled") {
+            await addInvestment.mutateAsync({
+              accountId: single.accountId,
+              type: description.trim(),
+              amount: convTotal,
+              percentage: currentPercentage,
+              date: dueDate,
+              installmentsCount: convN,
+              installmentNumber: convCur,
+            });
+          } else {
+            await addInvestment.mutateAsync({
+              accountId: single.accountId,
+              type: description.trim(),
+              amount,
+              percentage: currentPercentage,
+              date: dueDate,
+              recurring: true,
+            });
+          }
         }
         onClose();
         return;
@@ -268,6 +325,8 @@ export function EditInstallmentDialog({
           date: dueDate,
           paid,
           notifyDaysBefore: notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
+          paymentMethod,
+          autoDebitDay: paymentMethod === "auto_debit" && autoDebitDay ? Math.max(1, Math.min(31, parseInt(autoDebitDay))) : null,
         });
       } else if (single.kind === "income") {
         await updateIncome.mutateAsync({
@@ -276,6 +335,8 @@ export function EditInstallmentDialog({
           amount,
           date: dueDate,
           received: paid,
+          notifyDaysBefore: notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
+          paymentMethod,
         });
       } else {
         await updateInvestment.mutateAsync({
@@ -338,7 +399,7 @@ export function EditInstallmentDialog({
           {canConvert && (
             <div className="space-y-2">
               <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
-              <select
+              <Select
                 className={inputClass}
                 value={singleType}
                 onChange={(e) => setSingleType(e.target.value as "cash" | "parcelled" | "recurring")}
@@ -346,7 +407,7 @@ export function EditInstallmentDialog({
                 <option value="cash">À vista</option>
                 <option value="parcelled">Parcelado</option>
                 <option value="recurring">Recorrente</option>
-              </select>
+              </Select>
 
               {singleType === "parcelled" && (
                 <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">
@@ -417,7 +478,43 @@ export function EditInstallmentDialog({
             </div>
           )}
 
-          {single.kind === "debit" && singleType === "cash" && (
+          {single.kind !== "investment" && singleType === "cash" && (
+            <div className="space-y-2">
+              <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
+              <Select
+                className={inputClass}
+                value={paymentMethod ?? "none"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPaymentMethod(v === "none" ? null : (v as PaymentMethod));
+                }}
+              >
+                <option value="none">Nenhum</option>
+                {PAYMENT_METHOD_OPTIONS.filter(
+                  (o) => o.value !== "auto_debit" || single.kind === "debit",
+                ).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+              {single.kind === "debit" && paymentMethod === "auto_debit" && (
+                <Field label="Dia do débito (1-31)">
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    className={inputClass}
+                    value={autoDebitDay}
+                    onChange={(e) => setAutoDebitDay(e.target.value)}
+                    placeholder="Ex: 10"
+                  />
+                </Field>
+              )}
+            </div>
+          )}
+
+          {single.kind === "debit" && singleType === "cash" && paymentMethod === "auto_debit" && (
             <Accordion
               open={notifyEnabled}
               onOpenChange={(v) => {
@@ -581,6 +678,8 @@ export function EditInstallmentDialog({
           await updateDebit.mutateAsync({ id: inst.parentId, date: dueDate });
         } else if (inst.parentType === "income") {
           await updateIncome.mutateAsync({ id: inst.parentId, date: dueDate });
+        } else if (inst.parentType === "investment") {
+          await updateInvestment.mutateAsync({ id: inst.parentId, date: dueDate });
         }
       } else if (!isSingleParcel && parentDate) {
         await updateDateScope.mutateAsync({ installment: inst, newDate: dueDate, scope });
@@ -603,6 +702,8 @@ export function EditInstallmentDialog({
         await updateDebit.mutateAsync({ id: inst.parentId, description: newDesc });
       } else if (inst.parentType === "income") {
         await updateIncome.mutateAsync({ id: inst.parentId, description: newDesc });
+      } else if (inst.parentType === "investment") {
+        await updateInvestment.mutateAsync({ id: inst.parentId, type: newDesc });
       }
     }
     onClose();
@@ -752,7 +853,7 @@ export function EditInstallmentDialog({
           {canConvertPurchase && (
             <div className="space-y-2">
               <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
-              <select
+              <Select
                 className={inputClass}
                 value={purchType}
                 onChange={(e) => setPurchType(e.target.value as "cash" | "parcelled" | "recurring")}
@@ -760,7 +861,7 @@ export function EditInstallmentDialog({
                 <option value="cash">À vista</option>
                 <option value="parcelled">Parcelado</option>
                 <option value="recurring">Recorrente</option>
-              </select>
+              </Select>
 
               {purchType === "parcelled" && (
                 <div className="space-y-3 rounded-lg border border-border bg-background/30 p-3">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, Select } from "./Modal";
 import { MONTHS } from "@/lib/format";
 import { getEffectiveCurrentMonth } from "@/store/finance";
 
@@ -44,7 +44,7 @@ export function AddMonthDialog({
         </p>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Mês">
-            <select
+            <Select
               className={inputClass}
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
@@ -54,10 +54,10 @@ export function AddMonthDialog({
                   {name}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
           <Field label="Ano">
-            <select
+            <Select
               className={inputClass}
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
@@ -67,7 +67,7 @@ export function AddMonthDialog({
                   {y}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
         <div className="flex gap-2 pt-2">

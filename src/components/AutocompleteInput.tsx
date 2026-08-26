@@ -68,7 +68,6 @@ export function AutocompleteInput({
           onChange(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
           if (!showList) {
             if (e.key === "ArrowDown" && filtered.length) {

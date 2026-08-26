@@ -14,7 +14,7 @@ import {
   type AccountType,
 } from "@/store/finance";
 import { formatCurrency } from "@/lib/format";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, Select } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
 import { Plus, Trash2, Pencil, Check, X, Wallet, Building2, Smartphone, TrendingUp } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
@@ -210,7 +210,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field label="Tipo">
-                <select
+                <Select
                   value={type}
                   onChange={(e) => setType(e.target.value as AccountType)}
                   className={inputClass}
@@ -220,7 +220,7 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                       {t.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field label="Saldo inicial (R$)">
                 <CurrencyInput value={initial} onValueChange={setInitial} />

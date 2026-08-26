@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Field, inputClass } from "./Modal";
+import { Modal, Field, inputClass, Select } from "./Modal";
 import { MONTHS } from "@/lib/format";
 import type { CardScope } from "@/store/finance";
 import { AlertTriangle } from "lucide-react";
@@ -142,7 +142,7 @@ export function CardScopeConfirmDialog({
             {kind === "period" && (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Field label="De">
-                  <select
+                  <Select
                     className={inputClass}
                     value={startIdx}
                     onChange={(e) => setStartIdx(parseInt(e.target.value))}
@@ -152,10 +152,10 @@ export function CardScopeConfirmDialog({
                         {MONTHS[m.month]} de {m.year}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Até">
-                  <select
+                  <Select
                     className={inputClass}
                     value={endIdx}
                     onChange={(e) => setEndIdx(parseInt(e.target.value))}
@@ -165,7 +165,7 @@ export function CardScopeConfirmDialog({
                         {MONTHS[m.month]} de {m.year}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
                 {periodInvalid && (
                   <p className="col-span-2 text-[11px] text-destructive">

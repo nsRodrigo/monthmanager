@@ -31,13 +31,16 @@ import {
   useDeleteParcelledByScope,
   useCompactInstallmentNumbering,
   useDeleteOverScope,
+  useDuplicateOverScope,
   useReorderCards,
   resolveScopeMonths,
+  PAYMENT_METHOD_BADGES,
   type CardScope,
   type Installment,
   type Debit,
   type Income,
   type Investment,
+  type DuplicateSource,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
@@ -61,6 +64,8 @@ import {
   GripVertical,
   ShoppingBag,
   Wallet,
+  Copy,
+  MoreHorizontal,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -76,6 +81,7 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
 import { MobileMenuButton } from "@/components/MobileMenuButton";
+import { RowContextMenu } from "@/components/RowContextMenu";
 
 type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 
@@ -184,7 +190,10 @@ export function MonthDetailPane({
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openCard, setOpenCard] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  /** Quando um item é aberto via ícone de duplicar (em vez de editar), pula direto pro fluxo de duplicar. */
+  const [rowStartAction, setRowStartAction] = useState<"duplicate" | undefined>(undefined);
   const [editing, setEditing] = useState<{
     inst: Installment;
     label: string;
@@ -201,6 +210,7 @@ export function MonthDetailPane({
   const deleteParcelledScoped = useDeleteParcelledByScope();
   const compactInstallments = useCompactInstallmentNumbering();
   const deleteOverScope = useDeleteOverScope();
+  const duplicateOverScope = useDuplicateOverScope();
 
   // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
   const [scopeDelete, setScopeDelete] = useState<{
@@ -213,7 +223,7 @@ export function MonthDetailPane({
   /** Abre o "Aplicar em" para uma compra/débito/recebimento parcelado. */
   const askDeleteParcelled = (
     parentId: string,
-    parentType: "purchase" | "debit" | "income",
+    parentType: "purchase" | "debit" | "income" | "investment",
     label: string,
   ) => {
     const months = (installments ?? [])
@@ -225,7 +235,9 @@ export function MonthDetailPane({
           ? "Excluir compra parcelada"
           : parentType === "debit"
             ? "Excluir débito parcelado"
-            : "Excluir recebimento parcelado",
+            : parentType === "investment"
+              ? "Excluir investimento parcelado"
+              : "Excluir recebimento parcelado",
       description: (
         <>
           Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
@@ -251,7 +263,7 @@ export function MonthDetailPane({
 
   /** Abre o "Aplicar em" para uma série recorrente (débito/recebimento/compra). */
   const askDeleteRecurring = (
-    kind: "debit" | "income" | "purchase",
+    kind: "debit" | "income" | "purchase" | "investment",
     groupId: string,
     label: string,
     target: { cardId?: string; accountId?: string; amount?: number },
@@ -262,7 +274,9 @@ export function MonthDetailPane({
           ? "Excluir débito recorrente"
           : kind === "income"
             ? "Excluir recebimento recorrente"
-            : "Excluir compra recorrente",
+            : kind === "investment"
+              ? "Excluir investimento recorrente"
+              : "Excluir compra recorrente",
       description: (
         <>
           Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>.
@@ -276,7 +290,9 @@ export function MonthDetailPane({
         const source =
           kind === "purchase"
             ? { kind: "purchase" as const, cardId: target.cardId!, description: label, amount: 0, groupId }
-            : { kind, accountId: target.accountId!, description: label, amount: target.amount ?? 0, groupId };
+            : kind === "investment"
+              ? { kind: "investment" as const, accountId: target.accountId!, type: label, amount: target.amount ?? 0, groupId }
+              : { kind, accountId: target.accountId!, description: label, amount: target.amount ?? 0, groupId };
         await deleteOverScope.mutateAsync({
           source,
           scope,
@@ -338,7 +354,10 @@ export function MonthDetailPane({
       if (ids.size === 0) return null;
       return { key, ids };
     });
-  const clearSelection = () => setSelection(null);
+  const clearSelection = () => {
+    setSelection(null);
+    setBulkMenuOpen(false);
+  };
 
   const selProps = (key: SelectionKey, id: string) => ({
     selectionMode: isSelMode(key),
@@ -374,10 +393,45 @@ export function MonthDetailPane({
     clearSelection();
   };
 
+  /** Duplica os itens selecionados como cópias avulsas no mês corrente (sem diálogo de escopo). */
+  const bulkDuplicate = async (key: SelectionKey) => {
+    if (!selection || selection.key !== key) return;
+    const ids = Array.from(selection.ids);
+    const scope: CardScope = { kind: "month", year, month };
+    const dup = (source: DuplicateSource) =>
+      duplicateOverScope.mutateAsync({ source, scope, anchorYear: year, anchorMonth: month });
+    if (key === "incomes") {
+      for (const id of ids) {
+        const i = allIncomes.find((x) => x.id === id);
+        if (!i) continue;
+        await dup({ kind: "income", accountId: i.accountId, description: i.description, amount: i.amount, date: i.date, received: i.received, paymentMethod: i.paymentMethod });
+      }
+    } else if (key === "debits") {
+      for (const id of ids) {
+        const d = allDebits.find((x) => x.id === id);
+        if (!d) continue;
+        await dup({ kind: "debit", accountId: d.accountId, description: d.description, amount: d.amount, date: d.date, required: false, paid: d.paid, paymentMethod: d.paymentMethod, autoDebitDay: d.autoDebitDay });
+      }
+    } else if (key === "investments") {
+      for (const id of ids) {
+        const v = allInvestments.find((x) => x.id === id);
+        if (!v) continue;
+        await dup({ kind: "investment", accountId: v.accountId, type: v.type, amount: v.amount, percentage: v.percentage, date: v.date });
+      }
+    } else if (key.startsWith("card:")) {
+      for (const id of ids) {
+        const p = purchasesList.find((x) => x.id === id);
+        if (!p) continue;
+        await dup({ kind: "purchase", cardId: p.cardId, description: p.description, totalAmount: p.totalAmount, date: p.date });
+      }
+    }
+    clearSelection();
+  };
+
   const askDeleteInst = (
     _inst: Installment,
     label: string,
-    parentType: "purchase" | "debit" | "income",
+    parentType: "purchase" | "debit" | "income" | "investment",
     parentId: string,
   ) => askDeleteParcelled(parentId, parentType, label);
 
@@ -421,11 +475,8 @@ export function MonthDetailPane({
   const accountCardIds = new Set(accountCards.map((c) => c.id));
   const debits = allDebits.filter((d) => d.accountId === contaId);
   const incomes = allIncomes.filter((i) => i.accountId === contaId);
-  const investments = getMonthInvestments(
-    allInvestments.filter((i) => i.accountId === contaId),
-    year,
-    month,
-  );
+  const investmentsAcc = allInvestments.filter((i) => i.accountId === contaId);
+  const monthInvestments = getMonthInvestments(investmentsAcc, installmentsList, year, month);
 
   const visiblePurchaseIds = new Set(
     purchasesList.filter((p) => accountCardIds.has(p.cardId)).map((p) => p.id),
@@ -453,11 +504,11 @@ export function MonthDetailPane({
 
   // "Fixos" = recorrentes + débito automático (nos débitos) e recorrentes (nos recebimentos).
   const debitsFixedSingle = monthDebits.single
-    .filter((d) => !!d.recurrenceGroupId || d.autoDebit || d.required)
+    .filter((d) => !!d.recurrenceGroupId || d.paymentMethod === "auto_debit" || d.required)
     .slice()
     .sort(byDateAsc);
   const debitsCash = monthDebits.single
-    .filter((d) => !d.recurrenceGroupId && !d.autoDebit && !d.required)
+    .filter((d) => !d.recurrenceGroupId && d.paymentMethod !== "auto_debit" && !d.required)
     .slice()
     .sort(byDateAsc);
   const debitsParcelled = monthDebits.parcelled.slice().sort(byParcelDateAsc((p) => p.debit.date));
@@ -480,7 +531,15 @@ export function MonthDetailPane({
     .sort(byDateAsc);
   const incomesParcelled = monthIncomes.parcelled.slice().sort(byParcelDateAsc((p) => p.income.date));
 
-  const investmentsSorted = investments.slice().sort(byDateAsc);
+  const investmentsFixedSingle = monthInvestments.single
+    .filter((i) => !!i.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const investmentsCash = monthInvestments.single
+    .filter((i) => !i.recurrenceGroupId)
+    .slice()
+    .sort(byDateAsc);
+  const investmentsParcelled = monthInvestments.parcelled.slice().sort(byParcelDateAsc((p) => p.investment.date));
 
   // ───── Sort prefs (per-section, persisted in localStorage) ─────
   const debitsSort = useSortPreference("debits");
@@ -494,6 +553,9 @@ export function MonthDetailPane({
   type IncomeEntry =
     | { kind: "single"; income: Income }
     | { kind: "parcelled"; entry: (typeof incomesParcelled)[number] };
+  type InvestmentEntry =
+    | { kind: "single"; investment: Investment }
+    | { kind: "parcelled"; entry: (typeof investmentsParcelled)[number] };
 
   // Ordem padrão: mescla recorrentes + parcelados + débito automático
   // em um único grupo ordenado por data; à-vista fica ao final.
@@ -545,14 +607,28 @@ export function MonthDetailPane({
         id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
       });
 
+  const investmentsFixedMerged: InvestmentEntry[] = [
+    ...investmentsFixedSingle.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
+    ...investmentsParcelled.map<InvestmentEntry>((p) => ({ kind: "parcelled", entry: p })),
+  ].sort((a, b) => {
+    const da = a.kind === "single" ? a.investment.date : a.entry.investment.date;
+    const db = b.kind === "single" ? b.investment.date : b.entry.investment.date;
+    const ia = a.kind === "single" ? a.investment.id : a.entry.installment.id;
+    const ib = b.kind === "single" ? b.investment.id : b.entry.installment.id;
+    return da.localeCompare(db) || ia.localeCompare(ib);
+  });
+  const investmentsDefaultOrder: InvestmentEntry[] = [
+    ...investmentsFixedMerged,
+    ...investmentsCash.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
+  ];
   const investmentsOrdered =
     investmentsSort.sort.option === "default"
-      ? investmentsSorted
-      : applySort(investmentsSorted, investmentsSort.sort, {
-        name: (i) => i.type,
-        amount: (i) => i.amount,
-        date: (i) => i.date,
-        id: (i) => i.id,
+      ? investmentsDefaultOrder
+      : applySort(investmentsDefaultOrder, investmentsSort.sort, {
+        name: (e) => (e.kind === "single" ? e.investment.type : e.entry.investment!.type),
+        amount: (e) => (e.kind === "single" ? e.investment.amount : e.entry.installment.amount),
+        date: (e) => (e.kind === "single" ? e.investment.date : e.entry.investment.date),
+        id: (e) => (e.kind === "single" ? e.investment.id : e.entry.installment.id),
       });
 
 
@@ -565,7 +641,9 @@ export function MonthDetailPane({
   const totalCards = monthInst
     .filter((i) => i.parentType === "purchase")
     .reduce((s, i) => s + i.amount, 0);
-  const totalInvested = investments.reduce((s, i) => s + i.amount, 0);
+  const totalInvested =
+    monthInvestments.single.reduce((s, i) => s + i.amount, 0) +
+    monthInvestments.parcelled.reduce((s, p) => s + p.installment.amount, 0);
 
   // Totais pagos/recebidos: só contabiliza itens marcados (paid/received = true).
   // Itens não marcados valem 0 -- não entram negativos.
@@ -717,15 +795,6 @@ export function MonthDetailPane({
               onChange={incomesSort.set}
             />
           }
-          headerBar={
-            isSelMode("incomes") ? (
-              <SelectionBar
-                count={selection!.ids.size}
-                onCancel={clearSelection}
-                onDelete={() => bulkDelete("incomes")}
-              />
-            ) : null
-          }
           paidControl={
             !isSelMode("incomes") &&
               monthIncomes.single.length + monthIncomes.parcelled.length > 0 ? (
@@ -775,6 +844,7 @@ export function MonthDetailPane({
                         description: p.income!.description,
                         amount: p.income!.amount,
                         date: p.income!.date,
+                        paymentMethod: p.income!.paymentMethod,
                       },
                     })
                   }
@@ -785,6 +855,36 @@ export function MonthDetailPane({
             }
             const i = e.income;
             const isRecurring = !!i.recurrenceGroupId;
+            const openIncomeEdit = () => {
+              if (isRecurring) {
+                setEditingRecurring({
+                  kind: "income",
+                  id: i.id,
+                  groupId: i.recurrenceGroupId!,
+                  description: i.description,
+                  amount: i.amount,
+                  date: i.date,
+                  accountId: i.accountId,
+                  notifyDaysBefore: i.notifyDaysBefore,
+                  paymentMethod: i.paymentMethod === "auto_debit" ? null : i.paymentMethod,
+                });
+              } else {
+                setEditingSingle({
+                  item: {
+                    kind: "income",
+                    id: i.id,
+                    accountId: i.accountId,
+                    description: i.description,
+                    amount: i.amount,
+                    date: i.date,
+                    paid: i.received,
+                    notifyDaysBefore: i.notifyDaysBefore,
+                    paymentMethod: i.paymentMethod,
+                  },
+                  onDeleteParent: () => removeIncome.mutate(i.id),
+                });
+              }
+            };
             return (
               <IncomeRow
                 key={i.id}
@@ -792,31 +892,10 @@ export function MonthDetailPane({
                 onToggle={() =>
                   toggleIncome.mutate({ id: i.id, received: !i.received })
                 }
-                onEdit={() => {
-                  if (isRecurring) {
-                    setEditingRecurring({
-                      kind: "income",
-                      id: i.id,
-                      groupId: i.recurrenceGroupId!,
-                      description: i.description,
-                      amount: i.amount,
-                      date: i.date,
-                      accountId: i.accountId,
-                    });
-                  } else {
-                    setEditingSingle({
-                      item: {
-                        kind: "income",
-                        id: i.id,
-                        accountId: i.accountId,
-                        description: i.description,
-                        amount: i.amount,
-                        date: i.date,
-                        paid: i.received,
-                      },
-                      onDeleteParent: () => removeIncome.mutate(i.id),
-                    });
-                  }
+                onEdit={openIncomeEdit}
+                onDuplicate={() => {
+                  setRowStartAction("duplicate");
+                  openIncomeEdit();
                 }}
                 onRemove={
                   isRecurring
@@ -844,9 +923,9 @@ export function MonthDetailPane({
           description="Aplicações e resgates"
           tone="primary"
           total={totalInvested}
-          count={investments.length}
+          count={monthInvestments.single.length + monthInvestments.parcelled.length}
           defaultOpen={false}
-          empty={investments.length === 0}
+          empty={monthInvestments.single.length === 0 && monthInvestments.parcelled.length === 0}
           emptyText="Nenhum investimento nesta conta."
           sortControl={
             <SortMenu
@@ -855,21 +934,53 @@ export function MonthDetailPane({
               onChange={investmentsSort.set}
             />
           }
-          headerBar={
-            isSelMode("investments") ? (
-              <SelectionBar
-                count={selection!.ids.size}
-                onCancel={clearSelection}
-                onDelete={() => bulkDelete("investments")}
-              />
-            ) : null
-          }
         >
-          {investmentsOrdered.map((inv) => (
-            <InvestmentRow
-              key={inv.id}
-              inv={inv}
-              onEdit={() =>
+          {investmentsOrdered.map((e) => {
+            if (e.kind === "parcelled") {
+              const p = e.entry;
+              return (
+                <ParcelledRow
+                  key={p.installment.id}
+                  kind="investment"
+                  installment={p.installment}
+                  parent={p.investment!}
+                  onToggle={() => {}}
+                  onEdit={() =>
+                    setEditing({
+                      inst: p.installment,
+                      label: p.investment!.type,
+                      subtitle: `Investimento parcelado · Total ${formatCurrency(p.investment!.amount)} em ${p.investment!.installmentsCount}x`,
+                      onDeleteParent: () => askDeleteParcelled(p.investment!.id, "investment", p.investment!.type),
+                      parentSource: {
+                        kind: "investment",
+                        accountId: p.investment!.accountId,
+                        type: p.investment!.type,
+                        amount: p.investment!.amount,
+                        percentage: p.investment!.percentage,
+                        date: p.investment!.date,
+                      },
+                    })
+                  }
+                  onRemove={() => askDeleteInst(p.installment, p.investment!.type, "investment", p.investment!.id)}
+                  {...selProps("investments", p.investment!.id)}
+                />
+              );
+            }
+            const inv = e.investment;
+            const isRecurring = !!inv.recurrenceGroupId;
+            const openInvestmentEdit = () => {
+              if (isRecurring) {
+                setEditingRecurring({
+                  kind: "investment",
+                  id: inv.id,
+                  groupId: inv.recurrenceGroupId!,
+                  description: inv.type,
+                  amount: inv.amount,
+                  date: inv.date,
+                  accountId: inv.accountId,
+                  percentage: inv.percentage,
+                });
+              } else {
                 setEditingSingle({
                   item: {
                     kind: "investment",
@@ -880,21 +991,35 @@ export function MonthDetailPane({
                     date: inv.date,
                   },
                   onDeleteParent: () => removeInvestment.mutate(inv.id),
-                })
-              }
-              onRemove={async () => {
-                const ok = await confirmDialog({
-                  title: "Excluir investimento",
-                  description: `Excluir "${inv.type}"?`,
-                  variant: "destructive",
-                  confirmLabel: "Excluir",
                 });
-                if (ok) removeInvestment.mutate(inv.id);
-              }}
-              {...selProps("investments", inv.id)}
-            />
-
-          ))}
+              }
+            };
+            return (
+              <InvestmentRow
+                key={inv.id}
+                inv={inv}
+                onEdit={openInvestmentEdit}
+                onDuplicate={() => {
+                  setRowStartAction("duplicate");
+                  openInvestmentEdit();
+                }}
+                onRemove={
+                  isRecurring
+                    ? () => askDeleteRecurring("investment", inv.recurrenceGroupId!, inv.type, { accountId: inv.accountId, amount: inv.amount })
+                    : async () => {
+                      const ok = await confirmDialog({
+                        title: "Excluir investimento",
+                        description: `Excluir "${inv.type}"?`,
+                        variant: "destructive",
+                        confirmLabel: "Excluir",
+                      });
+                      if (ok) removeInvestment.mutate(inv.id);
+                    }
+                }
+                {...selProps("investments", inv.id)}
+              />
+            );
+          })}
         </GroupedSection>
 
         {/* DEBITS */}
@@ -923,15 +1048,6 @@ export function MonthDetailPane({
               state={debitsSort.sort}
               onChange={debitsSort.set}
             />
-          }
-          headerBar={
-            isSelMode("debits") ? (
-              <SelectionBar
-                count={selection!.ids.size}
-                onCancel={clearSelection}
-                onDelete={() => bulkDelete("debits")}
-              />
-            ) : null
           }
           paidControl={
             !isSelMode("debits") &&
@@ -982,6 +1098,8 @@ export function MonthDetailPane({
                         amount: p.debit!.amount,
                         date: p.debit!.date,
                         required: p.debit!.required,
+                        paymentMethod: p.debit!.paymentMethod,
+                        autoDebitDay: p.debit!.autoDebitDay,
                       },
                     })
                   }
@@ -992,43 +1110,51 @@ export function MonthDetailPane({
             }
             const d = e.debit;
             const isRecurring = !!d.recurrenceGroupId;
+            const openDebitEdit = () => {
+              if (isRecurring) {
+                setEditingRecurring({
+                  kind: "debit",
+                  id: d.id,
+                  groupId: d.recurrenceGroupId!,
+                  description: d.description,
+                  amount: d.amount,
+                  date: d.date,
+                  accountId: d.accountId,
+                  notifyDaysBefore: d.notifyDaysBefore,
+                  paymentMethod: d.paymentMethod === "auto_debit" ? null : d.paymentMethod,
+                });
+              } else {
+                setEditingSingle({
+                  item: {
+                    kind: "debit",
+                    id: d.id,
+                    accountId: d.accountId,
+                    description: d.description,
+                    amount: d.amount,
+                    date: d.date,
+                    paid: d.paid,
+                    notifyDaysBefore: d.notifyDaysBefore,
+                    paymentMethod: d.paymentMethod,
+                    autoDebitDay: d.autoDebitDay,
+                  },
+                  onDeleteParent: () => removeDebit.mutate(d.id),
+                });
+              }
+            };
             return (
               <DebitRow
                 key={d.id}
                 debit={d}
                 onToggle={() => toggleDebit.mutate({ id: d.id, paid: !d.paid })}
-                onEdit={() => {
-                  if (isRecurring) {
-                    setEditingRecurring({
-                      kind: "debit",
-                      id: d.id,
-                      groupId: d.recurrenceGroupId!,
-                      description: d.description,
-                      amount: d.amount,
-                      date: d.date,
-                      accountId: d.accountId,
-                      notifyDaysBefore: d.notifyDaysBefore,
-                    });
-                  } else {
-                    setEditingSingle({
-                      item: {
-                        kind: "debit",
-                        id: d.id,
-                        accountId: d.accountId,
-                        description: d.description,
-                        amount: d.amount,
-                        date: d.date,
-                        paid: d.paid,
-                        notifyDaysBefore: d.notifyDaysBefore,
-                      },
-                      onDeleteParent: () => removeDebit.mutate(d.id),
-                    });
-                  }
+                onEdit={openDebitEdit}
+                onDuplicate={() => {
+                  setRowStartAction("duplicate");
+                  openDebitEdit();
                 }}
                 onRemove={
                   isRecurring
                     ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description, { accountId: d.accountId, amount: d.amount })
-                    : d.autoDebit
+                    : d.paymentMethod === "auto_debit"
                       ? () => askDeleteSingle(d.id, "debit", d.description, d.date)
                       : async () => {
                         const ok = await confirmDialog({
@@ -1248,6 +1374,7 @@ export function MonthDetailPane({
                               amount: pur.totalAmount,
                               date: pur.date,
                               cardId: c.id,
+                              notifyDaysBefore: pur.notifyDaysBefore,
                             });
                             return;
                           }
@@ -1274,15 +1401,6 @@ export function MonthDetailPane({
                         itemSelProps={(_inst, parentId) =>
                           selProps(`card:${c.id}`, parentId)
                         }
-                        selectionBar={
-                          isSelMode(`card:${c.id}`) ? (
-                            <SelectionBar
-                              count={selection!.ids.size}
-                              onCancel={clearSelection}
-                              onDelete={() => bulkDelete(`card:${c.id}`)}
-                            />
-                          ) : null
-                        }
                       />
 
                     </div>
@@ -1299,6 +1417,49 @@ export function MonthDetailPane({
         // fica flutuando por cima dos botões do próprio diálogo (ex.: Cancelar/Adicionar).
         const anyFabDialogOpen = openDebit || openIncome || openInvest || openPurchase || openCard;
         if (anyFabDialogOpen) return null;
+
+        // Modo seleção múltipla: o FAB (+) vira um menu "•••" com Duplicar/Excluir
+        // dos itens selecionados, em vez do menu de "adicionar novo item".
+        if (selection) {
+          const bulkUi = (
+            <div
+              className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+            >
+              <div className="relative">
+                <RowContextMenu
+                  open={bulkMenuOpen}
+                  onClose={() => setBulkMenuOpen(false)}
+                  align="above"
+                  className="absolute right-0 bottom-full z-20 mb-1 min-w-[200px] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+                  actions={[
+                    {
+                      icon: Copy,
+                      label: "Duplicar",
+                      onClick: () => bulkDuplicate(selection.key),
+                    },
+                    {
+                      icon: Trash2,
+                      label: "Excluir",
+                      onClick: () => bulkDelete(selection.key),
+                      destructive: true,
+                    },
+                  ]}
+                />
+                <button
+                  type="button"
+                  onClick={() => setBulkMenuOpen((v) => !v)}
+                  aria-label="Ações da seleção"
+                  aria-expanded={bulkMenuOpen}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90"
+                >
+                  <MoreHorizontal className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+          );
+          return embedded && fabPortalTarget ? createPortal(bulkUi, fabPortalTarget) : bulkUi;
+        }
+
         const fabUi = (
           <>
             {fabOpen && (
@@ -1400,11 +1561,13 @@ export function MonthDetailPane({
       <AddInvestmentDialog
         open={openInvest}
         onClose={() => setOpenInvest(false)}
+        defaultYear={year}
+        defaultMonth={month}
         fixedAccountId={contaId}
       />
       <EditInstallmentDialog
         open={!!editing}
-        onClose={() => setEditing(null)}
+        onClose={() => { setEditing(null); setRowStartAction(undefined); }}
         installment={editing?.inst ?? null}
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
@@ -1412,14 +1575,16 @@ export function MonthDetailPane({
         parentSource={editing?.parentSource}
         defaultYear={year}
         defaultMonth={month}
+        startAction={rowStartAction}
       />
       <EditInstallmentDialog
         open={!!editingSingle}
-        onClose={() => setEditingSingle(null)}
+        onClose={() => { setEditingSingle(null); setRowStartAction(undefined); }}
         single={editingSingle?.item ?? null}
         onDeleteParent={editingSingle?.onDeleteParent}
         defaultYear={year}
         defaultMonth={month}
+        startAction={rowStartAction}
       />
       <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} defaultYear={year} defaultMonth={month} fixedAccountId={contaId} />
       <EditCardDialog
@@ -1431,10 +1596,11 @@ export function MonthDetailPane({
       />
       <EditRecurringDialog
         open={!!editingRecurring}
-        onClose={() => setEditingRecurring(null)}
+        onClose={() => { setEditingRecurring(null); setRowStartAction(undefined); }}
         target={editingRecurring}
         defaultYear={year}
         defaultMonth={month}
+        startAction={rowStartAction}
       />
       <CardScopeConfirmDialog
         open={!!scopeDelete}
@@ -1643,39 +1809,6 @@ function GroupedSection({
     </section>
   );
 }
-
-function SelectionBar({
-  count,
-  onCancel,
-  onDelete,
-}: {
-  count: number;
-  onCancel: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 bg-primary/10 px-3 py-2 md:px-4">
-      <p className="text-xs font-semibold text-primary">
-        {count} selecionado{count === 1 ? "" : "s"}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onCancel}
-          className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={onDelete}
-          className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/25"
-        >
-          <Trash2 className="h-3 w-3" /> Excluir
-        </button>
-      </div>
-    </div>
-  );
-}
-
 
 /* ───────── CARD ROW (collapsible card inside CARDS section) ───────── */
 
@@ -2080,31 +2213,6 @@ type SelectionRowProps = {
   onLongPress: () => void;
 };
 
-function SelectCheckbox({
-  selected,
-  onClick,
-}: {
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${selected
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border"
-        }`}
-      aria-label={selected ? "Desmarcar" : "Marcar"}
-    >
-      {selected && <Check className="h-3.5 w-3.5" />}
-    </button>
-  );
-}
-
 function PurchaseInstRow({
   inst,
   purchase,
@@ -2112,6 +2220,7 @@ function PurchaseInstRow({
   onToggle,
   onEdit,
   onRemove,
+  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2123,6 +2232,7 @@ function PurchaseInstRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
+  onDuplicate?: () => void;
 } & SelectionRowProps) {
   const lp = useLongPress(onLongPress);
   const guard = (fn: () => void) => (e: React.MouseEvent) => {
@@ -2142,18 +2252,14 @@ function PurchaseInstRow({
   const isRecurring = !isInstallment && !!purchase.recurrenceGroupId;
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {selectionMode ? (
-        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
-      ) : (
-        <span
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: cardColor }}
-          aria-hidden="true"
-        />
-      )}
+      <span
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ backgroundColor: cardColor }}
+        aria-hidden="true"
+      />
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
           className={`truncate text-sm font-semibold ${inst.paid ? "text-muted-foreground" : ""
@@ -2201,7 +2307,7 @@ function PurchaseInstRow({
           )}
         </button>
       </div>
-      {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} />}
+      {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} onDuplicate={onDuplicate} />}
     </div>
   );
 }
@@ -2211,6 +2317,7 @@ function DebitRow({
   onToggle,
   onEdit,
   onRemove,
+  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2220,6 +2327,7 @@ function DebitRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  onDuplicate?: () => void;
 } & SelectionRowProps) {
   const lp = useLongPress(onLongPress);
   const guard = (fn: () => void) => (e: React.MouseEvent) => {
@@ -2237,16 +2345,12 @@ function DebitRow({
   };
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {selectionMode ? (
-        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
-      ) : (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-debit/15 text-debit">
-          <ArrowDownRight className="h-3.5 w-3.5" />
-        </div>
-      )}
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-debit/15 text-debit">
+        <ArrowDownRight className="h-3.5 w-3.5" />
+      </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${debit.paid ? "text-muted-foreground" : ""
@@ -2261,11 +2365,17 @@ function DebitRow({
               REC
             </span>
           )}
-          {debit.autoDebit && (
+          {debit.paymentMethod === "auto_debit" ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
               <Zap className="h-2.5 w-2.5" />
               AUT{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
+          ) : (
+            debit.paymentMethod && (
+              <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
+                {PAYMENT_METHOD_BADGES[debit.paymentMethod]}
+              </span>
+            )
           )}
         </p>
       </button>
@@ -2288,12 +2398,24 @@ function DebitRow({
         </button>
       </div>
       {!selectionMode && (
-        <button
-          onClick={onRemove}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {onDuplicate && (
+            <button
+              onClick={onDuplicate}
+              className="text-muted-foreground hover:text-foreground"
+              title="Duplicar"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive"
+            title="Excluir"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -2304,6 +2426,7 @@ function IncomeRow({
   onToggle,
   onEdit,
   onRemove,
+  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2313,6 +2436,7 @@ function IncomeRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  onDuplicate?: () => void;
 } & SelectionRowProps) {
   const lp = useLongPress(onLongPress);
   const guard = (fn: () => void) => (e: React.MouseEvent) => {
@@ -2330,16 +2454,12 @@ function IncomeRow({
   };
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {selectionMode ? (
-        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
-      ) : (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </div>
-      )}
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
           className={`truncate text-sm font-semibold ${income.received ? "text-muted-foreground" : ""
@@ -2352,6 +2472,11 @@ function IncomeRow({
           {income.recurrenceGroupId && (
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
               REC
+            </span>
+          )}
+          {income.paymentMethod && (
+            <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
+              {PAYMENT_METHOD_BADGES[income.paymentMethod]}
             </span>
           )}
         </p>
@@ -2375,12 +2500,24 @@ function IncomeRow({
         </button>
       </div>
       {!selectionMode && (
-        <button
-          onClick={onRemove}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {onDuplicate && (
+            <button
+              onClick={onDuplicate}
+              className="text-muted-foreground hover:text-foreground"
+              title="Duplicar"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive"
+            title="Excluir"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -2398,9 +2535,9 @@ function ParcelledRow({
   onSelectToggle,
   onLongPress,
 }: {
-  kind: "debit" | "income";
+  kind: "debit" | "income" | "investment";
   installment: Installment;
-  parent: Debit | Income;
+  parent: Debit | Income | Investment;
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
@@ -2419,37 +2556,39 @@ function ParcelledRow({
     }
     fn();
   };
-  const tone = kind === "debit" ? "text-debit" : "text-success";
-  const auto = kind === "debit" && (parent as Debit).autoDebit;
+  const tone = kind === "debit" ? "text-debit" : kind === "income" ? "text-success" : "text-primary";
+  const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
+  const otherMethod =
+    kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
+  const label = kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
   const badgeClass =
     kind === "debit"
       ? "bg-debit/15 text-debit"
-      : "bg-success/15 text-success";
+      : kind === "income"
+        ? "bg-success/15 text-success"
+        : "bg-primary/15 text-primary";
+  const iconWrapClass =
+    kind === "debit" ? "bg-debit/15 text-debit" : kind === "income" ? "bg-success/15 text-success" : "bg-primary/15 text-primary";
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {selectionMode ? (
-        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
-      ) : (
-        <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${kind === "debit" ? "bg-debit/15 text-debit" : "bg-success/15 text-success"
-            }`}
-        >
-          {kind === "debit" ? (
-            <ArrowDownRight className="h-3.5 w-3.5" />
-          ) : (
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          )}
-        </div>
-      )}
+      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}>
+        {kind === "debit" ? (
+          <ArrowDownRight className="h-3.5 w-3.5" />
+        ) : kind === "income" ? (
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        ) : (
+          <TrendingUp className="h-3.5 w-3.5" />
+        )}
+      </div>
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
-          className={`truncate text-sm font-semibold ${installment.paid ? "text-muted-foreground" : ""
+          className={`truncate text-sm font-semibold ${kind !== "investment" && installment.paid ? "text-muted-foreground" : ""
             }`}
         >
-          {parent.description}
+          {label}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
           <span>{formatDate(installment.referenceDate || parent.date)}</span>
@@ -2465,27 +2604,34 @@ function ParcelledRow({
               AUT
             </span>
           )}
+          {otherMethod && (
+            <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
+              {PAYMENT_METHOD_BADGES[otherMethod]}
+            </span>
+          )}
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <div className="flex items-center gap-1.5">
           <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
         </div>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${installment.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-            }`}
-        >
-          {installment.paid ? (
-            <>
-              <Check className="h-3 w-3" /> {kind === "income" ? "Recebido" : "Pago"}
-            </>
-          ) : (
-            kind === "income" ? "Marcar recebido" : "Marcar pago"
-          )}
-        </button>
+        {kind !== "investment" && (
+          <button
+            onClick={guard(onToggle)}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${installment.paid
+                ? "bg-success/15 text-success hover:bg-success/25"
+                : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+              }`}
+          >
+            {installment.paid ? (
+              <>
+                <Check className="h-3 w-3" /> {kind === "income" ? "Recebido" : "Pago"}
+              </>
+            ) : (
+              kind === "income" ? "Marcar recebido" : "Marcar pago"
+            )}
+          </button>
+        )}
       </div>
       {!selectionMode && onRemove && (
         <button
@@ -2504,6 +2650,7 @@ function InvestmentRow({
   inv,
   onEdit,
   onRemove,
+  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2512,6 +2659,7 @@ function InvestmentRow({
   inv: Investment;
   onEdit: () => void;
   onRemove: () => void;
+  onDuplicate?: () => void;
 } & SelectionRowProps) {
   const lp = useLongPress(onLongPress);
   const guard = (fn: () => void) => (e: React.MouseEvent) => {
@@ -2529,28 +2677,44 @@ function InvestmentRow({
   };
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-3 md:gap-3 md:px-4"
+      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {selectionMode ? (
-        <SelectCheckbox selected={selected} onClick={onSelectToggle} />
-      ) : (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-          <TrendingUp className="h-3.5 w-3.5" />
-        </div>
-      )}
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <TrendingUp className="h-3.5 w-3.5" />
+      </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{inv.percentage}% rendimento</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{formatDate(inv.date)}</span>
+          <span>· {inv.percentage}% rendimento</span>
+          {inv.recurrenceGroupId && (
+            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
+              REC
+            </span>
+          )}
+        </p>
       </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
       {!selectionMode && (
-        <button
-          onClick={onRemove}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {onDuplicate && (
+            <button
+              onClick={onDuplicate}
+              className="text-muted-foreground hover:text-foreground"
+              title="Duplicar"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive"
+            title="Excluir"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -2562,17 +2726,31 @@ function Empty({ text }: { text: string }) {
   );
 }
 
-function RemoveInstButton({ onRemove }: { onRemove: () => void }) {
+function RemoveInstButton({ onRemove, onDuplicate }: { onRemove: () => void; onDuplicate?: () => void }) {
   return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onRemove();
-      }}
-      className="text-muted-foreground hover:text-destructive"
-      title="Excluir"
-    >
-      <Trash2 className="h-3.5 w-3.5" />
-    </button>
+    <div className="flex shrink-0 items-center gap-1">
+      {onDuplicate && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDuplicate();
+          }}
+          className="text-muted-foreground hover:text-foreground"
+          title="Duplicar"
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="text-muted-foreground hover:text-destructive"
+        title="Excluir"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }

@@ -34,6 +34,7 @@ import {
   useDuplicateOverScope,
   useReorderCards,
   resolveScopeMonths,
+  useMoveEntriesToMonth,
   PAYMENT_METHOD_BADGES,
   type CardScope,
   type Installment,
@@ -41,6 +42,7 @@ import {
   type Income,
   type Investment,
   type DuplicateSource,
+  type MoveMonthOp,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
@@ -66,6 +68,8 @@ import {
   Wallet,
   Copy,
   MoreHorizontal,
+  Settings,
+  CalendarClock,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -80,8 +84,9 @@ import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
-import { MobileMenuButton } from "@/components/MobileMenuButton";
-import { RowContextMenu } from "@/components/RowContextMenu";
+import { SettingsFabActions } from "@/components/SettingsFabActions";
+import { PaneTabsBar } from "@/components/PaneTabsBar";
+import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
 
 type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
 
@@ -179,6 +184,7 @@ export function MonthDetailPane({
   const removeIncome = useRemoveIncome();
   const removeInvestment = useRemoveInvestment();
   const reorderCards = useReorderCards();
+  const moveEntries = useMoveEntriesToMonth();
   const confirmDialog = useConfirm();
 
   const [reorderMode, setReorderMode] = useState(false);
@@ -190,7 +196,9 @@ export function MonthDetailPane({
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openCard, setOpenCard] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [fabView, setFabView] = useState<"create" | "settings">("create");
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
+  const [moveMonthOpen, setMoveMonthOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   /** Quando um item é aberto via ícone de duplicar (em vez de editar), pula direto pro fluxo de duplicar. */
   const [rowStartAction, setRowStartAction] = useState<"duplicate" | undefined>(undefined);
@@ -426,6 +434,74 @@ export function MonthDetailPane({
       }
     }
     clearSelection();
+  };
+
+  /**
+   * Resolve os ids selecionados (sempre o id da linha "pai" — débito/
+   * recebimento/investimento/compra, ver `selProps`) para as operações
+   * concretas que `useMoveEntriesToMonth` sabe executar:
+   *  - avulso OU uma ocorrência isolada de recorrente (`isParent === false`)
+   *    → move a própria linha ("single").
+   *  - parcelado (`isParent === true`) ou compra de cartão (sempre via
+   *    installment, mesmo 1x) → move só a parcela deste mês
+   *    ("installment") — as demais parcelas da série ficam onde estão.
+   */
+  const resolveMoveOps = (key: SelectionKey, ids: string[]): MoveMonthOp[] => {
+    const ops: MoveMonthOp[] = [];
+    const instFor = (parentType: "debit" | "income" | "investment" | "purchase", parentId: string) =>
+      installmentsList.find(
+        (i) => i.parentType === parentType && i.parentId === parentId && i.year === year && i.month === month,
+      );
+    if (key === "incomes") {
+      for (const id of ids) {
+        const i = allIncomes.find((x) => x.id === id);
+        if (!i) continue;
+        if (i.isParent) {
+          const inst = instFor("income", id);
+          if (inst) ops.push({ kind: "installment", id: inst.id });
+        } else {
+          ops.push({ kind: "single", table: "incomes", id });
+        }
+      }
+    } else if (key === "debits") {
+      for (const id of ids) {
+        const d = allDebits.find((x) => x.id === id);
+        if (!d) continue;
+        if (d.isParent) {
+          const inst = instFor("debit", id);
+          if (inst) ops.push({ kind: "installment", id: inst.id });
+        } else {
+          ops.push({ kind: "single", table: "debits", id });
+        }
+      }
+    } else if (key === "investments") {
+      for (const id of ids) {
+        const v = allInvestments.find((x) => x.id === id);
+        if (!v) continue;
+        if (v.isParent) {
+          const inst = instFor("investment", id);
+          if (inst) ops.push({ kind: "installment", id: inst.id });
+        } else {
+          ops.push({ kind: "single", table: "investments", id });
+        }
+      }
+    } else if (key.startsWith("card:")) {
+      for (const id of ids) {
+        const inst = instFor("purchase", id);
+        if (inst) ops.push({ kind: "installment", id: inst.id });
+      }
+    }
+    return ops;
+  };
+
+  const bulkMove = async (targetYear: number, targetMonth: number) => {
+    if (!selection) return;
+    const ops = resolveMoveOps(selection.key, Array.from(selection.ids));
+    if (ops.length > 0) {
+      await moveEntries.mutateAsync({ ops, year: targetYear, month: targetMonth });
+    }
+    clearSelection();
+    setMoveMonthOpen(false);
   };
 
   const askDeleteInst = (
@@ -711,7 +787,7 @@ export function MonthDetailPane({
       {/* Top nav — sticky so the year picker stays accessible while scrolling.
           Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
-      <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6">
+      <div className={`sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6 ${embedded ? "" : "relative"}`}>
         <button
           type="button"
           onClick={onBack}
@@ -721,6 +797,11 @@ export function MonthDetailPane({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
+        {!embedded && (
+          <div className="pointer-events-none absolute inset-x-0 hidden justify-center px-16 md:flex">
+            <PaneTabsBar />
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <MonthYearPicker
             contaId={contaId}
@@ -730,7 +811,6 @@ export function MonthDetailPane({
             next={nextMonth}
             onNavigate={onMonthChange}
           />
-          <MobileMenuButton />
         </div>
       </div>
 
@@ -867,6 +947,7 @@ export function MonthDetailPane({
                   accountId: i.accountId,
                   notifyDaysBefore: i.notifyDaysBefore,
                   paymentMethod: i.paymentMethod === "auto_debit" ? null : i.paymentMethod,
+                  paid: i.received,
                 });
               } else {
                 setEditingSingle({
@@ -1122,6 +1203,7 @@ export function MonthDetailPane({
                   accountId: d.accountId,
                   notifyDaysBefore: d.notifyDaysBefore,
                   paymentMethod: d.paymentMethod === "auto_debit" ? null : d.paymentMethod,
+                  paid: d.paid,
                 });
               } else {
                 setEditingSingle({
@@ -1418,44 +1500,63 @@ export function MonthDetailPane({
         const anyFabDialogOpen = openDebit || openIncome || openInvest || openPurchase || openCard;
         if (anyFabDialogOpen) return null;
 
-        // Modo seleção múltipla: o FAB (+) vira um menu "•••" com Duplicar/Excluir
+        // Modo seleção múltipla: o FAB (+) vira um menu "•••" com Duplicar/Mover/Excluir
         // dos itens selecionados, em vez do menu de "adicionar novo item".
         if (selection) {
           const bulkUi = (
-            <div
-              className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
-            >
-              <div className="relative">
-                <RowContextMenu
-                  open={bulkMenuOpen}
-                  onClose={() => setBulkMenuOpen(false)}
-                  align="above"
-                  className="absolute right-0 bottom-full z-20 mb-1 min-w-[200px] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
-                  actions={[
-                    {
-                      icon: Copy,
-                      label: "Duplicar",
-                      onClick: () => bulkDuplicate(selection.key),
-                    },
-                    {
-                      icon: Trash2,
-                      label: "Excluir",
-                      onClick: () => bulkDelete(selection.key),
-                      destructive: true,
-                    },
-                  ]}
+            <>
+              {bulkMenuOpen && (
+                <div
+                  className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
+                  onClick={() => setBulkMenuOpen(false)}
+                  aria-hidden="true"
                 />
+              )}
+              <div
+                className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+              >
+                {bulkMenuOpen && (
+                  <div className="flex flex-col items-end gap-2.5">
+                    <FabAction
+                      icon={Copy}
+                      label="Duplicar"
+                      tone="primary"
+                      onClick={() => {
+                        bulkDuplicate(selection.key);
+                        setBulkMenuOpen(false);
+                      }}
+                    />
+                    <FabAction
+                      icon={CalendarClock}
+                      label="Mover para outro mês"
+                      tone="credit"
+                      onClick={() => {
+                        setMoveMonthOpen(true);
+                        setBulkMenuOpen(false);
+                      }}
+                    />
+                    <FabAction
+                      icon={Trash2}
+                      label="Excluir"
+                      tone="destructive"
+                      onClick={() => {
+                        bulkDelete(selection.key);
+                        setBulkMenuOpen(false);
+                      }}
+                    />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setBulkMenuOpen((v) => !v)}
                   aria-label="Ações da seleção"
                   aria-expanded={bulkMenuOpen}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-700 text-white shadow-glow transition-transform duration-200 hover:bg-orange-800"
+                  className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-destructive shadow-elevated transition-colors hover:border-destructive/50"
                 >
                   <MoreHorizontal className="h-6 w-6" />
                 </button>
               </div>
-            </div>
+            </>
           );
           return embedded && fabPortalTarget ? createPortal(bulkUi, fabPortalTarget) : bulkUi;
         }
@@ -1472,7 +1573,7 @@ export function MonthDetailPane({
             <div
               className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
             >
-              {fabOpen && (
+              {fabOpen && fabView === "create" && (
                 <div className="flex flex-col items-end gap-2.5">
                   <FabAction
                     icon={CreditCard}
@@ -1519,14 +1620,31 @@ export function MonthDetailPane({
                       setFabOpen(false);
                     }}
                   />
+                  <FabAction
+                    icon={Settings}
+                    label="Configurações"
+                    tone="primary"
+                    onClick={() => setFabView("settings")}
+                  />
+                </div>
+              )}
+              {fabOpen && fabView === "settings" && (
+                <div className="flex flex-col items-end gap-2.5">
+                  <SettingsFabActions
+                    onNavigate={() => setFabOpen(false)}
+                    onBack={() => setFabView("create")}
+                  />
                 </div>
               )}
               <button
                 type="button"
-                onClick={() => setFabOpen((v) => !v)}
+                onClick={() => {
+                  setFabOpen((v) => !v);
+                  setFabView("create");
+                }}
                 aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
                 aria-expanded={fabOpen}
-                className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform duration-200 hover:opacity-90 ${fabOpen ? "rotate-45" : ""
+                className={`flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-primary shadow-elevated transition-transform duration-200 hover:border-primary/50 ${fabOpen ? "rotate-45" : ""
                   }`}
               >
                 <Plus className="h-6 w-6" />
@@ -1619,6 +1737,15 @@ export function MonthDetailPane({
           await scopeDelete.execute(scope);
           setScopeDelete(null);
         }}
+      />
+      <MoveToMonthDialog
+        open={moveMonthOpen}
+        onClose={() => setMoveMonthOpen(false)}
+        count={selection?.ids.size ?? 0}
+        currentYear={year}
+        currentMonth={month}
+        loading={moveEntries.isPending}
+        onConfirm={bulkMove}
       />
     </div>
   );
@@ -2307,7 +2434,6 @@ function PurchaseInstRow({
           )}
         </button>
       </div>
-      {!selectionMode && onRemove && <RemoveInstButton onRemove={onRemove} onDuplicate={onDuplicate} />}
     </div>
   );
 }
@@ -2397,26 +2523,6 @@ function DebitRow({
           )}
         </button>
       </div>
-      {!selectionMode && (
-        <div className="flex shrink-0 items-center gap-1">
-          {onDuplicate && (
-            <button
-              onClick={onDuplicate}
-              className="text-muted-foreground hover:text-foreground"
-              title="Duplicar"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            onClick={onRemove}
-            className="text-muted-foreground hover:text-destructive"
-            title="Excluir"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -2499,26 +2605,6 @@ function IncomeRow({
           )}
         </button>
       </div>
-      {!selectionMode && (
-        <div className="flex shrink-0 items-center gap-1">
-          {onDuplicate && (
-            <button
-              onClick={onDuplicate}
-              className="text-muted-foreground hover:text-foreground"
-              title="Duplicar"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            onClick={onRemove}
-            className="text-muted-foreground hover:text-destructive"
-            title="Excluir"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -2633,15 +2719,6 @@ function ParcelledRow({
           </button>
         )}
       </div>
-      {!selectionMode && onRemove && (
-        <button
-          onClick={onRemove}
-          className="text-muted-foreground hover:text-destructive"
-          title="Excluir"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      )}
     </div>
   );
 }
@@ -2696,26 +2773,6 @@ function InvestmentRow({
         </p>
       </button>
       <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
-      {!selectionMode && (
-        <div className="flex shrink-0 items-center gap-1">
-          {onDuplicate && (
-            <button
-              onClick={onDuplicate}
-              className="text-muted-foreground hover:text-foreground"
-              title="Duplicar"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            onClick={onRemove}
-            className="text-muted-foreground hover:text-destructive"
-            title="Excluir"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -2726,31 +2783,3 @@ function Empty({ text }: { text: string }) {
   );
 }
 
-function RemoveInstButton({ onRemove, onDuplicate }: { onRemove: () => void; onDuplicate?: () => void }) {
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      {onDuplicate && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDuplicate();
-          }}
-          className="text-muted-foreground hover:text-foreground"
-          title="Duplicar"
-        >
-          <Copy className="h-3.5 w-3.5" />
-        </button>
-      )}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className="text-muted-foreground hover:text-destructive"
-        title="Excluir"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}

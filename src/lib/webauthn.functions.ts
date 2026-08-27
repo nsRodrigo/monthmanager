@@ -7,10 +7,7 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
-import type {
-  AuthenticationResponseJSON,
-  RegistrationResponseJSON,
-} from "@simplewebauthn/server";
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 import type { Database } from "@/integrations/supabase/types";
 
 const RP_NAME = "Gestão Financeira";
@@ -34,14 +31,14 @@ function adminClient() {
   return createClient<Database>(
     process.env.SUPABASE_URL!,
     (process.env.SB_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
+    { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }
 
 async function userIdFromToken(accessToken: string): Promise<string> {
   const supa = createClient<Database>(
     process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!
+    process.env.SUPABASE_PUBLISHABLE_KEY!,
   );
   const { data, error } = await supa.auth.getClaims(accessToken);
   if (error || !data?.claims?.sub) throw new Error("Token inválido");
@@ -97,11 +94,9 @@ export const startRegistration = createServerFn({ method: "POST" })
   });
 
 export const finishRegistration = createServerFn({ method: "POST" })
-  .inputValidator((d: {
-    accessToken: string;
-    response: RegistrationResponseJSON;
-    deviceName: string;
-  }) => d)
+  .inputValidator(
+    (d: { accessToken: string; response: RegistrationResponseJSON; deviceName: string }) => d,
+  )
   .handler(async ({ data }) => {
     const userId = await userIdFromToken(data.accessToken);
     const origin = getOrigin();
@@ -317,9 +312,20 @@ export const deletePasskey = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const userId = await userIdFromToken(data.accessToken);
     const admin = adminClient();
+    await admin.from("user_passkeys").delete().eq("id", data.id).eq("user_id", userId);
+    return { success: true };
+  });
+
+export const renamePasskey = createServerFn({ method: "POST" })
+  .inputValidator((d: { accessToken: string; id: string; deviceName: string }) => d)
+  .handler(async ({ data }) => {
+    const userId = await userIdFromToken(data.accessToken);
+    const admin = adminClient();
+    const deviceName = data.deviceName.trim().slice(0, 60);
+    if (!deviceName) throw new Error("Nome não pode ser vazio.");
     await admin
       .from("user_passkeys")
-      .delete()
+      .update({ device_name: deviceName })
       .eq("id", data.id)
       .eq("user_id", userId);
     return { success: true };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Field, inputClass, Select, CheckboxExpand } from "./Modal";
+import { Modal, Field, inputClass, Select, CheckboxExpand, PaidToggle } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
 import {
   useUpdateRecurringSeries,
@@ -8,6 +8,8 @@ import {
   useAdvanceRecurring,
   useDuplicateOverScope,
   useDeleteOverScope,
+  useToggleDebitPaid,
+  useToggleIncomeReceived,
   PAYMENT_METHOD_OPTIONS,
   type CardScope,
   type DeleteSource,
@@ -33,6 +35,8 @@ export type RecurringEditTarget =
       /** Dias de antecedência da notificação push de vencimento. */
       notifyDaysBefore?: number | null;
       paymentMethod?: RecurringPaymentMethod;
+      /** "paid" (débito) ou "received" (recebimento) desta ocorrência específica. */
+      paid: boolean;
     }
   | {
       kind: "investment";
@@ -83,10 +87,13 @@ export function EditRecurringDialog({
   const duplicate = useDuplicateOverScope();
   const deleteScope = useDeleteOverScope();
   const advance = useAdvanceRecurring();
+  const toggleDebitPaid = useToggleDebitPaid();
+  const toggleIncomeReceived = useToggleIncomeReceived();
   const confirm = useConfirm();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
+  const [paid, setPaid] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"none" | Exclude<RecurringPaymentMethod, null>>(
@@ -111,6 +118,7 @@ export function EditRecurringDialog({
         ? target.paymentMethod
         : "none",
     );
+    setPaid((target.kind === "debit" || target.kind === "income") && target.paid);
     setManageView("none");
     setAdvanceCount("");
   }, [open, target]);
@@ -193,6 +201,20 @@ export function EditRecurringDialog({
       open={open && !askDuplicate && !askDelete && !askSaveScope && manageView === "none"}
       onClose={onClose}
       title="Editar lançamento"
+      headerRight={
+        canTag ? (
+          <PaidToggle
+            checked={paid}
+            onChange={async (v) => {
+              setPaid(v);
+              if (target.kind === "debit") await toggleDebitPaid.mutateAsync({ id: target.id, paid: v });
+              else if (target.kind === "income") await toggleIncomeReceived.mutateAsync({ id: target.id, received: v });
+            }}
+            offLabel={target.kind === "income" ? "Marcar recebido" : "Marcar pago"}
+            onLabel={target.kind === "income" ? "Recebido" : "Pago"}
+          />
+        ) : undefined
+      }
     >
       <div className="space-y-4">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">

@@ -35,8 +35,15 @@ type PanesContextValue = {
    * sair da tela (substituída ou fechada), a conta soma do estado por completo, como uma
    * aba de navegador que foi fechada. */
   panes: PaneEntry[];
-  /** Abre só esta conta — fecha (descarta) as demais que estavam visíveis. */
-  openSingle: (contaId: string) => void;
+  /**
+   * Abre só esta conta — fecha (descarta) as demais que estavam visíveis.
+   * Por padrão reaproveita a view (lista de meses ou um mês aberto) que o
+   * painel já tinha, como abas de navegador. Passe `resetView: true` para
+   * forçar a lista de meses — usado ao entrar na tela vindo de fora do
+   * workspace de painéis (ex.: Home), onde não faz sentido "continuar de
+   * onde parou" em lançamentos.
+   */
+  openSingle: (contaId: string, opts?: { resetView?: boolean }) => void;
   /** Adiciona esta conta ao lado das que já estão visíveis (split). */
   splitIn: (contaId: string) => void;
   /** Fecha de vez este painel — some da tela e da lista de abas. */
@@ -71,9 +78,9 @@ export function PanesRegistryProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openSingle = useCallback(
-    (contaId: string) => {
+    (contaId: string, opts?: { resetView?: boolean }) => {
       setState((prev) => {
-        const existing = prev.panes.find((p) => p.contaId === contaId);
+        const existing = opts?.resetView ? undefined : prev.panes.find((p) => p.contaId === contaId);
         return { panes: [existing ?? { contaId, view: { type: "months" }, size: 1 }] };
       });
     },

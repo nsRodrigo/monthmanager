@@ -154,6 +154,13 @@ export function EditInstallmentDialog({
   })();
   const effectiveDate = installment?.referenceDate || parentDate;
 
+  // Meio de pagamento é um campo do parent (debit/income), igual descrição —
+  // não existe "por parcela", então não precisa de escopo pra editar.
+  const parentDebit = installment?.parentType === "debit" ? debits.find((d) => d.id === installment.parentId) : undefined;
+  const parentIncome = installment?.parentType === "income" ? incomes.find((i) => i.id === installment.parentId) : undefined;
+  const parentPaymentMethod: PaymentMethod = parentDebit?.paymentMethod ?? parentIncome?.paymentMethod ?? null;
+  const parentAutoDebitDay = parentDebit?.autoDebitDay ?? null;
+
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
@@ -195,6 +202,8 @@ export function EditInstallmentDialog({
       setPurchInstallments("2");
       setPurchInstNumber("1");
       setPurchMode("total");
+      setPaymentMethod(parentPaymentMethod);
+      setAutoDebitDay(parentAutoDebitDay ? String(parentAutoDebitDay) : "");
     } else if (single) {
       setDescription(single.description);
       setAmount(single.amount);
@@ -213,6 +222,10 @@ export function EditInstallmentDialog({
     setAskDateScope(false);
     setAdvanceCount("");
     setManageView("none");
+    // parentPaymentMethod/parentAutoDebitDay ficam de fora de propósito — igual
+    // parentDate, são derivados de listas que podem re-fetchar com o modal
+    // aberto, e re-rodar isso apagaria o que o usuário já digitou.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, installment, single, parentLabel, parentDate, effectiveDate]);
 
   // Menu de contexto de um item → pula direto pro fluxo de duplicar.
@@ -706,6 +719,19 @@ export function EditInstallmentDialog({
         await updateInvestment.mutateAsync({ id: inst.parentId, type: newDesc });
       }
     }
+    // Atualiza meio de pagamento do parent (debit / income) se mudou — igual
+    // descrição, é um campo só do parent, não existe "por parcela".
+    if (
+      (inst.parentType === "debit" || inst.parentType === "income") &&
+      paymentMethod !== parentPaymentMethod
+    ) {
+      if (inst.parentType === "debit") {
+        const day = paymentMethod === "auto_debit" && autoDebitDay ? Math.max(1, Math.min(31, parseInt(autoDebitDay))) : null;
+        await updateDebit.mutateAsync({ id: inst.parentId, paymentMethod, autoDebitDay: day });
+      } else {
+        await updateIncome.mutateAsync({ id: inst.parentId, paymentMethod });
+      }
+    }
     onClose();
   }
 
@@ -848,6 +874,42 @@ export function EditInstallmentDialog({
             <p className="-mt-2 text-[11px] text-amber-500/90">
               Histórico: valor original {formatCurrency(latestAdjustment.data.previousTotal)} → ajustado para {formatCurrency(latestAdjustment.data.newTotal)}.
             </p>
+          )}
+
+          {(inst.parentType === "debit" || inst.parentType === "income") && (
+            <div className="space-y-2">
+              <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
+              <Select
+                className={inputClass}
+                value={paymentMethod ?? "none"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPaymentMethod(v === "none" ? null : (v as PaymentMethod));
+                }}
+              >
+                <option value="none">Nenhum</option>
+                {PAYMENT_METHOD_OPTIONS.filter(
+                  (o) => o.value !== "auto_debit" || inst.parentType === "debit",
+                ).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+              {inst.parentType === "debit" && paymentMethod === "auto_debit" && (
+                <Field label="Dia do débito (1-31)">
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    className={inputClass}
+                    value={autoDebitDay}
+                    onChange={(e) => setAutoDebitDay(e.target.value)}
+                    placeholder="Ex: 10"
+                  />
+                </Field>
+              )}
+            </div>
           )}
 
           {canConvertPurchase && (

@@ -13,7 +13,6 @@ import {
 import { getVapidPublicKey, saveSubscription } from "@/lib/push.functions";
 import { subscribeToPush, isPushSupported } from "@/lib/push";
 import { supabase } from "@/integrations/supabase/client";
-import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { useConfirm } from "@/store/confirm";
 
 export const Route = createFileRoute("/admin/whitelist")({
@@ -188,7 +187,6 @@ function WhitelistAdmin() {
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" /> Home
         </Link>
-        <MobileMenuButton />
       </div>
 
       <header className="mb-6">

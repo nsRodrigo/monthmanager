@@ -17,7 +17,6 @@ import {
   getEffectiveCurrentMonth,
   normalizeZero,
   isCardVisibleInMonth,
-  type Account,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes, type PaneView } from "@/store/panes";
@@ -38,7 +37,8 @@ import {
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
-import { MobileMenuButton } from "@/components/MobileMenuButton";
+import { AccountSettingsFab } from "@/components/AccountSettingsFab";
+import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -55,32 +55,39 @@ export const Route = createFileRoute("/contas/$contaId")({
  */
 function PanesWorkspace() {
   const { contaId } = Route.useParams();
-  const { data: accounts = [] } = useAccounts();
-  const { panes, openSingle, splitIn, closePane, setView, resizeAt, capActive } = usePanes();
+  const { panes, openSingle, closePane, setView, resizeAt, capActive } = usePanes();
   const maxPanes = useMaxPanes();
 
   // Navegação normal (clicar numa conta, colar/digitar a URL) sempre reabre
   // só essa conta — fecha as demais que estavam visíveis, como uma aba de
   // navegador (não ficam lembradas em lugar nenhum). Pra ver duas contas
   // lado a lado, use Ctrl+clique ou o dock — ver src/store/panes.tsx.
+  //
+  // A PRIMEIRA vez que este componente monta (ex.: veio da Home ou de
+  // qualquer tela fora de /contas/*) força a lista de meses, mesmo que essa
+  // conta já tivesse um painel lembrado em lançamentos de uma visita
+  // anterior — senão "clicar na conta de novo" reabre direto nos
+  // lançamentos que ficaram abertos por último, o que é surpreendente pra
+  // quem só queria ver os meses de novo. Trocas de conta feitas SEM sair do
+  // workspace (sidebar/dock enquanto já se está em /contas/*) continuam
+  // reabrindo cada aba onde ela parou.
+  const isFreshEntry = useRef(true);
   useEffect(() => {
-    openSingle(contaId);
+    openSingle(contaId, { resetView: isFreshEntry.current });
+    isFreshEntry.current = false;
   }, [contaId, openSingle]);
 
   useEffect(() => {
     capActive(maxPanes);
   }, [maxPanes, capActive]);
 
-  const activeIds = panes.map((p) => p.contaId);
-  const availableToAdd = accounts.filter((a) => !activeIds.includes(a.id));
-
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <PaneTabs
-        availableToAdd={availableToAdd}
-        canAdd={panes.length < maxPanes && availableToAdd.length > 0}
-        onAdd={splitIn}
-      />
+      {maxPanes > 1 && (
+        <div className="flex shrink-0 items-center justify-center border-b border-border/60 bg-background px-4 py-2">
+          <PaneTabsBar />
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 flex-row">
         {panes.map((p, i) => (
           <Fragment key={p.contaId}>
@@ -132,59 +139,6 @@ function PaneSlot({
         />
       </div>
       <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-40" aria-hidden="true" />
-    </div>
-  );
-}
-
-/**
- * Barra fina no topo: só o "+" pra abrir outra conta ao lado (quem prefere
- * teclado usa Ctrl/Cmd+clique numa conta da sidebar — ver
- * `src/store/panes.tsx`). Sem link de volta pra Home aqui — cada painel já
- * tem sua própria seta de voltar no topo (ver `AccountPane`), e some
- * totalmente quando não há conta disponível pra abrir ao lado.
- */
-function PaneTabs({
-  availableToAdd,
-  canAdd,
-  onAdd,
-}: {
-  availableToAdd: Account[];
-  canAdd: boolean;
-  onAdd: (id: string) => void;
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  if (!canAdd) return null;
-  return (
-    <div className="sticky top-0 z-30 flex flex-wrap items-center justify-end gap-2 border-b border-border/60 bg-background/85 px-4 py-2.5 backdrop-blur-md md:px-6">
-      {canAdd && (
-        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Abrir outra conta ao lado"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-1.5">
-            {availableToAdd.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => {
-                  onAdd(a.id);
-                  setPickerOpen(false);
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-secondary"
-              >
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
-                <span className="truncate">{a.name}</span>
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-      )}
     </div>
   );
 }
@@ -507,7 +461,6 @@ function AccountPane({
             </Link>
             <div className="flex items-center gap-2">
               <YearPickerChip compact />
-              <MobileMenuButton />
             </div>
           </div>
           <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
@@ -683,6 +636,8 @@ function AccountPane({
       </>
       )}
       </div>
+
+      {view.type !== "month" && <AccountSettingsFab />}
 
       <AddMonthDialog
         open={openAddMonth}

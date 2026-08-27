@@ -2,20 +2,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Fingerprint, LogOut, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/store/auth";
-import {
-  isWebAuthnSupported,
-  isInIframe,
-  browserStartAuthentication,
-} from "@/lib/passkeys";
+import { useLockSettings } from "@/store/lock-settings";
+import { isWebAuthnSupported, isInIframe, browserStartAuthentication } from "@/lib/passkeys";
 import {
   startAuthentication as srvStartAuth,
   finishAuthentication as srvFinishAuth,
   listPasskeys as srvList,
 } from "@/lib/webauthn.functions";
 import { supabase } from "@/integrations/supabase/client";
-
-const IDLE_MS = 10 * 60 * 1000; // 10 min de inatividade com app aberto
-const BG_MS = 5 * 60 * 1000; // 5 min em segundo plano antes de exigir biometria
 
 /**
  * Bloqueia a UI quando:
@@ -32,6 +26,7 @@ const BG_MS = 5 * 60 * 1000; // 5 min em segundo plano antes de exigir biometria
  */
 export function BiometricLock({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
+  const { idleMs, backgroundMs } = useLockSettings();
   const startAuthFn = useServerFn(srvStartAuth);
   const finishAuthFn = useServerFn(srvFinishAuth);
   const listFn = useServerFn(srvList);
@@ -97,27 +92,44 @@ export function BiometricLock({ children }: { children: ReactNode }) {
     const resetIdle = () => {
       if (locked) return; // não resetar timer enquanto está bloqueado
       if (idleTimer.current) clearTimeout(idleTimer.current);
-      idleTimer.current = setTimeout(() => setLocked(true), IDLE_MS);
+      idleTimer.current = setTimeout(() => setLocked(true), idleMs);
     };
 
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        hiddenAt.current = Date.now();
-      } else if (document.visibilityState === "visible") {
-        const elapsed = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
-        hiddenAt.current = null;
-        // Em segundo plano: exige biometria após o timeout configurado.
-        if (elapsed >= BG_MS) {
-          setLocked(true);
-        } else {
-          resetIdle();
-        }
+    // `visibilitychange` e `pagehide`/`pageshow` disparam para o MESMO gesto
+    // (app foi pra segundo plano / voltou) em momentos diferentes conforme o
+    // navegador/SO — no iOS em PWA, por exemplo, é comum só um dos dois
+    // disparar de forma confiável. Por isso os dois pares de handlers abaixo
+    // escrevem no mesmo `hiddenAt` e respeitam a mesma janela de graça
+    // (`backgroundMs`), em vez de tratar pagehide como "bloquear na hora":
+    // tratar os dois caminhos diferente fazia o app travar instantaneamente
+    // ao trocar de app rapidamente (gesto comum) mesmo dentro da janela de
+    // tolerância. `markShown` é idempotente (`hiddenAt.current == null` = já
+    // processado pelo outro evento do mesmo par) — evita zerar a contagem e
+    // reabrir sem pedir biometria.
+    const markHidden = () => {
+      if (hiddenAt.current == null) hiddenAt.current = Date.now();
+    };
+    const markShown = () => {
+      if (hiddenAt.current == null) return;
+      const elapsed = Date.now() - hiddenAt.current;
+      hiddenAt.current = null;
+      // Em segundo plano além do timeout configurado: exige biometria de novo.
+      if (elapsed >= backgroundMs) {
+        setLocked(true);
+      } else {
+        resetIdle();
       }
     };
 
-    // pageshow detecta retorno via bfcache (PWA reaberto)
-    const onPageShow = () => setLocked(true);
-    const onPageHide = () => setLocked(true);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") markHidden();
+      else if (document.visibilityState === "visible") markShown();
+    };
+
+    // pagehide/pageshow cobrem o caso de bfcache (PWA suspenso/restaurado)
+    // que às vezes não passa por visibilitychange.
+    const onPageShow = () => markShown();
+    const onPageHide = () => markHidden();
 
     const events: Array<keyof DocumentEventMap> = [
       "mousemove",
@@ -140,7 +152,7 @@ export function BiometricLock({ children }: { children: ReactNode }) {
       window.removeEventListener("pagehide", onPageHide);
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
-  }, [enabled, user, locked]);
+  }, [enabled, user, locked, idleMs, backgroundMs]);
 
   const unlock = async () => {
     if (!user?.email) return;

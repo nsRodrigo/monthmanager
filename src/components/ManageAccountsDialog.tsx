@@ -16,8 +16,19 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { Modal, Field, inputClass, Select } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
-import { Plus, Trash2, Pencil, Check, X, Wallet, Building2, Smartphone, TrendingUp } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Check,
+  X,
+  Wallet,
+  Building2,
+  Smartphone,
+  TrendingUp,
+} from "lucide-react";
 import { useConfirm } from "@/store/confirm";
+import { useBiometricStepUp } from "@/hooks/use-biometric-stepup";
 
 const TYPES: { value: AccountType; label: string; icon: typeof Wallet }[] = [
   { value: "corrente", label: "Conta corrente", icon: Building2 },
@@ -28,6 +39,7 @@ const TYPES: { value: AccountType; label: string; icon: typeof Wallet }[] = [
 
 export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const confirmDialog = useConfirm();
+  const confirmBiometrics = useBiometricStepUp();
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -93,7 +105,11 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                         onChange={(e) => setEditName(e.target.value)}
                         className={inputClass}
                       />
-                      <CurrencyInput value={editInitial} onValueChange={setEditInitial} placeholder="Saldo inicial" />
+                      <CurrencyInput
+                        value={editInitial}
+                        onValueChange={setEditInitial}
+                        placeholder="Saldo inicial"
+                      />
                       <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         Cor
                         <input
@@ -168,12 +184,17 @@ export function ManageAccountsDialog({ open, onClose }: { open: boolean; onClose
                             variant: "destructive",
                             confirmLabel: "Excluir",
                           });
-                          if (ok) {
-                            removeAccount.mutate(a.id, {
-                              onSuccess: () => toast.success("Conta excluída com sucesso."),
-                              onError: () => toast.error("Erro ao excluir conta. Tente novamente."),
-                            });
+                          if (!ok) return;
+                          // Ação irreversível — se o usuário tem biometria cadastrada,
+                          // exige uma prova extra de posse do dispositivo antes de apagar.
+                          if (!(await confirmBiometrics())) {
+                            toast.error("Confirmação biométrica necessária para excluir a conta.");
+                            return;
                           }
+                          removeAccount.mutate(a.id, {
+                            onSuccess: () => toast.success("Conta excluída com sucesso."),
+                            onError: () => toast.error("Erro ao excluir conta. Tente novamente."),
+                          });
                         }}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       >

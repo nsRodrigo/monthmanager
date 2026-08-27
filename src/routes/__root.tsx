@@ -1,15 +1,36 @@
-import { Link, Outlet, createRootRoute, HeadContent, Scripts, useLocation, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Wallet, FileSpreadsheet, Settings, LayoutDashboard, Building2, Smartphone, TrendingUp, User, Cloud, ShieldCheck } from "lucide-react";
+import {
+  Link,
+  Outlet,
+  createRootRoute,
+  HeadContent,
+  Scripts,
+  useLocation,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
+import {
+  LogOut,
+  Wallet,
+  FileSpreadsheet,
+  Settings,
+  LayoutDashboard,
+  Building2,
+  Smartphone,
+  TrendingUp,
+  User,
+  Cloud,
+  ShieldCheck,
+} from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
 import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
-import { PanesRegistryProvider, usePanes, useMaxPanes } from "@/store/panes";
-import { MobileMenuProvider } from "@/store/mobile-menu";
+import { PanesRegistryProvider, usePanes } from "@/store/panes";
+import { LockSettingsProvider } from "@/store/lock-settings";
 import { useAccounts, type AccountType } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
@@ -32,114 +53,6 @@ const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
   investimento: TrendingUp,
 };
 
-const DRAWER_WIDTH = 288; // 18rem (w-72)
-
-/**
- * Estado + gestos de arraste da gaveta mobile — a gaveta entra pela BORDA
- * DIREITA (mesmo lado do ícone de menu, que também fica à direita em cada
- * tela). `visible` é quantos px dela já estão à mostra, vindo da direita:
- * 0 = escondida, DRAWER_WIDTH = totalmente aberta.
- * - Fechar (gaveta ABERTA): handlers JSX normais, presos só na própria
- *   `<aside>` — uma superfície pequena e dedicada, sem ambiguidade possível.
- *   Arrastar pra DIREITA fecha (empurra de volta pra fora da tela).
- * - Abrir (conteúdo FECHADO): ouvido no `window` inteiro (não preso a nenhum
- *   elemento específico do layout, então funciona em qualquer parte da
- *   tela) e só "assume" o gesto depois de confirmar arraste horizontal pra
- *   ESQUERDA além de um limiar — até lá, não mexe em nada, então toques e
- *   rolagem normal continuam intactos por baixo. Sempre `passive`, nunca
- *   chama preventDefault — não compete com o scroll nativo.
- */
-function useSwipeDrawer(open: boolean, setOpen: (v: boolean) => void) {
-  const [dragVisible, setDragVisible] = useState<number | null>(null);
-  const openRef = useRef(open);
-  useEffect(() => {
-    openRef.current = open;
-  }, [open]);
-
-  const closeStartRef = useRef<{ x: number; t: number } | null>(null);
-  const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
-    closeStartRef.current = { x: e.clientX, t: performance.now() };
-    setDragVisible(DRAWER_WIDTH);
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
-    const start = closeStartRef.current;
-    if (!start) return;
-    const dx = e.clientX - start.x; // positivo = arrastando pra direita (fechando)
-    setDragVisible(Math.max(0, Math.min(DRAWER_WIDTH, DRAWER_WIDTH - dx)));
-  };
-  const onPointerUp = () => {
-    const start = closeStartRef.current;
-    closeStartRef.current = null;
-    if (!start) return;
-    const visible = dragVisible ?? DRAWER_WIDTH;
-    const dt = Math.max(1, performance.now() - start.t);
-    const hidden = DRAWER_WIDTH - visible; // quanto já escondeu
-    const velocityHide = hidden / dt; // px/ms, positivo = escondendo rápido
-    setDragVisible(null);
-    setOpen(!(hidden > DRAWER_WIDTH * 0.22 || velocityHide > 0.35));
-  };
-
-  useEffect(() => {
-    let start: { x: number; y: number; t: number } | null = null;
-    let committed = false;
-
-    const onDown = (e: PointerEvent) => {
-      if (openRef.current) return;
-      start = { x: e.clientX, y: e.clientY, t: performance.now() };
-      committed = false;
-    };
-    const onMove = (e: PointerEvent) => {
-      if (!start) return;
-      const dx = e.clientX - start.x;
-      if (!committed) {
-        const dy = e.clientY - start.y;
-        if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // ainda ambíguo — espera mais movimento
-        if (Math.abs(dx) <= Math.abs(dy) * 1.3 || dx >= 0) {
-          start = null; // era rolagem vertical ou arraste pra direita — não é o gesto de abrir
-          return;
-        }
-        committed = true;
-      }
-      setDragVisible(Math.max(0, Math.min(DRAWER_WIDTH, -dx)));
-    };
-    const onUp = (e: PointerEvent) => {
-      const s = start;
-      start = null;
-      if (!s || !committed) {
-        committed = false;
-        setDragVisible(null);
-        return;
-      }
-      committed = false;
-      const dt = Math.max(1, performance.now() - s.t);
-      const dx = e.clientX - s.x; // negativo (arrastou pra esquerda)
-      const velocity = -dx / dt; // positivo = abrindo rápido
-      setDragVisible(null);
-      setOpen(-dx > DRAWER_WIDTH * 0.22 || velocity > 0.35);
-    };
-
-    window.addEventListener("pointerdown", onDown, { passive: true });
-    window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("pointerup", onUp, { passive: true });
-    window.addEventListener("pointercancel", onUp, { passive: true });
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    };
-  }, [setOpen]);
-
-  const visible = dragVisible ?? (open ? DRAWER_WIDTH : 0);
-  const dragging = dragVisible !== null;
-  return {
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
-    visible,
-    dragging,
-  };
-}
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -148,7 +61,10 @@ function NotFoundComponent() {
         <h2 className="mt-4 text-xl font-semibold text-foreground">Página não encontrada</h2>
         <p className="mt-2 text-sm text-muted-foreground">A página que você procura não existe.</p>
         <div className="mt-6">
-          <Link to="/" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
             Voltar ao início
           </Link>
         </div>
@@ -169,13 +85,30 @@ export const Route = createRootRoute({
       { name: "apple-mobile-web-app-title", content: "Gestão" },
       { name: "format-detection", content: "telephone=no" },
       { title: "Gestão Financeira" },
-      { name: "description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
+      {
+        name: "description",
+        content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária.",
+      },
       { property: "og:title", content: "Gestão Financeira" },
       { name: "twitter:title", content: "Gestão Financeira" },
-      { property: "og:description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
-      { name: "twitter:description", content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6" },
+      {
+        property: "og:description",
+        content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária.",
+      },
+      {
+        name: "twitter:description",
+        content: "Controle detalhado de gastos, cartões e parcelamentos por conta bancária.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/18c4ff5b-0931-4d13-ae61-96e2eaf5e2b6",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -269,7 +202,9 @@ function SidebarContent({
         <span className={`whitespace-nowrap ${labelClass}`}>Home</span>
       </Link>
 
-      <p className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${labelClass}`}>
+      <p
+        className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${labelClass}`}
+      >
         Contas
       </p>
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
@@ -280,7 +215,8 @@ function SidebarContent({
         )}
         {accounts.map((a) => {
           const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
-          const active = loc.pathname.startsWith("/contas/") && panes.panes.some((p) => p.contaId === a.id);
+          const active =
+            loc.pathname.startsWith("/contas/") && panes.panes.some((p) => p.contaId === a.id);
           return (
             <Link
               key={a.id}
@@ -396,7 +332,9 @@ function SidebarContent({
           </div>
           <div className={`min-w-0 flex-1 ${labelClass}`}>
             <p className="truncate text-xs font-semibold whitespace-nowrap">{displayName}</p>
-            <p className="truncate text-[10px] text-muted-foreground whitespace-nowrap">{user?.email}</p>
+            <p className="truncate text-[10px] text-muted-foreground whitespace-nowrap">
+              {user?.email}
+            </p>
           </div>
         </Link>
         <button
@@ -420,8 +358,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { handlers: dragHandlers, visible: dragVisible, dragging } = useSwipeDrawer(mobileOpen, setMobileOpen);
 
   const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
 
@@ -438,15 +374,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!user) history.clear();
   }, [user?.id]);
 
-  // Fecha a gaveta mobile ao trocar de rota.
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Carregando" />
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          aria-label="Carregando"
+        />
       </div>
     );
   }
@@ -454,111 +388,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!user && !isPublic) return null;
   if (isPublic) return <>{children}</>;
 
-  const translatePx = DRAWER_WIDTH - dragVisible;
-  const overlayOpacity = dragVisible / DRAWER_WIDTH;
-  const transition = dragging ? "none" : "180ms ease-out";
-
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop/tablet: sempre expandida (240px), sem recolher */}
-      <aside
-        className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-border bg-card/40 p-5 md:flex"
-      >
+      {/* Desktop/tablet: sempre expandida (240px), sem recolher. No mobile a
+          navegação vive nos botões flutuantes de cada tela (☰ na Home/Meses,
+          "Configurações" dentro do "+" no Lançamento) em vez de uma gaveta. */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-border bg-card/40 p-5 md:flex">
         <SidebarContent />
       </aside>
 
-      {/* Mobile: gaveta cheia, entra pela direita — aberta pelo ícone ☰ de cada
-          tela, arrastando pra esquerda em qualquer ponto, ou arrastando a
-          própria gaveta pra direita pra fechar. */}
-      <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
-        style={{
-          opacity: overlayOpacity,
-          transition: `opacity ${transition}`,
-          pointerEvents: mobileOpen || dragging ? "auto" : "none",
-        }}
-        onClick={() => setMobileOpen(false)}
-        aria-hidden={!mobileOpen && !dragging}
-      />
-      <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-72 touch-none flex-col border-l border-border bg-card p-5 md:hidden"
-        style={{
-          transform: `translateX(${translatePx}px)`,
-          transition: `transform ${transition}`,
-          pointerEvents: mobileOpen || dragging ? "auto" : "none",
-        }}
-        aria-hidden={!mobileOpen && !dragging}
-        {...dragHandlers}
-      >
-        <SidebarContent onNavigate={() => setMobileOpen(false)} />
-      </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
         </a>
         <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
-          <MobileMenuProvider openMobileMenu={() => setMobileOpen(true)}>{children}</MobileMenuProvider>
+          {children}
         </main>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Faixa fixa no rodapé — como abas de navegador, espelha exatamente as
- * contas visíveis na tela agora (`panes`), nesta ordem. Clique normal num
- * chip abre só aquela conta, fechando as demais (`openSingle`) — igual a
- * clicar na conta na barra lateral. Ctrl/Cmd+clique (só faz sentido já
- * dentro de /contas/*) divide a tela — adiciona aquela conta ao lado da(s)
- * que já está(ão) visível(is), respeitando o limite de painéis do tamanho
- * de tela atual (nesse caso a conta já está entre as abas, então não muda
- * nada). Fechar um painel pelo X (ver `closePane`) remove a conta tanto da
- * tela quanto desta faixa — não fica lembrada em lugar nenhum.
- */
-function PanesDock() {
-  const { panes, splitIn, openSingle } = usePanes();
-  const maxPanes = useMaxPanes();
-  const location = useRouterState({ select: (s) => s.location });
-  const { data: accounts = [] } = useAccounts();
-  const navigate = useNavigate();
-
-  // "Abas" não existe em telas pequenas (nunca há mais de 1 painel lado a
-  // lado ali) — o dock não aparece de jeito nenhum nesse tamanho.
-  if (maxPanes === 1) return null;
-  if (panes.length === 0) return null;
-
-  const onContasRoute = location.pathname.startsWith("/contas/");
-  const canSplit = panes.length < maxPanes;
-
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-      <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-border bg-card/95 px-3 py-2 shadow-elevated backdrop-blur-md">
-        <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Abas
-        </span>
-        {panes.map((p) => {
-          const a = accounts.find((x) => x.id === p.contaId);
-          if (!a) return null;
-          return (
-            <button
-              key={p.contaId}
-              type="button"
-              title="Clique para abrir sozinha · Ctrl/Cmd+clique para abrir ao lado"
-              onClick={(e) => {
-                if ((e.ctrlKey || e.metaKey) && onContasRoute) {
-                  if (canSplit) splitIn(p.contaId);
-                  return;
-                }
-                openSingle(p.contaId);
-                navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } });
-              }}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold transition-colors hover:border-primary"
-            >
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} aria-hidden="true" />
-              <span className="max-w-[8rem] truncate">{a.name}</span>
-            </button>
-          );
-        })}
       </div>
     </div>
   );
@@ -570,20 +415,21 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <AccountFilterProvider>
-          <PanesRegistryProvider>
-            <ConfirmProvider>
-              <NavigationLoader />
-              <RealtimeSync />
-              <BiometricLock>
-                <AuthGate>
-                  <Outlet />
-                </AuthGate>
-              </BiometricLock>
-              <UndoRedoBar />
-              <PanesDock />
-              <InstallPrompt />
-            </ConfirmProvider>
-          </PanesRegistryProvider>
+            <PanesRegistryProvider>
+              <ConfirmProvider>
+                <NavigationLoader />
+                <RealtimeSync />
+                <LockSettingsProvider>
+                  <BiometricLock>
+                    <AuthGate>
+                      <Outlet />
+                    </AuthGate>
+                  </BiometricLock>
+                </LockSettingsProvider>
+                <UndoRedoBar />
+                <InstallPrompt />
+              </ConfirmProvider>
+            </PanesRegistryProvider>
           </AccountFilterProvider>
         </AuthProvider>
       </ThemeProvider>

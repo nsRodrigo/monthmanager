@@ -4838,6 +4838,147 @@ export function useRenumberInstallment() {
 }
 
 // =======================
+// Mover lançamentos para outro mês (ação em lote da seleção múltipla)
+// =======================
+
+/**
+ * Um item selecionado a "mover" já foi resolvido pelo chamador (rota de
+ * mês) para uma destas duas formas — ver `resolveMoveOps` lá:
+ *  - "single": avulso OU uma ocorrência de recorrente (debit/income/
+ *    investment com `is_parent=false`) — o mês é o próprio
+ *    `reference_year`/`reference_month` da linha.
+ *  - "installment": uma parcela específica (de compra, débito, recebimento
+ *    ou investimento parcelado) — o mês é `year`/`month` da linha em
+ *    `installments`, igual a qualquer outra parcela (ver comentário em
+ *    `Installment.referenceDate`: a data é só visual, quem manda no mês é
+ *    year/month/due_date).
+ */
+export type MoveMonthOp =
+  | { kind: "single"; table: "debits" | "incomes" | "investments"; id: string }
+  | { kind: "installment"; id: string };
+
+/**
+ * Move um lote de lançamentos (avulsos, ocorrências de recorrente, ou
+ * parcelas específicas) para outro mês — SEM tocar na data digitada
+ * (`date`/`due_date` de compra, ou `reference_date` da parcela): só a
+ * "vaga" (`reference_year/month` ou `year/month` da parcela) muda.
+ *
+ * Mover uma parcela de uma série (parcelado/recorrente de cartão) afeta
+ * SÓ aquela parcela — as demais da série continuam nos meses originais,
+ * exatamente como `useRenumberInstallment` já faz ("mês é sempre vaga fixa
+ * por linha"). Por isso não existe conceito de "escopo" aqui (mover não é
+ * uma operação que faça sentido aplicar a uma série inteira de uma vez —
+ * empilharia todas as parcelas no mesmo mês).
+ */
+export function useMoveEntriesToMonth() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { ops: MoveMonthOp[]; year: number; month: number }) => {
+      const { ops, year, month } = args;
+      const singleIds: Record<"debits" | "incomes" | "investments", string[]> = {
+        debits: [], incomes: [], investments: [],
+      };
+      const instIds: string[] = [];
+      for (const op of ops) {
+        if (op.kind === "single") singleIds[op.table].push(op.id);
+        else instIds.push(op.id);
+      }
+
+      const prevByTable: Record<"debits" | "incomes" | "investments", Array<{ id: string; reference_year: number | null; reference_month: number | null }>> = {
+        debits: [], incomes: [], investments: [],
+      };
+      for (const table of ["debits", "incomes", "investments"] as const) {
+        if (singleIds[table].length === 0) continue;
+        const { data, error } = await supabase
+          .from(table)
+          .select("id,reference_year,reference_month")
+          .in("id", singleIds[table]);
+        if (error) throw error;
+        prevByTable[table] = (data ?? []) as typeof prevByTable[typeof table];
+      }
+      let prevInst: Array<{ id: string; year: number; month: number; due_date: string }> = [];
+      if (instIds.length > 0) {
+        const { data, error } = await supabase
+          .from("installments")
+          .select("id,year,month,due_date")
+          .in("id", instIds);
+        if (error) throw error;
+        prevInst = (data ?? []) as typeof prevInst;
+      }
+
+      for (const table of ["debits", "incomes", "investments"] as const) {
+        if (singleIds[table].length === 0) continue;
+        const { error } = await supabase
+          .from(table)
+          .update({ reference_year: year, reference_month: month })
+          .in("id", singleIds[table]);
+        if (error) throw error;
+      }
+      if (prevInst.length > 0) {
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        for (const row of prevInst) {
+          const day = Math.min(parseLocalDate(row.due_date).d, lastDay);
+          const { error } = await supabase
+            .from("installments")
+            .update({ year, month, due_date: fmtLocalDate(year, month, day) })
+            .eq("id", row.id);
+          if (error) throw error;
+        }
+      }
+
+      return { singleIds, prevByTable, prevInst, target: { year, month } };
+    },
+    onSettled: () => inv(["debits", "incomes", "investments", "installments"]),
+    onSuccess: ({ singleIds, prevByTable, prevInst, target }) => {
+      const inv2 = inv;
+      const count =
+        singleIds.debits.length + singleIds.incomes.length + singleIds.investments.length + prevInst.length;
+      if (count === 0) return;
+      history.push({
+        label: `Mover ${count} lançamento${count === 1 ? "" : "s"} de mês`,
+        undo: async () => {
+          for (const table of ["debits", "incomes", "investments"] as const) {
+            for (const row of prevByTable[table]) {
+              await supabase
+                .from(table)
+                .update({ reference_year: row.reference_year, reference_month: row.reference_month })
+                .eq("id", row.id);
+            }
+          }
+          for (const row of prevInst) {
+            await supabase
+              .from("installments")
+              .update({ year: row.year, month: row.month, due_date: row.due_date })
+              .eq("id", row.id);
+          }
+          inv2(["debits", "incomes", "investments", "installments"]);
+        },
+        redo: async () => {
+          for (const table of ["debits", "incomes", "investments"] as const) {
+            if (singleIds[table].length === 0) continue;
+            await supabase
+              .from(table)
+              .update({ reference_year: target.year, reference_month: target.month })
+              .in("id", singleIds[table]);
+          }
+          if (prevInst.length > 0) {
+            const lastDay = new Date(target.year, target.month + 1, 0).getDate();
+            for (const row of prevInst) {
+              const day = Math.min(parseLocalDate(row.due_date).d, lastDay);
+              await supabase
+                .from("installments")
+                .update({ year: target.year, month: target.month, due_date: fmtLocalDate(target.year, target.month, day) })
+                .eq("id", row.id);
+            }
+          }
+          inv2(["debits", "incomes", "investments", "installments"]);
+        },
+      });
+    },
+  });
+}
+
+// =======================
 // Effective "current" month — Day-27 rule
 // =======================
 /**

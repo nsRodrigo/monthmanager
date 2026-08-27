@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Field, inputClass } from "@/components/Modal";
-import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
@@ -102,7 +101,6 @@ function ProfilePage() {
         <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" /> Home
         </Link>
-        <MobileMenuButton />
       </div>
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Meu perfil</h1>

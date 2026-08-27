@@ -1,16 +1,18 @@
-export type Tone = "debit" | "income" | "primary" | "credit";
+export type Tone = "debit" | "income" | "primary" | "credit" | "destructive";
 
 export const toneText: Record<Tone, string> = {
   debit: "text-debit",
   income: "text-success",
   credit: "text-credit",
   primary: "text-primary",
+  destructive: "text-destructive",
 };
 export const toneBg: Record<Tone, string> = {
   debit: "bg-debit/15",
   income: "bg-success/15",
   credit: "bg-credit/15",
   primary: "bg-primary/15",
+  destructive: "bg-destructive/15",
 };
 /** Leve lavagem de cor para o cabeçalho da seção (mais sutil que toneBg, usado nos chips). */
 export const toneWash: Record<Tone, string> = {
@@ -18,6 +20,7 @@ export const toneWash: Record<Tone, string> = {
   income: "bg-success/[0.06]",
   credit: "bg-credit/[0.06]",
   primary: "bg-primary/[0.06]",
+  destructive: "bg-destructive/[0.06]",
 };
 
 export function FabAction({

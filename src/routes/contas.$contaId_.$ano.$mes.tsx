@@ -45,6 +45,7 @@ import {
   type MoveMonthOp,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
+import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
@@ -117,7 +118,10 @@ function AccountMonthRoute() {
       month={Number(mes)}
       onBack={() => navigate({ to: "/contas/$contaId", params: { contaId } })}
       onMonthChange={(y, m) =>
-        navigate({ to: "/contas/$contaId/$ano/$mes", params: { contaId, ano: String(y), mes: String(m) } })
+        navigate({
+          to: "/contas/$contaId/$ano/$mes",
+          params: { contaId, ano: String(y), mes: String(m) },
+        })
       }
     />
   );
@@ -131,6 +135,7 @@ export function MonthDetailPane({
   onMonthChange,
   embedded = false,
   fabPortalTarget = null,
+  onClose,
 }: {
   contaId: string;
   year: number;
@@ -146,6 +151,8 @@ export function MonthDetailPane({
   embedded?: boolean;
   /** Nó do DOM onde o FAB deve ser portado quando `embedded` — ver PaneSlot em contas.$contaId.tsx. */
   fabPortalTarget?: HTMLDivElement | null;
+  /** Só passado quando há mais de 1 painel aberto — fecha este painel inteiro (distinto de "voltar aos meses"). */
+  onClose?: () => void;
 }) {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
@@ -163,6 +170,8 @@ export function MonthDetailPane({
 
   const { setAccountId } = useAccountFilter();
   useEffect(() => setAccountId(contaId), [contaId, setAccountId]);
+  const { panes } = usePanes();
+  const maxPanes = useMaxPanes();
 
   // Persiste o ano atual no sessionStorage para que, ao voltar para a tela
   // de lista de meses, ela abra exatamente no ano do mês que estava sendo
@@ -287,7 +296,8 @@ export function MonthDetailPane({
               : "Excluir compra recorrente",
       description: (
         <>
-          Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>.
+          Você está excluindo a série <span className="font-semibold text-foreground">{label}</span>
+          .
         </>
       ),
       // Usa sempre useDeleteOverScope: além de apagar as linhas, ele grava
@@ -297,10 +307,28 @@ export function MonthDetailPane({
       execute: async (scope) => {
         const source =
           kind === "purchase"
-            ? { kind: "purchase" as const, cardId: target.cardId!, description: label, amount: 0, groupId }
+            ? {
+                kind: "purchase" as const,
+                cardId: target.cardId!,
+                description: label,
+                amount: 0,
+                groupId,
+              }
             : kind === "investment"
-              ? { kind: "investment" as const, accountId: target.accountId!, type: label, amount: target.amount ?? 0, groupId }
-              : { kind, accountId: target.accountId!, description: label, amount: target.amount ?? 0, groupId };
+              ? {
+                  kind: "investment" as const,
+                  accountId: target.accountId!,
+                  type: label,
+                  amount: target.amount ?? 0,
+                  groupId,
+                }
+              : {
+                  kind,
+                  accountId: target.accountId!,
+                  description: label,
+                  amount: target.amount ?? 0,
+                  groupId,
+                };
         await deleteOverScope.mutateAsync({
           source,
           scope,
@@ -320,25 +348,23 @@ export function MonthDetailPane({
   ) => {
     setScopeDelete({
       title:
-        parentType === "debit" ? "Excluir débito"
-          : parentType === "income" ? "Excluir recebimento"
+        parentType === "debit"
+          ? "Excluir débito"
+          : parentType === "income"
+            ? "Excluir recebimento"
             : "Excluir compra",
       description: (
         <>
-          Você está excluindo{" "}
-          <span className="font-semibold text-foreground">{label}</span>.
+          Você está excluindo <span className="font-semibold text-foreground">{label}</span>.
         </>
       ),
       execute: async (scope) => {
         const [iy, im] = date.slice(0, 10).split("-").map(Number);
         const targets = resolveScopeMonths(scope, year, month);
-        const withinScope = targets.some(
-          (t) => t.year === iy && t.month === im - 1,
-        );
+        const withinScope = targets.some((t) => t.year === iy && t.month === im - 1);
         if (!withinScope) return;
         if (parentType === "debit") await removeDebit.mutateAsync(id);
-        else if (parentType === "income")
-          await removeIncome.mutateAsync(id);
+        else if (parentType === "income") await removeIncome.mutateAsync(id);
         else await removePurchase.mutateAsync(id);
       },
     });
@@ -412,25 +438,56 @@ export function MonthDetailPane({
       for (const id of ids) {
         const i = allIncomes.find((x) => x.id === id);
         if (!i) continue;
-        await dup({ kind: "income", accountId: i.accountId, description: i.description, amount: i.amount, date: i.date, received: i.received, paymentMethod: i.paymentMethod });
+        await dup({
+          kind: "income",
+          accountId: i.accountId,
+          description: i.description,
+          amount: i.amount,
+          date: i.date,
+          received: i.received,
+          paymentMethod: i.paymentMethod,
+        });
       }
     } else if (key === "debits") {
       for (const id of ids) {
         const d = allDebits.find((x) => x.id === id);
         if (!d) continue;
-        await dup({ kind: "debit", accountId: d.accountId, description: d.description, amount: d.amount, date: d.date, required: false, paid: d.paid, paymentMethod: d.paymentMethod, autoDebitDay: d.autoDebitDay });
+        await dup({
+          kind: "debit",
+          accountId: d.accountId,
+          description: d.description,
+          amount: d.amount,
+          date: d.date,
+          required: false,
+          paid: d.paid,
+          paymentMethod: d.paymentMethod,
+          autoDebitDay: d.autoDebitDay,
+        });
       }
     } else if (key === "investments") {
       for (const id of ids) {
         const v = allInvestments.find((x) => x.id === id);
         if (!v) continue;
-        await dup({ kind: "investment", accountId: v.accountId, type: v.type, amount: v.amount, percentage: v.percentage, date: v.date });
+        await dup({
+          kind: "investment",
+          accountId: v.accountId,
+          type: v.type,
+          amount: v.amount,
+          percentage: v.percentage,
+          date: v.date,
+        });
       }
     } else if (key.startsWith("card:")) {
       for (const id of ids) {
         const p = purchasesList.find((x) => x.id === id);
         if (!p) continue;
-        await dup({ kind: "purchase", cardId: p.cardId, description: p.description, totalAmount: p.totalAmount, date: p.date });
+        await dup({
+          kind: "purchase",
+          cardId: p.cardId,
+          description: p.description,
+          totalAmount: p.totalAmount,
+          date: p.date,
+        });
       }
     }
     clearSelection();
@@ -448,9 +505,16 @@ export function MonthDetailPane({
    */
   const resolveMoveOps = (key: SelectionKey, ids: string[]): MoveMonthOp[] => {
     const ops: MoveMonthOp[] = [];
-    const instFor = (parentType: "debit" | "income" | "investment" | "purchase", parentId: string) =>
+    const instFor = (
+      parentType: "debit" | "income" | "investment" | "purchase",
+      parentId: string,
+    ) =>
       installmentsList.find(
-        (i) => i.parentType === parentType && i.parentId === parentId && i.year === year && i.month === month,
+        (i) =>
+          i.parentType === parentType &&
+          i.parentId === parentId &&
+          i.year === year &&
+          i.month === month,
       );
     if (key === "incomes") {
       for (const id of ids) {
@@ -524,7 +588,9 @@ export function MonthDetailPane({
     recurrenceGroupId?: string | null;
   }) => {
     if (pur.recurrenceGroupId) {
-      askDeleteRecurring("purchase", pur.recurrenceGroupId, pur.description, { cardId: pur.cardId });
+      askDeleteRecurring("purchase", pur.recurrenceGroupId, pur.description, {
+        cardId: pur.cardId,
+      });
       return;
     }
     if (pur.installmentsCount > 1) {
@@ -541,10 +607,7 @@ export function MonthDetailPane({
   };
 
   const accountCards = useMemo(
-    () =>
-      cards.filter(
-        (c) => c.accountId === contaId && isCardVisibleInMonth(c, year, month),
-      ),
+    () => cards.filter((c) => c.accountId === contaId && isCardVisibleInMonth(c, year, month)),
     [cards, contaId, year, month],
   );
 
@@ -570,13 +633,15 @@ export function MonthDetailPane({
     a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
   // Ordena parcelas pela data da COMPRA original (parent.date) — não pela
   // data da fatura (dueDate) — para que a ordem bata com o que é exibido.
-  const byParcelDateAsc = <T extends { installment: { parentId: string; number: number; id: string } }>(
-    dateOf: (t: T) => string,
-  ) => (a: T, b: T) =>
-    dateOf(a).localeCompare(dateOf(b)) ||
-    a.installment.parentId.localeCompare(b.installment.parentId) ||
-    a.installment.number - b.installment.number ||
-    a.installment.id.localeCompare(b.installment.id);
+  const byParcelDateAsc =
+    <T extends { installment: { parentId: string; number: number; id: string } }>(
+      dateOf: (t: T) => string,
+    ) =>
+    (a: T, b: T) =>
+      dateOf(a).localeCompare(dateOf(b)) ||
+      a.installment.parentId.localeCompare(b.installment.parentId) ||
+      a.installment.number - b.installment.number ||
+      a.installment.id.localeCompare(b.installment.id);
 
   // "Fixos" = recorrentes + débito automático (nos débitos) e recorrentes (nos recebimentos).
   const debitsFixedSingle = monthDebits.single
@@ -605,7 +670,9 @@ export function MonthDetailPane({
     .filter((i) => !i.recurrenceGroupId)
     .slice()
     .sort(byDateAsc);
-  const incomesParcelled = monthIncomes.parcelled.slice().sort(byParcelDateAsc((p) => p.income.date));
+  const incomesParcelled = monthIncomes.parcelled
+    .slice()
+    .sort(byParcelDateAsc((p) => p.income.date));
 
   const investmentsFixedSingle = monthInvestments.single
     .filter((i) => !!i.recurrenceGroupId)
@@ -615,7 +682,9 @@ export function MonthDetailPane({
     .filter((i) => !i.recurrenceGroupId)
     .slice()
     .sort(byDateAsc);
-  const investmentsParcelled = monthInvestments.parcelled.slice().sort(byParcelDateAsc((p) => p.investment.date));
+  const investmentsParcelled = monthInvestments.parcelled
+    .slice()
+    .sort(byParcelDateAsc((p) => p.investment.date));
 
   // ───── Sort prefs (per-section, persisted in localStorage) ─────
   const debitsSort = useSortPreference("debits");
@@ -653,11 +722,11 @@ export function MonthDetailPane({
     debitsSort.sort.option === "default"
       ? debitsDefaultOrder
       : applySort(debitsDefaultOrder, debitsSort.sort, {
-        name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
-        amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
-        date: (e) => (e.kind === "single" ? e.debit.date : e.entry.debit.date),
-        id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
-      });
+          name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
+          amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.debit.date : e.entry.debit.date),
+          id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
+        });
 
   const incomesFixedMerged: IncomeEntry[] = [
     ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
@@ -677,11 +746,11 @@ export function MonthDetailPane({
     incomesSort.sort.option === "default"
       ? incomesDefaultOrder
       : applySort(incomesDefaultOrder, incomesSort.sort, {
-        name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
-        amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
-        date: (e) => (e.kind === "single" ? e.income.date : e.entry.income.date),
-        id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
-      });
+          name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
+          amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.income.date : e.entry.income.date),
+          id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
+        });
 
   const investmentsFixedMerged: InvestmentEntry[] = [
     ...investmentsFixedSingle.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
@@ -701,12 +770,11 @@ export function MonthDetailPane({
     investmentsSort.sort.option === "default"
       ? investmentsDefaultOrder
       : applySort(investmentsDefaultOrder, investmentsSort.sort, {
-        name: (e) => (e.kind === "single" ? e.investment.type : e.entry.investment!.type),
-        amount: (e) => (e.kind === "single" ? e.investment.amount : e.entry.installment.amount),
-        date: (e) => (e.kind === "single" ? e.investment.date : e.entry.investment.date),
-        id: (e) => (e.kind === "single" ? e.investment.id : e.entry.installment.id),
-      });
-
+          name: (e) => (e.kind === "single" ? e.investment.type : e.entry.investment!.type),
+          amount: (e) => (e.kind === "single" ? e.investment.amount : e.entry.installment.amount),
+          date: (e) => (e.kind === "single" ? e.investment.date : e.entry.investment.date),
+          id: (e) => (e.kind === "single" ? e.investment.id : e.entry.installment.id),
+        });
 
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
@@ -725,20 +793,13 @@ export function MonthDetailPane({
   // Itens não marcados valem 0 -- não entram negativos.
   const totalIncomeNet =
     monthIncomes.single.reduce((s, i) => s + (i.received ? i.amount : 0), 0) +
-    monthIncomes.parcelled.reduce(
-      (s, p) => s + (p.installment.paid ? p.installment.amount : 0),
-      0,
-    );
+    monthIncomes.parcelled.reduce((s, p) => s + (p.installment.paid ? p.installment.amount : 0), 0);
   const totalDebitsNet =
     monthDebits.single.reduce((s, d) => s + (d.paid ? d.amount : 0), 0) +
-    monthDebits.parcelled.reduce(
-      (s, p) => s + (p.installment.paid ? p.installment.amount : 0),
-      0,
-    );
+    monthDebits.parcelled.reduce((s, p) => s + (p.installment.paid ? p.installment.amount : 0), 0);
   const totalCardsNet = monthInst
     .filter((i) => i.parentType === "purchase")
     .reduce((s, i) => s + (i.paid ? i.amount : 0), 0);
-
 
   // Saldo Atual = saldo final do mês anterior + recebíveis do mês atual
   const saldoAtual = (() => {
@@ -783,14 +844,21 @@ export function MonthDetailPane({
   const nextMonth = month === 11 ? { y: year + 1, m: 0 } : { y: year, m: month + 1 };
 
   return (
-    <div className={embedded ? "" : "mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10"}>
+    <div>
+      {!embedded && maxPanes > 1 && panes.length > 0 && (
+        <div className="hidden items-center border-b border-border/60 bg-muted px-4 py-2 md:flex md:px-6">
+          <PaneTabsBar />
+        </div>
+      )}
       {/* Top nav — sticky so the year picker stays accessible while scrolling.
           Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
-      <div className={`sticky top-0 z-30 -mx-4 mb-5 md:-mx-6 ${embedded ? "" : "relative"}`}>
+      <div className={`sticky top-0 z-10 ${embedded ? "" : "relative"}`}>
         <HeaderBand
           title="Lançamentos"
+          eyebrow={account?.name}
           onBack={onBack}
+          onClose={onClose}
           right={
             <MonthYearPicker
               contaId={contaId}
@@ -802,19 +870,14 @@ export function MonthDetailPane({
             />
           }
         />
-        {!embedded && (
-          <div className="pointer-events-none absolute inset-x-0 top-4 hidden justify-center px-16 md:flex">
-            <PaneTabsBar />
-          </div>
-        )}
       </div>
 
+      <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
       {/* Frame com saldo atual e gastos totais */}
       <MonthSummaryFrame
         saldoAtual={normalizeZero(saldoAtual)}
         gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
       />
-
 
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
           pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
@@ -825,17 +888,18 @@ export function MonthDetailPane({
             vem antes de recebimentos (não só entre investimentos/débitos). */}
         <div className="flex items-center justify-between gap-3 px-1">
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-              CONTA CORRENTE
-            </h2>
+            <h2 className="truncate text-sm font-bold uppercase tracking-wider">CONTA CORRENTE</h2>
             <p className="truncate text-[11px] text-muted-foreground">
               Recebimentos − débitos − investimentos
             </p>
           </div>
           <div className="shrink-0 text-right">
             <p
-              className={`text-sm font-bold ${totalIncomeNet - totalDebits - totalInvested >= 0 ? "text-foreground" : "text-destructive"
-                }`}
+              className={`text-sm font-bold ${
+                totalIncomeNet - totalDebits - totalInvested >= 0
+                  ? "text-foreground"
+                  : "text-destructive"
+              }`}
             >
               {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
             </p>
@@ -851,21 +915,14 @@ export function MonthDetailPane({
           total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
           paidState={incomesAllReceived ? "paid" : null}
-          empty={
-            monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0
-          }
-
+          empty={monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0}
           emptyText="Nenhum recebimento neste mês."
           sortControl={
-            <SortMenu
-              scope="incomes"
-              state={incomesSort.sort}
-              onChange={incomesSort.set}
-            />
+            <SortMenu scope="incomes" state={incomesSort.sort} onChange={incomesSort.set} />
           }
           paidControl={
             !isSelMode("incomes") &&
-              monthIncomes.single.length + monthIncomes.parcelled.length > 0 ? (
+            monthIncomes.single.length + monthIncomes.parcelled.length > 0 ? (
               <button
                 type="button"
                 onClick={() => {
@@ -880,10 +937,11 @@ export function MonthDetailPane({
                     received: target,
                   });
                 }}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${incomesAllReceived
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  incomesAllReceived
                     ? "bg-success/15 text-success hover:bg-success/25"
                     : "bg-warning/15 text-warning hover:bg-warning/25"
-                  }`}
+                }`}
               >
                 {incomesAllReceived ? "✓ Recebido" : "Marcar recebido"}
               </button>
@@ -905,7 +963,8 @@ export function MonthDetailPane({
                       inst: p.installment,
                       label: p.income!.description,
                       subtitle: `Recebimento parcelado · Total ${formatCurrency(p.income!.amount)} em ${p.income!.installmentsCount}x`,
-                      onDeleteParent: () => askDeleteParcelled(p.income!.id, "income", p.income!.description),
+                      onDeleteParent: () =>
+                        askDeleteParcelled(p.income!.id, "income", p.income!.description),
                       parentSource: {
                         kind: "income",
                         accountId: p.income!.accountId,
@@ -916,7 +975,9 @@ export function MonthDetailPane({
                       },
                     })
                   }
-                  onRemove={() => askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)}
+                  onRemove={() =>
+                    askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)
+                  }
                   {...selProps("incomes", p.income!.id)}
                 />
               );
@@ -958,9 +1019,7 @@ export function MonthDetailPane({
               <IncomeRow
                 key={i.id}
                 income={i}
-                onToggle={() =>
-                  toggleIncome.mutate({ id: i.id, received: !i.received })
-                }
+                onToggle={() => toggleIncome.mutate({ id: i.id, received: !i.received })}
                 onEdit={openIncomeEdit}
                 onDuplicate={() => {
                   setRowStartAction("duplicate");
@@ -968,16 +1027,20 @@ export function MonthDetailPane({
                 }}
                 onRemove={
                   isRecurring
-                    ? () => askDeleteRecurring("income", i.recurrenceGroupId!, i.description, { accountId: i.accountId, amount: i.amount })
+                    ? () =>
+                        askDeleteRecurring("income", i.recurrenceGroupId!, i.description, {
+                          accountId: i.accountId,
+                          amount: i.amount,
+                        })
                     : async () => {
-                      const ok = await confirmDialog({
-                        title: "Excluir recebimento",
-                        description: `Excluir "${i.description}"?`,
-                        variant: "destructive",
-                        confirmLabel: "Excluir",
-                      });
-                      if (ok) removeIncome.mutate(i.id);
-                    }
+                        const ok = await confirmDialog({
+                          title: "Excluir recebimento",
+                          description: `Excluir "${i.description}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeIncome.mutate(i.id);
+                      }
                 }
                 {...selProps("incomes", i.id)}
               />
@@ -1019,7 +1082,8 @@ export function MonthDetailPane({
                       inst: p.installment,
                       label: p.investment!.type,
                       subtitle: `Investimento parcelado · Total ${formatCurrency(p.investment!.amount)} em ${p.investment!.installmentsCount}x`,
-                      onDeleteParent: () => askDeleteParcelled(p.investment!.id, "investment", p.investment!.type),
+                      onDeleteParent: () =>
+                        askDeleteParcelled(p.investment!.id, "investment", p.investment!.type),
                       parentSource: {
                         kind: "investment",
                         accountId: p.investment!.accountId,
@@ -1030,7 +1094,9 @@ export function MonthDetailPane({
                       },
                     })
                   }
-                  onRemove={() => askDeleteInst(p.installment, p.investment!.type, "investment", p.investment!.id)}
+                  onRemove={() =>
+                    askDeleteInst(p.installment, p.investment!.type, "investment", p.investment!.id)
+                  }
                   {...selProps("investments", p.investment!.id)}
                 />
               );
@@ -1074,16 +1140,20 @@ export function MonthDetailPane({
                 }}
                 onRemove={
                   isRecurring
-                    ? () => askDeleteRecurring("investment", inv.recurrenceGroupId!, inv.type, { accountId: inv.accountId, amount: inv.amount })
+                    ? () =>
+                        askDeleteRecurring("investment", inv.recurrenceGroupId!, inv.type, {
+                          accountId: inv.accountId,
+                          amount: inv.amount,
+                        })
                     : async () => {
-                      const ok = await confirmDialog({
-                        title: "Excluir investimento",
-                        description: `Excluir "${inv.type}"?`,
-                        variant: "destructive",
-                        confirmLabel: "Excluir",
-                      });
-                      if (ok) removeInvestment.mutate(inv.id);
-                    }
+                        const ok = await confirmDialog({
+                          title: "Excluir investimento",
+                          description: `Excluir "${inv.type}"?`,
+                          variant: "destructive",
+                          confirmLabel: "Excluir",
+                        });
+                        if (ok) removeInvestment.mutate(inv.id);
+                      }
                 }
                 {...selProps("investments", inv.id)}
               />
@@ -1107,37 +1177,29 @@ export function MonthDetailPane({
                 : "open"
               : null
           }
-          empty={
-            monthDebits.single.length === 0 && monthDebits.parcelled.length === 0
-          }
+          empty={monthDebits.single.length === 0 && monthDebits.parcelled.length === 0}
           emptyText="Nenhum débito neste mês."
           sortControl={
-            <SortMenu
-              scope="debits"
-              state={debitsSort.sort}
-              onChange={debitsSort.set}
-            />
+            <SortMenu scope="debits" state={debitsSort.sort} onChange={debitsSort.set} />
           }
           paidControl={
-            !isSelMode("debits") &&
-              monthDebits.single.length + monthDebits.parcelled.length > 0 ? (
+            !isSelMode("debits") && monthDebits.single.length + monthDebits.parcelled.length > 0 ? (
               <button
                 type="button"
                 onClick={() => {
                   const target = !debitsAllPaid;
                   monthDebits.single.forEach((d) => {
-                    if (d.paid !== target)
-                      toggleDebit.mutate({ id: d.id, paid: target });
+                    if (d.paid !== target) toggleDebit.mutate({ id: d.id, paid: target });
                   });
                   monthDebits.parcelled.forEach((p) => {
-                    if (p.installment.paid !== target)
-                      toggleInst(p.installment.id, target);
+                    if (p.installment.paid !== target) toggleInst(p.installment.id, target);
                   });
                 }}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${debitsAllPaid
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  debitsAllPaid
                     ? "bg-success/15 text-success hover:bg-success/25"
                     : "bg-warning/15 text-warning hover:bg-warning/25"
-                  }`}
+                }`}
               >
                 {debitsAllPaid ? "✓ Pago" : "Marcar pago"}
               </button>
@@ -1159,7 +1221,8 @@ export function MonthDetailPane({
                       inst: p.installment,
                       label: p.debit!.description,
                       subtitle: `Débito parcelado · Total ${formatCurrency(p.debit!.amount)} em ${p.debit!.installmentsCount}x`,
-                      onDeleteParent: () => askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
+                      onDeleteParent: () =>
+                        askDeleteParcelled(p.debit!.id, "debit", p.debit!.description),
                       parentSource: {
                         kind: "debit",
                         accountId: p.debit!.accountId,
@@ -1172,7 +1235,9 @@ export function MonthDetailPane({
                       },
                     })
                   }
-                  onRemove={() => askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)}
+                  onRemove={() =>
+                    askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)
+                  }
                   {...selProps("debits", p.debit!.id)}
                 />
               );
@@ -1223,18 +1288,22 @@ export function MonthDetailPane({
                 }}
                 onRemove={
                   isRecurring
-                    ? () => askDeleteRecurring("debit", d.recurrenceGroupId!, d.description, { accountId: d.accountId, amount: d.amount })
+                    ? () =>
+                        askDeleteRecurring("debit", d.recurrenceGroupId!, d.description, {
+                          accountId: d.accountId,
+                          amount: d.amount,
+                        })
                     : d.paymentMethod === "auto_debit"
                       ? () => askDeleteSingle(d.id, "debit", d.description, d.date)
                       : async () => {
-                        const ok = await confirmDialog({
-                          title: "Excluir débito",
-                          description: `Excluir "${d.description}"?`,
-                          variant: "destructive",
-                          confirmLabel: "Excluir",
-                        });
-                        if (ok) removeDebit.mutate(d.id);
-                      }
+                          const ok = await confirmDialog({
+                            title: "Excluir débito",
+                            description: `Excluir "${d.description}"?`,
+                            variant: "destructive",
+                            confirmLabel: "Excluir",
+                          });
+                          if (ok) removeDebit.mutate(d.id);
+                        }
                 }
                 {...selProps("debits", d.id)}
               />
@@ -1249,8 +1318,8 @@ export function MonthDetailPane({
           const orderedAllCards =
             reorderMode && reorderIds
               ? (reorderIds
-                .map((id) => allAccountCards.find((c) => c.id === id))
-                .filter(Boolean) as typeof allAccountCards)
+                  .map((id) => allAccountCards.find((c) => c.id === id))
+                  .filter(Boolean) as typeof allAccountCards)
               : allAccountCards;
 
           const cardsAll = accountCards
@@ -1388,94 +1457,105 @@ export function MonthDetailPane({
                     : "Nenhum cartão com movimento neste mês."}
                 </p>
               ) : (
-                cardsAll.map(({ card: c, items: cardInst }) => {
-                  const total = cardInst.reduce((s, i) => s + i.amount, 0);
-                  const faturaIsPaid = isCardFullyPaid(installmentsList, purchasesList, cardPayments, c.id, year, month);
-                  const allChecked = cardInst.length > 0 && cardInst.every((i) => i.paid);
-                  const cardState: "paid" | "allChecked" | "open" =
-                    faturaIsPaid ? "paid" : allChecked ? "allChecked" : "open";
-                  const countRevisado = cardInst.filter((i) => i.paid).length;
-                  const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
-                  const dueDate = new Date(year, month, Math.min(dueDay, 28));
-                  return (
-                    <div
-                      key={c.id}
-                      className={`rounded-2xl border border-l-4 bg-card transition-colors ${cardState === "paid"
-                          ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
-                          : cardState === "allChecked"
-                            ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
-                            : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
+                <div className="grid gap-3">
+                  {cardsAll.map(({ card: c, items: cardInst }) => {
+                    const total = cardInst.reduce((s, i) => s + i.amount, 0);
+                    const faturaIsPaid = isCardFullyPaid(
+                      installmentsList,
+                      purchasesList,
+                      cardPayments,
+                      c.id,
+                      year,
+                      month,
+                    );
+                    const allChecked = cardInst.length > 0 && cardInst.every((i) => i.paid);
+                    const cardState: "paid" | "allChecked" | "open" = faturaIsPaid
+                      ? "paid"
+                      : allChecked
+                        ? "allChecked"
+                        : "open";
+                    const countRevisado = cardInst.filter((i) => i.paid).length;
+                    const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
+                    const dueDate = new Date(year, month, Math.min(dueDay, 28));
+                    return (
+                      <div
+                        key={c.id}
+                        className={`rounded-2xl border border-l-4 bg-card transition-colors ${
+                          cardState === "paid"
+                            ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+                            : cardState === "allChecked"
+                              ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
+                              : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
                         }`}
-                      style={{ borderLeftColor: c.color }}
-                    >
-                      <CardRowSorted
-                        card={c}
-                        cardInst={cardInst}
-                        purchases={purchasesList}
-                        total={total}
-                        paid={faturaIsPaid}
-                        cardState={cardState}
-                        countRevisado={countRevisado}
-                        paymentPending={setCardPaid.isPending}
-                        dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
-                        onTogglePaid={() => {
-                          if (!setCardPaid.isPending) {
-                            const newPaid = !faturaIsPaid;
-                            setCardPaid.mutate({ cardId: c.id, year, month, paid: newPaid });
-                            if (newPaid) {
-                              cardInst.forEach((i) => {
-                                if (!i.paid) toggleInst(i.id, true);
-                              });
+                        style={{ borderLeftColor: c.color }}
+                      >
+                        <CardRowSorted
+                          card={c}
+                          cardInst={cardInst}
+                          purchases={purchasesList}
+                          total={total}
+                          paid={faturaIsPaid}
+                          cardState={cardState}
+                          countRevisado={countRevisado}
+                          paymentPending={setCardPaid.isPending}
+                          dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
+                          onTogglePaid={() => {
+                            if (!setCardPaid.isPending) {
+                              const newPaid = !faturaIsPaid;
+                              setCardPaid.mutate({ cardId: c.id, year, month, paid: newPaid });
+                              if (newPaid) {
+                                cardInst.forEach((i) => {
+                                  if (!i.paid) toggleInst(i.id, true);
+                                });
+                              }
                             }
-                          }
-                        }}
-                        onEditCard={() => setEditingCardId(c.id)}
-                        onRequestReorder={enterReorder}
-                        onToggleInst={(id, p) => toggleInst(id, p)}
-                        onEditInst={(inst) => {
-                          const pur = purchasesList.find((p) => p.id === inst.parentId);
-                          if (!pur) return;
-                          if (pur.recurrenceGroupId) {
-                            setEditingRecurring({
-                              kind: "purchase",
-                              id: pur.id,
-                              groupId: pur.recurrenceGroupId,
-                              description: pur.description,
-                              amount: pur.totalAmount,
-                              date: pur.date,
-                              cardId: c.id,
-                              notifyDaysBefore: pur.notifyDaysBefore,
-                            });
-                            return;
-                          }
-                          setEditing({
-                            inst,
-                            label: pur.description,
-                            subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
+                          }}
+                          onEditCard={() => setEditingCardId(c.id)}
+                          onRequestReorder={enterReorder}
+                          onToggleInst={(id, p) => toggleInst(id, p)}
+                          onEditInst={(inst) => {
+                            const pur = purchasesList.find((p) => p.id === inst.parentId);
+                            if (!pur) return;
+                            if (pur.recurrenceGroupId) {
+                              setEditingRecurring({
+                                kind: "purchase",
+                                id: pur.id,
+                                groupId: pur.recurrenceGroupId,
+                                description: pur.description,
+                                amount: pur.totalAmount,
+                                date: pur.date,
+                                cardId: c.id,
+                                notifyDaysBefore: pur.notifyDaysBefore,
+                              });
+                              return;
+                            }
+                            setEditing({
+                              inst,
+                              label: pur.description,
+                              subtitle: `Compra em ${formatDate(pur.date)} · Total ${formatCurrency(pur.totalAmount)}${
+                                pur.installmentsCount > 1 ? ` em ${pur.installmentsCount}x` : ""
                               }`,
-                            onDeleteParent: () => askDeletePurchase(pur),
-                            parentSource: {
-                              kind: "purchase",
-                              cardId: c.id,
-                              description: pur.description,
-                              totalAmount: pur.totalAmount,
-                              date: pur.date,
-                            },
-                          });
-                        }}
-                        onRemoveInst={(inst) => {
-                          const pur = purchasesList.find((p) => p.id === inst.parentId);
-                          if (!pur) return;
-                          askDeletePurchase(pur);
-                        }}
-                        itemSelProps={(_inst, parentId) =>
-                          selProps(`card:${c.id}`, parentId)
-                        }
-                      />
-
-                    </div>
-                  );
-                })
+                              onDeleteParent: () => askDeletePurchase(pur),
+                              parentSource: {
+                                kind: "purchase",
+                                cardId: c.id,
+                                description: pur.description,
+                                totalAmount: pur.totalAmount,
+                                date: pur.date,
+                              },
+                            });
+                          }}
+                          onRemoveInst={(inst) => {
+                            const pur = purchasesList.find((p) => p.id === inst.parentId);
+                            if (!pur) return;
+                            askDeletePurchase(pur);
+                          }}
+                          itemSelProps={(_inst, parentId) => selProps(`card:${c.id}`, parentId)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </section>
           );
@@ -1632,8 +1712,9 @@ export function MonthDetailPane({
                 }}
                 aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
                 aria-expanded={fabOpen}
-                className={`flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-primary shadow-elevated transition-transform duration-200 hover:border-primary/50 ${fabOpen ? "rotate-45" : ""
-                  }`}
+                className={`flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-primary shadow-elevated transition-transform duration-200 hover:border-primary/50 ${
+                  fabOpen ? "rotate-45" : ""
+                }`}
               >
                 <Plus className="h-6 w-6" />
               </button>
@@ -1673,7 +1754,10 @@ export function MonthDetailPane({
       />
       <EditInstallmentDialog
         open={!!editing}
-        onClose={() => { setEditing(null); setRowStartAction(undefined); }}
+        onClose={() => {
+          setEditing(null);
+          setRowStartAction(undefined);
+        }}
         installment={editing?.inst ?? null}
         parentLabel={editing?.label}
         parentSubtitle={editing?.subtitle}
@@ -1685,14 +1769,23 @@ export function MonthDetailPane({
       />
       <EditInstallmentDialog
         open={!!editingSingle}
-        onClose={() => { setEditingSingle(null); setRowStartAction(undefined); }}
+        onClose={() => {
+          setEditingSingle(null);
+          setRowStartAction(undefined);
+        }}
         single={editingSingle?.item ?? null}
         onDeleteParent={editingSingle?.onDeleteParent}
         defaultYear={year}
         defaultMonth={month}
         startAction={rowStartAction}
       />
-      <AddCardDialog open={openCard} onClose={() => setOpenCard(false)} defaultYear={year} defaultMonth={month} fixedAccountId={contaId} />
+      <AddCardDialog
+        open={openCard}
+        onClose={() => setOpenCard(false)}
+        defaultYear={year}
+        defaultMonth={month}
+        fixedAccountId={contaId}
+      />
       <EditCardDialog
         open={!!editingCardId}
         onClose={() => setEditingCardId(null)}
@@ -1702,7 +1795,10 @@ export function MonthDetailPane({
       />
       <EditRecurringDialog
         open={!!editingRecurring}
-        onClose={() => { setEditingRecurring(null); setRowStartAction(undefined); }}
+        onClose={() => {
+          setEditingRecurring(null);
+          setRowStartAction(undefined);
+        }}
         target={editingRecurring}
         defaultYear={year}
         defaultMonth={month}
@@ -1735,6 +1831,7 @@ export function MonthDetailPane({
         loading={moveEntries.isPending}
         onConfirm={bulkMove}
       />
+      </div>
     </div>
   );
 }
@@ -1750,11 +1847,13 @@ function MonthSummaryFrame({
 }) {
   const saldoFinal = saldoAtual - gastosTotais;
   const inicialTone = saldoAtual >= 0 ? "text-primary" : "text-destructive";
-  const inicialBg = saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
+  const inicialBg =
+    saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   const finalTone = saldoFinal >= 0 ? "text-primary" : "text-destructive";
-  const finalBg = saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
+  const finalBg =
+    saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   return (
-    <div className="relative z-10 -mt-9 animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4">
+    <div className="relative z-20 -mt-6 animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4 md:grid-cols-3">
       <div className={`rounded-xl border p-3 ${inicialBg}`}>
         <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
           <Wallet className="h-3 w-3" /> Saldo Inicial
@@ -1772,19 +1871,20 @@ function MonthSummaryFrame({
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
       </div>
-      <div className="col-span-2 rounded-xl border border-debit/20 bg-debit/10 p-3">
+      <div className="col-span-2 rounded-xl border border-debit/20 bg-debit/10 p-3 md:col-span-1">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-debit">
           <ArrowDownRight className="h-3 w-3" /> Gastos Totais
         </div>
         <p className="mt-1 text-base font-bold text-debit sm:text-lg">
           {formatCurrency(gastosTotais)}
         </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">débitos + investimentos + cartões</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">
+          débitos + investimentos + cartões
+        </p>
       </div>
     </div>
   );
 }
-
 
 /* ───────── GROUPED SECTION (collapsible category accordion) ───────── */
 
@@ -1836,7 +1936,6 @@ function GroupedSection({
         : "border-border";
   return (
     <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
-
       {/* Header */}
       <div className={`flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5 ${toneWash[tone]}`}>
         {/* Linha 1: ícone + título (+ valor/controles no desktop) */}
@@ -1862,15 +1961,21 @@ function GroupedSection({
               )}
             </div>
           )}
-          {open && paidControl ? <div className="hidden shrink-0 md:block">{paidControl}</div> : null}
-          {open && sortControl ? <div className="hidden shrink-0 md:block">{sortControl}</div> : null}
+          {open && paidControl ? (
+            <div className="hidden shrink-0 md:block">{paidControl}</div>
+          ) : null}
+          {open && sortControl ? (
+            <div className="hidden shrink-0 md:block">{sortControl}</div>
+          ) : null}
           <button
             type="button"
             onClick={toggle}
             aria-label={open ? "Recolher" : "Expandir"}
             className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
-            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+            <ChevronDown
+              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            />
           </button>
         </div>
 
@@ -1886,7 +1991,9 @@ function GroupedSection({
                   </p>
                 )}
               </div>
-            ) : <div />}
+            ) : (
+              <div />
+            )}
             <div className="flex items-center gap-2">
               {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
               {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
@@ -1929,14 +2036,14 @@ function GroupedSection({
 
 type PurchaseList = ReturnType<typeof usePurchases>["data"] extends infer T
   ? T extends Array<infer P>
-  ? P[]
-  : never
+    ? P[]
+    : never
   : never;
 type Purchase = PurchaseList[number];
 type Card = ReturnType<typeof useCards>["data"] extends infer T
   ? T extends Array<infer C>
-  ? C
-  : never
+    ? C
+    : never
   : never;
 
 function CardRowSorted({
@@ -1981,14 +2088,14 @@ function CardRowSorted({
     sort.option === "default"
       ? null
       : applySort(cardInst, sort, {
-        name: (i) => {
-          const pur = purchases.find((p: Purchase) => p.id === i.parentId);
-          return pur?.description ?? "";
-        },
-        amount: (i) => i.amount,
-        date: (i) => i.dueDate,
-        id: (i) => i.id,
-      });
+          name: (i) => {
+            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+            return pur?.description ?? "";
+          },
+          amount: (i) => i.amount,
+          date: (i) => i.dueDate,
+          id: (i) => i.id,
+        });
   return (
     <CardRow
       cardName={card.name}
@@ -2011,13 +2118,10 @@ function CardRowSorted({
       selectionBar={selectionBar}
       sortedItems={sortedItems}
       onRequestReorder={onRequestReorder}
-      sortControl={
-        <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
-      }
+      sortControl={<SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />}
     />
   );
 }
-
 
 function CardRow({
   cardName,
@@ -2057,10 +2161,10 @@ function CardRow({
   onHideMonth?: () => void;
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T
-  ? T extends Array<infer P>
-  ? P[]
-  : never
-  : never;
+    ? T extends Array<infer P>
+      ? P[]
+      : never
+    : never;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
   onRemoveInst?: (inst: Installment) => void;
@@ -2124,9 +2228,7 @@ function CardRow({
           />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{cardName}</p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-              {dueLabel}
-            </p>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{dueLabel}</p>
           </div>
           <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
             <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
@@ -2145,12 +2247,13 @@ function CardRow({
               e.stopPropagation();
               if (!paymentPending) onTogglePaid();
             }}
-            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${cardState === "paid"
+            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
+              cardState === "paid"
                 ? "bg-success/15 text-success hover:bg-success/25"
                 : cardState === "allChecked"
                   ? "bg-credit/15 text-credit hover:bg-credit/25"
                   : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
+            }`}
           >
             {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
           </button>
@@ -2168,7 +2271,9 @@ function CardRow({
             aria-label={open ? "Recolher" : "Expandir"}
             className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
-            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+            <ChevronDown
+              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            />
           </button>
         </div>
 
@@ -2192,12 +2297,13 @@ function CardRow({
                 e.stopPropagation();
                 if (!paymentPending) onTogglePaid();
               }}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${cardState === "paid"
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                cardState === "paid"
                   ? "bg-success/15 text-success hover:bg-success/25"
                   : cardState === "allChecked"
                     ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
                     : "bg-warning/15 text-warning hover:bg-warning/25"
-                }`}
+              }`}
             >
               {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
             </button>
@@ -2251,11 +2357,8 @@ function CardRow({
             {selectionBar}
 
             {items.length === 0 ? (
-
               <div className="space-y-3 px-4 py-6 text-center">
-                <p className="text-xs text-muted-foreground">
-                  Nenhum lançamento neste mês.
-                </p>
+                <p className="text-xs text-muted-foreground">Nenhum lançamento neste mês.</p>
                 {onHideMonth && (
                   <button
                     type="button"
@@ -2277,7 +2380,10 @@ function CardRow({
                     const pur = purchases.find((p) => p.id === inst.parentId);
                     return { inst, pur };
                   })
-                  .filter((x): x is { inst: typeof items[number]; pur: NonNullable<typeof x.pur> } => !!x.pur)
+                  .filter(
+                    (x): x is { inst: (typeof items)[number]; pur: NonNullable<typeof x.pur> } =>
+                      !!x.pur,
+                  )
                   .sort((a, b) => {
                     if (sortedItems) return 0; // respect provided order
                     // Prioriza parcelados + recorrentes (tier 0) sobre à-vista (tier 1),
@@ -2305,9 +2411,6 @@ function CardRow({
                       onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                       {...itemSelProps(inst, inst.parentId)}
                     />
-
-
-
                   ))}
               </div>
             )}
@@ -2317,7 +2420,6 @@ function CardRow({
     </div>
   );
 }
-
 
 /* ───────── ROWS ───────── */
 
@@ -2342,7 +2444,13 @@ function PurchaseInstRow({
   onLongPress,
 }: {
   inst: Installment;
-  purchase: { description: string; date: string; totalAmount: number; installmentsCount: number; recurrenceGroupId?: string | null };
+  purchase: {
+    description: string;
+    date: string;
+    totalAmount: number;
+    installmentsCount: number;
+    recurrenceGroupId?: string | null;
+  };
   cardColor: string;
   onToggle: () => void;
   onEdit: () => void;
@@ -2376,10 +2484,7 @@ function PurchaseInstRow({
         aria-hidden="true"
       />
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${inst.paid ? "text-muted-foreground" : ""
-            }`}
-        >
+        <p className={`truncate text-sm font-semibold ${inst.paid ? "text-muted-foreground" : ""}`}>
           {purchase.description}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -2407,10 +2512,11 @@ function PurchaseInstRow({
         </div>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${inst.paid
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            inst.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-            }`}
+          }`}
           title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
         >
           {inst.paid ? (
@@ -2467,8 +2573,7 @@ function DebitRow({
       </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
-          className={`truncate text-sm font-semibold ${debit.paid ? "text-muted-foreground" : ""
-            }`}
+          className={`truncate text-sm font-semibold ${debit.paid ? "text-muted-foreground" : ""}`}
         >
           {debit.description}
         </p>
@@ -2497,10 +2602,11 @@ function DebitRow({
         <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${debit.paid
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            debit.paid
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-            }`}
+          }`}
         >
           {debit.paid ? (
             <>
@@ -2556,8 +2662,9 @@ function IncomeRow({
       </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
         <p
-          className={`truncate text-sm font-semibold ${income.received ? "text-muted-foreground" : ""
-            }`}
+          className={`truncate text-sm font-semibold ${
+            income.received ? "text-muted-foreground" : ""
+          }`}
         >
           {income.description}
         </p>
@@ -2579,10 +2686,11 @@ function IncomeRow({
         <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
         <button
           onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${income.received
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+            income.received
               ? "bg-success/15 text-success hover:bg-success/25"
               : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-            }`}
+          }`}
         >
           {income.received ? (
             <>
@@ -2630,11 +2738,13 @@ function ParcelledRow({
     }
     fn();
   };
-  const tone = kind === "debit" ? "text-debit" : kind === "income" ? "text-success" : "text-primary";
+  const tone =
+    kind === "debit" ? "text-debit" : kind === "income" ? "text-success" : "text-primary";
   const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
   const otherMethod =
     kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
-  const label = kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
+  const label =
+    kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
   const badgeClass =
     kind === "debit"
       ? "bg-debit/15 text-debit"
@@ -2642,13 +2752,19 @@ function ParcelledRow({
         ? "bg-success/15 text-success"
         : "bg-primary/15 text-primary";
   const iconWrapClass =
-    kind === "debit" ? "bg-debit/15 text-debit" : kind === "income" ? "bg-success/15 text-success" : "bg-primary/15 text-primary";
+    kind === "debit"
+      ? "bg-debit/15 text-debit"
+      : kind === "income"
+        ? "bg-success/15 text-success"
+        : "bg-primary/15 text-primary";
   return (
     <div
       className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}>
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
+      >
         {kind === "debit" ? (
           <ArrowDownRight className="h-3.5 w-3.5" />
         ) : kind === "income" ? (
@@ -2659,8 +2775,9 @@ function ParcelledRow({
       </div>
       <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
         <p
-          className={`truncate text-sm font-semibold ${kind !== "investment" && installment.paid ? "text-muted-foreground" : ""
-            }`}
+          className={`truncate text-sm font-semibold ${
+            kind !== "investment" && installment.paid ? "text-muted-foreground" : ""
+          }`}
         >
           {label}
         </p>
@@ -2692,17 +2809,20 @@ function ParcelledRow({
         {kind !== "investment" && (
           <button
             onClick={guard(onToggle)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${installment.paid
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+              installment.paid
                 ? "bg-success/15 text-success hover:bg-success/25"
                 : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-              }`}
+            }`}
           >
             {installment.paid ? (
               <>
                 <Check className="h-3 w-3" /> {kind === "income" ? "Recebido" : "Pago"}
               </>
+            ) : kind === "income" ? (
+              "Marcar recebido"
             ) : (
-              kind === "income" ? "Marcar recebido" : "Marcar pago"
+              "Marcar pago"
             )}
           </button>
         )}
@@ -2766,8 +2886,5 @@ function InvestmentRow({
 }
 
 function Empty({ text }: { text: string }) {
-  return (
-    <div className="px-4 py-6 text-center text-xs text-muted-foreground">{text}</div>
-  );
+  return <div className="px-4 py-6 text-center text-xs text-muted-foreground">{text}</div>;
 }
-

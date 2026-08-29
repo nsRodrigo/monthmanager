@@ -33,18 +33,13 @@ export function PaneTabsBar() {
 
   const onContasRoute = location.pathname.startsWith("/contas/");
   const canSplit = panes.length < maxPanes;
-  const activeContaId = location.pathname.match(/^\/contas\/([^/]+)/)?.[1];
   const availableToAdd = accounts.filter((a) => !panes.some((p) => p.contaId === a.id));
 
   return (
-    <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto">
-      <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        Abas
-      </span>
+    <div className="pointer-events-auto flex max-w-full items-center gap-1.5 overflow-x-auto">
       {panes.map((p) => {
         const a = accounts.find((x) => x.id === p.contaId);
         if (!a) return null;
-        const isActive = p.contaId === activeContaId;
         return (
           <button
             key={p.contaId}
@@ -58,11 +53,7 @@ export function PaneTabsBar() {
               openSingle(p.contaId);
               navigate({ to: "/contas/$contaId", params: { contaId: p.contaId } });
             }}
-            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
-              isActive
-                ? "border-primary/50 bg-primary/15 text-primary"
-                : "border-border/60 bg-transparent hover:border-primary/60"
-            }`}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary/35 bg-primary/15 px-3 text-xs font-semibold text-primary transition-colors hover:border-primary/60"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"

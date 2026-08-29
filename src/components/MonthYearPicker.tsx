@@ -134,12 +134,12 @@ export function MonthYearPicker({ contaId, year, month, prev, next, onNavigate }
   };
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+    <div className="flex items-center gap-1 rounded-full border border-white/20 bg-white/15 p-1">
       <button
         type="button"
         onClick={() => go(prev.y, prev.m)}
         disabled={!prevHasData}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
+        className="rounded-full p-1.5 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
         aria-label="Mês anterior"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -150,7 +150,7 @@ export function MonthYearPicker({ contaId, year, month, prev, next, onNavigate }
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="cursor-pointer rounded-md bg-transparent px-1.5 py-0.5 text-xs font-semibold capitalize outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+              className="cursor-pointer rounded-md bg-transparent px-1.5 py-0.5 text-xs font-semibold text-white capitalize outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/50"
               aria-label="Selecionar mês"
             >
               {MONTHS[month]}
@@ -183,7 +183,7 @@ export function MonthYearPicker({ contaId, year, month, prev, next, onNavigate }
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="cursor-pointer rounded-md bg-transparent px-1.5 py-0.5 text-xs font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+              className="cursor-pointer rounded-md bg-transparent px-1.5 py-0.5 text-xs font-semibold text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/50"
               aria-label="Selecionar ano"
             >
               {year}
@@ -224,7 +224,7 @@ export function MonthYearPicker({ contaId, year, month, prev, next, onNavigate }
         type="button"
         onClick={() => go(next.y, next.m)}
         disabled={!nextHasData}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
+        className="rounded-full p-1.5 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
         aria-label="Próximo mês"
       >
         <ChevronRight className="h-4 w-4" aria-hidden="true" />

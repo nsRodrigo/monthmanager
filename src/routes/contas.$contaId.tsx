@@ -85,7 +85,7 @@ function PanesWorkspace() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {maxPanes > 1 && (
-        <div className="flex shrink-0 items-center justify-center border-b border-border/60 bg-background px-4 py-2">
+        <div className="flex shrink-0 items-center border-b border-border/60 bg-muted px-4 py-2">
           <PaneTabsBar />
         </div>
       )}
@@ -374,12 +374,12 @@ function AccountPane({
   };
 
   const YearPickerChip = ({ compact = false }: { compact?: boolean }) => (
-    <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+    <div className="flex items-center gap-1 rounded-full border border-white/20 bg-white/15 p-1">
       <button
         type="button"
         onClick={goPrevYear}
         disabled={!canPrevYear}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+        className="rounded-full p-1.5 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-white/80"
         aria-label="Ano anterior"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -389,7 +389,7 @@ function AccountPane({
           <button
             type="button"
             className={cn(
-              "cursor-pointer rounded-md bg-transparent px-2 py-0.5 font-semibold outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring",
+              "cursor-pointer rounded-md bg-transparent px-2 py-0.5 font-semibold text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/50",
               compact ? "text-xs" : "text-sm",
             )}
             aria-label="Selecionar ano"
@@ -424,7 +424,7 @@ function AccountPane({
         type="button"
         onClick={goNextYear}
         disabled={!canNextYear}
-        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+        className="rounded-full p-1.5 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-white/80"
         aria-label="Próximo ano"
       >
         <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -433,66 +433,52 @@ function AccountPane({
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
-      {onClose && (
-        <div className="mb-2 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar este painel"
-            title="Fechar este painel"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-destructive"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+    <div>
       {view.type !== "month" && (
         <>
           {/* Mesma faixa de identidade da tela de Lançamentos — os dois
               "topos de tela" usam exatamente o mesmo componente visual. */}
           <HeaderBand
-            className="sticky top-0 z-30 -mx-4 mb-5 md:-mx-6"
-            title={`Meses de ${year}`}
+            className="sticky top-0 z-10"
+            title={account.name}
+            eyebrow={<span className="capitalize">{account.type}</span>}
             avatar={
-              <Link
-                to="/"
-                aria-label="Voltar para a Home"
-                title="Voltar para a Home"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
+              !onClose && (
+                <Link
+                  to="/"
+                  aria-label="Voltar para a Home"
+                  title="Voltar para a Home"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Link>
+              )
             }
             right={<YearPickerChip compact />}
+            onClose={onClose}
           />
-          {/* HEADER + DASHBOARD — só na lista de meses; a tela de lançamentos
-              (um mês específico) não repete o card da conta, já visto aqui. */}
-          <header className="relative z-10 -mt-9 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
-            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                style={{ backgroundColor: account.color + "30", color: account.color }}
-              >
-                <Wallet className="h-6 w-6" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {account.type}
-                </p>
-                <h2 className="break-words text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
-                  {account.name}
-                </h2>
-              </div>
-              <div className="text-right">
+          <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
+          {/* HERO + DASHBOARD — só na lista de meses; a tela de lançamentos
+              (um mês específico) não repete o card da conta, já visto aqui.
+              Nome/tipo já aparecem na HeaderBand acima, então aqui só o
+              saldo (mesmo padrão do "hero" da Home) + tendência. */}
+          <header className="relative z-20 -mt-6 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Saldo atual</p>
                 <p
-                  className={`whitespace-nowrap text-sm font-bold sm:text-base ${
+                  className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
                     balance >= 0 ? "text-foreground" : "text-destructive"
                   }`}
                 >
                   {formatCurrency(balance)}
                 </p>
-                <p className="text-[10px] text-muted-foreground">saldo atual</p>
+              </div>
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{ backgroundColor: account.color + "33", color: account.color }}
+              >
+                <Wallet className="h-[18px] w-[18px]" />
               </div>
             </div>
 
@@ -509,24 +495,8 @@ function AccountPane({
               </button>
             </div>
           </header>
-        </>
-      )}
 
-      <div key={view.type === "month" ? `${view.year}-${view.month}` : "months"} className="animate-fade-slide-in">
-      {view.type === "month" ? (
-        <div>
-          <MonthDetailPane
-            contaId={contaId}
-            year={view.year}
-            month={view.month}
-            onBack={() => onViewChange({ type: "months" })}
-            onMonthChange={(y, m) => onViewChange({ type: "month", year: y, month: m })}
-            embedded
-            fabPortalTarget={fabPortalTarget}
-          />
-        </div>
-      ) : (
-        <>
+          <div key="months" className="animate-fade-slide-in">
       {/* MONTHS LIST — only months that have any value */}
       <div className="mt-5 space-y-2">
         {monthsForYear.length === 0 ? (
@@ -576,7 +546,7 @@ function AccountPane({
               type="button"
               onClick={() => onViewChange({ type: "month", year, month: m })}
               className={`group block w-full rounded-3xl border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
-                isCurrent ? "border-primary/50 shadow-glow" : "border-border"
+                isCurrent ? "border-primary shadow-[0_0_0_1px_var(--primary)]" : "border-border"
               }`}
             >
               {/* Mobile: stacked. Desktop (sm+): name+balanço left, saldo em conta right */}
@@ -633,11 +603,23 @@ function AccountPane({
           })
         )}
       </div>
-      </>
+          </div>
+          <AccountSettingsFab />
+          </div>
+        </>
       )}
-      </div>
-
-      {view.type !== "month" && <AccountSettingsFab />}
+      {view.type === "month" && (
+        <MonthDetailPane
+          contaId={contaId}
+          year={view.year}
+          month={view.month}
+          onBack={() => onViewChange({ type: "months" })}
+          onMonthChange={(y, m) => onViewChange({ type: "month", year: y, month: m })}
+          embedded
+          fabPortalTarget={fabPortalTarget}
+          onClose={onClose}
+        />
+      )}
 
       <AddMonthDialog
         open={openAddMonth}

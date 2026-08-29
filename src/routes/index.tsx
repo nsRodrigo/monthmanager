@@ -18,6 +18,9 @@ import {
   normalizeZero,
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
+import { usePanes, useMaxPanes } from "@/store/panes";
+import { useAuth } from "@/store/auth";
+import { useProfile } from "@/store/profile";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Sparkline } from "@/components/Sparkline";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
@@ -59,6 +62,10 @@ function Consolidated() {
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
   const { data: investments = [] } = useInvestments();
+  const { user } = useAuth();
+  const { data: profile } = useProfile();
+  const { panes } = usePanes();
+  const maxPanes = useMaxPanes();
 
   // On the consolidated dashboard the global filter must be cleared,
   // so dialogs (new card / new debit) ask for the account explicitly.
@@ -136,48 +143,66 @@ function Consolidated() {
     );
   }
 
+  const displayName = profile?.displayName || user?.email?.split("@")[0] || "Você";
+  const initials = displayName
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
-    <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">
-      <div className="relative mb-8">
-        <HeaderBand
-          title="Home"
-          eyebrow={
-            <span className="capitalize">
-              {MONTHS[month]} {year}
-            </span>
-          }
-          subtitle="Visão geral de todas as suas contas."
-        />
-        <div className="pointer-events-none absolute inset-x-0 top-1 hidden justify-center px-24 md:flex">
+    <div>
+      {maxPanes > 1 && panes.length > 0 && (
+        <div className="hidden items-center border-b border-border/60 bg-muted px-4 py-2 md:flex">
           <PaneTabsBar />
         </div>
-      </div>
-
-      <section className="relative z-10 -mt-9 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
-        <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
-        <p
-          className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
-            expected >= 0 ? "text-foreground" : "text-destructive"
-          }`}
-        >
-          {formatCurrency(expected)}
-        </p>
-        {trendPct !== null && (
-          <span
-            className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-              trendPct >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
-            }`}
-          >
-            {trendPct >= 0 ? (
-              <ArrowUpRight className="h-3 w-3" />
-            ) : (
-              <ArrowDownRight className="h-3 w-3" />
-            )}
-            {Math.abs(trendPct).toFixed(1)}% vs. mês passado
+      )}
+      <HeaderBand
+        title="Home"
+        eyebrow={
+          <span className="capitalize">
+            {MONTHS[month]} {year}
           </span>
-        )}
-        <Sparkline points={trend} className="mt-3" />
-        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">
+        }
+        avatar={
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-extrabold text-primary">
+            {initials}
+          </div>
+        }
+      />
+
+      <div className="mx-auto max-w-6xl px-5 pb-8 md:pb-12">
+      <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
+            <p
+              className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
+                expected >= 0 ? "text-foreground" : "text-destructive"
+              }`}
+            >
+              {formatCurrency(expected)}
+            </p>
+            {trendPct !== null && (
+              <span
+                className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  trendPct >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+                }`}
+              >
+                {trendPct >= 0 ? (
+                  <ArrowUpRight className="h-3 w-3" />
+                ) : (
+                  <ArrowDownRight className="h-3 w-3" />
+                )}
+                {Math.abs(trendPct).toFixed(1)}% vs. mês passado
+              </span>
+            )}
+          </div>
+          <Sparkline points={trend} className="mt-3 md:mt-1 md:w-56 md:shrink-0" />
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
           <Stat
             label="A receber"
             value={formatCurrency(totalIncome)}
@@ -262,10 +287,10 @@ function Consolidated() {
                 />
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2.5 sm:gap-4">
                   <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12"
-                    style={{ backgroundColor: a.color + "25", color: a.color }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: a.color + "33", color: a.color }}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-[18px] w-[18px]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{a.name}</p>
@@ -308,6 +333,7 @@ function Consolidated() {
         </div>
       </section>
       <AccountSettingsFab />
+      </div>
     </div>
   );
 }
@@ -326,11 +352,11 @@ function MiniStat({
   const c =
     tone === "success" ? "text-success" : tone === "debit" ? "text-debit" : "text-credit";
   return (
-    <div className="min-w-0 rounded-lg bg-background/40 px-2 py-1.5">
+    <div className="min-w-0 rounded-lg bg-muted px-2 py-1.5">
       <p className={`flex items-center gap-1 text-[10px] uppercase tracking-wider ${c}`}>
         <Icon className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{label}</span>
       </p>
-      <p className={`truncate text-xs font-bold ${c}`}>{formatCurrency(value)}</p>
+      <p className="truncate text-xs font-bold text-foreground">{formatCurrency(value)}</p>
     </div>
   );
 }

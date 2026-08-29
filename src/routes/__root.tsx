@@ -10,13 +10,9 @@ import {
 } from "@tanstack/react-router";
 import {
   LogOut,
-  Wallet,
   FileSpreadsheet,
   Settings,
   LayoutDashboard,
-  Building2,
-  Smartphone,
-  TrendingUp,
   User,
   Cloud,
   ShieldCheck,
@@ -33,7 +29,7 @@ import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
 import { PanesRegistryProvider, usePanes } from "@/store/panes";
 import { LockSettingsProvider } from "@/store/lock-settings";
-import { useAccounts, type AccountType } from "@/store/finance";
+import { useAccounts } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
@@ -47,13 +43,6 @@ import { history } from "@/store/history";
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
 });
-
-const ICON_BY_TYPE: Record<AccountType, typeof Wallet> = {
-  corrente: Building2,
-  digital: Smartphone,
-  carteira: Wallet,
-  investimento: TrendingUp,
-};
 
 function NotFoundComponent() {
   return (
@@ -214,7 +203,6 @@ function SidebarContent({
           </p>
         )}
         {accounts.map((a) => {
-          const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
           const active =
             loc.pathname.startsWith("/contas/") && panes.panes.some((p) => p.contaId === a.id);
           return (
@@ -243,12 +231,11 @@ function SidebarContent({
                   : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
               }`}
             >
-              <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                style={{ backgroundColor: a.color + "25", color: a.color }}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </div>
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: a.color }}
+                aria-hidden="true"
+              />
               <span className={`truncate whitespace-nowrap ${labelClass}`}>{a.name}</span>
             </Link>
           );
@@ -315,7 +302,9 @@ function SidebarContent({
         <Link
           to="/perfil"
           onClick={onNavigate}
-          className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-secondary"
+          className={`flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors ${
+            loc.pathname === "/perfil" ? "bg-secondary text-foreground" : "hover:bg-secondary"
+          }`}
           aria-label="Abrir meu perfil"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground">

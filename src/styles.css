@@ -47,24 +47,24 @@
 :root {
   --radius: 0.875rem;
   /* Dark theme by default — financial app feel */
-  --background: oklch(0.16 0.015 260);
-  --foreground: oklch(0.97 0.005 260);
-  --card: oklch(0.21 0.018 260);
-  --card-foreground: oklch(0.97 0.005 260);
-  --popover: oklch(0.21 0.018 260);
-  --popover-foreground: oklch(0.97 0.005 260);
+  --background: oklch(0.16 0.015 155);
+  --foreground: oklch(0.97 0.005 155);
+  --card: oklch(0.21 0.018 155);
+  --card-foreground: oklch(0.97 0.005 155);
+  --popover: oklch(0.21 0.018 155);
+  --popover-foreground: oklch(0.97 0.005 155);
   --primary: oklch(0.72 0.18 155);
   --primary-foreground: oklch(0.15 0.02 155);
-  --secondary: oklch(0.27 0.02 260);
-  --secondary-foreground: oklch(0.97 0.005 260);
-  --muted: oklch(0.24 0.018 260);
-  --muted-foreground: oklch(0.68 0.02 260);
+  --secondary: oklch(0.27 0.02 155);
+  --secondary-foreground: oklch(0.97 0.005 155);
+  --muted: oklch(0.24 0.018 155);
+  --muted-foreground: oklch(0.68 0.02 155);
   --accent: oklch(0.3 0.04 280);
-  --accent-foreground: oklch(0.97 0.005 260);
+  --accent-foreground: oklch(0.97 0.005 155);
   --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.98 0.005 260);
-  --border: oklch(0.28 0.018 260);
-  --input: oklch(0.25 0.018 260);
+  --destructive-foreground: oklch(0.98 0.005 155);
+  --border: oklch(0.28 0.018 155);
+  --input: oklch(0.25 0.018 155);
   --ring: oklch(0.72 0.18 155);
 
   --success: oklch(0.72 0.18 155);
@@ -85,12 +85,15 @@
   --gradient-income: linear-gradient(135deg, oklch(0.5 0.18 155), oklch(0.7 0.17 170));
   --gradient-card: linear-gradient(135deg, oklch(0.23 0.02 265), oklch(0.2 0.018 255));
   --gradient-hero: linear-gradient(135deg, oklch(0.2 0.04 280) 0%, oklch(0.18 0.025 260) 50%, oklch(0.18 0.03 200) 100%);
-  /* Faixa de identidade (cabeçalho de página) — mesmo par de matizes do
-     --gradient-primary (155/175), só numa luminosidade mais baixa pra
-     funcionar como fundo com texto branco por cima. Fixa entre temas
-     (claro/escuro/alto-contraste) de propósito: é a assinatura de marca,
-     não uma superfície que deva se adaptar. */
-  --gradient-band: linear-gradient(155deg, oklch(0.4 0.13 155) 0%, oklch(0.46 0.12 175) 100%);
+  /* Faixa de identidade (cabeçalho de página) — mesmos valores exatos do
+     mockup aprovado (radredesign-desktop/mobile.html): brilho radial no
+     canto superior direito + gradiente verde-esmeralda→teal de 3 tons, já
+     embutidos juntos no mesmo background. Fixa entre temas (claro/escuro/
+     alto-contraste) de propósito: é a assinatura de marca, não uma
+     superfície que deva se adaptar. */
+  --gradient-band:
+    radial-gradient(120% 90% at 88% -10%, rgba(255, 255, 255, 0.16), transparent 55%),
+    linear-gradient(155deg, #0a6e46 0%, #0c8f74 52%, #12a68a 100%);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 4px 12px oklch(0 0 0 / 0.35);
@@ -99,30 +102,30 @@
 }
 
 .dark {
-  --background: oklch(0.16 0.015 260);
-  --foreground: oklch(0.97 0.005 260);
+  --background: oklch(0.16 0.015 155);
+  --foreground: oklch(0.97 0.005 155);
 }
 
 /* === Tema CLARO === */
 .theme-light {
-  --background: oklch(0.99 0.003 260);
-  --foreground: oklch(0.18 0.02 260);
+  --background: oklch(0.99 0.003 155);
+  --foreground: oklch(0.18 0.02 155);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 260);
+  --card-foreground: oklch(0.18 0.02 155);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 260);
+  --popover-foreground: oklch(0.18 0.02 155);
   --primary: oklch(0.55 0.18 155);
   --primary-foreground: oklch(0.99 0.005 155);
-  --secondary: oklch(0.95 0.01 260);
-  --secondary-foreground: oklch(0.2 0.02 260);
-  --muted: oklch(0.96 0.008 260);
-  --muted-foreground: oklch(0.45 0.02 260);
+  --secondary: oklch(0.95 0.01 155);
+  --secondary-foreground: oklch(0.2 0.02 155);
+  --muted: oklch(0.96 0.008 155);
+  --muted-foreground: oklch(0.45 0.02 155);
   --accent: oklch(0.94 0.02 280);
-  --accent-foreground: oklch(0.2 0.02 260);
+  --accent-foreground: oklch(0.2 0.02 155);
   --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.99 0.005 260);
-  --border: oklch(0.9 0.01 260);
-  --input: oklch(0.97 0.008 260);
+  --destructive-foreground: oklch(0.99 0.005 155);
+  --border: oklch(0.9 0.01 155);
+  --input: oklch(0.97 0.008 155);
   --ring: oklch(0.55 0.18 155);
   --success: oklch(0.55 0.18 155);
   --success-foreground: oklch(0.99 0.005 155);

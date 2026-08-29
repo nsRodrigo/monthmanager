@@ -20,7 +20,18 @@
       "Bash(npx tsc *)",
       "Bash(echo \"exit:$?\")",
       "Bash(npx prettier *)",
-      "Bash(sleep 2 && tail -10 /tmp/devserver.log)"
+      "Bash(sleep 2 && tail -10 /tmp/devserver.log)",
+      "Bash(curl -s -o /dev/null -w \"http:%{http_code}\\\\n\" http://localhost:8082/ *)",
+      "Bash(grep -n \"cardsAll.map\\\\|</section>\" \"c:/Users/rodri/Desktop/Estudos/monthmanager/src/routes/contas.\\\\$contaId_.\\\\$ano.\\\\$mes.tsx\" | sed -n '1,40p')",
+      "Read(//c/Users/rodri/Desktop/Estudos/monthmanager/src/routes/**)",
+      "Bash(powershell -Command \"Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 8082 -State Listen\\).OwningProcess -Force\")",
+      "Bash(mkdir -p C:/Users/rodri/AppData/Local/Temp/claude/c--Users-rodri-Desktop-Estudos-monthmanager/c9311cec-9619-41a9-9ebd-473f80e74cdb/scratchpad/pw)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(rm -f \"C:/Users/rodri/AppData/Local/Temp/auth-state.json\" *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\rodri\\AppData\\Local\\Temp"
     ]
   }
 }

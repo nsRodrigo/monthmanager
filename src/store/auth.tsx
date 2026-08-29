@@ -94,7 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setLoading(false);
+    // On success, onAuthStateChange fires enforceWhitelist(s, isInitial=false)
+    // for this event (isInitial only applies to the very first session
+    // resolution), which by design skips touching `loading` so background
+    // token-refresh events don't flicker the UI. That means nothing else
+    // clears it after a real sign-in — clear it here explicitly either way.
+    setLoading(false);
     return { error: error?.message ?? null };
   };
   const signUp = async (email: string, password: string) => {
@@ -122,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: { emailRedirectTo: `${window.location.origin}/` },
     });
-    if (error) setLoading(false);
+    setLoading(false);
     return { error: error?.message ?? null };
   };
   const signOut = async () => {

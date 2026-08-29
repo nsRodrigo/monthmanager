@@ -39,6 +39,7 @@ import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
+import { HeaderBand } from "@/components/HeaderBand";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -448,27 +449,26 @@ function AccountPane({
       )}
       {view.type !== "month" && (
         <>
-          {/* Mesma barra sticky + traço inferior da tela de Lançamentos — os
-              dois "topos de tela" usam exatamente o mesmo componente visual. */}
-          <div className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6">
-            <Link
-              to="/"
-              aria-label="Voltar para a Home"
-              title="Voltar para a Home"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Link>
-            <div className="flex items-center gap-2">
-              <YearPickerChip compact />
-            </div>
-          </div>
-          <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
-            Meses de {year}
-          </h1>
+          {/* Mesma faixa de identidade da tela de Lançamentos — os dois
+              "topos de tela" usam exatamente o mesmo componente visual. */}
+          <HeaderBand
+            className="sticky top-0 z-30 -mx-4 mb-5 md:-mx-6"
+            title={`Meses de ${year}`}
+            avatar={
+              <Link
+                to="/"
+                aria-label="Voltar para a Home"
+                title="Voltar para a Home"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Link>
+            }
+            right={<YearPickerChip compact />}
+          />
           {/* HEADER + DASHBOARD — só na lista de meses; a tela de lançamentos
               (um mês específico) não repete o card da conta, já visto aqui. */}
-          <header className="relative animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-hero p-4 shadow-elegant sm:p-6">
+          <header className="relative z-10 -mt-9 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"

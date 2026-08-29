@@ -3,7 +3,13 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { attachSupabaseAuth } from "@/integrations/supabase/client-auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { refreshGoogleAccessToken, revokeGoogleToken, uploadJsonToDrive } from "@/server/google-drive.server";
+import {
+  downloadDriveFile,
+  listDriveBackupFiles,
+  refreshGoogleAccessToken,
+  revokeGoogleToken,
+  uploadJsonToDrive,
+} from "@/server/google-drive.server";
 
 export const getGoogleDriveStatus = createServerFn({ method: "GET" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
@@ -47,6 +53,36 @@ export const disconnectGoogleDrive = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("google_drive_tokens").delete().eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const listGoogleDriveBackups = createServerFn({ method: "GET" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("google_drive_tokens")
+      .select("refresh_token")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Google Drive não está conectado.");
+    const accessToken = await refreshGoogleAccessToken(row.refresh_token);
+    return listDriveBackupFiles(accessToken);
+  });
+
+export const downloadGoogleDriveBackup = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .inputValidator((data) => z.object({ fileId: z.string().min(1) }).parse(data))
+  .handler(async ({ context, data }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("google_drive_tokens")
+      .select("refresh_token")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Google Drive não está conectado.");
+    const accessToken = await refreshGoogleAccessToken(row.refresh_token);
+    const json = await downloadDriveFile(accessToken, data.fileId);
+    return { json };
   });
 
 export const uploadBackupToGoogleDrive = createServerFn({ method: "POST" })

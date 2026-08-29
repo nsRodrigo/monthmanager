@@ -15,13 +15,16 @@ import {
   exportBackup,
   listSnapshots,
   loadSnapshot,
+  parseBackupJson,
   readBackupFile,
   restoreBackup,
 } from "@/lib/backup";
 import {
   connectGoogleDrive,
   disconnectGoogleDrive,
+  downloadGoogleDriveBackup,
   getGoogleDriveStatus,
+  listGoogleDriveBackups,
   uploadBackupToGoogleDrive,
 } from "@/lib/google-drive.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +34,7 @@ import {
   Check,
   ChevronLeft,
   Cloud,
+  CloudDownload,
   Download,
   HardDriveDownload,
   History,
@@ -300,7 +304,9 @@ function BackupPage() {
           </p>
         </section>
 
-        <GoogleDriveSection />
+        <GoogleDriveSection
+          onRestoreFromPayload={(payload, source) => setRestoreOpen({ payload, source })}
+        />
 
         <section className="rounded-xl border border-border bg-card/40 p-4">
           <div className="mb-3 flex items-center gap-2">
@@ -442,11 +448,17 @@ function BackupPage() {
 
 const GDRIVE_REDIRECT_FLAG = "gdrive_connecting";
 
-function GoogleDriveSection() {
+function GoogleDriveSection({
+  onRestoreFromPayload,
+}: {
+  onRestoreFromPayload: (payload: BackupPayload, source: string) => void;
+}) {
   const statusFn = useServerFn(getGoogleDriveStatus);
   const connectFn = useServerFn(connectGoogleDrive);
   const disconnectFn = useServerFn(disconnectGoogleDrive);
   const uploadFn = useServerFn(uploadBackupToGoogleDrive);
+  const listBackupsFn = useServerFn(listGoogleDriveBackups);
+  const downloadBackupFn = useServerFn(downloadGoogleDriveBackup);
 
   const [status, setStatus] = useState<{
     connected: boolean;
@@ -456,6 +468,9 @@ function GoogleDriveSection() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [driveFiles, setDriveFiles] = useState<
+    { id: string; name: string; createdTime: string; size?: string }[] | null
+  >(null);
   const finishingRef = useRef(false);
 
   async function refreshStatus() {
@@ -522,6 +537,38 @@ function GoogleDriveSection() {
       },
     });
     if (err) setError(err.message ?? "Erro ao conectar com o Google.");
+  }
+
+  async function onToggleDriveFiles() {
+    if (driveFiles) {
+      setDriveFiles(null);
+      return;
+    }
+    setError(null);
+    setBusy("list");
+    try {
+      setDriveFiles(await listBackupsFn());
+    } catch (e: any) {
+      setError(e.message ?? "Falha ao listar backups do Google Drive.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRestoreFromDrive(fileId: string, fileName: string) {
+    setError(null);
+    setInfo(null);
+    setBusy(`restore-${fileId}`);
+    try {
+      const { json } = await downloadBackupFn({ data: { fileId } });
+      const payload = parseBackupJson(json);
+      setDriveFiles(null);
+      onRestoreFromPayload(payload, `Google Drive: ${fileName}`);
+    } catch (e: any) {
+      setError(e.message ?? "Falha ao baixar backup do Google Drive.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function onDisconnect() {
@@ -600,6 +647,18 @@ function GoogleDriveSection() {
               Enviar backup agora
             </button>
             <button
+              onClick={onToggleDriveFiles}
+              disabled={busy === "list"}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium hover:border-primary disabled:opacity-60"
+            >
+              {busy === "list" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CloudDownload className="h-4 w-4" />
+              )}
+              Restaurar do Drive
+            </button>
+            <button
               onClick={onDisconnect}
               disabled={busy === "disconnect"}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:border-destructive/50 hover:text-destructive disabled:opacity-60"
@@ -612,6 +671,43 @@ function GoogleDriveSection() {
               Desconectar
             </button>
           </div>
+
+          {driveFiles && (
+            <div className="mt-3 rounded-lg border border-border bg-background p-2">
+              {driveFiles.length === 0 ? (
+                <p className="p-2 text-xs text-muted-foreground">
+                  Nenhum backup encontrado no Drive.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {driveFiles.map((f) => (
+                    <li
+                      key={f.id}
+                      className="flex items-center justify-between gap-2 rounded-md p-2 text-sm hover:bg-card/60"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{f.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {new Date(f.createdTime).toLocaleString("pt-BR")}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onRestoreFromDrive(f.id, f.name)}
+                        disabled={busy === `restore-${f.id}`}
+                        className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                      >
+                        {busy === `restore-${f.id}` ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          "Usar"
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -681,6 +777,9 @@ function RestoreDialog({
         setErr("Confirmação biométrica necessária para restaurar.");
         return;
       }
+      // Guarda uma cópia do estado atual antes de apagar — se a restauração
+      // sair errada, dá pra voltar por essa entrada na lista de Snapshots.
+      await createSnapshot(`Pré-restauração ${new Date().toLocaleString("pt-BR")}`);
       await restoreBackup(payload, selected, { wipeBeforeInsert: true });
       onDone();
     } catch (e: any) {
@@ -716,8 +815,9 @@ function RestoreDialog({
         </div>
 
         <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-          ⚠️ As entidades selecionadas serão <strong>substituídas</strong> pelo conteúdo do backup.
-          Os dados atuais dessas tabelas serão apagados.
+          ⚠️ As entidades selecionadas serão <strong>substituídas</strong> pelo conteúdo do backup. Os
+          dados atuais dessas tabelas serão apagados — mas antes disso um snapshot do estado atual é
+          salvo automaticamente. Se der errado, use "Restaurar" nele na seção Snapshots pra voltar.
         </div>
 
         <label className="mt-3 block text-xs">

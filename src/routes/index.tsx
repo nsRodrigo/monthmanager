@@ -22,6 +22,7 @@ import { formatCurrency, MONTHS } from "@/lib/format";
 import { Sparkline } from "@/components/Sparkline";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
+import { HeaderBand } from "@/components/HeaderBand";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -137,22 +138,22 @@ function Consolidated() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:py-12">
-      <header className="relative mb-8 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-primary capitalize">
-            {MONTHS[month]} {year}
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-4xl">Home</h1>
-          <p className="mt-1 text-muted-foreground">
-            Visão geral de todas as suas contas.
-          </p>
-        </div>
+      <div className="relative mb-8">
+        <HeaderBand
+          title="Home"
+          eyebrow={
+            <span className="capitalize">
+              {MONTHS[month]} {year}
+            </span>
+          }
+          subtitle="Visão geral de todas as suas contas."
+        />
         <div className="pointer-events-none absolute inset-x-0 top-1 hidden justify-center px-24 md:flex">
           <PaneTabsBar />
         </div>
-      </header>
+      </div>
 
-      <section className="overflow-hidden rounded-3xl border border-border bg-gradient-hero p-4 shadow-elegant sm:p-6">
+      <section className="relative z-10 -mt-9 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
         <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
         <p
           className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${

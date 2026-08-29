@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Wallet, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({ meta: [{ title: "Redefinir senha — Gestão Financeira" }] }),
@@ -44,19 +45,17 @@ function ResetPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-5">
-      <div className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-band px-5">
+      <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-elevated sm:p-8">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
-            <Wallet className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
-          </div>
+          <Logo size="md" />
           <div className="text-center">
             <h1 className="text-2xl font-bold">Gestão Financeira</h1>
             <p className="text-sm text-muted-foreground">Defina uma nova senha</p>
           </div>
         </div>
 
-        <form onSubmit={submit} className="space-y-3 rounded-2xl border border-border bg-card p-6">
+        <form onSubmit={submit} className="space-y-3">
           {!ready && (
             <p className="rounded-lg bg-warning/10 p-2 text-xs text-warning-foreground">
               Aguardando link de recuperação… Se você não veio por um link de email, peça um novo em "Esqueci minha senha".

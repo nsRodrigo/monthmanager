@@ -117,6 +117,12 @@ export async function exportBackup(formats: BackupFormat[], payload?: BackupPayl
   }
 }
 
+export function parseBackupJson(text: string): BackupPayload {
+  const parsed = JSON.parse(text);
+  if (!parsed?.data || typeof parsed.data !== "object") throw new Error("Arquivo inválido.");
+  return parsed as BackupPayload;
+}
+
 export async function readBackupFile(file: File): Promise<BackupPayload> {
   const name = file.name.toLowerCase();
   let text: string;
@@ -130,9 +136,7 @@ export async function readBackupFile(file: File): Promise<BackupPayload> {
   } else {
     throw new Error("Apenas arquivos .json ou .zip são aceitos para restauração.");
   }
-  const parsed = JSON.parse(text);
-  if (!parsed?.data || typeof parsed.data !== "object") throw new Error("Arquivo inválido.");
-  return parsed as BackupPayload;
+  return parseBackupJson(text);
 }
 
 /** Apaga e reinsere as tabelas selecionadas com o conteúdo do payload. */

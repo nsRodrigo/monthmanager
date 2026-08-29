@@ -1,23 +1,13 @@
 import { useState, useEffect } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import {
-  User,
-  Sun,
-  Moon,
-  Contrast,
-  Check,
-  KeyRound,
-  Eye,
-  EyeOff,
-  ChevronLeft,
-  Palette,
-} from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
+import { HeaderBand } from "@/components/HeaderBand";
 
 export const Route = createFileRoute("/perfil")({
   head: () => ({ meta: [{ title: "Meu perfil — Finanças" }] }),
@@ -97,15 +87,13 @@ function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" /> Home
-        </Link>
+      <div className="mb-6">
+        <HeaderBand
+          title="Meu perfil"
+          subtitle="Dados pessoais, tema e segurança."
+          onBack={goBack}
+        />
       </div>
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Meu perfil</h1>
-        <p className="text-sm text-muted-foreground">Dados pessoais, tema e segurança.</p>
-      </header>
 
       <div className="space-y-6 pb-20">
         <section className="rounded-xl border border-border bg-card/40 p-4">

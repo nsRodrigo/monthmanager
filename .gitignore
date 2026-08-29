@@ -30,3 +30,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env vars — nunca versionar (segredos como GOOGLE_CLIENT_SECRET vivem aqui em dev local)
+.env

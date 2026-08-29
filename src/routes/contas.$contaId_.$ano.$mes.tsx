@@ -46,9 +46,9 @@ import {
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
+import { HeaderBand } from "@/components/HeaderBand";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
-  ChevronLeft,
   ChevronDown,
   Plus,
   CreditCard,
@@ -787,39 +787,27 @@ export function MonthDetailPane({
       {/* Top nav — sticky so the year picker stays accessible while scrolling.
           Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
-      <div className={`sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6 ${embedded ? "" : "relative"}`}>
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Voltar"
-          title="Voltar"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
+      <div className={`sticky top-0 z-30 -mx-4 mb-5 md:-mx-6 ${embedded ? "" : "relative"}`}>
+        <HeaderBand
+          title="Lançamentos"
+          onBack={onBack}
+          right={
+            <MonthYearPicker
+              contaId={contaId}
+              year={year}
+              month={month}
+              prev={prevMonth}
+              next={nextMonth}
+              onNavigate={onMonthChange}
+            />
+          }
+        />
         {!embedded && (
-          <div className="pointer-events-none absolute inset-x-0 hidden justify-center px-16 md:flex">
+          <div className="pointer-events-none absolute inset-x-0 top-4 hidden justify-center px-16 md:flex">
             <PaneTabsBar />
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <MonthYearPicker
-            contaId={contaId}
-            year={year}
-            month={month}
-            prev={prevMonth}
-            next={nextMonth}
-            onNavigate={onMonthChange}
-          />
-        </div>
       </div>
-
-      {/* Header */}
-      <header className="mb-4">
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-          Lançamentos
-        </h1>
-      </header>
 
       {/* Frame com saldo atual e gastos totais */}
       <MonthSummaryFrame
@@ -1766,7 +1754,7 @@ function MonthSummaryFrame({
   const finalTone = saldoFinal >= 0 ? "text-primary" : "text-destructive";
   const finalBg = saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   return (
-    <div className="animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-gradient-hero p-3 shadow-elegant sm:p-4">
+    <div className="relative z-10 -mt-9 animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4">
       <div className={`rounded-xl border p-3 ${inicialBg}`}>
         <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
           <Wallet className="h-3 w-3" /> Saldo Inicial

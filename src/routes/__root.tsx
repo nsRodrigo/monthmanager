@@ -22,6 +22,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
+import { Logo } from "@/components/Logo";
+import { AppLoader } from "@/components/AppLoader";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -179,9 +181,7 @@ function SidebarContent({
   return (
     <>
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-          <Wallet className="h-5 w-5 text-primary-foreground" />
-        </div>
+        <Logo size="sm" />
         <span className={`text-lg font-bold tracking-tight whitespace-nowrap ${labelClass}`}>
           Gestão Financeira
         </span>
@@ -411,28 +411,31 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <AccountFilterProvider>
-            <PanesRegistryProvider>
-              <ConfirmProvider>
-                <NavigationLoader />
-                <RealtimeSync />
-                <LockSettingsProvider>
-                  <BiometricLock>
-                    <AuthGate>
-                      <Outlet />
-                    </AuthGate>
-                  </BiometricLock>
-                </LockSettingsProvider>
-                <UndoRedoBar />
-                <InstallPrompt />
-              </ConfirmProvider>
-            </PanesRegistryProvider>
-          </AccountFilterProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <>
+      <AppLoader />
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <AccountFilterProvider>
+              <PanesRegistryProvider>
+                <ConfirmProvider>
+                  <NavigationLoader />
+                  <RealtimeSync />
+                  <LockSettingsProvider>
+                    <BiometricLock>
+                      <AuthGate>
+                        <Outlet />
+                      </AuthGate>
+                    </BiometricLock>
+                  </LockSettingsProvider>
+                  <UndoRedoBar />
+                  <InstallPrompt />
+                </ConfirmProvider>
+              </PanesRegistryProvider>
+            </AccountFilterProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </>
   );
 }

@@ -65,6 +65,38 @@ export async function uploadJsonToDrive(
   return (await res.json()) as { id: string };
 }
 
+export type DriveBackupFile = { id: string; name: string; createdTime: string; size?: string };
+
+export async function listDriveBackupFiles(accessToken: string): Promise<DriveBackupFile[]> {
+  const params = new URLSearchParams({
+    q: "name contains 'backup-financeiro' and trashed = false",
+    fields: "files(id,name,createdTime,size)",
+    orderBy: "createdTime desc",
+    pageSize: "50",
+  });
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Falha ao listar backups no Google Drive (${res.status}): ${text}`);
+  }
+  const json = (await res.json()) as { files?: DriveBackupFile[] };
+  return json.files ?? [];
+}
+
+export async function downloadDriveFile(accessToken: string, fileId: string): Promise<string> {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Falha ao baixar backup do Google Drive (${res.status}): ${text}`);
+  }
+  return res.text();
+}
+
 /** Melhor esforço — revoga o refresh token no Google ao desconectar. Nunca lança. */
 export async function revokeGoogleToken(refreshToken: string): Promise<void> {
   try {

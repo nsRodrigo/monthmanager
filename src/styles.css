@@ -85,6 +85,12 @@
   --gradient-income: linear-gradient(135deg, oklch(0.5 0.18 155), oklch(0.7 0.17 170));
   --gradient-card: linear-gradient(135deg, oklch(0.23 0.02 265), oklch(0.2 0.018 255));
   --gradient-hero: linear-gradient(135deg, oklch(0.2 0.04 280) 0%, oklch(0.18 0.025 260) 50%, oklch(0.18 0.03 200) 100%);
+  /* Faixa de identidade (cabeçalho de página) — mesmo par de matizes do
+     --gradient-primary (155/175), só numa luminosidade mais baixa pra
+     funcionar como fundo com texto branco por cima. Fixa entre temas
+     (claro/escuro/alto-contraste) de propósito: é a assinatura de marca,
+     não uma superfície que deva se adaptar. */
+  --gradient-band: linear-gradient(155deg, oklch(0.4 0.13 155) 0%, oklch(0.46 0.12 175) 100%);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 4px 12px oklch(0 0 0 / 0.35);
@@ -295,6 +301,7 @@
   .bg-gradient-income { background-image: var(--gradient-income); }
   .bg-gradient-card { background-image: var(--gradient-card); }
   .bg-gradient-hero { background-image: var(--gradient-hero); }
+  .bg-gradient-band { background-image: var(--gradient-band); }
   .shadow-elegant { box-shadow: var(--shadow-md); }
   .shadow-glow { box-shadow: var(--shadow-glow); }
   .shadow-elevated { box-shadow: var(--shadow-lg); }

@@ -5,7 +5,22 @@
       "Bash(head -30 /tmp/out.txt)",
       "Bash(curl -s \"http://localhost:8080/src/components/AddDebitDialog.tsx\" -o /tmp/debit.js -w \"%{http_code}\\\\n\"; grep -n \"Tipo de pagamento\\\\|Marcar pago\\\\|PaidToggle\" /tmp/debit.js | head -20)",
       "Bash(curl -s \"http://localhost:8080/src/components/EditInstallmentDialog.tsx\" -o /tmp/edit.js -w \"%{http_code}\\\\n\"; grep -n \"Tipo de pagamento\\\\|PaidToggle\\\\|Marcar pago\\\\|Marcar recebido\" /tmp/edit.js | head -20)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npm run *)",
+      "Bash(sleep 4 && cat /tmp/devserver.log)",
+      "Bash(tail -40 /tmp/devserver.log)",
+      "Bash(sleep 2 && tail -30 /tmp/devserver.log)",
+      "Bash(npx --yes playwright screenshot --help)",
+      "Bash(npx --yes playwright screenshot --wait-for-timeout=2000 --full-page http://localhost:8080/ /tmp/screenshot.png)",
+      "Read(//c/Users/rodri/AppData/Local/Temp/**)",
+      "Bash(npx --yes playwright screenshot --wait-for-timeout=6000 --full-page http://localhost:8080/ /tmp/screenshot2.png)",
+      "Bash(sleep 2 && tail -20 /tmp/devserver.log)",
+      "Bash(sleep 2 && tail -15 /tmp/devserver.log)",
+      "Bash(grep -E 'Logo|HeaderBand|index\\\\.tsx|perfil\\\\.tsx|auth\\\\.tsx|reset-password\\\\.tsx|contas\\\\.\\\\$contaId\\\\.tsx|__root\\\\.tsx')",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(npx prettier *)",
+      "Bash(sleep 2 && tail -10 /tmp/devserver.log)"
     ]
   }
 }

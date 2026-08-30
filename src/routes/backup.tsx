@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { HeaderBand } from "@/components/HeaderBand";
 import { useServerFn } from "@tanstack/react-start";
 import {
   BACKUP_TABLES,
@@ -32,7 +33,6 @@ import { useConfirm } from "@/store/confirm";
 import { useBiometricStepUp } from "@/hooks/use-biometric-stepup";
 import {
   Check,
-  ChevronLeft,
   Cloud,
   CloudDownload,
   Download,
@@ -94,6 +94,8 @@ function shouldRunAuto(freq: Freq, last: string | null): boolean {
 }
 
 function BackupPage() {
+  const navigate = useNavigate();
+  const goBack = () => navigate({ to: "/" });
   const confirmDialog = useConfirm();
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const [busy, setBusy] = useState<string | null>(null);
@@ -222,22 +224,14 @@ function BackupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" /> Home
-        </Link>
-      </div>
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Backup e Sincronização</h1>
-        <p className="text-sm text-muted-foreground">
-          Exporte, restaure e mantenha versões dos seus dados financeiros.
-        </p>
-      </header>
-      <div className="space-y-6 pb-20">
+    <div>
+      <HeaderBand
+        title="Backup e Sincronização"
+        subtitle="Exporte, restaure e mantenha versões dos seus dados financeiros."
+        onBack={goBack}
+      />
+      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
+      <div className="space-y-6 pt-6 pb-20">
         {error && (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {error}
@@ -441,6 +435,7 @@ function BackupPage() {
             }}
           />
         )}
+      </div>
       </div>
     </div>
   );

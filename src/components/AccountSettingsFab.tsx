@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { SettingsFabActions } from "@/components/SettingsFabActions";
+import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 
 /**
  * Botão flutuante de configurações — Home e Meses no mobile. Reúne as opções
@@ -10,6 +11,7 @@ import { SettingsFabActions } from "@/components/SettingsFabActions";
  */
 export function AccountSettingsFab() {
   const [open, setOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
 
   return (
     <div className="md:hidden">
@@ -19,7 +21,10 @@ export function AccountSettingsFab() {
       <div className="fixed bottom-10 right-4 z-40 flex flex-col items-end gap-3">
         {open && (
           <div className="flex flex-col items-end gap-2.5">
-            <SettingsFabActions onNavigate={() => setOpen(false)} />
+            <SettingsFabActions
+              onNavigate={() => setOpen(false)}
+              onManageAccounts={() => setManageOpen(true)}
+            />
           </div>
         )}
         <button
@@ -34,6 +39,7 @@ export function AccountSettingsFab() {
           <Menu className="h-6 w-6" />
         </button>
       </div>
+      <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
     </div>
   );
 }

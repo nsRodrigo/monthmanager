@@ -1,6 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Trash2, Plus, ShieldCheck, ShieldOff, UserX, Users, Check, X, Bell, Clock } from "lucide-react";
+import { Trash2, Plus, ShieldCheck, ShieldOff, UserX, Users, Check, X, Bell, Clock } from "lucide-react";
+import { HeaderBand } from "@/components/HeaderBand";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useIsAdmin, useMyRoles, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
@@ -25,6 +26,7 @@ function WhitelistAdmin() {
   const { isLoading } = useMyRoles();
   const isAdmin = useIsAdmin();
   const navigate = useNavigate();
+  const goBack = () => navigate({ to: "/" });
   const { data: whitelistData, isLoading: loadingList } = useWhitelist();
   const list = Array.isArray(whitelistData) ? whitelistData : [];
   const addMut = useAddToWhitelist();
@@ -182,19 +184,14 @@ function WhitelistAdmin() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" /> Home
-        </Link>
-      </div>
-
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Administração</h1>
-        <p className="text-sm text-muted-foreground">Whitelist de cadastros e usuários ativos.</p>
-      </header>
-
-      <div className="space-y-6 pb-20">
+    <div>
+      <HeaderBand
+        title="Administração"
+        subtitle="Whitelist de cadastros e usuários ativos."
+        onBack={goBack}
+      />
+      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
+      <div className="space-y-6 pt-6 pb-20">
 
       {/* Push notifications */}
       <section className="rounded-xl border border-border bg-card/40 p-4">
@@ -368,6 +365,7 @@ function WhitelistAdmin() {
           </div>
         )}
       </section>
+      </div>
       </div>
     </div>
   );

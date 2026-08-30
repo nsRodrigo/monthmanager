@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccounts,
   useCards,
@@ -24,6 +24,7 @@ import { useProfile } from "@/store/profile";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Sparkline } from "@/components/Sparkline";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
+import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
 import {
@@ -55,6 +56,7 @@ const ICON_BY_TYPE = {
 } as const;
 
 function Consolidated() {
+  const [manageOpen, setManageOpen] = useState(false);
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -127,18 +129,26 @@ function Consolidated() {
 
   if (accounts.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
-          <Wallet className="h-8 w-8" />
+      <div>
+        <HeaderBand title="Home" />
+        <div className="mx-auto max-w-2xl px-5 pt-10 pb-16 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+            <Wallet className="h-8 w-8" />
+          </div>
+          <h1 className="mt-6 text-3xl font-bold tracking-tight">Bem-vindo!</h1>
+          <p className="mt-2 text-muted-foreground">
+            Comece criando sua primeira conta bancária. Cada conta organiza seus cartões,
+            débitos, recebimentos e investimentos.
+          </p>
+          <button
+            type="button"
+            onClick={() => setManageOpen(true)}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow hover:opacity-90"
+          >
+            Adicionar conta
+          </button>
         </div>
-        <h1 className="mt-6 text-3xl font-bold tracking-tight">Bem-vindo!</h1>
-        <p className="mt-2 text-muted-foreground">
-          Comece criando sua primeira conta bancária. Cada conta organiza seus cartões,
-          débitos, recebimentos e investimentos.
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use o botão <strong>Adicionar conta</strong> na lateral para começar.
-        </p>
+        <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
       </div>
     );
   }

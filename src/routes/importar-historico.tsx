@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { HeaderBand } from "@/components/HeaderBand";
 import {
   parseHistoricalWorkbook,
   summarizeSections,
@@ -21,7 +22,6 @@ import {
   Check,
   AlertCircle,
   ChevronRight,
-  ChevronLeft,
   ChevronDown,
   Trash2,
   Database,
@@ -48,6 +48,8 @@ const MONTH_NAMES = [
 ];
 
 function HistoricalImportPage() {
+  const navigate = useNavigate();
+  const goBack = () => navigate({ to: "/" });
   const [results, setResults] = useState<ParseResult[]>([]);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -181,20 +183,14 @@ function HistoricalImportPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-8 md:py-12">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" /> Home
-        </Link>
-      </div>
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Importar planilha histórica</h1>
-        <p className="text-sm text-muted-foreground">
-          Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções.
-        </p>
-      </header>
-
-      <div className="space-y-6 pb-20">
+    <div>
+      <HeaderBand
+        title="Importar planilha histórica"
+        subtitle="Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções."
+        onBack={goBack}
+      />
+      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
+      <div className="space-y-6 pt-6 pb-20">
 
       {/* Zona perigosa */}
       <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
@@ -444,6 +440,7 @@ function HistoricalImportPage() {
           </section>
         </>
       )}
+      </div>
       </div>
     </div>
   );

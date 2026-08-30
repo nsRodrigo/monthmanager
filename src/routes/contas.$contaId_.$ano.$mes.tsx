@@ -86,6 +86,7 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
 import { SettingsFabActions } from "@/components/SettingsFabActions";
+import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
 
@@ -206,6 +207,7 @@ export function MonthDetailPane({
   const [openCard, setOpenCard] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [fabView, setFabView] = useState<"create" | "settings">("create");
+  const [manageOpen, setManageOpen] = useState(false);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [moveMonthOpen, setMoveMonthOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -1701,6 +1703,7 @@ export function MonthDetailPane({
                   <SettingsFabActions
                     onNavigate={() => setFabOpen(false)}
                     onBack={() => setFabView("create")}
+                    onManageAccounts={() => setManageOpen(true)}
                   />
                 </div>
               )}
@@ -1831,6 +1834,7 @@ export function MonthDetailPane({
         loading={moveEntries.isPending}
         onConfirm={bulkMove}
       />
+      <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
       </div>
     </div>
   );

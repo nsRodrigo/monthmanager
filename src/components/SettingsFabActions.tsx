@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft } from "lucide-react";
 import { FabAction } from "@/components/FabAction";
-import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
 
@@ -10,18 +8,23 @@ import { useIsAdmin } from "@/store/roles";
  * Lista de ações de configuração (mesmas do antigo menu lateral, exceto a
  * lista de contas) — usada tanto no FAB próprio de Home/Meses quanto dentro
  * do "+" da tela de Lançamento (com `onBack` para o item "Voltar").
+ *
+ * `onManageAccounts` fica a cargo de quem chama (em vez de um estado local
+ * + `ManageAccountsDialog` aqui dentro): `onNavigate` fecha o FAB, o que
+ * desmontaria este componente — e o diálogo junto — antes de abrir.
  */
 export function SettingsFabActions({
   onNavigate,
   onBack,
+  onManageAccounts,
 }: {
   onNavigate: () => void;
   onBack?: () => void;
+  onManageAccounts: () => void;
 }) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const isAdmin = useIsAdmin();
-  const [manageOpen, setManageOpen] = useState(false);
 
   return (
     <>
@@ -31,7 +34,7 @@ export function SettingsFabActions({
         label="Gerenciar conta"
         tone="primary"
         onClick={() => {
-          setManageOpen(true);
+          onManageAccounts();
           onNavigate();
         }}
       />
@@ -82,7 +85,6 @@ export function SettingsFabActions({
           signOut();
         }}
       />
-      <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
     </>
   );
 }

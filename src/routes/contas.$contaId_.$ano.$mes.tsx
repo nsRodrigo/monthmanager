@@ -15,6 +15,7 @@ import {
   useToggleIncomeReceived,
   useBulkReceiveIncomes,
   useRemoveIncome,
+  useAddIncome,
   useToggleInstallmentPaid,
   useSetCardPaid,
   useRemovePurchase,
@@ -71,6 +72,8 @@ import {
   MoreHorizontal,
   Settings,
   CalendarClock,
+  Banknote,
+  FileText,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -192,6 +195,7 @@ export function MonthDetailPane({
   const toggleIncome = useToggleIncomeReceived();
   const bulkReceiveIncomes = useBulkReceiveIncomes();
   const removeIncome = useRemoveIncome();
+  const addIncome = useAddIncome();
   const removeInvestment = useRemoveInvestment();
   const reorderCards = useReorderCards();
   const moveEntries = useMoveEntriesToMonth();
@@ -492,6 +496,196 @@ export function MonthDetailPane({
         });
       }
     }
+    clearSelection();
+  };
+
+  /**
+   * Gera um recebimento avulso equivalente a cada débito/compra selecionado
+   * (ex.: emprestou o cartão pra alguém que parcelou uma compra — em vez de
+   * lançar manualmente o recebimento todo mês, seleciona a parcela da fatura
+   * daquele mês e gera o recebível correspondente). Só disponível nas seções
+   * de débitos e cartões (ver botão condicional mais abaixo).
+   * Usa o valor/data da parcela deste mês quando o item é parcelado/recorrente
+   * ou de cartão; senão usa o valor/data do lançamento avulso.
+   */
+  const bulkGenerateReceivable = async (key: SelectionKey) => {
+    if (!selection || selection.key !== key) return;
+    if (key !== "debits" && !key.startsWith("card:")) return;
+    const ids = Array.from(selection.ids);
+    const instFor = (parentType: "debit" | "purchase", parentId: string) =>
+      installmentsList.find(
+        (i) =>
+          i.parentType === parentType &&
+          i.parentId === parentId &&
+          i.year === year &&
+          i.month === month,
+      );
+    for (const id of ids) {
+      let description: string;
+      let amount: number;
+      let date: string;
+      if (key === "debits") {
+        const d = allDebits.find((x) => x.id === id);
+        if (!d) continue;
+        if (d.isParent) {
+          const inst = instFor("debit", id);
+          if (!inst) continue;
+          amount = inst.amount;
+          date = inst.referenceDate ?? inst.dueDate;
+        } else {
+          amount = d.amount;
+          date = d.date;
+        }
+        description = d.description;
+      } else {
+        const pur = purchasesList.find((x) => x.id === id);
+        if (!pur) continue;
+        const inst = instFor("purchase", id);
+        if (!inst) continue;
+        amount = inst.amount;
+        date = inst.referenceDate ?? inst.dueDate;
+        description = pur.description;
+      }
+      await addIncome.mutateAsync({ accountId: contaId, description, amount, date });
+    }
+    clearSelection();
+  };
+
+  const selectionSectionLabel = (key: SelectionKey) => {
+    if (key === "incomes") return "Recebimentos";
+    if (key === "debits") return "Débitos";
+    if (key === "investments") return "Investimentos";
+    const cardId = key.slice("card:".length);
+    const card = accountCards.find((c) => c.id === cardId);
+    return card ? `Compras — ${card.name}` : "Compras";
+  };
+
+  /** Resolve cada id selecionado para uma linha de relatório (descrição/data/valor/status),
+   *  usando o valor/data da parcela deste mês quando o item é parcelado/de cartão. */
+  const resolveSelectionRows = (key: SelectionKey, ids: string[]) => {
+    const instFor = (
+      parentType: "debit" | "income" | "investment" | "purchase",
+      parentId: string,
+    ) =>
+      installmentsList.find(
+        (i) =>
+          i.parentType === parentType &&
+          i.parentId === parentId &&
+          i.year === year &&
+          i.month === month,
+      );
+    const rows: { description: string; date: string; amount: number; status: string }[] = [];
+    if (key === "incomes") {
+      for (const id of ids) {
+        const i = allIncomes.find((x) => x.id === id);
+        if (!i) continue;
+        if (i.isParent) {
+          const inst = instFor("income", id);
+          if (!inst) continue;
+          rows.push({
+            description: i.description,
+            date: inst.referenceDate ?? inst.dueDate,
+            amount: inst.amount,
+            status: inst.paid ? "Recebido" : "Pendente",
+          });
+        } else {
+          rows.push({
+            description: i.description,
+            date: i.date,
+            amount: i.amount,
+            status: i.received ? "Recebido" : "Pendente",
+          });
+        }
+      }
+    } else if (key === "debits") {
+      for (const id of ids) {
+        const d = allDebits.find((x) => x.id === id);
+        if (!d) continue;
+        if (d.isParent) {
+          const inst = instFor("debit", id);
+          if (!inst) continue;
+          rows.push({
+            description: d.description,
+            date: inst.referenceDate ?? inst.dueDate,
+            amount: inst.amount,
+            status: inst.paid ? "Pago" : "Pendente",
+          });
+        } else {
+          rows.push({
+            description: d.description,
+            date: d.date,
+            amount: d.amount,
+            status: d.paid ? "Pago" : "Pendente",
+          });
+        }
+      }
+    } else if (key === "investments") {
+      for (const id of ids) {
+        const v = allInvestments.find((x) => x.id === id);
+        if (!v) continue;
+        if (v.isParent) {
+          const inst = instFor("investment", id);
+          if (!inst) continue;
+          rows.push({
+            description: v.type,
+            date: inst.referenceDate ?? inst.dueDate,
+            amount: inst.amount,
+            status: "",
+          });
+        } else {
+          rows.push({ description: v.type, date: v.date, amount: v.amount, status: "" });
+        }
+      }
+    } else if (key.startsWith("card:")) {
+      for (const id of ids) {
+        const pur = purchasesList.find((x) => x.id === id);
+        if (!pur) continue;
+        const inst = instFor("purchase", id);
+        if (!inst) continue;
+        rows.push({
+          description: pur.description,
+          date: inst.referenceDate ?? inst.dueDate,
+          amount: inst.amount,
+          status: inst.paid ? "Pago" : "Pendente",
+        });
+      }
+    }
+    return rows.sort((a, b) => a.date.localeCompare(b.date));
+  };
+
+  /**
+   * Gera e baixa um PDF com os itens selecionados (descrição/data/status/valor) e o total.
+   * jsPDF (~475kB) é importado dinamicamente aqui para não pesar o bundle da
+   * rota do mês, que carrega sempre — só baixa quando o usuário realmente
+   * clica em "Gerar PDF".
+   */
+  const bulkGeneratePdf = async (key: SelectionKey) => {
+    if (!selection || selection.key !== key) return;
+    const rows = resolveSelectionRows(key, Array.from(selection.ids));
+    if (rows.length === 0) return;
+    const total = rows.reduce((s, r) => s + r.amount, 0);
+    const title = selectionSectionLabel(key);
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(title, 14, 16);
+    doc.setFontSize(10);
+    doc.setTextColor(90);
+    doc.text(`${account?.name ?? ""} · ${MONTHS[month]} ${year}`, 14, 22);
+    autoTable(doc, {
+      startY: 28,
+      head: [["Descrição", "Data", "Status", "Valor"]],
+      body: rows.map((r) => [r.description, formatDate(r.date), r.status, formatCurrency(r.amount)]),
+      foot: [["", "", "Total", formatCurrency(total)]],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [16, 122, 87] },
+      footStyles: { fillColor: [240, 240, 240], textColor: [20, 20, 20], fontStyle: "bold" },
+    });
+    const safeTitle = title.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "_");
+    doc.save(`${safeTitle}_${MONTHS[month]}_${year}.pdf`);
     clearSelection();
   };
 
@@ -1587,6 +1781,26 @@ export function MonthDetailPane({
               >
                 {bulkMenuOpen && (
                   <div className="flex flex-col items-end gap-2.5">
+                    {(selection.key === "debits" || selection.key.startsWith("card:")) && (
+                      <FabAction
+                        icon={Banknote}
+                        label="Gerar recebível"
+                        tone="income"
+                        onClick={() => {
+                          bulkGenerateReceivable(selection.key);
+                          setBulkMenuOpen(false);
+                        }}
+                      />
+                    )}
+                    <FabAction
+                      icon={FileText}
+                      label="Gerar PDF"
+                      tone="primary"
+                      onClick={() => {
+                        bulkGeneratePdf(selection.key);
+                        setBulkMenuOpen(false);
+                      }}
+                    />
                     <FabAction
                       icon={Copy}
                       label="Duplicar"

@@ -46,7 +46,7 @@ const queryClient = new QueryClient({
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Página não encontrada</h2>
@@ -69,7 +69,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#0f172a" },
+      { name: "theme-color", content: "#0a6e46" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
@@ -365,7 +365,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-dvh items-center justify-center bg-background">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-label="Carregando"
@@ -378,7 +378,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (isPublic) return <>{children}</>;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-dvh bg-background">
       {/* Desktop/tablet: sempre expandida (240px), sem recolher. No mobile a
           navegação vive nos botões flutuantes de cada tela (☰ na Home/Meses,
           "Configurações" dentro do "+" no Lançamento) em vez de uma gaveta. */}

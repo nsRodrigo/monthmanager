@@ -15,6 +15,7 @@ export function HeaderBand({
   right,
   onClose,
   className = "",
+  collapsible = false,
 }: {
   title: string;
   eyebrow?: ReactNode;
@@ -25,10 +26,33 @@ export function HeaderBand({
   /** Botão de fechar painel, no canto superior direito da faixa (distinto de `onBack`). */
   onClose?: () => void;
   className?: string;
+  /**
+   * Quando true, a faixa encolhe (título/eyebrow somem) ao rolar a tela,
+   * guiada pela CSS var `--band-p` (0–1) que `useBandScrollProgress` liga no
+   * ancestral com scroll real — `onBack`/`avatar`/`right` continuam sempre
+   * visíveis, só o bloco de título é que recolhe.
+   */
+  collapsible?: boolean;
 }) {
   return (
     <div
-      className={`relative overflow-hidden bg-gradient-band px-5 pt-[22px] pb-10 sm:px-[30px] ${className}`}
+      className={`relative overflow-hidden bg-gradient-band px-5 sm:px-[30px] ${
+        collapsible ? "" : "pb-10"
+      } ${className}`}
+      style={
+        collapsible
+          ? {
+              paddingTop: "calc(22px - 6px * var(--band-p, 0) + env(safe-area-inset-top))",
+              paddingBottom: "calc(40px - 34px * var(--band-p, 0))",
+              transition: "padding-top .12s linear, padding-bottom .12s linear",
+            }
+          : {
+              // Faixa agora fica sticky no topo de verdade em todas as telas —
+              // soma a safe-area pra não desenhar o botão voltar/avatar por
+              // baixo do notch/status bar no iOS (viewport-fit=cover).
+              paddingTop: "calc(22px + env(safe-area-inset-top))",
+            }
+      }
     >
       {onClose && (
         <button
@@ -53,7 +77,19 @@ export function HeaderBand({
           </button>
         )}
         {avatar}
-        <div className="min-w-0 flex-1">
+        <div
+          className="min-w-0 flex-1"
+          style={
+            collapsible
+              ? {
+                  opacity: "calc(1 - var(--band-p, 0))",
+                  maxHeight: "calc(52px * (1 - var(--band-p, 0)))",
+                  overflow: "hidden",
+                  transition: "opacity .12s linear",
+                }
+              : undefined
+          }
+        >
           {eyebrow && (
             <p className="truncate text-[11.5px] font-medium text-white/70">{eyebrow}</p>
           )}

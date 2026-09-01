@@ -40,6 +40,7 @@ import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
+import { useBandScrollProgress } from "@/hooks/use-band-scroll-progress";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -204,6 +205,7 @@ function AccountPane({
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
   const { data: investments = [] } = useInvestments();
+  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ collapseRange: 130, frameRange: 68 });
 
   const account = accounts.find((a) => a.id === contaId);
   const { setAccountId } = useAccountFilter();
@@ -438,31 +440,33 @@ function AccountPane({
         <>
           {/* Mesma faixa de identidade da tela de Lançamentos — os dois
               "topos de tela" usam exatamente o mesmo componente visual. */}
-          <HeaderBand
-            className="sticky top-0 z-10"
-            title={account.name}
-            eyebrow={<span className="capitalize">{account.type}</span>}
-            avatar={
-              !onClose && (
-                <Link
-                  to="/"
-                  aria-label="Voltar para a Home"
-                  title="Voltar para a Home"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Link>
-              )
-            }
-            right={<YearPickerChip compact />}
-            onClose={onClose}
-          />
+          <div ref={bandAnchorRef} className="sticky top-0 z-10">
+            <HeaderBand
+              collapsible
+              title={account.name}
+              eyebrow={<span className="capitalize">{account.type}</span>}
+              avatar={
+                !onClose && (
+                  <Link
+                    to="/"
+                    aria-label="Voltar para a Home"
+                    title="Voltar para a Home"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Link>
+                )
+              }
+              right={<YearPickerChip compact />}
+              onClose={onClose}
+            />
+          </div>
           <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
           {/* HERO + DASHBOARD — só na lista de meses; a tela de lançamentos
               (um mês específico) não repete o card da conta, já visto aqui.
               Nome/tipo já aparecem na HeaderBand acima, então aqui só o
               saldo (mesmo padrão do "hero" da Home) + tendência. */}
-          <header className="relative z-20 -mt-6 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
+          <header className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm text-muted-foreground">Saldo atual</p>

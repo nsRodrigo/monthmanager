@@ -185,11 +185,13 @@ function WhitelistAdmin() {
 
   return (
     <div>
-      <HeaderBand
-        title="Administração"
-        subtitle="Whitelist de cadastros e usuários ativos."
-        onBack={goBack}
-      />
+      <div className="sticky top-0 z-10">
+        <HeaderBand
+          title="Administração"
+          subtitle="Whitelist de cadastros e usuários ativos."
+          onBack={goBack}
+        />
+      </div>
       <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
       <div className="space-y-6 pt-6 pb-20">
 

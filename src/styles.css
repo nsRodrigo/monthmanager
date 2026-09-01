@@ -298,6 +298,15 @@
     animation: modal-pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
+  /* Card sobreposto ao topo da faixa verde (Saldo previsto/atual): some com
+     fade suave ao rolar, ligado por `useBandScrollProgress` na var --band-pf,
+     em vez de ficar visualmente cortado pela faixa (que hoje é sticky). */
+  .header-frame-fade {
+    opacity: calc(1 - var(--band-pf, 0));
+    transform: translateY(calc(-8px * var(--band-pf, 0)));
+    transition: opacity 0.1s linear;
+  }
+
   .bg-gradient-primary { background-image: var(--gradient-primary); }
   .bg-gradient-credit { background-image: var(--gradient-credit); }
   .bg-gradient-debit { background-image: var(--gradient-debit); }

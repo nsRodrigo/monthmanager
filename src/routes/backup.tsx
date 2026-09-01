@@ -225,11 +225,13 @@ function BackupPage() {
 
   return (
     <div>
-      <HeaderBand
-        title="Backup e Sincronização"
-        subtitle="Exporte, restaure e mantenha versões dos seus dados financeiros."
-        onBack={goBack}
-      />
+      <div className="sticky top-0 z-10">
+        <HeaderBand
+          title="Backup e Sincronização"
+          subtitle="Exporte, restaure e mantenha versões dos seus dados financeiros."
+          onBack={goBack}
+        />
+      </div>
       <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
       <div className="space-y-6 pt-6 pb-20">
         {error && (

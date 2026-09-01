@@ -117,7 +117,7 @@ function AuthPage() {
         : "Recuperar senha";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-band px-5">
+    <div className="flex min-h-dvh items-center justify-center bg-gradient-band px-5">
       <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-elevated sm:p-8">
         <div className="mb-8 flex flex-col items-center gap-3">
           <Logo size="md" />

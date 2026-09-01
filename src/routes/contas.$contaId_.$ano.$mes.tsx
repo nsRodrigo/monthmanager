@@ -49,6 +49,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
+import { useBandScrollProgress } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -158,6 +159,7 @@ export function MonthDetailPane({
   /** Só passado quando há mais de 1 painel aberto — fecha este painel inteiro (distinto de "voltar aos meses"). */
   onClose?: () => void;
 }) {
+  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ collapseRange: 130, frameRange: 68 });
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases } = usePurchases();
@@ -1049,8 +1051,9 @@ export function MonthDetailPane({
       {/* Top nav — sticky so the year picker stays accessible while scrolling.
           Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
-      <div className={`sticky top-0 z-10 ${embedded ? "" : "relative"}`}>
+      <div ref={bandAnchorRef} className={`sticky top-0 z-10 ${embedded ? "" : "relative"}`}>
         <HeaderBand
+          collapsible
           title="Lançamentos"
           eyebrow={account?.name}
           onBack={onBack}
@@ -2071,7 +2074,7 @@ function MonthSummaryFrame({
   const finalBg =
     saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   return (
-    <div className="relative z-20 -mt-6 animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4 md:grid-cols-3">
+    <div className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4 md:grid-cols-3">
       <div className={`rounded-xl border p-3 ${inicialBg}`}>
         <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
           <Wallet className="h-3 w-3" /> Saldo Inicial

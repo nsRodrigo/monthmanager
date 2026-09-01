@@ -27,6 +27,7 @@ import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
+import { useBandScrollProgress } from "@/hooks/use-band-scroll-progress";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -36,6 +37,7 @@ import {
   Wallet,
   Building2,
   Smartphone,
+  User,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -57,6 +59,7 @@ const ICON_BY_TYPE = {
 
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
+  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ frameRange: 68 });
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -169,22 +172,35 @@ function Consolidated() {
           <PaneTabsBar />
         </div>
       )}
-      <HeaderBand
-        title="Home"
-        eyebrow={
-          <span className="capitalize">
-            {MONTHS[month]} {year}
-          </span>
-        }
-        avatar={
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-extrabold text-primary">
-            {initials}
-          </div>
-        }
-      />
+      <div ref={bandAnchorRef} className="sticky top-0 z-10">
+        <HeaderBand
+          title="Home"
+          eyebrow={
+            <span className="capitalize">
+              {MONTHS[month]} {year}
+            </span>
+          }
+          avatar={
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-xs font-extrabold text-primary">
+              {profile?.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                initials || <User className="h-4 w-4" aria-hidden="true" />
+              )}
+            </div>
+          }
+        />
+      </div>
 
       <div className="mx-auto max-w-6xl px-5 pb-8 md:pb-12">
-      <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
+      <section className="header-frame-fade relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
             <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>

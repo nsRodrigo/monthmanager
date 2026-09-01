@@ -186,6 +186,7 @@ function HistoricalImportPage() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
+          compact
           title="Importar planilha histórica"
           subtitle="Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções."
           onBack={goBack}

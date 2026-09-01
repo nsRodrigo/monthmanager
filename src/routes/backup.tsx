@@ -227,6 +227,7 @@ function BackupPage() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
+          compact
           title="Backup e Sincronização"
           subtitle="Exporte, restaure e mantenha versões dos seus dados financeiros."
           onBack={goBack}

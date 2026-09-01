@@ -116,6 +116,7 @@ function ProfilePage() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
+          compact
           title="Meu perfil"
           subtitle="Dados pessoais, tema e segurança."
           onBack={goBack}

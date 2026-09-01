@@ -16,6 +16,7 @@ export function HeaderBand({
   onClose,
   className = "",
   collapsible = false,
+  compact = false,
 }: {
   title: string;
   eyebrow?: ReactNode;
@@ -33,17 +34,28 @@ export function HeaderBand({
    * visíveis, só o bloco de título é que recolhe.
    */
   collapsible?: boolean;
+  /**
+   * Quando true, o respiro embaixo do título encolhe de 40px pra 20px —
+   * pras telas sem card sobreposto (Perfil, Backup, Importar, Admin), onde
+   * os 40px extras não têm função (nada se encaixa neles) e só sobram como
+   * verde vazio. Ignorado se `collapsible` for true.
+   */
+  compact?: boolean;
 }) {
   return (
     <div
       className={`relative overflow-hidden bg-gradient-band px-5 sm:px-[30px] ${
-        collapsible ? "" : "pb-10"
+        collapsible ? "" : compact ? "pb-5" : "pb-10"
       } ${className}`}
       style={
         collapsible
           ? {
-              paddingTop: "calc(22px - 6px * var(--band-p, 0) + env(safe-area-inset-top))",
-              paddingBottom: "calc(40px - 34px * var(--band-p, 0))",
+              // No colapso total (--band-p: 1) os dois lados convergem pra
+              // ~10px, simétrico — antes o padding-bottom sobrava bem menor
+              // que o padding-top (6px vs 16px), deixando o conteúdo da
+              // faixa recolhida com cara de "puxado pra baixo".
+              paddingTop: "calc(22px - 12px * var(--band-p, 0) + env(safe-area-inset-top))",
+              paddingBottom: "calc(40px - 30px * var(--band-p, 0))",
               transition: "padding-top .12s linear, padding-bottom .12s linear",
             }
           : {

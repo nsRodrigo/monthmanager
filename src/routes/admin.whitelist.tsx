@@ -187,6 +187,7 @@ function WhitelistAdmin() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
+          compact
           title="Administração"
           subtitle="Whitelist de cadastros e usuários ativos."
           onBack={goBack}

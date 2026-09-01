@@ -306,6 +306,14 @@
     transform: translateY(calc(-8px * var(--band-pf, 0)));
     transition: opacity 0.1s linear;
   }
+  /* Em Meses/Lançamentos o card também tem `animate-fade-slide-in` (efeito
+     de entrada ao trocar de mês/ano) — essa animação usa `fill: both`, que
+     prende opacity/transform no valor final pra sempre depois de tocar,
+     vencendo o fade por scroll acima. Desliga só o fill quando as duas
+     classes coexistem, sem afetar `animate-fade-slide-in` sozinha. */
+  .header-frame-fade.animate-fade-slide-in {
+    animation-fill-mode: none;
+  }
 
   .bg-gradient-primary { background-image: var(--gradient-primary); }
   .bg-gradient-credit { background-image: var(--gradient-credit); }

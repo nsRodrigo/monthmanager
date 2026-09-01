@@ -4,7 +4,7 @@ import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette } from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette, Camera } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
@@ -42,6 +42,37 @@ function ProfilePage() {
 
   const save = () => {
     update.mutate({ displayName: name.trim() || null }, { onSuccess: goBack });
+  };
+
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  const handleAvatarFile = async (file: File | undefined) => {
+    if (!file || !user) return;
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Escolha um arquivo de imagem.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Imagem muito grande (máx. 5 MB).");
+      return;
+    }
+    setAvatarError(null);
+    setAvatarUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { cacheControl: "3600", upsert: false });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      await update.mutateAsync({ avatarUrl: data.publicUrl });
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Erro ao enviar a foto.");
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const changePassword = async () => {
@@ -102,25 +133,51 @@ function ProfilePage() {
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
-                  {profile?.avatarUrl ? (
-                    <img
-                      src={profile.avatarUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                <div className="relative shrink-0">
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
+                    {profile?.avatarUrl ? (
+                      <img
+                        src={profile.avatarUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      initials || <User className="h-7 w-7" />
+                    )}
+                    {avatarUploading && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      </div>
+                    )}
+                  </div>
+                  <label
+                    className="absolute -right-1 -bottom-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-sm hover:opacity-90"
+                    title="Trocar foto"
+                    aria-label="Trocar foto de perfil"
+                  >
+                    <Camera className="h-3 w-3" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={avatarUploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        handleAvatarFile(file);
                       }}
                     />
-                  ) : (
-                    initials || <User className="h-7 w-7" />
-                  )}
+                  </label>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">
                     {profile?.displayName ?? "Sem nome"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                  {avatarError && <p className="mt-1 text-xs text-destructive">{avatarError}</p>}
                 </div>
               </div>
 

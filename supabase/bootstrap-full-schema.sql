@@ -1980,3 +1980,22 @@ WHERE d.required = true
   AND d.user_id = og.user_id
   AND d.account_id = og.account_id
   AND d.description = og.description;
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260901000000_avatars_bucket.sql
+-- ──────────────────────────────────────────────────────────
+-- Bucket de fotos de perfil (avatar). Público — a URL vai direto pra
+-- <img src>, sem signed URL — mas a escrita fica restrita ao próprio dono
+-- via prefixo de pasta (auth.uid()/arquivo), mesmo padrão do bucket
+-- "irpf-docs" acima.
+INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "avatars public select" ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+CREATE POLICY "avatars own insert" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "avatars own update" ON storage.objects FOR UPDATE
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "avatars own delete" ON storage.objects FOR DELETE
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);

@@ -85,15 +85,18 @@
   --gradient-income: linear-gradient(135deg, oklch(0.5 0.18 155), oklch(0.7 0.17 170));
   --gradient-card: linear-gradient(135deg, oklch(0.23 0.02 265), oklch(0.2 0.018 255));
   --gradient-hero: linear-gradient(135deg, oklch(0.2 0.04 280) 0%, oklch(0.18 0.025 260) 50%, oklch(0.18 0.03 200) 100%);
-  /* Faixa de identidade (cabeçalho de página) — mesmos valores exatos do
-     mockup aprovado (radredesign-desktop/mobile.html): brilho radial no
-     canto superior direito + gradiente verde-esmeralda→teal de 3 tons, já
-     embutidos juntos no mesmo background. Fixa entre temas (claro/escuro/
-     alto-contraste) de propósito: é a assinatura de marca, não uma
-     superfície que deva se adaptar. */
+  /* Faixa de identidade (cabeçalho de página) — gradiente vertical
+     (escuro em cima → claro embaixo) com um brilho radial reposicionado
+     mais pro meio/direita, em vez de colado na borda de cima. A borda
+     superior fica então numa cor sólida só (#0a6e46, ponta a ponta),
+     medido renderizando e amostrando os pixels — é o que permite o
+     theme-color da barra de status (manifest.webmanifest + meta tag)
+     bater 100% com a faixa em qualquer largura de tela. Fixa entre temas
+     (claro/escuro/alto-contraste) de propósito: é a assinatura de marca,
+     não uma superfície que deva se adaptar. */
   --gradient-band:
-    radial-gradient(120% 90% at 88% -10%, rgba(255, 255, 255, 0.16), transparent 55%),
-    linear-gradient(155deg, #0a6e46 0%, #0c8f74 52%, #12a68a 100%);
+    radial-gradient(70% 60% at 82% 35%, rgba(255, 255, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, #0a6e46 0%, #0c8f74 52%, #12a68a 100%);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-md: 0 4px 12px oklch(0 0 0 / 0.35);

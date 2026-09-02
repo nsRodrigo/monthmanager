@@ -173,7 +173,7 @@ function Consolidated() {
           <PaneTabsBar />
         </div>
       )}
-      <div ref={bandAnchorRef} className="sticky top-0 z-10">
+      <div ref={bandAnchorRef} className="sticky top-0 z-10 bg-background">
         <HeaderBand
           collapsible
           collapseTitleMode="shrink"
@@ -200,9 +200,7 @@ function Consolidated() {
             </div>
           }
         />
-      </div>
-
-      <div className="mx-auto max-w-6xl px-5 pb-8 md:pb-12">
+        <div className="mx-auto max-w-6xl px-5">
       <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
@@ -283,7 +281,10 @@ function Consolidated() {
           Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>
+        </div>
+      </div>
 
+      <div className="mx-auto max-w-6xl px-5 pb-8 md:pb-12">
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">

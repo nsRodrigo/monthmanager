@@ -26,12 +26,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Versão exibida no app (login, bloqueio biométrico, Home) — major.minor
+      # vêm do package.json (bump manual quando quiser marcar um marco), o
+      # terceiro número é o run_number do Actions, que sobe sozinho a cada
+      # push. Assim dá pra ver na hora se o deploy que chegou no celular é
+      # o mais recente ou um antigo em cache.
+      - name: Compute app version
+        id: version
+        run: |
+          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          echo "value=${BASE}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       - name: Build
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+          VITE_APP_VERSION: ${{ steps.version.outputs.value }}
 
       - name: Deploy to Cloudflare Workers (production)
         if: github.ref == 'refs/heads/main'

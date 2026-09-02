@@ -4,6 +4,7 @@ import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Eye, EyeOff } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { APP_VERSION } from "@/lib/version";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
@@ -240,6 +241,9 @@ function AuthPage() {
           )}
         </form>
       </div>
+      <span className="fixed bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/50">
+        v{APP_VERSION}
+      </span>
     </div>
   );
 }

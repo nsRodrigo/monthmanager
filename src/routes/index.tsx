@@ -28,6 +28,7 @@ import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useBandScrollProgress } from "@/hooks/use-band-scroll-progress";
+import { APP_VERSION } from "@/lib/version";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -359,6 +360,7 @@ function Consolidated() {
           })}
         </div>
       </section>
+      <p className="mt-8 text-center text-[10px] text-muted-foreground/60">v{APP_VERSION}</p>
       <AccountSettingsFab />
       </div>
     </div>

@@ -10,6 +10,7 @@ import {
   listPasskeys as srvList,
 } from "@/lib/webauthn.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_VERSION } from "@/lib/version";
 
 /**
  * Bloqueia a UI quando:
@@ -266,6 +267,9 @@ export function BiometricLock({ children }: { children: ReactNode }) {
               <LogOut className="h-3.5 w-3.5" /> Sair da conta
             </button>
           </div>
+          <span className="fixed bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/50">
+            v{APP_VERSION}
+          </span>
         </div>
       )}
     </>

@@ -60,7 +60,7 @@ const ICON_BY_TYPE = {
 
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
-  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ collapseRange: 130, frameRange: 68 });
+  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ frameRange: 68 });
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -175,8 +175,6 @@ function Consolidated() {
       )}
       <div ref={bandAnchorRef} className="sticky top-0 z-10 bg-background">
         <HeaderBand
-          collapsible
-          collapseTitleMode="shrink"
           title="Home"
           eyebrow={
             <span className="capitalize">

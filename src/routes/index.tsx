@@ -176,6 +176,7 @@ function Consolidated() {
       <div ref={bandAnchorRef} className="sticky top-0 z-10">
         <HeaderBand
           collapsible
+          collapseTitleMode="shrink"
           title="Home"
           eyebrow={
             <span className="capitalize">
@@ -263,7 +264,7 @@ function Consolidated() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
             const balance = normalizeZero(

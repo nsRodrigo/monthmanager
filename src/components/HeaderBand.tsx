@@ -16,6 +16,7 @@ export function HeaderBand({
   onClose,
   className = "",
   collapsible = false,
+  collapseTitleMode = "hide",
   compact = false,
 }: {
   title: string;
@@ -34,6 +35,13 @@ export function HeaderBand({
    * visíveis, só o bloco de título é que recolhe.
    */
   collapsible?: boolean;
+  /**
+   * Só relevante com `collapsible`. "hide" (padrão) esconde eyebrow+título
+   * — certo pras telas com `right` (seletor de mês/ano) pra ocupar aquele
+   * espaço. "shrink" mantém os dois visíveis e só reduz o tamanho da
+   * fonte — usado na Home, que não tem seletor pra substituir o título.
+   */
+  collapseTitleMode?: "hide" | "shrink";
   /**
    * Quando true, o respiro embaixo do título encolhe de 40px pra 20px —
    * pras telas sem card sobreposto (Perfil, Backup, Importar, Admin), onde
@@ -92,7 +100,7 @@ export function HeaderBand({
         <div
           className="min-w-0 flex-1"
           style={
-            collapsible
+            collapsible && collapseTitleMode === "hide"
               ? {
                   opacity: "calc(1 - var(--band-p, 0))",
                   maxHeight: "calc(52px * (1 - var(--band-p, 0)))",
@@ -103,9 +111,28 @@ export function HeaderBand({
           }
         >
           {eyebrow && (
-            <p className="truncate text-[11.5px] font-medium text-white/70">{eyebrow}</p>
+            <p
+              className="truncate text-[11.5px] font-medium text-white/70"
+              style={
+                collapsible && collapseTitleMode === "shrink"
+                  ? { fontSize: "calc(11.5px - 2.5px * var(--band-p, 0))" }
+                  : undefined
+              }
+            >
+              {eyebrow}
+            </p>
           )}
-          <h1 className="mt-px truncate text-[23px] leading-tight font-extrabold tracking-tight text-white">
+          <h1
+            className="mt-px truncate text-[23px] leading-tight font-extrabold tracking-tight text-white"
+            style={
+              collapsible && collapseTitleMode === "shrink"
+                ? {
+                    fontSize: "calc(23px - 8px * var(--band-p, 0))",
+                    marginTop: "calc(1px - 1px * var(--band-p, 0))",
+                  }
+                : undefined
+            }
+          >
             {title}
           </h1>
           {subtitle && <p className="mt-0.5 truncate text-xs text-white/75">{subtitle}</p>}

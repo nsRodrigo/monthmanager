@@ -366,6 +366,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!user) history.clear();
   }, [user?.id]);
 
+  // Telas fora de /contas/* rolam a própria janela (não um painel interno) —
+  // sem isso, navegar pela sidebar podia cair no meio de uma tela que a
+  // anterior tinha deixado rolada, em vez de começar do topo.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  // Tentativa de fazer a barra de navegação do Android (embaixo) acompanhar
+  // a cor de fundo da tela — sem garantia: diferente da barra de status
+  // (theme-color, padronizado), não existe um jeito confiável/padronizado
+  // de um site controlar essa barra; isso é best-effort.
+  useEffect(() => {
+    document.body.style.backgroundColor = isPublic ? "#12a68a" : "";
+    return () => {
+      document.body.style.backgroundColor = "";
+    };
+  }, [isPublic]);
+
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">

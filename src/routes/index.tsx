@@ -203,10 +203,18 @@ function Consolidated() {
       </div>
 
       <div className="mx-auto max-w-6xl px-5 pb-8 md:pb-12">
-      <section className="header-frame-fade relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
+      <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
-            <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
+            <p
+              className="overflow-hidden text-sm text-muted-foreground"
+              style={{
+                opacity: "calc(1 - var(--band-pf, 0))",
+                maxHeight: "calc(20px * (1 - var(--band-pf, 0)))",
+              }}
+            >
+              Saldo previsto no fim do mês
+            </p>
             <p
               className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
                 expected >= 0 ? "text-foreground" : "text-destructive"
@@ -231,7 +239,14 @@ function Consolidated() {
           </div>
           <Sparkline points={trend} className="mt-3 md:mt-1 md:w-56 md:shrink-0" />
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
+        <div
+          className="grid grid-cols-2 gap-2.5 overflow-hidden sm:gap-3 md:grid-cols-4"
+          style={{
+            opacity: "calc(1 - var(--band-pf, 0))",
+            maxHeight: "calc(160px * (1 - var(--band-pf, 0)))",
+            marginTop: "calc(20px * (1 - var(--band-pf, 0)))",
+          }}
+        >
           <Stat
             label="A receber"
             value={formatCurrency(totalIncome)}
@@ -257,7 +272,14 @@ function Consolidated() {
             tone="primary"
           />
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
+        <p
+          className="overflow-hidden text-xs text-muted-foreground"
+          style={{
+            opacity: "calc(1 - var(--band-pf, 0))",
+            maxHeight: "calc(20px * (1 - var(--band-pf, 0)))",
+            marginTop: "calc(12px * (1 - var(--band-pf, 0)))",
+          }}
+        >
           Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>

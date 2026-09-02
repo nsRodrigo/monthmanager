@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 /** Acha o ancestral que de fato rola — um painel com overflow-y-auto (telas
  * de /contas/*, que rolam de forma independente) ou, na ausência de um, a
@@ -67,4 +67,21 @@ export function useBandScrollProgress<T extends HTMLElement>({
   }, [collapseRange, frameRange]);
 
   return anchorRef;
+}
+
+/**
+ * Volta o scroll pro topo sempre que algo em `deps` muda — pro painel de
+ * /contas/* (que rola dentro de um div próprio, não a janela), trocar de
+ * conta ou de mês/ano herdava o scrollTop de onde a tela anterior tinha
+ * ficado, em vez de começar do topo. Reaproveita o mesmo `anchorRef` de
+ * `useBandScrollProgress` — os dois vivem dentro do mesmo ancestral com
+ * scroll real.
+ */
+export function useResetScrollOnChange(ref: RefObject<HTMLElement | null>, deps: unknown[]) {
+  useEffect(() => {
+    const scrollEl = findScrollAncestor(ref.current);
+    if (scrollEl === window) window.scrollTo(0, 0);
+    else (scrollEl as HTMLElement).scrollTop = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
 }

@@ -49,7 +49,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress } from "@/hooks/use-band-scroll-progress";
+import { useBandScrollProgress, useResetScrollOnChange } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -160,6 +160,7 @@ export function MonthDetailPane({
   onClose?: () => void;
 }) {
   const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ collapseRange: 130, frameRange: 68 });
+  useResetScrollOnChange(bandAnchorRef, [contaId, year, month]);
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases } = usePurchases();

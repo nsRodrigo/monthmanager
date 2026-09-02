@@ -246,6 +246,22 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+    /* Pseudo-elementos da View Transitions API não são `*`/`::before`/
+       `::after` de verdade — precisam da própria regra. */
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation-duration: 0.01ms !important;
+    }
+  }
+
+  /* Crossfade nativo entre navegações (router.tsx: defaultViewTransition).
+     Mesma curva do modal-pop, um pouco mais rápida — é uma troca de tela
+     inteira, não quer chamar atenção pra si. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.22s;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   /* Contraste alto: aumenta peso dos textos sutis */
@@ -279,6 +295,25 @@
   }
   .animate-fade-slide-in {
     animation: fade-slide-in 0.28s ease both;
+  }
+
+  /* Splash de abertura (AppLoader): selo entra com leve zoom, título entra
+     logo depois — em vez de só aparecer estático. */
+  @keyframes splash-icon-in {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .animate-splash-icon-in {
+    animation: splash-icon-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .animate-splash-text-in {
+    animation: fade-slide-in 0.4s ease 0.15s both;
   }
 
   /* Modal/diálogo: sempre centralizado na tela (mobile e desktop), com leve

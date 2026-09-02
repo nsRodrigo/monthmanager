@@ -29,8 +29,12 @@ export function AppLoader() {
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
-      <Logo size="lg" />
-      <span className="text-lg font-extrabold tracking-tight text-white">Gestão Financeira</span>
+      <div className="animate-splash-icon-in">
+        <Logo size="lg" />
+      </div>
+      <span className="animate-splash-text-in text-lg font-extrabold tracking-tight text-white">
+        Gestão Financeira
+      </span>
     </div>
   );
 }

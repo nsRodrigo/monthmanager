@@ -205,32 +205,34 @@ export function BiometricLock({ children }: { children: ReactNode }) {
       {children}
       {checking && !locked && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-gradient-band"
           role="status"
           aria-label="Verificando sessão"
         >
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-primary shadow-glow">
-            <Fingerprint className="h-10 w-10 text-primary-foreground" aria-hidden="true" />
+          <div className="animate-splash-icon-in flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
+            <Fingerprint className="h-8 w-8 text-primary-foreground" aria-hidden="true" />
           </div>
         </div>
       )}
       {locked && (
         <div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/98 backdrop-blur-md p-5"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-band p-5"
           role="dialog"
           aria-modal="true"
           aria-label="App bloqueado — toque para autenticar"
         >
           <div className="w-full max-w-sm text-center">
             <div
-              className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-primary shadow-glow ${
+              className={`animate-splash-icon-in mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow ${
                 authing ? "animate-pulse" : ""
               }`}
             >
-              <Fingerprint className="h-10 w-10 text-primary-foreground" aria-hidden="true" />
+              <Fingerprint className="h-8 w-8 text-primary-foreground" aria-hidden="true" />
             </div>
-            <h2 className="text-2xl font-bold">App bloqueado</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <h2 className="animate-splash-text-in text-2xl font-extrabold tracking-tight text-white">
+              App bloqueado
+            </h2>
+            <p className="animate-splash-text-in mt-2 text-sm text-white/75">
               {authing
                 ? "Aguardando autenticação…"
                 : "Toque na tela para autenticar com biometria."}
@@ -239,15 +241,15 @@ export function BiometricLock({ children }: { children: ReactNode }) {
             {err && (
               <p
                 role="alert"
-                className="mt-5 rounded-lg bg-destructive/10 p-3 text-xs text-destructive"
+                className="mt-5 rounded-lg border border-red-300/50 bg-white/10 p-3 text-xs text-red-100"
               >
                 {err}
                 <br />
-                <span className="text-muted-foreground">Toque novamente para tentar.</span>
+                <span className="text-white/70">Toque novamente para tentar.</span>
               </p>
             )}
 
-            <div className="mt-8 flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="mt-8 flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wider text-white/70">
               <ShieldCheck className="h-3 w-3" />
               Verificação obrigatória
             </div>
@@ -259,7 +261,7 @@ export function BiometricLock({ children }: { children: ReactNode }) {
                 await signOut();
                 setLocked(false);
               }}
-              className="mt-6 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="mt-6 inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white"
             >
               <LogOut className="h-3.5 w-3.5" /> Sair da conta
             </button>

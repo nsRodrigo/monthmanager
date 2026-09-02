@@ -61,6 +61,10 @@ export const getRouter = () => {
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
+    // Crossfade nativo (document.startViewTransition) entre navegações —
+    // sem lib nova, cai pro comportamento normal em browsers sem suporte
+    // (Firefox). Timing/easing customizados em styles.css.
+    defaultViewTransition: true,
   });
 
   return router;

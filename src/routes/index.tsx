@@ -60,7 +60,7 @@ const ICON_BY_TYPE = {
 
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
-  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ frameRange: 68 });
+  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ frameRange: 140 });
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -207,6 +207,7 @@ function Consolidated() {
               style={{
                 opacity: "calc(1 - var(--band-pf, 0))",
                 maxHeight: "calc(20px * (1 - var(--band-pf, 0)))",
+                transition: "opacity .15s linear, max-height .15s linear",
               }}
             >
               Saldo previsto no fim do mês
@@ -241,6 +242,7 @@ function Consolidated() {
             opacity: "calc(1 - var(--band-pf, 0))",
             maxHeight: "calc(160px * (1 - var(--band-pf, 0)))",
             marginTop: "calc(20px * (1 - var(--band-pf, 0)))",
+            transition: "opacity .15s linear, max-height .15s linear, margin-top .15s linear",
           }}
         >
           <Stat
@@ -274,17 +276,18 @@ function Consolidated() {
             opacity: "calc(1 - var(--band-pf, 0))",
             maxHeight: "calc(20px * (1 - var(--band-pf, 0)))",
             marginTop: "calc(12px * (1 - var(--band-pf, 0)))",
+            transition: "opacity .15s linear, max-height .15s linear, margin-top .15s linear",
           }}
         >
           Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>
+      <h2 className="mt-8 mb-3 text-lg font-semibold">Suas contas</h2>
         </div>
       </div>
 
       <div className="mx-auto max-w-6xl px-5 pb-8 md:pb-12">
-      <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">Suas contas</h2>
+      <section>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {accounts.map((a) => {
             const Icon = ICON_BY_TYPE[a.type] ?? Wallet;

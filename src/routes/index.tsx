@@ -203,15 +203,11 @@ function Consolidated() {
       <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
-            <div
-              className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-linear ${
-                cardCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
-              }`}
-            >
-              <p className="overflow-hidden text-sm text-muted-foreground">
+            {!cardCollapsed && (
+              <p className="animate-fade-slide-in text-sm text-muted-foreground">
                 Saldo previsto no fim do mês
               </p>
-            </div>
+            )}
             <p
               className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
                 expected >= 0 ? "text-foreground" : "text-destructive"
@@ -236,12 +232,8 @@ function Consolidated() {
           </div>
           <Sparkline points={trend} className="mt-3 md:mt-1 md:w-56 md:shrink-0" />
         </div>
-        <div
-          className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-linear ${
-            cardCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr] mt-5"
-          }`}
-        >
-          <div className="grid grid-cols-2 gap-2.5 overflow-hidden sm:gap-3 md:grid-cols-4">
+        {!cardCollapsed && (
+          <div className="animate-fade-slide-in mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
             <Stat
               label="A receber"
               value={formatCurrency(totalIncome)}
@@ -267,16 +259,12 @@ function Consolidated() {
               tone="primary"
             />
           </div>
-        </div>
-        <div
-          className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-linear ${
-            cardCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr] mt-3"
-          }`}
-        >
-          <p className="overflow-hidden text-xs text-muted-foreground">
+        )}
+        {!cardCollapsed && (
+          <p className="animate-fade-slide-in mt-3 text-xs text-muted-foreground">
             Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
           </p>
-        </div>
+        )}
       </section>
       <h2 className="my-5 text-lg font-semibold">Suas contas</h2>
         </div>

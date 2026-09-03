@@ -172,12 +172,18 @@ export function useAccordionScrollClose(
     const scrollEl = findScrollAncestor(scrollAnchor);
     const getY = () => (scrollEl === window ? window.scrollY : (scrollEl as HTMLElement).scrollTop);
 
-    let naturalHeight = content.scrollHeight;
     let ticking = false;
     const update = () => {
       ticking = false;
       const y = getY();
       const p = Math.max(0, Math.min(1, y / closeRange));
+      // Mede a altura natural fresca a cada chamada, em vez de guardar num
+      // cache que só era atualizado quando o ResizeObserver disparava —
+      // sobrava sempre uma frestinha (a 2ª fileira de stats cortada) quando
+      // esse cache ficava um pixel desatualizado. `content` nunca tem altura
+      // própria fixada, só o `wrapper`, então isso não custa um reflow extra
+      // além do que já existe.
+      const naturalHeight = content.scrollHeight;
       wrapper.style.height = `${naturalHeight * (1 - p)}px`;
       wrapper.style.opacity = String(1 - p);
       if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;
@@ -189,10 +195,7 @@ export function useAccordionScrollClose(
       }
     };
 
-    const ro = new ResizeObserver(() => {
-      naturalHeight = content.scrollHeight;
-      update();
-    });
+    const ro = new ResizeObserver(update);
     ro.observe(content);
 
     update();

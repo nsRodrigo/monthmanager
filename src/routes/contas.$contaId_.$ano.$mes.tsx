@@ -49,7 +49,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress, useResetScrollOnChange } from "@/hooks/use-band-scroll-progress";
+import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -159,8 +159,9 @@ export function MonthDetailPane({
   /** Só passado quando há mais de 1 painel aberto — fecha este painel inteiro (distinto de "voltar aos meses"). */
   onClose?: () => void;
 }) {
-  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ collapseRange: 130, frameRange: 68 });
-  useResetScrollOnChange(bandAnchorRef, [contaId, year, month]);
+  const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
+  useBandScrollProgress(bandAnchor, { collapseRange: 130, frameRange: 68 });
+  useResetScrollOnChange(bandAnchor, [contaId, year, month]);
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases } = usePurchases();

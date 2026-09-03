@@ -27,7 +27,7 @@ import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
+import { useAccordionScrollClose, useAnchorNode } from "@/hooks/use-band-scroll-progress";
 import { APP_VERSION } from "@/lib/version";
 import {
   ArrowDownRight,
@@ -61,13 +61,12 @@ const ICON_BY_TYPE = {
 
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
-  const bandAnchorRef = useRef<HTMLDivElement>(null);
-  const accordionContentRef = useRef<HTMLDivElement>(null);
+  const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
   const accordionChevronRef = useRef<HTMLSpanElement>(null);
-  const accordionWrapperRef = useAccordionScrollClose(bandAnchorRef, accordionContentRef, {
-    closeRange: 130,
-    chevronRef: accordionChevronRef,
-  });
+  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(
+    bandAnchor,
+    { closeRange: 130, chevronRef: accordionChevronRef },
+  );
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();

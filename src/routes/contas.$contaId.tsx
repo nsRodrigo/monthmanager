@@ -40,7 +40,7 @@ import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress, useResetScrollOnChange } from "@/hooks/use-band-scroll-progress";
+import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -205,8 +205,9 @@ function AccountPane({
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
   const { data: investments = [] } = useInvestments();
-  const bandAnchorRef = useBandScrollProgress<HTMLDivElement>({ collapseRange: 130, frameRange: 68 });
-  useResetScrollOnChange(bandAnchorRef, [
+  const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
+  useBandScrollProgress(bandAnchor, { collapseRange: 130, frameRange: 68 });
+  useResetScrollOnChange(bandAnchor, [
     contaId,
     view.type,
     view.type === "month" ? view.year : null,

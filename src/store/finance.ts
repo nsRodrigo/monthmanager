@@ -4506,11 +4506,13 @@ export function useUpdatePurchase() {
       description?: string;
       totalAmount?: number;
       date?: string;
+      cardId?: string;
     }) => {
-      const patch: { description?: string; total_amount?: number; purchase_date?: string } = {};
+      const patch: { description?: string; total_amount?: number; purchase_date?: string; card_id?: string } = {};
       if (args.description !== undefined) patch.description = args.description;
       if (args.totalAmount !== undefined) patch.total_amount = args.totalAmount;
       if (args.date !== undefined) patch.purchase_date = args.date;
+      if (args.cardId !== undefined) patch.card_id = args.cardId;
       const { error } = await supabase.from("purchases").update(patch).eq("id", args.id);
       if (error) throw error;
     },
@@ -4526,6 +4528,7 @@ export function useUpdatePurchase() {
                 description: args.description ?? p.description,
                 totalAmount: args.totalAmount ?? p.totalAmount,
                 date: args.date ?? p.date,
+                cardId: args.cardId ?? p.cardId,
               }
               : p,
           )
@@ -4543,11 +4546,13 @@ export function useUpdatePurchase() {
         description: previous.description,
         total_amount: previous.totalAmount,
         purchase_date: previous.date,
+        card_id: previous.cardId,
       };
       const after = {
         description: args.description ?? previous.description,
         total_amount: args.totalAmount ?? previous.totalAmount,
         purchase_date: args.date ?? previous.date,
+        card_id: args.cardId ?? previous.cardId,
       };
       const inv2 = inv;
       const id = args.id;
@@ -4838,6 +4843,260 @@ export function useRenumberInstallment() {
 }
 
 // =======================
+// Deslocar série inteira por N meses — usado tanto por "Reorganizar dados"
+// (sempre desloca a série inteira) quanto por "Mover para outro mês" quando
+// o usuário escolhe levar o resto da série junto.
+// =======================
+
+/** year/month (0-indexed) deslocados por `deltaMonths`, com rollover de ano. */
+function shiftYearMonth(year: number, month: number, deltaMonths: number): { year: number; month: number } {
+  const total = year * 12 + month + deltaMonths;
+  return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 };
+}
+
+/** Data ISO deslocada por `deltaMonths`, mantendo o dia (clampado ao tamanho do mês de destino). */
+function shiftDateByMonths(dateIso: string, deltaMonths: number): string {
+  const { y, m, d } = parseLocalDate(dateIso);
+  const { year, month } = shiftYearMonth(y, m, deltaMonths);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return fmtLocalDate(year, month, Math.min(d, lastDay));
+}
+
+/**
+ * Desloca TODAS as parcelas (`installments`) de um ou mais lançamentos-pai
+ * do mesmo `parent_type`, independente do mês em que cada uma está hoje —
+ * é o que faz mover o mês X levar a série inteira (parcelas anteriores E
+ * posteriores) junto, em vez de só a parcela que caiu no mês movido.
+ * Preserva `number`/`total` — só `year`/`month`/`due_date` mudam.
+ */
+export type InstallmentShiftChange = {
+  id: string;
+  before: { year: number; month: number; due_date: string };
+  after: { year: number; month: number; due_date: string };
+};
+
+async function shiftInstallmentsByParentIds(
+  parentType: "purchase" | "debit" | "income" | "investment",
+  parentIds: string[],
+  deltaMonths: number,
+): Promise<InstallmentShiftChange[]> {
+  if (parentIds.length === 0 || deltaMonths === 0) return [];
+  const { data, error } = await supabase
+    .from("installments")
+    .select("id,year,month,due_date")
+    .eq("parent_type", parentType)
+    .in("parent_id", parentIds);
+  if (error) throw error;
+  const changes: InstallmentShiftChange[] = [];
+  for (const row of (data ?? []) as { id: string; year: number; month: number; due_date: string }[]) {
+    const { year, month } = shiftYearMonth(row.year, row.month, deltaMonths);
+    const due_date = shiftDateByMonths(row.due_date, deltaMonths);
+    const { error: uErr } = await supabase
+      .from("installments")
+      .update({ year, month, due_date })
+      .eq("id", row.id);
+    if (uErr) throw uErr;
+    changes.push({
+      id: row.id,
+      before: { year: row.year, month: row.month, due_date: row.due_date },
+      after: { year, month, due_date },
+    });
+  }
+  return changes;
+}
+
+/**
+ * Desloca TODAS as ocorrências de um ou mais grupos recorrentes (débito/
+ * receita/investimento) — só a "vaga" (`reference_year`/`reference_month`)
+ * muda; a data digitada (`date`) nunca é tocada por um remanejamento, mesmo
+ * princípio já usado em `useMoveEntriesToMonth` para avulsos/ocorrências.
+ */
+export type RecurringShiftChange = {
+  table: "debits" | "incomes" | "investments";
+  id: string;
+  before: { reference_year: number; reference_month: number };
+  after: { reference_year: number; reference_month: number };
+};
+
+async function shiftRecurringTableGroups(
+  table: "debits" | "incomes" | "investments",
+  groupIds: string[],
+  deltaMonths: number,
+): Promise<RecurringShiftChange[]> {
+  if (groupIds.length === 0 || deltaMonths === 0) return [];
+  const { data, error } = await supabase
+    .from(table)
+    .select("id,reference_year,reference_month")
+    .in("recurrence_group_id", groupIds);
+  if (error) throw error;
+  const changes: RecurringShiftChange[] = [];
+  for (const row of (data ?? []) as { id: string; reference_year: number | null; reference_month: number | null }[]) {
+    if (row.reference_year == null || row.reference_month == null) continue;
+    const { year, month } = shiftYearMonth(row.reference_year, row.reference_month, deltaMonths);
+    const { error: uErr } = await supabase
+      .from(table)
+      .update({ reference_year: year, reference_month: month })
+      .eq("id", row.id);
+    if (uErr) throw uErr;
+    changes.push({
+      table,
+      id: row.id,
+      before: { reference_year: row.reference_year, reference_month: row.reference_month },
+      after: { reference_year: year, reference_month: month },
+    });
+  }
+  return changes;
+}
+
+/**
+ * Desloca uma compra recorrente inteira (grupo de `purchases` que
+ * compartilham `recurrence_group_id`). Cada ocorrência é uma linha de
+ * `purchases` pareada com uma única `installments` (ver comentário em
+ * `useUpdateRecurringPurchaseSeries`) — só a parcela pareada se move,
+ * `purchase_date` nunca é tocado (mesma regra das demais recorrências).
+ */
+async function shiftRecurringPurchaseGroups(
+  groupIds: string[],
+  deltaMonths: number,
+): Promise<InstallmentShiftChange[]> {
+  if (groupIds.length === 0 || deltaMonths === 0) return [];
+  const { data, error } = await supabase.from("purchases").select("id").in("recurrence_group_id", groupIds);
+  if (error) throw error;
+  const ids = (data ?? []).map((r: { id: string }) => r.id);
+  return shiftInstallmentsByParentIds("purchase", ids, deltaMonths);
+}
+
+/** Ids resolvidos que compõem um deslocamento de série (ver `shiftSeriesByMonths`). */
+export type SeriesShiftIds = {
+  purchaseIds: string[];
+  debitParentIds: string[];
+  incomeParentIds: string[];
+  investmentParentIds: string[];
+  recurringGroups: { purchases: string[]; debits: string[]; incomes: string[]; investments: string[] };
+};
+
+export function emptySeriesShiftIds(): SeriesShiftIds {
+  return {
+    purchaseIds: [],
+    debitParentIds: [],
+    incomeParentIds: [],
+    investmentParentIds: [],
+    recurringGroups: { purchases: [], debits: [], incomes: [], investments: [] },
+  };
+}
+
+/** `true` se `ids` não contém nenhuma série a deslocar (todos os buckets vazios). */
+export function isSeriesShiftEmpty(ids: SeriesShiftIds): boolean {
+  return (
+    ids.purchaseIds.length === 0 &&
+    ids.debitParentIds.length === 0 &&
+    ids.incomeParentIds.length === 0 &&
+    ids.investmentParentIds.length === 0 &&
+    ids.recurringGroups.purchases.length === 0 &&
+    ids.recurringGroups.debits.length === 0 &&
+    ids.recurringGroups.incomes.length === 0 &&
+    ids.recurringGroups.investments.length === 0
+  );
+}
+
+/** Aplica um deslocamento de série (parcelamentos + grupos recorrentes) já resolvidos. */
+async function shiftSeriesByMonths(
+  ids: SeriesShiftIds,
+  deltaMonths: number,
+): Promise<{ installmentChanges: InstallmentShiftChange[]; recurringChanges: RecurringShiftChange[] }> {
+  const installmentChanges: InstallmentShiftChange[] = [];
+  installmentChanges.push(...(await shiftInstallmentsByParentIds("purchase", ids.purchaseIds, deltaMonths)));
+  installmentChanges.push(...(await shiftInstallmentsByParentIds("debit", ids.debitParentIds, deltaMonths)));
+  installmentChanges.push(...(await shiftInstallmentsByParentIds("income", ids.incomeParentIds, deltaMonths)));
+  installmentChanges.push(...(await shiftInstallmentsByParentIds("investment", ids.investmentParentIds, deltaMonths)));
+  installmentChanges.push(...(await shiftRecurringPurchaseGroups(ids.recurringGroups.purchases, deltaMonths)));
+  const recurringChanges: RecurringShiftChange[] = [];
+  recurringChanges.push(...(await shiftRecurringTableGroups("debits", ids.recurringGroups.debits, deltaMonths)));
+  recurringChanges.push(...(await shiftRecurringTableGroups("incomes", ids.recurringGroups.incomes, deltaMonths)));
+  recurringChanges.push(
+    ...(await shiftRecurringTableGroups("investments", ids.recurringGroups.investments, deltaMonths)),
+  );
+  return { installmentChanges, recurringChanges };
+}
+
+/**
+ * Resolve, a partir dos `MoveMonthOp` selecionados na tela de mês (seleção
+ * múltipla) e dos dados já carregados no cliente, a quais séries inteiras
+ * (parcelamento ou recorrência) cada item selecionado pertence — usado para
+ * decidir se "Mover para outro mês" deve perguntar ao usuário se quer levar
+ * o resto da série junto, e para montar o deslocamento caso ele confirme.
+ */
+export function resolveSeriesFromOps(
+  ops: MoveMonthOp[],
+  data: { purchases: Purchase[]; installments: Installment[]; debits: Debit[]; incomes: Income[]; investments: Investment[] },
+): { ids: SeriesShiftIds; standaloneOps: MoveMonthOp[] } {
+  const ids = emptySeriesShiftIds();
+  const purchaseIds = new Set<string>();
+  const debitParentIds = new Set<string>();
+  const incomeParentIds = new Set<string>();
+  const investmentParentIds = new Set<string>();
+  const recPurchases = new Set<string>();
+  const recDebits = new Set<string>();
+  const recIncomes = new Set<string>();
+  const recInvestments = new Set<string>();
+  // Ops que já ficam cobertos pelo deslocamento da série — não devem ser
+  // movidos de novo individualmente (senão o mesmo item seria deslocado
+  // duas vezes: uma pelo `shiftSeriesByMonths`, outra pelo update pontual).
+  const standaloneOps: MoveMonthOp[] = [];
+
+  for (const op of ops) {
+    if (op.kind === "installment") {
+      const inst = data.installments.find((i) => i.id === op.id);
+      if (!inst) {
+        standaloneOps.push(op);
+        continue;
+      }
+      // Parcela única (total=1, ex.: compra à vista) não é uma "série" —
+      // não há nada extra pra levar junto, então segue como avulsa.
+      if (inst.total <= 1) {
+        standaloneOps.push(op);
+        continue;
+      }
+      if (inst.parentType === "purchase") {
+        const p = data.purchases.find((x) => x.id === inst.parentId);
+        if (p?.recurrenceGroupId) recPurchases.add(p.recurrenceGroupId);
+        else purchaseIds.add(inst.parentId);
+      } else if (inst.parentType === "debit") {
+        debitParentIds.add(inst.parentId);
+      } else if (inst.parentType === "income") {
+        incomeParentIds.add(inst.parentId);
+      } else if (inst.parentType === "investment") {
+        investmentParentIds.add(inst.parentId);
+      } else {
+        standaloneOps.push(op);
+      }
+    } else {
+      const list = op.table === "debits" ? data.debits : op.table === "incomes" ? data.incomes : data.investments;
+      const row = list.find((r) => r.id === op.id);
+      if (row?.recurrenceGroupId) {
+        if (op.table === "debits") recDebits.add(row.recurrenceGroupId);
+        else if (op.table === "incomes") recIncomes.add(row.recurrenceGroupId);
+        else recInvestments.add(row.recurrenceGroupId);
+      } else {
+        standaloneOps.push(op);
+      }
+    }
+  }
+
+  ids.purchaseIds = [...purchaseIds];
+  ids.debitParentIds = [...debitParentIds];
+  ids.incomeParentIds = [...incomeParentIds];
+  ids.investmentParentIds = [...investmentParentIds];
+  ids.recurringGroups = {
+    purchases: [...recPurchases],
+    debits: [...recDebits],
+    incomes: [...recIncomes],
+    investments: [...recInvestments],
+  };
+  return { ids, standaloneOps };
+}
+
+// =======================
 // Mover lançamentos para outro mês (ação em lote da seleção múltipla)
 // =======================
 
@@ -4863,17 +5122,23 @@ export type MoveMonthOp =
  * (`date`/`due_date` de compra, ou `reference_date` da parcela): só a
  * "vaga" (`reference_year/month` ou `year/month` da parcela) muda.
  *
- * Mover uma parcela de uma série (parcelado/recorrente de cartão) afeta
+ * Por padrão, mover uma parcela de uma série (parcelado/recorrente) afeta
  * SÓ aquela parcela — as demais da série continuam nos meses originais,
  * exatamente como `useRenumberInstallment` já faz ("mês é sempre vaga fixa
- * por linha"). Por isso não existe conceito de "escopo" aqui (mover não é
- * uma operação que faça sentido aplicar a uma série inteira de uma vez —
- * empilharia todas as parcelas no mesmo mês).
+ * por linha"). Quando `seriesShift` é informado (usuário confirmou levar a
+ * série junto — ver `resolveSeriesFromOps`/`MoveSeriesConfirmDialog`), a
+ * série inteira resolvida por `ids` é deslocada por `deltaMonths` junto com
+ * os `ops` avulsos restantes.
  */
 export function useMoveEntriesToMonth() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: { ops: MoveMonthOp[]; year: number; month: number }) => {
+    mutationFn: async (args: {
+      ops: MoveMonthOp[];
+      year: number;
+      month: number;
+      seriesShift?: { ids: SeriesShiftIds; deltaMonths: number };
+    }) => {
       const { ops, year, month } = args;
       const singleIds: Record<"debits" | "incomes" | "investments", string[]> = {
         debits: [], incomes: [], investments: [],
@@ -4926,13 +5191,26 @@ export function useMoveEntriesToMonth() {
         }
       }
 
-      return { singleIds, prevByTable, prevInst, target: { year, month } };
+      let seriesChanges: { installmentChanges: InstallmentShiftChange[]; recurringChanges: RecurringShiftChange[] } = {
+        installmentChanges: [],
+        recurringChanges: [],
+      };
+      if (args.seriesShift && !isSeriesShiftEmpty(args.seriesShift.ids)) {
+        seriesChanges = await shiftSeriesByMonths(args.seriesShift.ids, args.seriesShift.deltaMonths);
+      }
+
+      return { singleIds, prevByTable, prevInst, target: { year, month }, seriesChanges };
     },
     onSettled: () => inv(["debits", "incomes", "investments", "installments"]),
-    onSuccess: ({ singleIds, prevByTable, prevInst, target }) => {
+    onSuccess: ({ singleIds, prevByTable, prevInst, target, seriesChanges }) => {
       const inv2 = inv;
       const count =
-        singleIds.debits.length + singleIds.incomes.length + singleIds.investments.length + prevInst.length;
+        singleIds.debits.length +
+        singleIds.incomes.length +
+        singleIds.investments.length +
+        prevInst.length +
+        seriesChanges.installmentChanges.length +
+        seriesChanges.recurringChanges.length;
       if (count === 0) return;
       history.push({
         label: `Mover ${count} lançamento${count === 1 ? "" : "s"} de mês`,
@@ -4950,6 +5228,12 @@ export function useMoveEntriesToMonth() {
               .from("installments")
               .update({ year: row.year, month: row.month, due_date: row.due_date })
               .eq("id", row.id);
+          }
+          for (const c of seriesChanges.installmentChanges) {
+            await supabase.from("installments").update(c.before).eq("id", c.id);
+          }
+          for (const c of seriesChanges.recurringChanges) {
+            await supabase.from(c.table).update(c.before).eq("id", c.id);
           }
           inv2(["debits", "incomes", "investments", "installments"]);
         },
@@ -4970,6 +5254,12 @@ export function useMoveEntriesToMonth() {
                 .update({ year: target.year, month: target.month, due_date: fmtLocalDate(target.year, target.month, day) })
                 .eq("id", row.id);
             }
+          }
+          for (const c of seriesChanges.installmentChanges) {
+            await supabase.from("installments").update(c.after).eq("id", c.id);
+          }
+          for (const c of seriesChanges.recurringChanges) {
+            await supabase.from(c.table).update(c.after).eq("id", c.id);
           }
           inv2(["debits", "incomes", "investments", "installments"]);
         },
@@ -5663,9 +5953,16 @@ export function useDescriptionSuggestions(
       .map((s) => s.display);
   }, [data]);
 }
+/**
+ * Move mês/ano inteiro de uma conta, deslocando SÉRIES INTEIRAS (não só o
+ * item que estava fisicamente no mês de origem) pelo mesmo delta — parcelas
+ * anteriores e posteriores de uma compra/débito/receita parcelados, e todas
+ * as ocorrências passadas/futuras de um grupo recorrente, se movem juntas.
+ * Modo "year" é o mesmo deslocamento com delta em múltiplos de 12 meses
+ * (preserva o mês, só o ano muda).
+ */
 export function useReorganizeData() {
   const inv = useInvalidate();
-  //const { data: user } = useUser();
   const { user } = useAuth();
 
   return useMutation({
@@ -5681,187 +5978,114 @@ export function useReorganizeData() {
     }) => {
       if (!user?.id) throw new Error("Nao autenticado");
 
-      if (args.mode === "month") {
-        // Mover debitos avulsos
-        const fromDate = `${args.fromYear}-${String(args.fromMonth + 1).padStart(2, "0")}`;
-        const toDate = `${args.toYear}-${String(args.toMonth + 1).padStart(2, "0")}`;
+      const deltaMonths =
+        args.mode === "month"
+          ? args.toYear * 12 + args.toMonth - (args.fromYear * 12 + args.fromMonth)
+          : (args.toYearOnly - args.fromYearOnly) * 12;
+      if (deltaMonths === 0) return;
 
-        const { data: debitsToMove } = await supabase
-          .from("debits")
-          .select("id, date")
+      const matchesSource = (y: number, m: number) =>
+        args.mode === "month" ? y === args.fromYear && m === args.fromMonth : y === args.fromYearOnly;
+
+      const ids = emptySeriesShiftIds();
+
+      // ── Compras (cartão) da conta ──
+      const { data: cards } = await supabase.from("cards").select("id").eq("account_id", args.contaId);
+      const cardIds = (cards ?? []).map((c: { id: string }) => c.id);
+
+      if (cardIds.length > 0) {
+        const { data: purchases } = await supabase
+          .from("purchases")
+          .select("id,recurrence_group_id")
+          .in("card_id", cardIds);
+        const purchasesById = new Map(
+          (purchases ?? []).map((p: { id: string; recurrence_group_id: string | null }) => [
+            p.id,
+            p.recurrence_group_id,
+          ]),
+        );
+        const purchaseIds = [...purchasesById.keys()];
+        if (purchaseIds.length > 0) {
+          const { data: insts } = await supabase
+            .from("installments")
+            .select("parent_id,year,month")
+            .eq("parent_type", "purchase")
+            .in("parent_id", purchaseIds);
+          const touched = new Set<string>();
+          for (const row of (insts ?? []) as { parent_id: string; year: number; month: number }[]) {
+            if (matchesSource(row.year, row.month)) touched.add(row.parent_id);
+          }
+          for (const pid of touched) {
+            const groupId = purchasesById.get(pid);
+            if (groupId) ids.recurringGroups.purchases.push(groupId);
+            else ids.purchaseIds.push(pid);
+          }
+        }
+      }
+
+      // ── Débitos / receitas / investimentos parcelados da conta ──
+      for (const [parentType, table, bucket] of [
+        ["debit", "debits", ids.debitParentIds],
+        ["income", "incomes", ids.incomeParentIds],
+        ["investment", "investments", ids.investmentParentIds],
+      ] as const) {
+        const { data: parents } = await supabase.from(table).select("id").eq("account_id", args.contaId);
+        const parentIds = (parents ?? []).map((p: { id: string }) => p.id);
+        if (parentIds.length === 0) continue;
+        const { data: insts } = await supabase
+          .from("installments")
+          .select("parent_id,year,month")
+          .eq("parent_type", parentType)
+          .in("parent_id", parentIds);
+        const touched = new Set<string>();
+        for (const row of (insts ?? []) as { parent_id: string; year: number; month: number }[]) {
+          if (matchesSource(row.year, row.month)) touched.add(row.parent_id);
+        }
+        bucket.push(...touched);
+      }
+
+      // ── Débitos / receitas / investimentos avulsos e ocorrências recorrentes ──
+      const singlesToMove: Array<{ table: "debits" | "incomes" | "investments"; id: string; y: number; m: number }> = [];
+      for (const table of ["debits", "incomes", "investments"] as const) {
+        const { data: rows } = await supabase
+          .from(table)
+          .select("id,date,reference_year,reference_month,recurrence_group_id")
           .eq("account_id", args.contaId)
-          .like("date", `${fromDate}%`);
-
-        for (const d of debitsToMove ?? []) {
-          const newDate = d.date.replace(fromDate, toDate);
-          await supabase.from("debits").update({ date: newDate }).eq("id", d.id);
-        }
-
-        // Mover receitas avulsas
-        const { data: incomesToMove } = await supabase
-          .from("incomes")
-          .select("id, date")
-          .eq("account_id", args.contaId)
-          .like("date", `${fromDate}%`);
-
-        for (const i of incomesToMove ?? []) {
-          const newDate = i.date.replace(fromDate, toDate);
-          await supabase.from("incomes").update({ date: newDate }).eq("id", i.id);
-        }
-
-        // Mover investimentos
-        const { data: invToMove } = await supabase
-          .from("investments")
-          .select("id, date")
-          .eq("account_id", args.contaId)
-          .like("date", `${fromDate}%`);
-
-        for (const i of invToMove ?? []) {
-          const newDate = i.date.replace(fromDate, toDate);
-          await supabase.from("investments").update({ date: newDate }).eq("id", i.id);
-        }
-
-        // Mover parcelas (installments) do mes
-        // Buscar purchases da conta para filtrar apenas as parcelas corretas
-        const { data: cards } = await supabase
-          .from("cards")
-          .select("id")
-          .eq("account_id", args.contaId);
-        const cardIds = (cards ?? []).map((c: { id: string }) => c.id);
-
-        if (cardIds.length > 0) {
-          const { data: purchases } = await supabase
-            .from("purchases")
-            .select("id")
-            .in("card_id", cardIds);
-          const purchaseIds = (purchases ?? []).map((p: { id: string }) => p.id);
-
-          if (purchaseIds.length > 0) {
-            await supabase
-              .from("installments")
-              .update({ year: args.toYear, month: args.toMonth })
-              .in("purchase_id", purchaseIds)
-              .eq("year", args.fromYear)
-              .eq("month", args.fromMonth);
+          .eq("is_parent", false);
+        for (const row of (rows ?? []) as Array<{
+          id: string;
+          date: string;
+          reference_year: number | null;
+          reference_month: number | null;
+          recurrence_group_id: string | null;
+        }>) {
+          const { y, m } =
+            row.reference_year != null && row.reference_month != null
+              ? { y: row.reference_year, m: row.reference_month }
+              : (() => {
+                const p = parseLocalDate(row.date);
+                return { y: p.y, m: p.m };
+              })();
+          if (!matchesSource(y, m)) continue;
+          if (row.recurrence_group_id) {
+            ids.recurringGroups[table].push(row.recurrence_group_id);
+          } else {
+            singlesToMove.push({ table, id: row.id, y, m });
           }
         }
+      }
 
-        // Mover parcelas de debitos e receitas parcelados
-        const { data: debitIds } = await supabase
-          .from("debits")
-          .select("id")
-          .eq("account_id", args.contaId);
+      await shiftSeriesByMonths(ids, deltaMonths);
 
-        if ((debitIds ?? []).length > 0) {
-          await supabase
-            .from("installments")
-            .update({ year: args.toYear, month: args.toMonth })
-            .in("parent_id", (debitIds ?? []).map((d: { id: string }) => d.id))
-            .eq("parent_type", "debit")
-            .eq("year", args.fromYear)
-            .eq("month", args.fromMonth);
-        }
-
-        const { data: incomeIds } = await supabase
-          .from("incomes")
-          .select("id")
-          .eq("account_id", args.contaId);
-
-        if ((incomeIds ?? []).length > 0) {
-          await supabase
-            .from("installments")
-            .update({ year: args.toYear, month: args.toMonth })
-            .in("parent_id", (incomeIds ?? []).map((i: { id: string }) => i.id))
-            .eq("parent_type", "income")
-            .eq("year", args.fromYear)
-            .eq("month", args.fromMonth);
-        }
-
-      } else {
-        // Mover ano inteiro: iterar pelos 12 meses
-        for (let m = 0; m < 12; m++) {
-          const fromDate = `${args.fromYearOnly}-${String(m + 1).padStart(2, "0")}`;
-          const toDate = `${args.toYearOnly}-${String(m + 1).padStart(2, "0")}`;
-
-          // Debitos
-          const { data: debits } = await supabase
-            .from("debits")
-            .select("id, date")
-            .eq("account_id", args.contaId)
-            .like("date", `${fromDate}%`);
-          for (const d of debits ?? []) {
-            await supabase.from("debits").update({ date: d.date.replace(fromDate, toDate) }).eq("id", d.id);
-          }
-
-          // Receitas
-          const { data: incomes } = await supabase
-            .from("incomes")
-            .select("id, date")
-            .eq("account_id", args.contaId)
-            .like("date", `${fromDate}%`);
-          for (const i of incomes ?? []) {
-            await supabase.from("incomes").update({ date: i.date.replace(fromDate, toDate) }).eq("id", i.id);
-          }
-
-          // Investimentos
-          const { data: invs } = await supabase
-            .from("investments")
-            .select("id, date")
-            .eq("account_id", args.contaId)
-            .like("date", `${fromDate}%`);
-          for (const i of invs ?? []) {
-            await supabase.from("investments").update({ date: i.date.replace(fromDate, toDate) }).eq("id", i.id);
-          }
-        }
-
-        // Parcelas: atualizar year diretamente
-        const { data: cards } = await supabase
-          .from("cards")
-          .select("id")
-          .eq("account_id", args.contaId);
-        const cardIds = (cards ?? []).map((c: { id: string }) => c.id);
-
-        if (cardIds.length > 0) {
-          const { data: purchases } = await supabase
-            .from("purchases")
-            .select("id")
-            .in("card_id", cardIds);
-          const purchaseIds = (purchases ?? []).map((p: { id: string }) => p.id);
-
-          if (purchaseIds.length > 0) {
-            await supabase
-              .from("installments")
-              .update({ year: args.toYearOnly })
-              .in("purchase_id", purchaseIds)
-              .eq("year", args.fromYearOnly);
-          }
-        }
-
-        const { data: debitIds } = await supabase
-          .from("debits")
-          .select("id")
-          .eq("account_id", args.contaId);
-        if ((debitIds ?? []).length > 0) {
-          await supabase
-            .from("installments")
-            .update({ year: args.toYearOnly })
-            .in("parent_id", (debitIds ?? []).map((d: { id: string }) => d.id))
-            .eq("parent_type", "debit")
-            .eq("year", args.fromYearOnly);
-        }
-
-        const { data: incomeIds } = await supabase
-          .from("incomes")
-          .select("id")
-          .eq("account_id", args.contaId);
-        if ((incomeIds ?? []).length > 0) {
-          await supabase
-            .from("installments")
-            .update({ year: args.toYearOnly })
-            .in("parent_id", (incomeIds ?? []).map((i: { id: string }) => i.id))
-            .eq("parent_type", "income")
-            .eq("year", args.fromYearOnly);
-        }
+      // Avulsos puros (sem série): só a "vaga" muda, nunca a data digitada —
+      // mesmo princípio já usado em `useMoveEntriesToMonth`.
+      for (const single of singlesToMove) {
+        const shifted = shiftYearMonth(single.y, single.m, deltaMonths);
+        const { error } = await supabase
+          .from(single.table)
+          .update({ reference_year: shifted.year, reference_month: shifted.month })
+          .eq("id", single.id);
+        if (error) throw error;
       }
     },
     onSuccess: () => inv(["debits", "incomes", "investments", "installments", "purchases"]),

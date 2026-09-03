@@ -36,6 +36,8 @@ import {
   useReorderCards,
   resolveScopeMonths,
   useMoveEntriesToMonth,
+  resolveSeriesFromOps,
+  isSeriesShiftEmpty,
   PAYMENT_METHOD_BADGES,
   type CardScope,
   type Installment,
@@ -45,6 +47,7 @@ import {
   type DuplicateSource,
   type MoveMonthOp,
 } from "@/store/finance";
+import { MoveSeriesConfirmDialog } from "@/components/MoveSeriesConfirmDialog";
 import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
@@ -218,6 +221,11 @@ export function MonthDetailPane({
   const [manageOpen, setManageOpen] = useState(false);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [moveMonthOpen, setMoveMonthOpen] = useState(false);
+  const [askMoveSeries, setAskMoveSeries] = useState<{
+    ops: MoveMonthOp[];
+    year: number;
+    month: number;
+  } | null>(null);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   /** Quando um item é aberto via ícone de duplicar (em vez de editar), pula direto pro fluxo de duplicar. */
   const [rowStartAction, setRowStartAction] = useState<"duplicate" | undefined>(undefined);
@@ -758,14 +766,74 @@ export function MonthDetailPane({
     return ops;
   };
 
-  const bulkMove = async (targetYear: number, targetMonth: number) => {
-    if (!selection) return;
-    const ops = resolveMoveOps(selection.key, Array.from(selection.ids));
-    if (ops.length > 0) {
+  const seriesResolveData = {
+    purchases: purchasesList,
+    installments: installmentsList,
+    debits: allDebits,
+    incomes: allIncomes,
+    investments: allInvestments,
+  };
+
+  /** Quantas linhas (parcelas/ocorrências) uma série resolvida abrange ao todo. */
+  const countSeriesRows = (ids: ReturnType<typeof resolveSeriesFromOps>["ids"]) => {
+    let n = 0;
+    for (const pid of ids.purchaseIds)
+      n += installmentsList.filter((i) => i.parentType === "purchase" && i.parentId === pid).length;
+    for (const pid of ids.debitParentIds)
+      n += installmentsList.filter((i) => i.parentType === "debit" && i.parentId === pid).length;
+    for (const pid of ids.incomeParentIds)
+      n += installmentsList.filter((i) => i.parentType === "income" && i.parentId === pid).length;
+    for (const pid of ids.investmentParentIds)
+      n += installmentsList.filter((i) => i.parentType === "investment" && i.parentId === pid).length;
+    for (const gid of ids.recurringGroups.purchases)
+      n += purchasesList.filter((p) => p.recurrenceGroupId === gid).length;
+    for (const gid of ids.recurringGroups.debits)
+      n += allDebits.filter((d) => d.recurrenceGroupId === gid && !d.isParent).length;
+    for (const gid of ids.recurringGroups.incomes)
+      n += allIncomes.filter((i) => i.recurrenceGroupId === gid && !i.isParent).length;
+    for (const gid of ids.recurringGroups.investments)
+      n += allInvestments.filter((v) => v.recurrenceGroupId === gid && !v.isParent).length;
+    return n;
+  };
+
+  const runMove = async (
+    ops: MoveMonthOp[],
+    targetYear: number,
+    targetMonth: number,
+    expandSeries: boolean,
+  ) => {
+    if (expandSeries) {
+      const { ids, standaloneOps } = resolveSeriesFromOps(ops, seriesResolveData);
+      const deltaMonths = targetYear * 12 + targetMonth - (year * 12 + month);
+      await moveEntries.mutateAsync({
+        ops: standaloneOps,
+        year: targetYear,
+        month: targetMonth,
+        seriesShift: { ids, deltaMonths },
+      });
+    } else if (ops.length > 0) {
       await moveEntries.mutateAsync({ ops, year: targetYear, month: targetMonth });
     }
     clearSelection();
     setMoveMonthOpen(false);
+    setAskMoveSeries(null);
+  };
+
+  const bulkMove = async (targetYear: number, targetMonth: number) => {
+    if (!selection) return;
+    const ops = resolveMoveOps(selection.key, Array.from(selection.ids));
+    if (ops.length === 0) {
+      clearSelection();
+      setMoveMonthOpen(false);
+      return;
+    }
+    const { ids } = resolveSeriesFromOps(ops, seriesResolveData);
+    if (!isSeriesShiftEmpty(ids)) {
+      setMoveMonthOpen(false);
+      setAskMoveSeries({ ops, year: targetYear, month: targetMonth });
+      return;
+    }
+    await runMove(ops, targetYear, targetMonth, false);
   };
 
   const askDeleteInst = (
@@ -2052,6 +2120,25 @@ export function MonthDetailPane({
         currentMonth={month}
         loading={moveEntries.isPending}
         onConfirm={bulkMove}
+      />
+      <MoveSeriesConfirmDialog
+        open={!!askMoveSeries}
+        onClose={() => setAskMoveSeries(null)}
+        loading={moveEntries.isPending}
+        targetLabel={askMoveSeries ? `${MONTHS[askMoveSeries.month]} de ${askMoveSeries.year}` : ""}
+        extraCount={
+          askMoveSeries
+            ? (() => {
+              const { ids, standaloneOps } = resolveSeriesFromOps(askMoveSeries.ops, seriesResolveData);
+              const covered = askMoveSeries.ops.length - standaloneOps.length;
+              return Math.max(0, countSeriesRows(ids) - covered);
+            })()
+            : 0
+        }
+        onConfirm={async (expandSeries) => {
+          if (!askMoveSeries) return;
+          await runMove(askMoveSeries.ops, askMoveSeries.year, askMoveSeries.month, expandSeries);
+        }}
       />
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
       </div>

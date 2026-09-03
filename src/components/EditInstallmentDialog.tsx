@@ -13,6 +13,8 @@ import {
   useUpdatePurchase,
   useChangeInstallmentSeries,
   useRenumberInstallment,
+  useCards,
+  useAccounts,
   useAddDebit,
   useAddIncome,
   useAddPurchase,
@@ -110,6 +112,8 @@ export function EditInstallmentDialog({
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
   const { data: investments = [] } = useInvestments();
+  const { data: cards = [] } = useCards();
+  const { data: accounts = [] } = useAccounts();
   const latestAdjustment = useLatestAmountAdjustment(
     installment?.parentId,
     installment?.parentType,
@@ -164,6 +168,7 @@ export function EditInstallmentDialog({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState("");
   const [paid, setPaid] = useState(false);
   const [askDateScope, setAskDateScope] = useState(false);
   const [advanceCount, setAdvanceCount] = useState("");
@@ -204,6 +209,11 @@ export function EditInstallmentDialog({
       setPurchMode("total");
       setPaymentMethod(parentPaymentMethod);
       setAutoDebitDay(parentAutoDebitDay ? String(parentAutoDebitDay) : "");
+      setSelectedCardId(
+        installment.parentType === "purchase"
+          ? purchases.find((p) => p.id === installment.parentId)?.cardId ?? ""
+          : "",
+      );
     } else if (single) {
       setDescription(single.description);
       setAmount(single.amount);
@@ -719,6 +729,15 @@ export function EditInstallmentDialog({
         await updateInvestment.mutateAsync({ id: inst.parentId, type: newDesc });
       }
     }
+    // Move a compra para outro cartão (mesma conta ou outra) — a compra só
+    // muda de "dono" (card_id); nenhuma parcela em `installments` é tocada.
+    if (
+      inst.parentType === "purchase" &&
+      selectedCardId &&
+      selectedCardId !== purchaseForInst?.cardId
+    ) {
+      await updatePurchase.mutateAsync({ id: inst.parentId, cardId: selectedCardId });
+    }
     // Atualiza meio de pagamento do parent (debit / income) se mudou — igual
     // descrição, é um campo só do parent, não existe "por parcela".
     if (
@@ -743,7 +762,7 @@ export function EditInstallmentDialog({
       await removePurchase.mutateAsync(purchaseForInst.id);
       if (purchType === "parcelled") {
         await addPurchase.mutateAsync({
-          cardId: purchaseForInst.cardId,
+          cardId: selectedCardId || purchaseForInst.cardId,
           description: description.trim(),
           totalAmount: purchTotal,
           date: dueDate,
@@ -753,7 +772,7 @@ export function EditInstallmentDialog({
         });
       } else {
         await addPurchase.mutateAsync({
-          cardId: purchaseForInst.cardId,
+          cardId: selectedCardId || purchaseForInst.cardId,
           description: description.trim(),
           totalAmount: amount,
           date: dueDate,
@@ -867,6 +886,30 @@ export function EditInstallmentDialog({
               />
             </Field>
           </div>
+
+          {inst.parentType === "purchase" && (
+            <Field label="Cartão">
+              <Select
+                className={inputClass}
+                value={selectedCardId}
+                onChange={(e) => setSelectedCardId(e.target.value)}
+              >
+                {accounts.map((acc) => {
+                  const accCards = cards.filter((c) => c.accountId === acc.id);
+                  if (accCards.length === 0) return null;
+                  return (
+                    <optgroup key={acc.id} label={acc.name}>
+                      {accCards.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </Select>
+            </Field>
+          )}
           <p className="-mt-2 text-[11px] text-muted-foreground">
             Valor atual da parcela: {formatCurrency(inst.amount)}.
           </p>

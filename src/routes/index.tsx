@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccounts,
   useCards,
@@ -35,7 +35,6 @@ import {
   CreditCard,
   TrendingUp,
   ChevronRight,
-  ChevronDown,
   Wallet,
   Building2,
   Smartphone,
@@ -62,10 +61,9 @@ const ICON_BY_TYPE = {
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  const accordionChevronRef = useRef<HTMLSpanElement>(null);
   const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(
     bandAnchor,
-    { closeRange: 130, chevronRef: accordionChevronRef },
+    { closeRange: 130 },
   );
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
@@ -234,13 +232,7 @@ function Consolidated() {
           <Sparkline points={trend} className="mt-3 md:mt-1 md:w-56 md:shrink-0" />
         </div>
 
-        <div className="mt-3 flex items-center justify-center gap-1.5 border-t border-border/60 pt-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-          Detalhes do mês
-          <span ref={accordionChevronRef} className="inline-flex" style={{ transition: "transform .1s linear" }}>
-            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-          </span>
-        </div>
-        <div ref={accordionWrapperRef} className="overflow-hidden">
+        <div ref={accordionWrapperRef} className="mt-3 overflow-hidden border-t border-border/60">
           <div ref={accordionContentRef} className="grid grid-cols-2 gap-2.5 pt-3 sm:gap-3 md:grid-cols-4">
             <Stat
               label="A receber"

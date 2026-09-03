@@ -131,7 +131,7 @@ function PaneSlot({
   const [fabPortalTarget, setFabPortalTarget] = useState<HTMLDivElement | null>(null);
   return (
     <div className="relative h-full min-w-0 overflow-hidden">
-      <div className="absolute inset-0 overflow-y-auto">
+      <div className="absolute inset-0 overflow-y-auto [overflow-anchor:none]">
         <AccountPane
           contaId={contaId}
           view={view}

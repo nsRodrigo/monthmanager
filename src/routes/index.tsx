@@ -27,7 +27,7 @@ import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useScrollPastThreshold } from "@/hooks/use-band-scroll-progress";
+import { useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
 import { APP_VERSION } from "@/lib/version";
 import {
   ArrowDownRight,
@@ -35,6 +35,7 @@ import {
   CreditCard,
   TrendingUp,
   ChevronRight,
+  ChevronDown,
   Wallet,
   Building2,
   Smartphone,
@@ -61,7 +62,12 @@ const ICON_BY_TYPE = {
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
   const bandAnchorRef = useRef<HTMLDivElement>(null);
-  const cardCollapsed = useScrollPastThreshold(bandAnchorRef, { enterAt: 90, exitAt: 30 });
+  const accordionContentRef = useRef<HTMLDivElement>(null);
+  const accordionChevronRef = useRef<HTMLSpanElement>(null);
+  const accordionWrapperRef = useAccordionScrollClose(bandAnchorRef, accordionContentRef, {
+    closeRange: 130,
+    chevronRef: accordionChevronRef,
+  });
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();
@@ -203,13 +209,7 @@ function Consolidated() {
       <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
-            <p
-              className={`overflow-hidden text-sm text-muted-foreground transition-[max-height,opacity] duration-200 ease-out ${
-                cardCollapsed ? "max-h-0 opacity-0" : "max-h-6 opacity-100"
-              }`}
-            >
-              Saldo previsto no fim do mês
-            </p>
+            <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
             <p
               className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
                 expected >= 0 ? "text-foreground" : "text-destructive"
@@ -234,12 +234,15 @@ function Consolidated() {
           </div>
           <Sparkline points={trend} className="mt-3 md:mt-1 md:w-56 md:shrink-0" />
         </div>
-        <div
-          className={`overflow-hidden transition-[max-height,opacity,margin-top] duration-200 ease-out ${
-            cardCollapsed ? "mt-0 max-h-0 opacity-0" : "mt-5 max-h-[220px] opacity-100"
-          }`}
-        >
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
+
+        <div className="mt-3 flex items-center justify-center gap-1.5 border-t border-border/60 pt-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Detalhes do mês
+          <span ref={accordionChevronRef} className="inline-flex" style={{ transition: "transform .1s linear" }}>
+            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        </div>
+        <div ref={accordionWrapperRef} className="overflow-hidden">
+          <div ref={accordionContentRef} className="grid grid-cols-2 gap-2.5 pt-3 sm:gap-3 md:grid-cols-4">
             <Stat
               label="A receber"
               value={formatCurrency(totalIncome)}
@@ -266,15 +269,13 @@ function Consolidated() {
             />
           </div>
         </div>
-        <p
-          className={`overflow-hidden text-xs text-muted-foreground transition-[max-height,opacity,margin-top] duration-200 ease-out ${
-            cardCollapsed ? "mt-0 max-h-0 opacity-0" : "mt-3 max-h-6 opacity-100"
-          }`}
-        >
+        <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
           Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>
-      <h2 className="my-5 text-lg font-semibold">Suas contas</h2>
+      <div className="h-2" />
+      <h2 className="px-1 text-lg font-semibold">Suas contas</h2>
+      <div className="h-2" />
         </div>
       </div>
 

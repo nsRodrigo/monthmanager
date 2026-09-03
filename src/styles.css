@@ -191,6 +191,12 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    /* Sem isso, o navegador tenta "compensar" a posição de scroll sozinho
+       (scroll anchoring) toda vez que algo perto do topo muda de altura —
+       ex.: a faixa/card colapsando enquanto fica sticky. Isso brigava com
+       a lógica de scroll dos hooks em use-band-scroll-progress.ts, travando
+       o scroll real no meio da animação. */
+    overflow-anchor: none;
   }
 
   /* Scrollbar no tom do tema (Firefox) — some com a barra cinza-clara padrão do navegador. */

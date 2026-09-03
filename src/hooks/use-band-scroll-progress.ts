@@ -125,3 +125,63 @@ export function useScrollPastThreshold(
 
   return past;
 }
+
+/**
+ * Fecha um bloco (acordeão) acompanhando o scroll em tempo real — a altura
+ * vai de "auto" (medida via ResizeObserver, pra continuar certa se o
+ * conteúdo mudar) até 0 conforme o scroll avança até `closeRange`, e volta
+ * a abrir do mesmo jeito ao rolar de volta pro topo.
+ *
+ * Só funciona sem "fantasma"/travamento se o ancestral que rola tiver
+ * `overflow-anchor: none` — sem isso, o navegador tenta compensar
+ * sozinho a posição de scroll toda vez que esse bloco muda de altura
+ * (scroll anchoring), brigando com a própria lógica daqui.
+ */
+export function useAccordionScrollClose(
+  scrollRef: RefObject<HTMLElement | null>,
+  contentRef: RefObject<HTMLElement | null>,
+  { closeRange = 130, chevronRef }: { closeRange?: number; chevronRef?: RefObject<HTMLElement | null> } = {},
+) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const scrollEl = findScrollAncestor(scrollRef.current);
+    const wrapper = wrapperRef.current;
+    const content = contentRef.current;
+    if (!wrapper || !content) return;
+
+    const getY = () => (scrollEl === window ? window.scrollY : (scrollEl as HTMLElement).scrollTop);
+
+    let naturalHeight = content.scrollHeight;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = getY();
+      const p = Math.max(0, Math.min(1, y / closeRange));
+      wrapper.style.height = `${naturalHeight * (1 - p)}px`;
+      wrapper.style.opacity = String(1 - p);
+      if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    };
+
+    const ro = new ResizeObserver(() => {
+      naturalHeight = content.scrollHeight;
+      update();
+    });
+    ro.observe(content);
+
+    update();
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      scrollEl.removeEventListener("scroll", onScroll);
+    };
+  }, [scrollRef, contentRef, closeRange]);
+
+  return wrapperRef;
+}

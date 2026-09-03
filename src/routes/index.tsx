@@ -282,7 +282,7 @@ function Consolidated() {
           Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>
         </p>
       </section>
-      <h2 className="mt-8 mb-3 text-lg font-semibold">Suas contas</h2>
+      <h2 className="my-5 text-lg font-semibold">Suas contas</h2>
         </div>
       </div>
 

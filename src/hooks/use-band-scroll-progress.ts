@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 /** Acha o ancestral que de fato rola — um painel com overflow-y-auto (telas
  * de /contas/*, que rolam de forma independente) ou, na ausência de um, a
@@ -84,4 +84,44 @@ export function useResetScrollOnChange(ref: RefObject<HTMLElement | null>, deps:
     else (scrollEl as HTMLElement).scrollTop = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+}
+
+/**
+ * Booleano com histerese (não fica "piscando" na fronteira): vira `true`
+ * quando o scroll passa de `enterAt`, só volta a `false` quando cai abaixo
+ * de `exitAt`. Usado pra colapsar/expandir um bloco por estado do React
+ * (classe CSS com transição normal) em vez de recalcular `max-height` a
+ * cada pixel via CSS var — essa segunda abordagem, dentro de um ancestral
+ * `position: sticky`, tinha layout e pintura dessincronizando durante a
+ * animação (o conteúdo seguinte aparecia "fantasma" por cima).
+ */
+export function useScrollPastThreshold(
+  ref: RefObject<HTMLElement | null>,
+  { enterAt, exitAt }: { enterAt: number; exitAt: number },
+) {
+  const [past, setPast] = useState(false);
+
+  useEffect(() => {
+    const scrollEl = findScrollAncestor(ref.current);
+    const getY = () => (scrollEl === window ? window.scrollY : (scrollEl as HTMLElement).scrollTop);
+
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = getY();
+      setPast((prev) => (prev ? y > exitAt : y > enterAt));
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    };
+
+    update();
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollEl.removeEventListener("scroll", onScroll);
+  }, [ref, enterAt, exitAt]);
+
+  return past;
 }

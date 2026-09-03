@@ -207,7 +207,7 @@ function Consolidated() {
               style={{
                 opacity: "calc(1 - var(--band-pf, 0))",
                 maxHeight: "calc(20px * (1 - var(--band-pf, 0)))",
-                transition: "opacity .15s linear, max-height .15s linear",
+                transition: "opacity .15s linear",
               }}
             >
               Saldo previsto no fim do mês
@@ -242,7 +242,7 @@ function Consolidated() {
             opacity: "calc(1 - var(--band-pf, 0))",
             maxHeight: "calc(160px * (1 - var(--band-pf, 0)))",
             marginTop: "calc(20px * (1 - var(--band-pf, 0)))",
-            transition: "opacity .15s linear, max-height .15s linear, margin-top .15s linear",
+            transition: "opacity .15s linear",
           }}
         >
           <Stat
@@ -276,7 +276,7 @@ function Consolidated() {
             opacity: "calc(1 - var(--band-pf, 0))",
             maxHeight: "calc(20px * (1 - var(--band-pf, 0)))",
             marginTop: "calc(12px * (1 - var(--band-pf, 0)))",
-            transition: "opacity .15s linear, max-height .15s linear, margin-top .15s linear",
+            transition: "opacity .15s linear",
           }}
         >
           Saldo atual das contas: <span className="font-semibold text-foreground">{formatCurrency(normalizeZero(accountBalance))}</span>

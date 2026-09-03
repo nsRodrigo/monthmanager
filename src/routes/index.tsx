@@ -204,60 +204,60 @@ function Consolidated() {
         />
         <div className="mx-auto max-w-6xl px-5">
       <section className="relative z-10 -mt-6 overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-          <div>
-            <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
-            <p
-              className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
-                expected >= 0 ? "text-foreground" : "text-destructive"
+        <div>
+          <p className="text-sm text-muted-foreground">Saldo previsto no fim do mês</p>
+          <p
+            className={`mt-1 break-words text-3xl font-bold tracking-tight sm:text-4xl ${
+              expected >= 0 ? "text-foreground" : "text-destructive"
+            }`}
+          >
+            {formatCurrency(expected)}
+          </p>
+          {trendPct !== null && (
+            <span
+              className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                trendPct >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
               }`}
             >
-              {formatCurrency(expected)}
-            </p>
-            {trendPct !== null && (
-              <span
-                className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                  trendPct >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
-                }`}
-              >
-                {trendPct >= 0 ? (
-                  <ArrowUpRight className="h-3 w-3" />
-                ) : (
-                  <ArrowDownRight className="h-3 w-3" />
-                )}
-                {Math.abs(trendPct).toFixed(1)}% vs. mês passado
-              </span>
-            )}
-          </div>
-          <Sparkline points={trend} className="mt-3 md:mt-1 md:w-56 md:shrink-0" />
+              {trendPct >= 0 ? (
+                <ArrowUpRight className="h-3 w-3" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3" />
+              )}
+              {Math.abs(trendPct).toFixed(1)}% vs. mês passado
+            </span>
+          )}
         </div>
 
-        <div ref={accordionWrapperRef} className="mt-3 overflow-hidden border-t border-border/60">
-          <div ref={accordionContentRef} className="grid grid-cols-2 gap-2.5 pt-3 sm:gap-3 md:grid-cols-4">
-            <Stat
-              label="A receber"
-              value={formatCurrency(totalIncome)}
-              icon={ArrowUpRight}
-              tone="success"
-            />
-            <Stat
-              label="A pagar (débito)"
-              value={formatCurrency(totalDebits)}
-              icon={ArrowDownRight}
-              tone="debit"
-            />
-            <Stat
-              label="Faturas"
-              value={formatCurrency(totalCredit)}
-              icon={CreditCard}
-              tone="credit"
-            />
-            <Stat
-              label="Investido"
-              value={formatCurrency(totalInvested)}
-              icon={TrendingUp}
-              tone="primary"
-            />
+        <div ref={accordionWrapperRef} className="overflow-hidden">
+          <div ref={accordionContentRef}>
+            <Sparkline points={trend} className="mt-3" />
+            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
+              <Stat
+                label="A receber"
+                value={formatCurrency(totalIncome)}
+                icon={ArrowUpRight}
+                tone="success"
+              />
+              <Stat
+                label="A pagar (débito)"
+                value={formatCurrency(totalDebits)}
+                icon={ArrowDownRight}
+                tone="debit"
+              />
+              <Stat
+                label="Faturas"
+                value={formatCurrency(totalCredit)}
+                icon={CreditCard}
+                tone="credit"
+              />
+              <Stat
+                label="Investido"
+                value={formatCurrency(totalInvested)}
+                icon={TrendingUp}
+                tone="primary"
+              />
+            </div>
           </div>
         </div>
         <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">

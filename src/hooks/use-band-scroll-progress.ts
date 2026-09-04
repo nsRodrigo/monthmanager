@@ -143,30 +143,30 @@ export function useScrollPastThreshold(
 }
 
 /**
- * Fecha um bloco (acordeão) acompanhando o scroll em tempo real — a altura
- * vai de "auto" (medida via ResizeObserver, pra continuar certa se o
- * conteúdo mudar) até 0, e volta a abrir do mesmo jeito ao rolar de volta
- * pro topo.
+ * Fecha um bloco (acordeão) por gesto — a altura vai de "auto" (medida via
+ * ResizeObserver, pra continuar certa se o conteúdo mudar) até 0, e volta a
+ * abrir do mesmo jeito no gesto contrário.
  *
- * A distância de fechamento NÃO é um número fixo — é a própria altura
- * natural do conteúdo, medida a cada frame. Assim, cada pixel rolado
- * encolhe o acordeão em exatamente 1px: o que estiver logo abaixo dele no
- * layout (num bloco `sticky` que engloba os dois, como o card da Home)
- * não se move UM PIXEL sequer até o acordeão terminar de fechar — só
- * depois disso a rolagem passa a "sobrar" de verdade e revelar o que vem
- * a seguir. Com uma distância fixa que não batesse exatamente com a
- * altura real, esse "vazamento" começava um pouco antes do acordeão
- * terminar de fechar (o bug reportado: itens abaixo já começavam a sumir
- * antes do acordeão fechar de vez).
+ * NÃO reage a `scroll` (ver por quê abaixo) — em vez disso CAPTURA o gesto
+ * (`wheel`/`touchmove`) enquanto o acordeão não estiver 100% aberto/fechado:
+ * o dedo/mouse não rola a página de verdade, só avança um `progress` (0→1)
+ * interno. Só quando o acordeão termina de fechar o gesto é liberado pro
+ * scroll nativo normal (e vice-versa: rolar pra cima com a página já no
+ * topo reabre o acordeão antes de soltar o gesto pro scroll).
+ *
+ * Por que não dá pra reagir a `scroll` (como as duas versões anteriores
+ * faziam): quando este acordeão fica dentro de um bloco `sticky` (o card da
+ * Home, com "Suas contas" logo abaixo), encolher o acordeão E rolar a
+ * página são dois efeitos que SOMAM o quanto o conteúdo seguinte sobe na
+ * tela — nunca cancelam, não importa a distância de fechamento escolhida.
+ * Por isso itens abaixo (a lista "Suas contas") sempre acabavam se
+ * movendo/cobrindo ANTES do acordeão terminar de fechar. Capturar o gesto
+ * em vez de deixar a página rolar de verdade é a única forma de garantir
+ * "nada embaixo se mexe até o acordeão fechar".
  *
  * `wrapper`/`content` também vêm de `useAnchorNode` — não de `useRef` puro
  * — para reagir corretamente quando a tela troca de "carregando" pro
  * conteúdo real (ver o comentário grande lá em cima).
- *
- * Só funciona sem "fantasma"/travamento se o ancestral que rola tiver
- * `overflow-anchor: none` — sem isso, o navegador tenta compensar
- * sozinho a posição de scroll toda vez que esse bloco muda de altura
- * (scroll anchoring), brigando com a própria lógica daqui.
  */
 export function useAccordionScrollClose(
   scrollAnchor: HTMLElement | null,
@@ -174,56 +174,82 @@ export function useAccordionScrollClose(
 ) {
   const [wrapper, wrapperRef] = useAnchorNode<HTMLDivElement>();
   const [content, contentRef] = useAnchorNode<HTMLDivElement>();
+  const progressRef = useRef(0);
 
   useEffect(() => {
     if (!scrollAnchor || !wrapper || !content) return;
     const scrollEl = findScrollAncestor(scrollAnchor);
-    const getY = () => (scrollEl === window ? window.scrollY : (scrollEl as HTMLElement).scrollTop);
+    const getScrollTop = () => (scrollEl === window ? window.scrollY : (scrollEl as HTMLElement).scrollTop);
 
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      const y = getY();
-      // `content` nunca tem altura própria fixada (só `wrapper` tem), então
-      // isso sempre reflete a altura natural de verdade, mesmo enquanto o
-      // wrapper já está encolhido.
-      const naturalHeight = Math.max(1, Math.ceil(content.getBoundingClientRect().height));
-      // Zona morta de 8px: o navegador (sobretudo Android/PWA reaberto do
-      // app switcher) nem sempre restaura o scroll em exatamente y=0 —
-      // sobra um resíduo de poucos pixels que, sem essa margem, já bastava
-      // pra fechar uma fatia visível do acordeão mesmo com a tela
-      // "parecendo" no topo.
-      const p = y <= 8 ? 0 : Math.max(0, Math.min(1, (y - 8) / naturalHeight));
+    const render = () => {
+      const p = progressRef.current;
       if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;
       // Totalmente aberto: NENHUMA altura fixa via JS — deixa o navegador
-      // medir sozinho (`height: auto` de fato, removendo a propriedade em
-      // vez de fixar um valor calculado). Duas tentativas anteriores
-      // (scrollHeight, depois getBoundingClientRect+Math.ceil) ainda
-      // cortavam a borda inferior da última fileira por diferença de
-      // medição — impossível de acontecer se não houver medida nenhuma.
+      // medir sozinho, removendo a propriedade em vez de fixar um valor
+      // calculado (uma altura calculada errada já cortou a borda inferior
+      // da última fileira em tentativas anteriores).
       if (p <= 0) {
         wrapper.style.removeProperty("height");
         wrapper.style.opacity = "1";
         return;
       }
+      // `content` nunca tem altura própria fixada (só `wrapper` tem), então
+      // isso sempre reflete a altura natural de verdade, mesmo com o
+      // wrapper já encolhido.
+      const naturalHeight = Math.max(1, Math.ceil(content.getBoundingClientRect().height));
       wrapper.style.height = `${naturalHeight * (1 - p)}px`;
       wrapper.style.opacity = String(1 - p);
     };
-    const onScroll = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(update);
+
+    // `deltaY` > 0 = gesto "pra baixo" (fechar); < 0 = "pra cima" (reabrir).
+    // Retorna `true` quando captura o gesto (chamador deve dar preventDefault).
+    const applyDelta = (deltaY: number) => {
+      const naturalHeight = Math.max(1, Math.ceil(content.getBoundingClientRect().height));
+      const goingDown = deltaY > 0;
+      if (goingDown && progressRef.current < 1) {
+        progressRef.current = Math.min(1, progressRef.current + deltaY / naturalHeight);
+        render();
+        return true;
       }
+      if (!goingDown && getScrollTop() <= 0 && progressRef.current > 0) {
+        progressRef.current = Math.max(0, progressRef.current + deltaY / naturalHeight);
+        render();
+        return true;
+      }
+      return false;
     };
 
-    const ro = new ResizeObserver(update);
+    const onWheel = (e: WheelEvent) => {
+      if (applyDelta(e.deltaY)) e.preventDefault();
+    };
+
+    let touchStartY: number | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchStartY == null) return;
+      const y = e.touches[0]?.clientY;
+      if (y == null) return;
+      const deltaY = touchStartY - y;
+      if (applyDelta(deltaY)) e.preventDefault();
+      touchStartY = y;
+    };
+
+    const target: HTMLElement | Window = scrollEl === window ? window : scrollEl;
+    target.addEventListener("wheel", onWheel as EventListener, { passive: false });
+    target.addEventListener("touchstart", onTouchStart as EventListener, { passive: true });
+    target.addEventListener("touchmove", onTouchMove as EventListener, { passive: false });
+
+    const ro = new ResizeObserver(render);
     ro.observe(content);
 
-    update();
-    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    render();
     return () => {
       ro.disconnect();
-      scrollEl.removeEventListener("scroll", onScroll);
+      target.removeEventListener("wheel", onWheel as EventListener);
+      target.removeEventListener("touchstart", onTouchStart as EventListener);
+      target.removeEventListener("touchmove", onTouchMove as EventListener);
     };
   }, [scrollAnchor, wrapper, content, chevronRef]);
 

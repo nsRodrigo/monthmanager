@@ -16,6 +16,7 @@ import {
   User,
   Cloud,
   ShieldCheck,
+  MapPin,
 } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { Logo } from "@/components/Logo";
@@ -282,6 +283,20 @@ function SidebarContent({
             <Cloud className="h-3.5 w-3.5" />
           </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Backup e sync</span>
+        </Link>
+        <Link
+          to="/locais-produtos"
+          onClick={onNavigate}
+          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+            loc.pathname === "/locais-produtos"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <MapPin className="h-3.5 w-3.5" />
+          </span>
+          <span className={`whitespace-nowrap ${labelClass}`}>Locais e Produtos</span>
         </Link>
         {isAdmin && (
           <Link

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Plus, Copy } from "lucide-react";
 import { Modal, Field, inputClass, Select, Accordion, PaidToggle } from "./Modal";
-import { useAddDebit, useAccounts, useDescriptionSuggestions, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
+import { useAddDebit, useAccounts, useUpsertCatalogItem, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
-import { AutocompleteInput } from "./AutocompleteInput";
+import { CatalogDescriptionField } from "./CatalogDescriptionField";
 
 type PaymentType = "unico" | "parcelado" | "recorrente";
 type PaymentMethod = "none" | (typeof PAYMENT_METHOD_OPTIONS)[number]["value"];
@@ -24,8 +24,8 @@ export function AddDebitDialog({
   fixedAccountId?: string;
 }) {
   const addDebit = useAddDebit();
+  const upsertCatalogItem = useUpsertCatalogItem();
   const { data: accounts = [] } = useAccounts();
-  const suggestions = useDescriptionSuggestions("debit");
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
@@ -91,6 +91,7 @@ export function AddDebitDialog({
       notifyDaysBefore:
         !isInstallment && notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
     });
+    upsertCatalogItem.mutate({ name: description.trim() });
     if (after === "another") resetFields();
     else if (after === "close") onClose();
     // "duplicate": mantém os campos como estão, pronto pra adicionar de novo.
@@ -118,7 +119,7 @@ export function AddDebitDialog({
       <div className="space-y-4">
         {!fixedAccountId && <AccountSelect value={accountId} onChange={setAccountId} />}
         <Field label="Descrição">
-          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: IPVA, aluguel" />
+          <CatalogDescriptionField value={description} onChange={setDescription} placeholder="Ex: IPVA, aluguel" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

@@ -1999,3 +1999,29 @@ CREATE POLICY "avatars own update" ON storage.objects FOR UPDATE
   USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
 CREATE POLICY "avatars own delete" ON storage.objects FOR DELETE
   USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260904000000_catalog_items.sql
+-- ──────────────────────────────────────────────────────────
+-- "Locais e Produtos" — catálogo de descrições reutilizáveis compartilhado
+-- entre débitos, recebimentos, compras e investimentos. name_normalized
+-- (trim+lower) com UNIQUE(user_id, name_normalized) garante não duplicar.
+CREATE TABLE public.catalog_items (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  name_normalized TEXT NOT NULL,
+  kind TEXT CHECK (kind IN ('local', 'produto')),
+  usage_count INTEGER NOT NULL DEFAULT 1,
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, name_normalized)
+);
+
+ALTER TABLE public.catalog_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own catalog_items select" ON public.catalog_items FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "own catalog_items insert" ON public.catalog_items FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own catalog_items update" ON public.catalog_items FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "own catalog_items delete" ON public.catalog_items FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX idx_catalog_items_user_name ON public.catalog_items(user_id, name_normalized);

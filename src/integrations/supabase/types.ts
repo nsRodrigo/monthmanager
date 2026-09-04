@@ -225,6 +225,39 @@ export type Database = {
           },
         ]
       }
+      catalog_items: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string | null
+          last_used_at: string
+          name: string
+          name_normalized: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string | null
+          last_used_at?: string
+          name: string
+          name_normalized: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string | null
+          last_used_at?: string
+          name?: string
+          name_normalized?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       debits: {
         Row: {
           account_id: string

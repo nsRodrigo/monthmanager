@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as LocaisProdutosRouteImport } from './routes/locais-produtos'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as BackupRouteImport } from './routes/backup'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -28,6 +29,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const PerfilRoute = PerfilRouteImport.update({
   id: '/perfil',
   path: '/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LocaisProdutosRoute = LocaisProdutosRouteImport.update({
+  id: '/locais-produtos',
+  path: '/locais-produtos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportarHistoricoRoute = ImportarHistoricoRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/locais-produtos': typeof LocaisProdutosRoute
   '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/locais-produtos': typeof LocaisProdutosRoute
   '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
+  '/locais-produtos': typeof LocaisProdutosRoute
   '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/backup'
     | '/importar-historico'
+    | '/locais-produtos'
     | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/backup'
     | '/importar-historico'
+    | '/locais-produtos'
     | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/backup'
     | '/importar-historico'
+    | '/locais-produtos'
     | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BackupRoute: typeof BackupRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
+  LocaisProdutosRoute: typeof LocaisProdutosRoute
   PerfilRoute: typeof PerfilRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/perfil'
       fullPath: '/perfil'
       preLoaderRoute: typeof PerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/locais-produtos': {
+      id: '/locais-produtos'
+      path: '/locais-produtos'
+      fullPath: '/locais-produtos'
+      preLoaderRoute: typeof LocaisProdutosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/importar-historico': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BackupRoute: BackupRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
+  LocaisProdutosRoute: LocaisProdutosRoute,
   PerfilRoute: PerfilRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,

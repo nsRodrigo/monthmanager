@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft } from "lucide-react";
+import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft, MapPin } from "lucide-react";
 import { FabAction } from "@/components/FabAction";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
@@ -54,6 +54,15 @@ export function SettingsFabActions({
         onClick={() => {
           onNavigate();
           navigate({ to: "/backup" });
+        }}
+      />
+      <FabAction
+        icon={MapPin}
+        label="Locais e Produtos"
+        tone="primary"
+        onClick={() => {
+          onNavigate();
+          navigate({ to: "/locais-produtos" });
         }}
       />
       {isAdmin && (

@@ -1,9 +1,9 @@
 import { useMemo, useState, useEffect } from "react";
 import { Plus, Copy } from "lucide-react";
 import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal";
-import { useCards, useAddPurchase, useDescriptionSuggestions } from "@/store/finance";
+import { useCards, useAddPurchase, useUpsertCatalogItem } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
-import { AutocompleteInput } from "./AutocompleteInput";
+import { CatalogDescriptionField } from "./CatalogDescriptionField";
 
 type PaymentType = "unico" | "parcelado" | "recorrente";
 
@@ -26,7 +26,7 @@ export function AddPurchaseDialog({
 }) {
   const { data: cards = [] } = useCards();
   const addPurchase = useAddPurchase();
-  const suggestions = useDescriptionSuggestions("purchase");
+  const upsertCatalogItem = useUpsertCatalogItem();
   const selectableCards = useMemo(
     () => (fixedAccountId ? cards.filter((card) => card.accountId === fixedAccountId) : cards),
     [cards, fixedAccountId],
@@ -91,6 +91,7 @@ export function AddPurchaseDialog({
       markCurrentPaid: markPaid && isInstallment,
       notifyDaysBefore: isRecurring && notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
     });
+    upsertCatalogItem.mutate({ name: description.trim() });
     if (after === "another") resetFields(true);
     else if (after === "close") onClose();
   };
@@ -125,7 +126,7 @@ export function AddPurchaseDialog({
           </Field>
         )}
         <Field label="Descrição">
-          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Tênis novo" />
+          <CatalogDescriptionField value={description} onChange={setDescription} placeholder="Ex: Tênis novo" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

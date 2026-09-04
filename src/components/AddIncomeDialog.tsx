@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Plus, Copy } from "lucide-react";
 import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal";
-import { useAddIncome, useAccounts, useDescriptionSuggestions, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
+import { useAddIncome, useAccounts, useUpsertCatalogItem, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInput } from "./CurrencyInput";
-import { AutocompleteInput } from "./AutocompleteInput";
+import { CatalogDescriptionField } from "./CatalogDescriptionField";
 
 type PaymentType = "unico" | "parcelado" | "recorrente";
 /** Recebimento não usa 'auto_debit' — esse meio é exclusivo de débitos. */
@@ -27,7 +27,7 @@ export function AddIncomeDialog({
 }) {
   const addIncome = useAddIncome();
   const { data: accounts = [] } = useAccounts();
-  const suggestions = useDescriptionSuggestions("income");
+  const upsertCatalogItem = useUpsertCatalogItem();
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
   const [description, setDescription] = useState("");
@@ -89,6 +89,7 @@ export function AddIncomeDialog({
         !isInstallment && notifyEnabled ? Math.max(0, parseInt(notifyDaysBefore) || 0) : null,
       paymentMethod: paymentMethod === "none" ? null : paymentMethod,
     });
+    upsertCatalogItem.mutate({ name: description.trim() });
     if (after === "another") resetFields();
     else if (after === "close") onClose();
   };
@@ -117,7 +118,7 @@ export function AddIncomeDialog({
           <AccountSelect value={accountId} onChange={setAccountId} label="Conta de destino" />
         )}
         <Field label="Descrição">
-          <AutocompleteInput value={description} onChange={setDescription} suggestions={suggestions} placeholder="Ex: Salário, freelance" />
+          <CatalogDescriptionField value={description} onChange={setDescription} placeholder="Ex: Salário, freelance" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>

@@ -23,7 +23,7 @@ import {
   useRemoveIncome,
   useRemovePurchase,
   useRemoveInvestment,
-  useDescriptionSuggestions,
+  useUpsertCatalogItem,
   useDuplicateOverScope,
   useDeleteOverScope,
   useDuplicateInstallmentSeries,
@@ -42,7 +42,7 @@ import {
   type PaymentMethod,
 } from "@/store/finance";
 import { CurrencyInput } from "./CurrencyInput";
-import { AutocompleteInput } from "./AutocompleteInput";
+import { CatalogDescriptionField } from "./CatalogDescriptionField";
 import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
 import { Trash2, Copy, FastForward, Rewind, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
@@ -93,6 +93,7 @@ export function EditInstallmentDialog({
   const updateIncome = useUpdateIncome();
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
+  const upsertCatalogItem = useUpsertCatalogItem();
   const changeInstSeries = useChangeInstallmentSeries();
   const renumberInstallment = useRenumberInstallment();
   const addDebit = useAddDebit();
@@ -126,14 +127,6 @@ export function EditInstallmentDialog({
   const [askDelete, setAskDelete] = useState(false);
   const dupAnchorY = defaultYear ?? new Date().getFullYear();
   const dupAnchorM = defaultMonth ?? new Date().getMonth();
-
-  // Same-category suggestion source — falls back to "debit" when no item is open.
-  const suggestionKind: "debit" | "income" | "purchase" | "investment" = single
-    ? single.kind
-    : installment
-      ? (installment.parentType as "debit" | "income" | "purchase" | "investment")
-      : "debit";
-  const suggestions = useDescriptionSuggestions(suggestionKind);
 
   // For installments (parcelas), the editable date is the PARENT's date
   // (purchase_date / debit.date / income.date), shared by all installments —
@@ -336,6 +329,7 @@ export function EditInstallmentDialog({
             });
           }
         }
+        upsertCatalogItem.mutate({ name: description.trim() });
         onClose();
         return;
       }
@@ -369,6 +363,7 @@ export function EditInstallmentDialog({
           date: dueDate,
         });
       }
+      upsertCatalogItem.mutate({ name: description.trim() });
       onClose();
     };
     const pending =
@@ -399,11 +394,7 @@ export function EditInstallmentDialog({
       >
         <div className="space-y-4">
           <Field label={single.kind === "investment" ? "Tipo" : "Descrição"}>
-            <AutocompleteInput
-              value={description}
-              onChange={setDescription}
-              suggestions={suggestions}
-            />
+            <CatalogDescriptionField value={description} onChange={setDescription} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={singleType === "parcelled" && convMode === "perInstallment" ? "Valor por parcela" : "Valor"}>
@@ -728,6 +719,7 @@ export function EditInstallmentDialog({
       } else if (inst.parentType === "investment") {
         await updateInvestment.mutateAsync({ id: inst.parentId, type: newDesc });
       }
+      upsertCatalogItem.mutate({ name: newDesc });
     }
     // Move a compra para outro cartão (mesma conta ou outra) — a compra só
     // muda de "dono" (card_id); nenhuma parcela em `installments` é tocada.
@@ -782,6 +774,7 @@ export function EditInstallmentDialog({
           recurring: true,
         });
       }
+      upsertCatalogItem.mutate({ name: description.trim() });
       onClose();
       return;
     }
@@ -866,11 +859,7 @@ export function EditInstallmentDialog({
       >
         <div className="space-y-4">
           <Field label="Descrição">
-            <AutocompleteInput
-              value={description}
-              onChange={setDescription}
-              suggestions={suggestions}
-            />
+            <CatalogDescriptionField value={description} onChange={setDescription} />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">

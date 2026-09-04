@@ -5893,66 +5893,177 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
 }
 
 // =======================
-// Description suggestions (autocomplete)
+// "Locais e Produtos" — catálogo de descrições reutilizáveis, compartilhado
+// entre débitos, recebimentos, compras e investimentos (ao contrário de
+// `useDescriptionSuggestions` acima, que só sugere dentro do mesmo tipo).
 // =======================
-/**
- * Returns previously-used descriptions for the current user from the given
- * domain, ranked by usage frequency (desc) then recency (desc). Same-category
- * only — debit suggestions don't pollute income, etc.
- */
-export function useDescriptionSuggestions(
-  kind: "debit" | "income" | "purchase" | "investment",
-): string[] {
+export type CatalogKind = "local" | "produto";
+
+export type CatalogItem = {
+  id: string;
+  name: string;
+  /** null = criado automaticamente ao salvar um lançamento, ainda não classificado. */
+  kind: CatalogKind | null;
+  usageCount: number;
+  lastUsedAt: string;
+};
+
+/** trim + minúsculas + espaços colapsados — é o que faz "Mercado Livre" e "mercado  livre" contarem como o mesmo item. */
+function normalizeCatalogName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function useCatalogItems() {
   const { user } = useAuth();
-  const table =
-    kind === "debit"
-      ? "debits"
-      : kind === "income"
-        ? "incomes"
-        : kind === "purchase"
-          ? "purchases"
-          : "investments";
-  const field = kind === "investment" ? "type" : "description";
-  const { data = [] } = useQuery({
-    queryKey: ["description-suggestions", kind, user?.id],
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-    queryFn: async (): Promise<{ label: string; createdAt: string }[]> => {
+  return useQuery({
+    queryKey: ["catalog-items", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<CatalogItem[]> => {
       const { data, error } = await supabase
-        .from(table)
-        .select(`${field}, created_at`)
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false })
-        .limit(1000);
+        .from("catalog_items")
+        .select("id,name,kind,usage_count,last_used_at")
+        .order("usage_count", { ascending: false })
+        .order("last_used_at", { ascending: false });
       if (error) throw error;
-      return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => ({
-        label: String(row[field] ?? "").trim(),
-        createdAt: String(row["created_at"] ?? ""),
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        name: r.name as string,
+        kind: (r.kind ?? null) as CatalogKind | null,
+        usageCount: r.usage_count as number,
+        lastUsedAt: r.last_used_at as string,
       }));
     },
   });
-  return useMemo(() => {
-    const stats = new Map<string, { display: string; count: number; latest: string }>();
-    for (const row of data) {
-      const label = row.label;
-      if (!label) continue;
-      const key = label.toLowerCase();
-      const prev = stats.get(key);
-      if (prev) {
-        prev.count += 1;
-        if (row.createdAt > prev.latest) {
-          prev.latest = row.createdAt;
-          prev.display = label;
-        }
-      } else {
-        stats.set(key, { display: label, count: 1, latest: row.createdAt });
-      }
-    }
-    return Array.from(stats.values())
-      .sort((a, b) => (b.count - a.count) || (b.latest > a.latest ? 1 : -1))
-      .map((s) => s.display);
-  }, [data]);
 }
+
+/**
+ * Registra o uso de uma descrição no catálogo: se já existe uma entrada com
+ * o mesmo nome normalizado, só incrementa `usage_count`/`last_used_at` e
+ * reaproveita o item; senão cria um novo (com `kind: null`, "não
+ * classificado"). É o que roda sozinho ao salvar qualquer lançamento —
+ * nenhuma tela de criação pede pra classificar Local/Produto.
+ */
+export function useUpsertCatalogItem() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { name: string; kind?: CatalogKind | null }) => {
+      if (!user) throw new Error("Não autenticado.");
+      const name = args.name.trim();
+      if (!name) return null;
+      const normalized = normalizeCatalogName(name);
+
+      const { data: existing, error: selErr } = await supabase
+        .from("catalog_items")
+        .select("id,usage_count")
+        .eq("user_id", user.id)
+        .eq("name_normalized", normalized)
+        .maybeSingle();
+      if (selErr) throw selErr;
+
+      if (existing) {
+        const { error } = await supabase
+          .from("catalog_items")
+          .update({ usage_count: existing.usage_count + 1, last_used_at: new Date().toISOString() })
+          .eq("id", existing.id);
+        if (error) throw error;
+        return existing.id as string;
+      }
+
+      const { data: created, error } = await supabase
+        .from("catalog_items")
+        .insert({
+          user_id: user.id,
+          name,
+          name_normalized: normalized,
+          kind: args.kind ?? null,
+          usage_count: 1,
+          last_used_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error) {
+        // Corrida rara (duplo-submit): outra chamada já criou o item entre o
+        // select e o insert acima — busca e incrementa em vez de falhar.
+        if ((error as { code?: string }).code === "23505") {
+          const { data: raced } = await supabase
+            .from("catalog_items")
+            .select("id,usage_count")
+            .eq("user_id", user.id)
+            .eq("name_normalized", normalized)
+            .single();
+          if (raced) {
+            await supabase
+              .from("catalog_items")
+              .update({ usage_count: raced.usage_count + 1, last_used_at: new Date().toISOString() })
+              .eq("id", raced.id);
+            return raced.id as string;
+          }
+        }
+        throw error;
+      }
+      return created.id as string;
+    },
+    onSettled: () => inv(["catalog-items"]),
+  });
+}
+
+/** Cadastro manual na tela "Locais e Produtos" — sempre define `kind` explicitamente. */
+export function useAddCatalogItem() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { name: string; kind: CatalogKind }) => {
+      if (!user) throw new Error("Não autenticado.");
+      const name = args.name.trim();
+      const { data, error } = await supabase
+        .from("catalog_items")
+        .insert({
+          user_id: user.id,
+          name,
+          name_normalized: normalizeCatalogName(name),
+          kind: args.kind,
+          usage_count: 1,
+          last_used_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSettled: () => inv(["catalog-items"]),
+  });
+}
+
+export function useUpdateCatalogItem() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { id: string; name?: string; kind?: CatalogKind | null }) => {
+      const patch: { name?: string; name_normalized?: string; kind?: CatalogKind | null } = {};
+      if (args.name !== undefined) {
+        patch.name = args.name.trim();
+        patch.name_normalized = normalizeCatalogName(args.name);
+      }
+      if (args.kind !== undefined) patch.kind = args.kind;
+      const { error } = await supabase.from("catalog_items").update(patch).eq("id", args.id);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["catalog-items"]),
+  });
+}
+
+/** Remove só da lista de sugestões — não reescreve a descrição já salva em lançamentos passados. */
+export function useDeleteCatalogItem() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("catalog_items").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["catalog-items"]),
+  });
+}
+
 /**
  * Move mês/ano inteiro de uma conta, deslocando SÉRIES INTEIRAS (não só o
  * item que estava fisicamente no mês de origem) pelo mesmo delta — parcelas

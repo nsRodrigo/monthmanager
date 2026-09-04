@@ -1,5 +1,18 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { navLoading } from "./store/nav-loading";
+
+/** Resolve depois que o browser efetivamente PINTOU o frame atual — um único
+ * `requestAnimationFrame` dispara ANTES do paint, então não garante nada
+ * sozinho; o clássico "double rAF" garante que o paint do primeiro frame já
+ * aconteceu antes de continuar. Usado pra garantir que o overlay de loading
+ * chegou a aparecer na tela antes de rodar trabalho síncrono pesado em
+ * seguida (ex.: o render da tela de destino). */
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -66,6 +79,23 @@ export const getRouter = () => {
     // (Firefox). Timing/easing customizados em styles.css.
     defaultViewTransition: true,
   });
+
+  // `<Link>` e `useNavigate()` chamam `router.navigate` internamente — então
+  // envolver esse único método aqui cobre TODA navegação do app, sem
+  // precisar tocar em cada `<Link>` espalhado pelo código. Ver o comentário
+  // em `src/store/nav-loading.ts` pra entender por que isso é necessário
+  // (o próprio estado do router não cobre o travamento real).
+  const originalNavigate = router.navigate;
+  router.navigate = (async (opts: Parameters<typeof originalNavigate>[0]) => {
+    navLoading.begin();
+    await nextPaint();
+    try {
+      return await originalNavigate(opts);
+    } finally {
+      await nextPaint();
+      navLoading.end();
+    }
+  }) as typeof router.navigate;
 
   return router;
 };

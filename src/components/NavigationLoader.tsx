@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
-import { useRouterState } from "@tanstack/react-router";
+import { useNavLoading } from "@/store/nav-loading";
 import { Loader2 } from "lucide-react";
 
 /**
  * Overlay sutil que aparece quando uma navegação demora mais que 150ms.
  * Mostra um fundo fosco com spinner centralizado até a próxima tela renderizar.
+ *
+ * Usa `useNavLoading` (ligado em `router.navigate`, ver src/router.tsx) em
+ * vez do estado nativo do router (`isLoading`/`isTransitioning`): rotas sem
+ * `loader` "terminam" a navegação quase instantaneamente aos olhos do
+ * router, mesmo quando o primeiro render da tela nova ainda trava a thread
+ * por um bom tempo (ex.: recalcular todo o histórico financeiro de uma
+ * conta) — esse travamento ficava fora da janela que o router expõe.
  */
 export function NavigationLoader() {
-  const isLoading = useRouterState({
-    select: (s) => s.isLoading || s.isTransitioning,
-  });
+  const isLoading = useNavLoading();
   const [show, setShow] = useState(false);
 
   useEffect(() => {

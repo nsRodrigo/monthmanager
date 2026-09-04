@@ -1,32 +1,29 @@
-import { useEffect, useState } from "react";
 import { useNavLoading } from "@/store/nav-loading";
 import { Loader2 } from "lucide-react";
 
 /**
- * Overlay sutil que aparece quando uma navegação demora mais que 150ms.
- * Mostra um fundo fosco com spinner centralizado até a próxima tela renderizar.
+ * Overlay sutil que aparece durante uma troca de tela — fundo fosco com
+ * spinner centralizado até a tela nova renderizar.
  *
- * Usa `useNavLoading` (ligado em `router.navigate`, ver src/router.tsx) em
- * vez do estado nativo do router (`isLoading`/`isTransitioning`): rotas sem
- * `loader` "terminam" a navegação quase instantaneamente aos olhos do
- * router, mesmo quando o primeiro render da tela nova ainda trava a thread
- * por um bom tempo (ex.: recalcular todo o histórico financeiro de uma
- * conta) — esse travamento ficava fora da janela que o router expõe.
+ * Usa `useNavLoading` (ligado em `router.load`, ver src/router.tsx e
+ * `withNavLoading` em src/store/nav-loading.ts) em vez do estado nativo do
+ * router (`isLoading`/`isTransitioning`): rotas sem `loader` "terminam" a
+ * navegação quase instantaneamente aos olhos do router, mesmo quando o
+ * primeiro render da tela nova ainda trava a thread por um bom tempo (ex.:
+ * recalcular todo o histórico financeiro de uma conta) — esse travamento
+ * ficava fora da janela que o router expõe.
+ *
+ * Aparece IMEDIATAMENTE (sem debounce) de propósito: o app usa transição
+ * visual nativa do navegador entre rotas (`defaultViewTransition` em
+ * src/router.tsx), que tira uma "foto" da tela atual e congela nela até a
+ * tela nova estar pronta — um debounce aqui (como os ~150ms que este
+ * componente já teve) fazia esse overlay não existir ainda no instante em
+ * que a foto era tirada, então ele nunca chegava a aparecer.
  */
 export function NavigationLoader() {
   const isLoading = useNavLoading();
-  const [show, setShow] = useState(false);
 
-  useEffect(() => {
-    if (!isLoading) {
-      setShow(false);
-      return;
-    }
-    const t = setTimeout(() => setShow(true), 150);
-    return () => clearTimeout(t);
-  }, [isLoading]);
-
-  if (!show) return null;
+  if (!isLoading) return null;
   return (
     <div
       className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center bg-background/60 backdrop-blur-sm"

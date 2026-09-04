@@ -90,17 +90,24 @@ export const getRouter = () => {
   // direto, sem passar por `navigate()`. Envolvendo `load` em vez disso,
   // cobre TUDO com um só ponto: cliques em `<Link>`, `useNavigate()`,
   // voltar/avançar do navegador, e `router.invalidate()`.
-  const originalLoad = router.load;
-  router.load = (async (opts: Parameters<typeof originalLoad>[0]) => {
-    navLoading.begin();
-    await nextPaint();
-    try {
-      return await originalLoad(opts);
-    } finally {
+  //
+  // `getRouter()` roda tanto no cliente quanto no servidor (SSR no Cloudflare
+  // Worker) — `requestAnimationFrame` (usado em `nextPaint`) não existe no
+  // servidor, então esse embrulho só pode ser aplicado no cliente; no
+  // servidor, `router.load` fica exatamente como o TanStack Router criou.
+  if (typeof window !== "undefined") {
+    const originalLoad = router.load;
+    router.load = (async (opts: Parameters<typeof originalLoad>[0]) => {
+      navLoading.begin();
       await nextPaint();
-      navLoading.end();
-    }
-  }) as typeof router.load;
+      try {
+        return await originalLoad(opts);
+      } finally {
+        await nextPaint();
+        navLoading.end();
+      }
+    }) as typeof router.load;
+  }
 
   return router;
 };

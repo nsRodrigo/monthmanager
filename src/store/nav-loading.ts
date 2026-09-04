@@ -9,12 +9,14 @@ import { useSyncExternalStore } from "react";
  * navegação quase instantaneamente aos olhos do router — o travamento real
  * acontece DEPOIS, durante o primeiro render da tela nova (ex.: a tela de
  * conta recalcula todo o histórico financeiro de forma síncrona). Esse
- * travamento fica fora da janela que o router expõe. `router.navigate` é
+ * travamento fica fora da janela que o router expõe. `router.load` (não
+ * `router.navigate` — ver comentário em `src/router.tsx` sobre por quê) é
  * envolvido em `src/router.tsx` pra chamar `begin()`/`end()` ao redor de
- * TODA navegação (cliques em `Link` e `navigate()` programático passam
- * pelo mesmo método), incluindo uma folga de alguns frames antes/depois
- * pra garantir que o overlay pinta antes do travamento e continua visível
- * até a tela nova realmente aparecer.
+ * TODA troca de tela: cliques em `Link`, `navigate()` programático, e
+ * também voltar/avançar do navegador — todos disparam `load()` por baixo.
+ * Inclui uma folga de alguns frames antes/depois pra garantir que o
+ * overlay pinta antes do travamento e continua visível até a tela nova
+ * realmente aparecer.
  */
 class NavLoadingStore {
   private count = 0;

@@ -80,22 +80,27 @@ export const getRouter = () => {
     defaultViewTransition: true,
   });
 
-  // `<Link>` e `useNavigate()` chamam `router.navigate` internamente — então
-  // envolver esse único método aqui cobre TODA navegação do app, sem
-  // precisar tocar em cada `<Link>` espalhado pelo código. Ver o comentário
-  // em `src/store/nav-loading.ts` pra entender por que isso é necessário
-  // (o próprio estado do router não cobre o travamento real).
-  const originalNavigate = router.navigate;
-  router.navigate = (async (opts: Parameters<typeof originalNavigate>[0]) => {
+  // `router.load` é o ponto de estrangulamento REAL de qualquer troca de
+  // tela — não `router.navigate`. `navigate()` só muda a URL/histórico; é a
+  // mudança no histórico que dispara `load()` por baixo (via
+  // `history.subscribe`, ver node_modules/@tanstack/react-router/.../
+  // Transitioner.js), e é ESSA chamada que resolve as rotas e reflete no
+  // React. Envolver só `navigate` deixava passar batido o botão/gesto de
+  // "voltar" do navegador (popstate) e forward, que disparam `load()`
+  // direto, sem passar por `navigate()`. Envolvendo `load` em vez disso,
+  // cobre TUDO com um só ponto: cliques em `<Link>`, `useNavigate()`,
+  // voltar/avançar do navegador, e `router.invalidate()`.
+  const originalLoad = router.load;
+  router.load = (async (opts: Parameters<typeof originalLoad>[0]) => {
     navLoading.begin();
     await nextPaint();
     try {
-      return await originalNavigate(opts);
+      return await originalLoad(opts);
     } finally {
       await nextPaint();
       navLoading.end();
     }
-  }) as typeof router.navigate;
+  }) as typeof router.load;
 
   return router;
 };

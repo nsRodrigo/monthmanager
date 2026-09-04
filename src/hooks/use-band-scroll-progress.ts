@@ -183,7 +183,14 @@ export function useAccordionScrollClose(
       // esse cache ficava um pixel desatualizado. `content` nunca tem altura
       // própria fixada, só o `wrapper`, então isso não custa um reflow extra
       // além do que já existe.
-      const naturalHeight = content.scrollHeight;
+      //
+      // `getBoundingClientRect()` (sub-pixel) em vez de `scrollHeight`
+      // (inteiro, arredondado pra baixo) + `Math.ceil`: com scrollHeight,
+      // uma altura real de ex. 245.6px virava 245px, cortando pelo
+      // `overflow-hidden` a fração que sobra — o suficiente pra sumir com a
+      // borda inferior arredondada da última fileira (Faturas/Investido),
+      // mesmo com o acordeão 100% aberto (p=0).
+      const naturalHeight = Math.ceil(content.getBoundingClientRect().height);
       wrapper.style.height = `${naturalHeight * (1 - p)}px`;
       wrapper.style.opacity = String(1 - p);
       if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;

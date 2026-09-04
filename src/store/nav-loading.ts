@@ -55,3 +55,35 @@ export const navLoading = new NavLoadingStore();
 export function useNavLoading(): boolean {
   return useSyncExternalStore(navLoading.subscribe, navLoading.getSnapshot, navLoading.getSnapshot);
 }
+
+/** Resolve depois que o browser efetivamente PINTOU o frame atual — um único
+ * `requestAnimationFrame` dispara ANTES do paint, então não garante nada
+ * sozinho; o clássico "double rAF" garante que o paint do primeiro frame já
+ * aconteceu antes de continuar. Também usado em `src/router.tsx` (import
+ * daqui, não uma cópia — mas lá só é CHAMADO no cliente, com guard
+ * `typeof window`, já que aquele arquivo roda no servidor também). */
+export function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+/**
+ * Mesma ideia do embrulho de `router.load` em `src/router.tsx`, só que pra
+ * transições que deliberadamente NÃO passam pelo router — ex.: trocar de
+ * "view" dentro de um painel de conta (Meses ↔ Lançamentos), que é estado
+ * local (`PaneView` em `src/store/panes.tsx`) pra parecer instantâneo como
+ * abas, sem mudar a URL. Nesses casos o overlay não aparece sozinho porque
+ * não existe navegação nenhuma pro router observar — chame isso manualmente
+ * ao redor da troca de estado.
+ */
+export async function withNavLoading(fn: () => void): Promise<void> {
+  navLoading.begin();
+  await nextPaint();
+  try {
+    fn();
+  } finally {
+    await nextPaint();
+    navLoading.end();
+  }
+}

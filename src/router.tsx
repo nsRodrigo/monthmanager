@@ -1,18 +1,6 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { navLoading } from "./store/nav-loading";
-
-/** Resolve depois que o browser efetivamente PINTOU o frame atual — um único
- * `requestAnimationFrame` dispara ANTES do paint, então não garante nada
- * sozinho; o clássico "double rAF" garante que o paint do primeiro frame já
- * aconteceu antes de continuar. Usado pra garantir que o overlay de loading
- * chegou a aparecer na tela antes de rodar trabalho síncrono pesado em
- * seguida (ex.: o render da tela de destino). */
-function nextPaint(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
-}
+import { navLoading, nextPaint } from "./store/nav-loading";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();

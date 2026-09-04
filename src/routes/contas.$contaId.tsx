@@ -20,6 +20,7 @@ import {
 } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes, type PaneView } from "@/store/panes";
+import { withNavLoading } from "@/store/nav-loading";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sparkline } from "@/components/Sparkline";
@@ -555,7 +556,7 @@ function AccountPane({
             <button
               key={m}
               type="button"
-              onClick={() => onViewChange({ type: "month", year, month: m })}
+              onClick={() => withNavLoading(() => onViewChange({ type: "month", year, month: m }))}
               className={`group block w-full rounded-3xl border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
                 isCurrent ? "border-primary shadow-[0_0_0_1px_var(--primary)]" : "border-border"
               }`}
@@ -624,8 +625,8 @@ function AccountPane({
           contaId={contaId}
           year={view.year}
           month={view.month}
-          onBack={() => onViewChange({ type: "months" })}
-          onMonthChange={(y, m) => onViewChange({ type: "month", year: y, month: m })}
+          onBack={() => withNavLoading(() => onViewChange({ type: "months" }))}
+          onMonthChange={(y, m) => withNavLoading(() => onViewChange({ type: "month", year: y, month: m }))}
           embedded
           fabPortalTarget={fabPortalTarget}
           onClose={onClose}

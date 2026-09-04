@@ -176,7 +176,12 @@ export function useAccordionScrollClose(
     const update = () => {
       ticking = false;
       const y = getY();
-      const p = Math.max(0, Math.min(1, y / closeRange));
+      // Zona morta de 8px: o navegador (sobretudo Android/PWA reaberto do
+      // app switcher) nem sempre restaura o scroll em exatamente y=0 —
+      // sobra um resíduo de poucos pixels que, sem essa margem, já bastava
+      // pra fechar uma fatia visível do acordeão (cortando a borda inferior
+      // arredondada da última fileira) mesmo com a tela "parecendo" no topo.
+      const p = y <= 8 ? 0 : Math.max(0, Math.min(1, (y - 8) / closeRange));
       // Mede a altura natural fresca a cada chamada, em vez de guardar num
       // cache que só era atualizado quando o ResizeObserver disparava —
       // sobrava sempre uma frestinha (a 2ª fileira de stats cortada) quando

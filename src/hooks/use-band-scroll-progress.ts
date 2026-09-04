@@ -179,26 +179,24 @@ export function useAccordionScrollClose(
       // Zona morta de 8px: o navegador (sobretudo Android/PWA reaberto do
       // app switcher) nem sempre restaura o scroll em exatamente y=0 —
       // sobra um resíduo de poucos pixels que, sem essa margem, já bastava
-      // pra fechar uma fatia visível do acordeão (cortando a borda inferior
-      // arredondada da última fileira) mesmo com a tela "parecendo" no topo.
+      // pra fechar uma fatia visível do acordeão mesmo com a tela
+      // "parecendo" no topo.
       const p = y <= 8 ? 0 : Math.max(0, Math.min(1, (y - 8) / closeRange));
-      // Mede a altura natural fresca a cada chamada, em vez de guardar num
-      // cache que só era atualizado quando o ResizeObserver disparava —
-      // sobrava sempre uma frestinha (a 2ª fileira de stats cortada) quando
-      // esse cache ficava um pixel desatualizado. `content` nunca tem altura
-      // própria fixada, só o `wrapper`, então isso não custa um reflow extra
-      // além do que já existe.
-      //
-      // `getBoundingClientRect()` (sub-pixel) em vez de `scrollHeight`
-      // (inteiro, arredondado pra baixo) + `Math.ceil`: com scrollHeight,
-      // uma altura real de ex. 245.6px virava 245px, cortando pelo
-      // `overflow-hidden` a fração que sobra — o suficiente pra sumir com a
-      // borda inferior arredondada da última fileira (Faturas/Investido),
-      // mesmo com o acordeão 100% aberto (p=0).
+      if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;
+      // Totalmente aberto: NENHUMA altura fixa via JS — deixa o navegador
+      // medir sozinho (`height: auto` de fato, removendo a propriedade em
+      // vez de fixar um valor calculado). Duas tentativas anteriores
+      // (scrollHeight, depois getBoundingClientRect+Math.ceil) ainda
+      // cortavam a borda inferior da última fileira por diferença de
+      // medição — impossível de acontecer se não houver medida nenhuma.
+      if (p <= 0) {
+        wrapper.style.removeProperty("height");
+        wrapper.style.opacity = "1";
+        return;
+      }
       const naturalHeight = Math.ceil(content.getBoundingClientRect().height);
       wrapper.style.height = `${naturalHeight * (1 - p)}px`;
       wrapper.style.opacity = String(1 - p);
-      if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;
     };
     const onScroll = () => {
       if (!ticking) {

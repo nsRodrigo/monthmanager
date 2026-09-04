@@ -61,10 +61,7 @@ const ICON_BY_TYPE = {
 function Consolidated() {
   const [manageOpen, setManageOpen] = useState(false);
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(
-    bandAnchor,
-    { closeRange: 130 },
-  );
+  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases = [] } = usePurchases();

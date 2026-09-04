@@ -145,8 +145,19 @@ export function useScrollPastThreshold(
 /**
  * Fecha um bloco (acordeão) acompanhando o scroll em tempo real — a altura
  * vai de "auto" (medida via ResizeObserver, pra continuar certa se o
- * conteúdo mudar) até 0 conforme o scroll avança até `closeRange`, e volta
- * a abrir do mesmo jeito ao rolar de volta pro topo.
+ * conteúdo mudar) até 0, e volta a abrir do mesmo jeito ao rolar de volta
+ * pro topo.
+ *
+ * A distância de fechamento NÃO é um número fixo — é a própria altura
+ * natural do conteúdo, medida a cada frame. Assim, cada pixel rolado
+ * encolhe o acordeão em exatamente 1px: o que estiver logo abaixo dele no
+ * layout (num bloco `sticky` que engloba os dois, como o card da Home)
+ * não se move UM PIXEL sequer até o acordeão terminar de fechar — só
+ * depois disso a rolagem passa a "sobrar" de verdade e revelar o que vem
+ * a seguir. Com uma distância fixa que não batesse exatamente com a
+ * altura real, esse "vazamento" começava um pouco antes do acordeão
+ * terminar de fechar (o bug reportado: itens abaixo já começavam a sumir
+ * antes do acordeão fechar de vez).
  *
  * `wrapper`/`content` também vêm de `useAnchorNode` — não de `useRef` puro
  * — para reagir corretamente quando a tela troca de "carregando" pro
@@ -159,10 +170,7 @@ export function useScrollPastThreshold(
  */
 export function useAccordionScrollClose(
   scrollAnchor: HTMLElement | null,
-  {
-    closeRange = 130,
-    chevronRef,
-  }: { closeRange?: number; chevronRef?: { current: HTMLElement | null } } = {},
+  { chevronRef }: { chevronRef?: { current: HTMLElement | null } } = {},
 ) {
   const [wrapper, wrapperRef] = useAnchorNode<HTMLDivElement>();
   const [content, contentRef] = useAnchorNode<HTMLDivElement>();
@@ -176,12 +184,16 @@ export function useAccordionScrollClose(
     const update = () => {
       ticking = false;
       const y = getY();
+      // `content` nunca tem altura própria fixada (só `wrapper` tem), então
+      // isso sempre reflete a altura natural de verdade, mesmo enquanto o
+      // wrapper já está encolhido.
+      const naturalHeight = Math.max(1, Math.ceil(content.getBoundingClientRect().height));
       // Zona morta de 8px: o navegador (sobretudo Android/PWA reaberto do
       // app switcher) nem sempre restaura o scroll em exatamente y=0 —
       // sobra um resíduo de poucos pixels que, sem essa margem, já bastava
       // pra fechar uma fatia visível do acordeão mesmo com a tela
       // "parecendo" no topo.
-      const p = y <= 8 ? 0 : Math.max(0, Math.min(1, (y - 8) / closeRange));
+      const p = y <= 8 ? 0 : Math.max(0, Math.min(1, (y - 8) / naturalHeight));
       if (chevronRef?.current) chevronRef.current.style.transform = `rotate(${p * -180}deg)`;
       // Totalmente aberto: NENHUMA altura fixa via JS — deixa o navegador
       // medir sozinho (`height: auto` de fato, removendo a propriedade em
@@ -194,7 +206,6 @@ export function useAccordionScrollClose(
         wrapper.style.opacity = "1";
         return;
       }
-      const naturalHeight = Math.ceil(content.getBoundingClientRect().height);
       wrapper.style.height = `${naturalHeight * (1 - p)}px`;
       wrapper.style.opacity = String(1 - p);
     };
@@ -214,7 +225,7 @@ export function useAccordionScrollClose(
       ro.disconnect();
       scrollEl.removeEventListener("scroll", onScroll);
     };
-  }, [scrollAnchor, wrapper, content, closeRange, chevronRef]);
+  }, [scrollAnchor, wrapper, content, chevronRef]);
 
   return { wrapperRef, contentRef };
 }

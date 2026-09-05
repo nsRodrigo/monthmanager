@@ -27,9 +27,11 @@ export function CatalogDescriptionField({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const q = value.trim().toLowerCase();
+  // Campo vazio (ou focado sem digitar) já mostra os mais usados — clicar
+  // no input também serve pra escolher da lista, sem precisar digitar nada.
   const matches = q
     ? items.filter((i) => i.name.toLowerCase() !== q && i.name.toLowerCase().includes(q)).slice(0, 6)
-    : [];
+    : items.slice(0, 6);
 
   useEffect(() => {
     if (!open) return;

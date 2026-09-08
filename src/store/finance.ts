@@ -5897,13 +5897,9 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
 // entre débitos, recebimentos, compras e investimentos (ao contrário de
 // `useDescriptionSuggestions` acima, que só sugere dentro do mesmo tipo).
 // =======================
-export type CatalogKind = "local" | "produto";
-
 export type CatalogItem = {
   id: string;
   name: string;
-  /** null = criado automaticamente ao salvar um lançamento, ainda não classificado. */
-  kind: CatalogKind | null;
   usageCount: number;
   lastUsedAt: string;
 };
@@ -5921,14 +5917,12 @@ export function useCatalogItems() {
     queryFn: async (): Promise<CatalogItem[]> => {
       const { data, error } = await supabase
         .from("catalog_items")
-        .select("id,name,kind,usage_count,last_used_at")
-        .order("usage_count", { ascending: false })
-        .order("last_used_at", { ascending: false });
+        .select("id,name,usage_count,last_used_at")
+        .order("name", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((r) => ({
         id: r.id as string,
         name: r.name as string,
-        kind: (r.kind ?? null) as CatalogKind | null,
         usageCount: r.usage_count as number,
         lastUsedAt: r.last_used_at as string,
       }));
@@ -5939,15 +5933,14 @@ export function useCatalogItems() {
 /**
  * Registra o uso de uma descrição no catálogo: se já existe uma entrada com
  * o mesmo nome normalizado, só incrementa `usage_count`/`last_used_at` e
- * reaproveita o item; senão cria um novo (com `kind: null`, "não
- * classificado"). É o que roda sozinho ao salvar qualquer lançamento —
- * nenhuma tela de criação pede pra classificar Local/Produto.
+ * reaproveita o item; senão cria um novo. É o que roda sozinho ao salvar
+ * qualquer lançamento — nenhuma tela de criação pede nada extra aqui.
  */
 export function useUpsertCatalogItem() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: { name: string; kind?: CatalogKind | null }) => {
+    mutationFn: async (args: { name: string }) => {
       if (!user) throw new Error("Não autenticado.");
       const name = args.name.trim();
       if (!name) return null;
@@ -5976,7 +5969,6 @@ export function useUpsertCatalogItem() {
           user_id: user.id,
           name,
           name_normalized: normalized,
-          kind: args.kind ?? null,
           usage_count: 1,
           last_used_at: new Date().toISOString(),
         })
@@ -6008,12 +6000,12 @@ export function useUpsertCatalogItem() {
   });
 }
 
-/** Cadastro manual na tela "Locais e Produtos" — sempre define `kind` explicitamente. */
+/** Cadastro manual na tela "Locais e Produtos". */
 export function useAddCatalogItem() {
   const { user } = useAuth();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: { name: string; kind: CatalogKind }) => {
+    mutationFn: async (args: { name: string }) => {
       if (!user) throw new Error("Não autenticado.");
       const name = args.name.trim();
       const { data, error } = await supabase
@@ -6022,7 +6014,6 @@ export function useAddCatalogItem() {
           user_id: user.id,
           name,
           name_normalized: normalizeCatalogName(name),
-          kind: args.kind,
           usage_count: 1,
           last_used_at: new Date().toISOString(),
         })
@@ -6038,13 +6029,8 @@ export function useAddCatalogItem() {
 export function useUpdateCatalogItem() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (args: { id: string; name?: string; kind?: CatalogKind | null }) => {
-      const patch: { name?: string; name_normalized?: string; kind?: CatalogKind | null } = {};
-      if (args.name !== undefined) {
-        patch.name = args.name.trim();
-        patch.name_normalized = normalizeCatalogName(args.name);
-      }
-      if (args.kind !== undefined) patch.kind = args.kind;
+    mutationFn: async (args: { id: string; name: string }) => {
+      const patch = { name: args.name.trim(), name_normalized: normalizeCatalogName(args.name) };
       const { error } = await supabase.from("catalog_items").update(patch).eq("id", args.id);
       if (error) throw error;
     },

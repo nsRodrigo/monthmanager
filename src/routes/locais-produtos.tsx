@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { HeaderBand } from "@/components/HeaderBand";
-import { Field, Select, inputClass } from "@/components/Modal";
+import { inputClass } from "@/components/Modal";
 import { useConfirm } from "@/store/confirm";
 import { formatDate } from "@/lib/format";
 import {
@@ -11,15 +11,14 @@ import {
   useUpdateCatalogItem,
   useDeleteCatalogItem,
   type CatalogItem,
-  type CatalogKind,
 } from "@/store/finance";
-import { MapPin, Package, Plus, Pencil, Trash2, Check, X, Search, AlertTriangle } from "lucide-react";
+import { Tag, Plus, Pencil, Trash2, Check, X, Search, AlertTriangle, ArrowDownAZ, Flame } from "lucide-react";
 
 export const Route = createFileRoute("/locais-produtos")({
   component: LocaisProdutosPage,
 });
 
-type Filter = "all" | CatalogKind;
+type Sort = "name" | "usage";
 
 function normalize(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -36,22 +35,11 @@ function LocaisProdutosPage() {
   const deleteItem = useDeleteCatalogItem();
 
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<Sort>("name");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newKind, setNewKind] = useState<CatalogKind>("local");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editKind, setEditKind] = useState<CatalogKind | null>(null);
-
-  const counts = useMemo(
-    () => ({
-      all: items.length,
-      local: items.filter((i) => i.kind === "local").length,
-      produto: items.filter((i) => i.kind === "produto").length,
-    }),
-    [items],
-  );
 
   const duplicate = useMemo(() => {
     const n = normalize(newName);
@@ -61,17 +49,16 @@ function LocaisProdutosPage() {
 
   const visible = useMemo(() => {
     const q = normalize(search);
-    return items.filter((i) => {
-      if (filter !== "all" && i.kind !== filter) return false;
-      if (q && !i.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [items, search, filter]);
+    const filtered = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
+    return [...filtered].sort((a, b) =>
+      sort === "usage" ? b.usageCount - a.usageCount : a.name.localeCompare(b.name, "pt-BR"),
+    );
+  }, [items, search, sort]);
 
   async function handleAdd() {
     const name = newName.trim();
     if (!name || duplicate) return;
-    await addItem.mutateAsync({ name, kind: newKind });
+    await addItem.mutateAsync({ name });
     setNewName("");
     setAdding(false);
     toast.success(`"${name}" cadastrado em Locais e Produtos.`);
@@ -80,13 +67,12 @@ function LocaisProdutosPage() {
   function startEdit(item: CatalogItem) {
     setEditingId(item.id);
     setEditName(item.name);
-    setEditKind(item.kind);
   }
 
   async function saveEdit(item: CatalogItem) {
     const name = editName.trim();
     if (!name) return;
-    await updateItem.mutateAsync({ id: item.id, name, kind: editKind });
+    await updateItem.mutateAsync({ id: item.id, name });
     setEditingId(null);
     toast.success("Item atualizado.");
   }
@@ -125,32 +111,33 @@ function LocaisProdutosPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar local ou produto..."
+              placeholder="Buscar item..."
               className={`${inputClass} pl-9`}
             />
           </div>
 
-          <div className="flex gap-2">
-            {(
-              [
-                ["all", `Todos · ${counts.all}`],
-                ["local", `Locais · ${counts.local}`],
-                ["produto", `Produtos · ${counts.produto}`],
-              ] as const
-            ).map(([key, label]) => (
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Ordenar por</p>
+            <div className="flex gap-1 rounded-full bg-secondary p-1">
               <button
-                key={key}
                 type="button"
-                onClick={() => setFilter(key)}
-                className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  filter === key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                onClick={() => setSort("name")}
+                className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  sort === "name" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                 }`}
               >
-                {label}
+                <ArrowDownAZ className="h-3.5 w-3.5" /> Nome
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setSort("usage")}
+                className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  sort === "usage" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <Flame className="h-3.5 w-3.5" /> Mais usados
+              </button>
+            </div>
           </div>
 
           {!adding ? (
@@ -164,35 +151,13 @@ function LocaisProdutosPage() {
           ) : (
             <div className="space-y-3 rounded-xl border border-border bg-card p-3">
               <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Novo item</p>
-              <div className="flex gap-2">
-                <input
-                  autoFocus
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Nome (ex.: Posto Shell)"
-                  className={`${inputClass} flex-1`}
-                />
-                <div className="flex overflow-hidden rounded-lg border border-input">
-                  <button
-                    type="button"
-                    onClick={() => setNewKind("local")}
-                    className={`flex items-center gap-1.5 px-3 text-xs font-semibold ${
-                      newKind === "local" ? "bg-credit/20 text-credit" : "text-muted-foreground"
-                    }`}
-                  >
-                    <MapPin className="h-3.5 w-3.5" /> Local
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewKind("produto")}
-                    className={`flex items-center gap-1.5 px-3 text-xs font-semibold ${
-                      newKind === "produto" ? "bg-debit/20 text-debit" : "text-muted-foreground"
-                    }`}
-                  >
-                    <Package className="h-3.5 w-3.5" /> Produto
-                  </button>
-                </div>
-              </div>
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome (ex.: Posto Shell)"
+                className={inputClass}
+              />
 
               {duplicate && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-debit/40 bg-debit/10 p-3">
@@ -233,36 +198,22 @@ function LocaisProdutosPage() {
             <p className="py-8 text-center text-sm text-muted-foreground">
               {items.length === 0
                 ? "Nenhum item ainda — cadastre um acima, ou ele entra sozinho quando você usar a descrição num lançamento."
-                : "Nenhum item encontrado com esse filtro."}
+                : "Nenhum item encontrado com essa busca."}
             </p>
           ) : (
             <div className="space-y-2">
               {visible.map((item) => {
-                const Icon = item.kind === "local" ? MapPin : item.kind === "produto" ? Package : Search;
                 const isEditing = editingId === item.id;
                 return (
                   <div key={item.id} className="rounded-xl border border-border bg-card p-3">
                     {isEditing ? (
                       <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <input
-                            autoFocus
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            className={`${inputClass} flex-1`}
-                          />
-                          <Select
-                            className={inputClass}
-                            value={editKind ?? "none"}
-                            onChange={(e) =>
-                              setEditKind(e.target.value === "none" ? null : (e.target.value as CatalogKind))
-                            }
-                          >
-                            <option value="none">Não classificado</option>
-                            <option value="local">Local</option>
-                            <option value="produto">Produto</option>
-                          </Select>
-                        </div>
+                        <input
+                          autoFocus
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className={inputClass}
+                        />
                         <div className="flex justify-end gap-1">
                           <button
                             type="button"
@@ -282,22 +233,13 @@ function LocaisProdutosPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                            item.kind === "local"
-                              ? "bg-credit/20 text-credit"
-                              : item.kind === "produto"
-                                ? "bg-debit/20 text-debit"
-                                : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <Icon className="h-[18px] w-[18px]" />
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                          <Tag className="h-[18px] w-[18px]" />
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-semibold">{item.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {item.kind === "local" ? "Local" : item.kind === "produto" ? "Produto" : "Não classificado"}
-                            {" · "}usado {item.usageCount}x · último em {formatDate(item.lastUsedAt)}
+                            usado {item.usageCount}x · último em {formatDate(item.lastUsedAt)}
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-col gap-0.5">

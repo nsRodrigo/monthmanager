@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { inputClass } from "./Modal";
 import { useCatalogItems, type CatalogItem } from "@/store/finance";
-import { Search, MapPin, Package } from "lucide-react";
+import { Tag } from "lucide-react";
 
 /**
  * Campo de Descrição ligado ao catálogo "Locais e Produtos" — um input
@@ -27,11 +27,14 @@ export function CatalogDescriptionField({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const q = value.trim().toLowerCase();
-  // Campo vazio (ou focado sem digitar) já mostra os mais usados — clicar
+  // Campo vazio (ou clicado sem digitar) já mostra os mais usados — clicar
   // no input também serve pra escolher da lista, sem precisar digitar nada.
-  const matches = q
-    ? items.filter((i) => i.name.toLowerCase() !== q && i.name.toLowerCase().includes(q)).slice(0, 6)
-    : items.slice(0, 6);
+  // `items` vem ordenado por nome (bom pra tela de gerenciar); aqui, pra
+  // sugestão enquanto digita, reordena por mais usado primeiro.
+  const byUsage = [...items].sort((a, b) => b.usageCount - a.usageCount);
+  const matches = (
+    q ? byUsage.filter((i) => i.name.toLowerCase() !== q && i.name.toLowerCase().includes(q)) : byUsage
+  ).slice(0, 6);
 
   useEffect(() => {
     if (!open) return;
@@ -75,44 +78,37 @@ export function CatalogDescriptionField({
           setOpen(true);
           setHighlight(0);
         }}
-        onFocus={() => setOpen(true)}
+        // Clique de verdade do usuário — não `onFocus`, que também dispara
+        // no auto-focus do primeiro campo que `Modal` faz ao abrir (e aí o
+        // dropdown aparecia sozinho assim que o modal abria, sem o usuário
+        // ter feito nada).
+        onClick={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
       />
       {open && matches.length > 0 && (
         <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-popover py-1 shadow-lg">
-          {matches.map((item, idx) => {
-            const Icon = item.kind === "local" ? MapPin : item.kind === "produto" ? Package : Search;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onMouseEnter={() => setHighlight(idx)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  select(item);
-                }}
-                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm ${
-                  idx === highlight ? "bg-secondary text-foreground" : ""
-                }`}
-              >
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-                    item.kind === "local"
-                      ? "bg-credit/20 text-credit"
-                      : item.kind === "produto"
-                        ? "bg-debit/20 text-debit"
-                        : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-3 w-3" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">{item.usageCount}x</span>
-              </button>
-            );
-          })}
+          {matches.map((item, idx) => (
+            <button
+              key={item.id}
+              type="button"
+              onMouseEnter={() => setHighlight(idx)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                select(item);
+              }}
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm ${
+                idx === highlight ? "bg-secondary text-foreground" : ""
+              }`}
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Tag className="h-3 w-3" />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              <span className="shrink-0 text-[10px] text-muted-foreground">{item.usageCount}x</span>
+            </button>
+          ))}
         </div>
       )}
     </div>

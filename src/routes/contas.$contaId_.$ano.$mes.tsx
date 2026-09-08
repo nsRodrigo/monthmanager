@@ -1595,11 +1595,24 @@ export function MonthDetailPane({
 
           const cardsAll = accountCards
             .map((c) => {
-              const items = monthInst.filter((i) => {
-                if (i.parentType !== "purchase") return false;
-                const pur = purchasesList.find((p) => p.id === i.parentId);
-                return pur?.cardId === c.id;
-              });
+              const items = monthInst
+                .filter((i) => {
+                  if (i.parentType !== "purchase") return false;
+                  const pur = purchasesList.find((p) => p.id === i.parentId);
+                  return pur?.cardId === c.id;
+                })
+                // Ordem "padrão" (sem sort explícito escolhido) por data
+                // efetiva — a mesma exibida na linha
+                // (`referenceDate || purchase.date`) — não a ordem crua de
+                // busca, que ficava presa na data ORIGINAL da parcela mesmo
+                // depois de editar a data visual.
+                .sort((a, b) => {
+                  const dateOf = (i: Installment) => {
+                    const pur = purchasesList.find((p) => p.id === i.parentId);
+                    return i.referenceDate || pur?.date || i.dueDate;
+                  };
+                  return dateOf(a).localeCompare(dateOf(b)) || a.id.localeCompare(b.id);
+                });
               return { card: c, items };
             })
             // Cartão sem nenhum item/fatura neste mês some da lista — mas
@@ -2407,7 +2420,14 @@ function CardRowSorted({
             return pur?.description ?? "";
           },
           amount: (i) => i.amount,
-          date: (i) => i.dueDate,
+          // Mesma data mostrada na linha (`inst.referenceDate || purchase.date`,
+          // ver a renderização abaixo) — não `i.dueDate` (a "vaga"/mês, que
+          // nunca muda ao editar a data visual), senão editar a data não
+          // reordenava a lista mesmo mudando o texto exibido.
+          date: (i) => {
+            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+            return i.referenceDate || pur?.date || i.dueDate;
+          },
           id: (i) => i.id,
         });
   return (

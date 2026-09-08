@@ -4,7 +4,7 @@ import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal
 import { useAddIncome, useAccounts, useUpsertCatalogItem, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
-import { CurrencyInput } from "./CurrencyInput";
+import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
 
 type PaymentType = "unico" | "parcelado" | "recorrente";
@@ -122,7 +122,7 @@ export function AddIncomeDialog({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor total"}>
-            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+            <CurrencyInputWithCalculator value={amount} onValueChange={setAmount} allowNegative />
           </Field>
           <Field label="Data da compra">
             <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />

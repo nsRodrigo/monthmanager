@@ -4,7 +4,7 @@ import { useAddInvestment } from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { Modal, Field, inputClass, Select } from "./Modal";
 import { AccountSelect } from "./AccountSelect";
-import { CurrencyInput } from "./CurrencyInput";
+import { CurrencyInputWithCalculator } from "./CurrencyInput";
 
 const TYPES = [
   "CDB",
@@ -113,7 +113,7 @@ export function AddInvestmentDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={mode === "perInstallment" && isInstallment ? "Valor por parcela" : "Valor aplicado"}>
-            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+            <CurrencyInputWithCalculator value={amount} onValueChange={setAmount} allowNegative />
           </Field>
           <Field label="Rendimento (% a.a.)">
             <input

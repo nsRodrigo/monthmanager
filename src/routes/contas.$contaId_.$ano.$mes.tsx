@@ -94,6 +94,7 @@ import { SortMenu, useSortPreference, applySort, type SortState } from "@/compon
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
 import { SettingsFabActions } from "@/components/SettingsFabActions";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
+import { CalculatorModal } from "@/components/CalculatorModal";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
 
@@ -219,6 +220,7 @@ export function MonthDetailPane({
   const [fabOpen, setFabOpen] = useState(false);
   const [fabView, setFabView] = useState<"create" | "settings">("create");
   const [manageOpen, setManageOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [moveMonthOpen, setMoveMonthOpen] = useState(false);
   const [askMoveSeries, setAskMoveSeries] = useState<{
@@ -1991,6 +1993,7 @@ export function MonthDetailPane({
                     onNavigate={() => setFabOpen(false)}
                     onBack={() => setFabView("create")}
                     onManageAccounts={() => setManageOpen(true)}
+                    onOpenCalculator={() => setCalcOpen(true)}
                   />
                 </div>
               )}
@@ -2141,6 +2144,7 @@ export function MonthDetailPane({
         }}
       />
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
+      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
       </div>
     </div>
   );

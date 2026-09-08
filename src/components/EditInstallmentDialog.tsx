@@ -41,7 +41,7 @@ import {
   type DeleteSource,
   type PaymentMethod,
 } from "@/store/finance";
-import { CurrencyInput } from "./CurrencyInput";
+import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
 import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
 import { Trash2, Copy, FastForward, Rewind, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
@@ -398,7 +398,7 @@ export function EditInstallmentDialog({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={singleType === "parcelled" && convMode === "perInstallment" ? "Valor por parcela" : "Valor"}>
-              <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+              <CurrencyInputWithCalculator value={amount} onValueChange={setAmount} allowNegative />
             </Field>
             <Field label="Data da compra">
               <input
@@ -864,7 +864,7 @@ export function EditInstallmentDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Valor">
-              <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+              <CurrencyInputWithCalculator value={amount} onValueChange={setAmount} allowNegative />
             </Field>
             <Field label="Data da compra">
               <input
@@ -1305,7 +1305,7 @@ export function EditInstallmentDialog({
                         value={formatCurrency(computedTotal)}
                       />
                     ) : (
-                      <CurrencyInput value={newTotalAmount} onValueChange={setNewTotalAmount} />
+                      <CurrencyInputWithCalculator value={newTotalAmount} onValueChange={setNewTotalAmount} />
                     )}
                   </Field>
                 </div>

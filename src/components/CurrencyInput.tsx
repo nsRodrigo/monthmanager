@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { inputClass } from "./Modal";
+import { CalculatorModal } from "./CalculatorModal";
+import { Calculator as CalculatorIcon } from "lucide-react";
 
 /**
  * Masked BRL currency input.
@@ -66,6 +68,41 @@ export function CurrencyInput({
         onValueChange(num);
       }}
     />
+  );
+}
+
+/**
+ * `CurrencyInput` + botão de calculadora ao lado — abre a calculadora por
+ * cima do modal atual (sem fechá-lo); "Usar este valor" escreve o resultado
+ * aqui e volta pro formulário. Usado nos campos "Valor" dos formulários de
+ * lançamento; `CurrencyInput` puro continua disponível pra outros contextos
+ * (filtros etc.) onde uma calculadora não faz sentido.
+ */
+export function CurrencyInputWithCalculator(props: {
+  value: number | undefined | null;
+  onValueChange: (n: number) => void;
+  placeholder?: string;
+  className?: string;
+  autoFocus?: boolean;
+  allowNegative?: boolean;
+}) {
+  const [calcOpen, setCalcOpen] = useState(false);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <CurrencyInput {...props} />
+      </div>
+      <button
+        type="button"
+        onClick={() => setCalcOpen(true)}
+        title="Abrir calculadora"
+        aria-label="Abrir calculadora"
+        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-input bg-input text-primary transition-colors hover:border-primary"
+      >
+        <CalculatorIcon className="h-[18px] w-[18px]" />
+      </button>
+      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} onUse={props.onValueChange} />
+    </div>
   );
 }
 

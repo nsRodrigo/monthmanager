@@ -17,6 +17,7 @@ import {
   Cloud,
   ShieldCheck,
   MapPin,
+  Calculator,
 } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { Logo } from "@/components/Logo";
@@ -34,6 +35,7 @@ import { useAccounts } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
+import { CalculatorModal } from "@/components/CalculatorModal";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
@@ -159,6 +161,7 @@ function SidebarContent({
   const { data: profile } = useProfile();
   const isAdmin = useIsAdmin();
   const [manageOpen, setManageOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const isConsolidated = loc.pathname === "/";
 
@@ -298,6 +301,16 @@ function SidebarContent({
           </span>
           <span className={`whitespace-nowrap ${labelClass}`}>Locais e Produtos</span>
         </Link>
+        <button
+          type="button"
+          onClick={() => setCalcOpen(true)}
+          className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-secondary/50 hover:text-foreground"
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+            <Calculator className="h-3.5 w-3.5" />
+          </span>
+          <span className={`whitespace-nowrap ${labelClass}`}>Calculadora</span>
+        </button>
         {isAdmin && (
           <Link
             to="/admin/whitelist"
@@ -356,6 +369,7 @@ function SidebarContent({
       </div>
 
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
+      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
     </>
   );
 }

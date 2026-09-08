@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, Field, inputClass, Select, CheckboxExpand, PaidToggle } from "./Modal";
-import { CurrencyInput } from "./CurrencyInput";
+import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import {
   useUpdateRecurringSeries,
   useDeleteRecurringSeries,
@@ -242,7 +242,7 @@ export function EditRecurringDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Valor">
-            <CurrencyInput value={amount} onValueChange={setAmount} allowNegative />
+            <CurrencyInputWithCalculator value={amount} onValueChange={setAmount} allowNegative />
           </Field>
           <Field label="Data da compra">
             <input

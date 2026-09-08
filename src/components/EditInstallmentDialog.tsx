@@ -410,6 +410,42 @@ export function EditInstallmentDialog({
             </Field>
           </div>
 
+          {single.kind !== "investment" && singleType === "cash" && (
+            <div className="space-y-2">
+              <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
+              <Select
+                className={inputClass}
+                value={paymentMethod ?? "none"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPaymentMethod(v === "none" ? null : (v as PaymentMethod));
+                }}
+              >
+                <option value="none">Nenhum</option>
+                {PAYMENT_METHOD_OPTIONS.filter(
+                  (o) => o.value !== "auto_debit" || single.kind === "debit",
+                ).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+              {single.kind === "debit" && paymentMethod === "auto_debit" && (
+                <Field label="Dia do débito (1-31)">
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    className={inputClass}
+                    value={autoDebitDay}
+                    onChange={(e) => setAutoDebitDay(e.target.value)}
+                    placeholder="Ex: 10"
+                  />
+                </Field>
+              )}
+            </div>
+          )}
+
           {canConvert && (
             <div className="space-y-2">
               <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
@@ -488,42 +524,6 @@ export function EditInstallmentDialog({
                 <p className="text-[11px] text-amber-500/90">
                   ⚠ Ao salvar, o lançamento atual será substituído pela nova série.
                 </p>
-              )}
-            </div>
-          )}
-
-          {single.kind !== "investment" && singleType === "cash" && (
-            <div className="space-y-2">
-              <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
-              <Select
-                className={inputClass}
-                value={paymentMethod ?? "none"}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPaymentMethod(v === "none" ? null : (v as PaymentMethod));
-                }}
-              >
-                <option value="none">Nenhum</option>
-                {PAYMENT_METHOD_OPTIONS.filter(
-                  (o) => o.value !== "auto_debit" || single.kind === "debit",
-                ).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-              {single.kind === "debit" && paymentMethod === "auto_debit" && (
-                <Field label="Dia do débito (1-31)">
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    className={inputClass}
-                    value={autoDebitDay}
-                    onChange={(e) => setAutoDebitDay(e.target.value)}
-                    placeholder="Ex: 10"
-                  />
-                </Field>
               )}
             </div>
           )}

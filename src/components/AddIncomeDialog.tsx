@@ -130,6 +130,22 @@ export function AddIncomeDialog({
         </div>
 
         <div className="space-y-2">
+          <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
+          <Select
+            className={inputClass}
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+          >
+            <option value="none">Nenhum</option>
+            {incomePaymentMethods.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <span className="block text-xs font-medium text-muted-foreground">Tipo de pagamento</span>
           <Select
             className={inputClass}
@@ -177,22 +193,6 @@ export function AddIncomeDialog({
               Replicado automaticamente todo mês, até o último mês que já existe nesta conta — e continua acompanhando conforme a conta cresce. Cada mês é independente e pode ser editado ou excluído sem afetar os demais.
             </p>
           )}
-        </div>
-
-        <div className="space-y-2">
-          <span className="block text-xs font-medium text-muted-foreground">Meio de pagamento</span>
-          <Select
-            className={inputClass}
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-          >
-            <option value="none">Nenhum</option>
-            {incomePaymentMethods.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
         </div>
 
         {isRecurring && (

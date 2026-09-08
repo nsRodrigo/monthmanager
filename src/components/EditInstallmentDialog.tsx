@@ -24,6 +24,7 @@ import {
   useRemovePurchase,
   useRemoveInvestment,
   useUpsertCatalogItem,
+  useCustomPaymentMethods,
   useDuplicateOverScope,
   useDeleteOverScope,
   useDuplicateInstallmentSeries,
@@ -94,6 +95,7 @@ export function EditInstallmentDialog({
   const updateInvestment = useUpdateInvestment();
   const updatePurchase = useUpdatePurchase();
   const upsertCatalogItem = useUpsertCatalogItem();
+  const { data: customPaymentMethods = [] } = useCustomPaymentMethods();
   const changeInstSeries = useChangeInstallmentSeries();
   const renumberInstallment = useRenumberInstallment();
   const addDebit = useAddDebit();
@@ -429,6 +431,15 @@ export function EditInstallmentDialog({
                     {o.label}
                   </option>
                 ))}
+                {customPaymentMethods.length > 0 && (
+                  <optgroup label="Personalizados">
+                    {customPaymentMethods.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </Select>
               {single.kind === "debit" && paymentMethod === "auto_debit" && (
                 <Field label="Dia do débito (1-31)">
@@ -927,6 +938,15 @@ export function EditInstallmentDialog({
                     {o.label}
                   </option>
                 ))}
+                {customPaymentMethods.length > 0 && (
+                  <optgroup label="Personalizados">
+                    {customPaymentMethods.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </Select>
               {inst.parentType === "debit" && paymentMethod === "auto_debit" && (
                 <Field label="Dia do débito (1-31)">

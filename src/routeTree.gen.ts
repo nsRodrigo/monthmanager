@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as MeiosPagamentoRouteImport } from './routes/meios-pagamento'
 import { Route as LocaisProdutosRouteImport } from './routes/locais-produtos'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as BackupRouteImport } from './routes/backup'
@@ -29,6 +30,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const PerfilRoute = PerfilRouteImport.update({
   id: '/perfil',
   path: '/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeiosPagamentoRoute = MeiosPagamentoRouteImport.update({
+  id: '/meios-pagamento',
+  path: '/meios-pagamento',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LocaisProdutosRoute = LocaisProdutosRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
+  '/meios-pagamento': typeof MeiosPagamentoRoute
   '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
+  '/meios-pagamento': typeof MeiosPagamentoRoute
   '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
+  '/meios-pagamento': typeof MeiosPagamentoRoute
   '/perfil': typeof PerfilRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/locais-produtos'
+    | '/meios-pagamento'
     | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/locais-produtos'
+    | '/meios-pagamento'
     | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/locais-produtos'
+    | '/meios-pagamento'
     | '/perfil'
     | '/reset-password'
     | '/admin/whitelist'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   BackupRoute: typeof BackupRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   LocaisProdutosRoute: typeof LocaisProdutosRoute
+  MeiosPagamentoRoute: typeof MeiosPagamentoRoute
   PerfilRoute: typeof PerfilRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/perfil'
       fullPath: '/perfil'
       preLoaderRoute: typeof PerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meios-pagamento': {
+      id: '/meios-pagamento'
+      path: '/meios-pagamento'
+      fullPath: '/meios-pagamento'
+      preLoaderRoute: typeof MeiosPagamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/locais-produtos': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   BackupRoute: BackupRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
   LocaisProdutosRoute: LocaisProdutosRoute,
+  MeiosPagamentoRoute: MeiosPagamentoRoute,
   PerfilRoute: PerfilRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,

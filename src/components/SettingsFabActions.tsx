@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft, MapPin, Calculator } from "lucide-react";
+import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft, MapPin, Calculator, Wallet } from "lucide-react";
 import { FabAction } from "@/components/FabAction";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
@@ -65,6 +65,15 @@ export function SettingsFabActions({
         onClick={() => {
           onNavigate();
           navigate({ to: "/locais-produtos" });
+        }}
+      />
+      <FabAction
+        icon={Wallet}
+        label="Meios de Pagamento"
+        tone="debit"
+        onClick={() => {
+          onNavigate();
+          navigate({ to: "/meios-pagamento" });
         }}
       />
       <FabAction

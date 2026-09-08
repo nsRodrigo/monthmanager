@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { Plus, Copy } from "lucide-react";
 import { Modal, Field, inputClass, Select, Accordion, PaidToggle } from "./Modal";
-import { useAddDebit, useAccounts, useUpsertCatalogItem, PAYMENT_METHOD_OPTIONS } from "@/store/finance";
+import {
+  useAddDebit,
+  useAccounts,
+  useUpsertCatalogItem,
+  useCustomPaymentMethods,
+  PAYMENT_METHOD_OPTIONS,
+} from "@/store/finance";
 import { useAccountFilter } from "@/store/account-filter";
 import { AccountSelect } from "./AccountSelect";
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
@@ -25,6 +31,7 @@ export function AddDebitDialog({
 }) {
   const addDebit = useAddDebit();
   const upsertCatalogItem = useUpsertCatalogItem();
+  const { data: customPaymentMethods = [] } = useCustomPaymentMethods();
   const { data: accounts = [] } = useAccounts();
   const { accountId: filterAccountId } = useAccountFilter();
   const [accountId, setAccountId] = useState("");
@@ -143,6 +150,15 @@ export function AddDebitDialog({
                 {o.label}
               </option>
             ))}
+            {customPaymentMethods.length > 0 && (
+              <optgroup label="Personalizados">
+                {customPaymentMethods.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </Select>
 
           {autoDebit && (

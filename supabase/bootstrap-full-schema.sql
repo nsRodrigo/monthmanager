@@ -2025,3 +2025,20 @@ CREATE POLICY "own catalog_items update" ON public.catalog_items FOR UPDATE USIN
 CREATE POLICY "own catalog_items delete" ON public.catalog_items FOR DELETE USING (auth.uid() = user_id);
 
 CREATE INDEX idx_catalog_items_user_name ON public.catalog_items(user_id, name_normalized);
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260908000000_payment_methods.sql
+-- ──────────────────────────────────────────────────────────
+-- Meios de pagamento personalizados — complementam os 6 fixos do código.
+CREATE TABLE public.payment_methods (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.payment_methods ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own payment_methods select" ON public.payment_methods FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "own payment_methods insert" ON public.payment_methods FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own payment_methods update" ON public.payment_methods FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "own payment_methods delete" ON public.payment_methods FOR DELETE USING (auth.uid() = user_id);

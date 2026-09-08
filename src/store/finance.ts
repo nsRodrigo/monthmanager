@@ -161,6 +161,76 @@ export const PAYMENT_METHOD_BADGES: Record<Exclude<PaymentMethod, null>, string>
   debit_card: "DEB",
 };
 
+/**
+ * Meios de pagamento PERSONALIZADOS, cadastrados na tela "Meios de
+ * pagamento" — complementam (não substituem) os 6 fixos acima. Guardados
+ * como texto livre: o `id` (uuid) vira o valor salvo em
+ * `debits.payment_method`/`incomes.payment_method` quando escolhido num
+ * select, já que essa coluna é TEXT sem CHECK. Não ganham o comportamento
+ * especial de nenhum dos fixos (ex.: `auto_debit` liga o campo "dia do
+ * débito") — são só um rótulo a mais pra escolher.
+ */
+export type CustomPaymentMethod = { id: string; name: string };
+
+export function useCustomPaymentMethods() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["payment-methods", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<CustomPaymentMethod[]> => {
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("id,name")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((r) => ({ id: r.id as string, name: r.name as string }));
+    },
+  });
+}
+
+export function useAddPaymentMethod() {
+  const { user } = useAuth();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { name: string }) => {
+      if (!user) throw new Error("Não autenticado.");
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .insert({ user_id: user.id, name: args.name.trim() })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSettled: () => inv(["payment-methods"]),
+  });
+}
+
+export function useUpdatePaymentMethod() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from("payment_methods")
+        .update({ name: args.name.trim() })
+        .eq("id", args.id);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["payment-methods"]),
+  });
+}
+
+export function useDeletePaymentMethod() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => inv(["payment-methods"]),
+  });
+}
+
 export type Debit = {
   id: string;
   accountId: string;

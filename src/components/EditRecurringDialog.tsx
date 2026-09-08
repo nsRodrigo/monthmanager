@@ -10,6 +10,7 @@ import {
   useDeleteOverScope,
   useToggleDebitPaid,
   useToggleIncomeReceived,
+  useCustomPaymentMethods,
   PAYMENT_METHOD_OPTIONS,
   type CardScope,
   type DeleteSource,
@@ -82,6 +83,7 @@ export function EditRecurringDialog({
   startAction?: "duplicate";
 }) {
   const updateDI = useUpdateRecurringSeries();
+  const { data: customPaymentMethods = [] } = useCustomPaymentMethods();
   const removeDI = useDeleteRecurringSeries();
   const updateP = useUpdateRecurringPurchaseSeries();
   const duplicate = useDuplicateOverScope();
@@ -270,6 +272,15 @@ export function EditRecurringDialog({
                   {o.label}
                 </option>
               ))}
+              {customPaymentMethods.length > 0 && (
+                <optgroup label="Personalizados">
+                  {customPaymentMethods.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </Select>
           </div>
         )}

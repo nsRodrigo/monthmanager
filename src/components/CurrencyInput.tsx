@@ -88,16 +88,14 @@ export function CurrencyInputWithCalculator(props: {
 }) {
   const [calcOpen, setCalcOpen] = useState(false);
   return (
-    <div className="flex items-center gap-2">
-      <div className="min-w-0 flex-1">
-        <CurrencyInput {...props} />
-      </div>
+    <div className="relative">
+      <CurrencyInput {...props} className={`${props.className ?? inputClass} pr-10`} />
       <button
         type="button"
         onClick={() => setCalcOpen(true)}
         title="Abrir calculadora"
         aria-label="Abrir calculadora"
-        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-input bg-input text-primary transition-colors hover:border-primary"
+        className="absolute top-1/2 right-1.5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-primary"
       >
         <CalculatorIcon className="h-[18px] w-[18px]" />
       </button>

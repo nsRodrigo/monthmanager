@@ -101,6 +101,18 @@ export function useDecideGrant() {
   });
 }
 
+/** Quem pediu cancela o próprio pedido enquanto ainda está pendente (RLS só permite isso nesse status). */
+export function useCancelAccessRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("account_access_grants").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["account-access-grants"] }),
+  });
+}
+
 /** Dono revoga um acesso já concedido, OU quem pediu abre mão do próprio acesso. */
 export function useRevokeGrant() {
   const qc = useQueryClient();

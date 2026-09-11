@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Trash2, Plus, ShieldCheck, ShieldOff, UserX, Users, Check, X, Bell, Clock, KeyRound } from "lucide-react";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useIsAdmin, useMyRoles, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
 import { useAuth } from "@/store/auth";
-import { useOutgoingGrants, useRequestAccess, useRevokeGrant } from "@/store/account-access";
+import { useOutgoingGrants, useRequestAccess, useRevokeGrant, useCancelAccessRequest } from "@/store/account-access";
 import { listUsers, deleteUser, setUserAdmin, type AdminUser } from "@/lib/admin-users.functions";
 import {
   listPendingRequests,
@@ -37,6 +38,14 @@ function WhitelistAdmin() {
   const { data: outgoingGrants = [] } = useOutgoingGrants();
   const requestAccessMut = useRequestAccess();
   const revokeGrantMut = useRevokeGrant();
+  const cancelRequestMut = useCancelAccessRequest();
+
+  function onRequestAccess(targetEmail: string) {
+    requestAccessMut.mutate(targetEmail, {
+      onSuccess: () => toast.success(`Pedido de acesso enviado para ${targetEmail}.`),
+      onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao enviar o pedido."),
+    });
+  }
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -379,16 +388,25 @@ function WhitelistAdmin() {
                     <div className="mt-2.5 flex items-center gap-2 border-t border-border pt-2.5">
                       {!grant || grant.status === "revoked" || grant.status === "rejected" ? (
                         <button
-                          onClick={() => u.email && requestAccessMut.mutate(u.email)}
+                          onClick={() => u.email && onRequestAccess(u.email)}
                           disabled={requestAccessMut.isPending || !u.email}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
                         >
                           <KeyRound className="h-3.5 w-3.5" /> Solicitar acesso
                         </button>
                       ) : grant.status === "pending" ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning">
-                          <Clock className="h-3.5 w-3.5" /> Aguardando confirmação
-                        </span>
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning">
+                            <Clock className="h-3.5 w-3.5" /> Aguardando confirmação
+                          </span>
+                          <button
+                            onClick={() => cancelRequestMut.mutate(grant.id)}
+                            disabled={cancelRequestMut.isPending}
+                            className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary disabled:opacity-50"
+                          >
+                            Cancelar pedido
+                          </button>
+                        </>
                       ) : (
                         <>
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-[11px] font-semibold text-success">

@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Check, ChevronDown, KeyRound, User } from "lucide-react";
+import { Check, ChevronDown, Clock, KeyRound, User, X } from "lucide-react";
 import { inputClass } from "@/components/Modal";
 import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
 import { useViewingAs } from "@/store/account-view";
-import { useOutgoingGrants, useRequestAccess } from "@/store/account-access";
+import { useOutgoingGrants, useRequestAccess, useCancelAccessRequest } from "@/store/account-access";
 import { supabase } from "@/integrations/supabase/client";
 
 function initialsOf(name: string) {
@@ -39,6 +39,7 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
   const [viewingAs, setViewingAs] = useViewingAs();
   const { data: outgoing = [] } = useOutgoingGrants();
   const requestAccess = useRequestAccess();
+  const cancelRequest = useCancelAccessRequest();
   const navigate = useNavigate();
 
   const [open, setOpen] = useState(variant === "inline");
@@ -91,6 +92,7 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
   const activeName = viewingAs?.name ?? ownName;
   const activeEmail = viewingAs?.email ?? user.email ?? "";
   const granted = outgoing.filter((g) => g.status === "active");
+  const pending = outgoing.filter((g) => g.status === "pending");
 
   async function selectOwnAccount() {
     setViewingAs(null);
@@ -177,6 +179,37 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
             </span>
           </button>
         ))
+      )}
+
+      {pending.length > 0 && (
+        <>
+          <p className="px-3 pt-2.5 pb-1 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+            Pedidos enviados
+          </p>
+          {pending.map((g) => (
+            <div key={g.id} className="flex items-center gap-2.5 px-3 py-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-muted-foreground">
+                {initialsOf(g.ownerEmail.split("@")[0])}
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold">{g.ownerEmail}</p>
+                <p className="flex items-center gap-1 truncate text-[10px] text-warning">
+                  <Clock className="h-3 w-3" /> Aguardando confirmação
+                </p>
+              </span>
+              <button
+                type="button"
+                onClick={() => cancelRequest.mutate(g.id)}
+                disabled={cancelRequest.isPending}
+                aria-label="Cancelar pedido"
+                title="Cancelar pedido"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-destructive disabled:opacity-50"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </>
       )}
 
       <div className="px-3 py-2">

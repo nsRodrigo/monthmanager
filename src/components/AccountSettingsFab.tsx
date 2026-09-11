@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { SettingsFabActions } from "@/components/SettingsFabActions";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
-import { CalculatorModal } from "@/components/CalculatorModal";
+import { FloatingCalculator } from "@/components/FloatingCalculator";
 
 /**
  * Botão flutuante de configurações — Home e Meses no mobile. Reúne as opções
@@ -43,7 +43,7 @@ export function AccountSettingsFab() {
         </button>
       </div>
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
+      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
     </div>
   );
 }

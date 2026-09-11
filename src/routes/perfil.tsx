@@ -4,10 +4,12 @@ import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette, Camera } from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { useIncomingGrants, useDecideGrant, useRevokeGrant } from "@/store/account-access";
 
 export const Route = createFileRoute("/perfil")({
   head: () => ({ meta: [{ title: "Meu perfil — Finanças" }] }),
@@ -20,6 +22,11 @@ function ProfilePage() {
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { data: incomingGrants = [] } = useIncomingGrants();
+  const decideGrant = useDecideGrant();
+  const revokeGrant = useRevokeGrant();
+  const pendingIncoming = incomingGrants.filter((g) => g.status === "pending");
+  const activeIncoming = incomingGrants.filter((g) => g.status === "active");
 
   const [name, setName] = useState(profile?.displayName ?? "");
   useEffect(() => {
@@ -314,6 +321,84 @@ function ProfilePage() {
             </div>
           </section>
         </div>
+
+        <section className="rounded-xl border border-border bg-card/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Contas</h2>
+          </div>
+          <AccountSwitcher variant="inline" />
+        </section>
+
+        {pendingIncoming.length > 0 && (
+          <section className="rounded-xl border border-border bg-card/40 p-4">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <Clock className="h-4 w-4 text-primary" /> Pedidos recebidos
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                {pendingIncoming.length}
+              </span>
+            </h2>
+            <div className="space-y-2">
+              {pendingIncoming.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{g.requesterEmail}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Pediu acesso de leitura e escrita à sua conta
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => decideGrant.mutate({ id: g.id, approve: true })}
+                    disabled={decideGrant.isPending}
+                    className="inline-flex items-center gap-1 rounded-lg bg-success/15 px-3 py-2 text-xs font-semibold text-success hover:bg-success/25 disabled:opacity-50"
+                  >
+                    <Check className="h-4 w-4" /> Permitir
+                  </button>
+                  <button
+                    onClick={() => decideGrant.mutate({ id: g.id, approve: false })}
+                    disabled={decideGrant.isPending}
+                    className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" /> Recusar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeIncoming.length > 0 && (
+          <section className="rounded-xl border border-border bg-card/40 p-4">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <ShieldCheck className="h-4 w-4 text-primary" /> Acessos que você concedeu
+            </h2>
+            <div className="space-y-2">
+              {activeIncoming.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{g.requesterEmail}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Pode ver e editar sua conta — revogue quando quiser
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => revokeGrant.mutate(g.id)}
+                    disabled={revokeGrant.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" /> Revogar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="flex gap-2">
           <button

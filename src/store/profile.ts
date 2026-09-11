@@ -33,6 +33,29 @@ export function useProfile() {
   });
 }
 
+/** Perfil de OUTRO usuário — só resolve se houver uma concessão de acesso ativa (RLS). */
+export function useProfileByUserId(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["profile", "by-id", userId],
+    enabled: !!userId,
+    queryFn: async (): Promise<Profile | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, user_id, display_name, avatar_url")
+        .eq("user_id", userId!)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        id: data.id,
+        userId: data.user_id,
+        displayName: data.display_name,
+        avatarUrl: data.avatar_url,
+      };
+    },
+  });
+}
+
 export function useUpdateProfile() {
   const qc = useQueryClient();
   const { user } = useAuth();

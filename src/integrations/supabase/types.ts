@@ -44,6 +44,39 @@ export type Database = {
         }
         Relationships: []
       }
+      account_access_grants: {
+        Row: {
+          decided_at: string | null
+          id: string
+          owner_email: string
+          owner_id: string
+          requested_at: string
+          requester_email: string
+          requester_id: string
+          status: string
+        }
+        Insert: {
+          decided_at?: string | null
+          id?: string
+          owner_email: string
+          owner_id: string
+          requested_at?: string
+          requester_email: string
+          requester_id: string
+          status?: string
+        }
+        Update: {
+          decided_at?: string | null
+          id?: string
+          owner_email?: string
+          owner_id?: string
+          requested_at?: string
+          requester_email?: string
+          requester_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           color: string

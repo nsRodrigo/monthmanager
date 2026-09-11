@@ -94,7 +94,7 @@ import { SortMenu, useSortPreference, applySort, type SortState } from "@/compon
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
 import { SettingsFabActions } from "@/components/SettingsFabActions";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
-import { CalculatorModal } from "@/components/CalculatorModal";
+import { FloatingCalculator } from "@/components/FloatingCalculator";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
 
@@ -2157,7 +2157,7 @@ export function MonthDetailPane({
         }}
       />
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
+      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
       </div>
     </div>
   );

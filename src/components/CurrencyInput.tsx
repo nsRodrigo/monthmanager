@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { inputClass } from "./Modal";
-import { CalculatorModal } from "./CalculatorModal";
+import { FloatingCalculator } from "./FloatingCalculator";
 import { Calculator as CalculatorIcon } from "lucide-react";
 
 /**
@@ -72,11 +72,12 @@ export function CurrencyInput({
 }
 
 /**
- * `CurrencyInput` + botão de calculadora ao lado — abre a calculadora por
- * cima do modal atual (sem fechá-lo); "Usar este valor" escreve o resultado
- * aqui e volta pro formulário. Usado nos campos "Valor" dos formulários de
- * lançamento; `CurrencyInput` puro continua disponível pra outros contextos
- * (filtros etc.) onde uma calculadora não faz sentido.
+ * `CurrencyInput` + ícone de calculadora dentro do campo — abre um painel
+ * flutuante (arrastável/redimensionável, sem escurecer o resto da tela) por
+ * cima do modal atual; "Usar este valor" escreve o resultado aqui e fecha o
+ * painel. Usado nos campos "Valor" dos formulários de lançamento;
+ * `CurrencyInput` puro continua disponível pra outros contextos (filtros
+ * etc.) onde uma calculadora não faz sentido.
  */
 export function CurrencyInputWithCalculator(props: {
   value: number | undefined | null;
@@ -99,7 +100,7 @@ export function CurrencyInputWithCalculator(props: {
       >
         <CalculatorIcon className="h-[18px] w-[18px]" />
       </button>
-      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} onUse={props.onValueChange} />
+      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} onUse={props.onValueChange} />
     </div>
   );
 }

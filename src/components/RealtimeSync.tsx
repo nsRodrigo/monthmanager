@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/store/auth";
+import { useActiveUserId } from "@/store/account-view";
 
 const TABLE_TO_KEYS: Record<string, string[]> = {
   accounts: ["accounts"],
@@ -30,10 +30,10 @@ const TABLE_TO_KEYS: Record<string, string[]> = {
  */
 export function RealtimeSync() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!activeUserId) return;
 
     const pendingTables = new Set<string>();
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -68,11 +68,11 @@ export function RealtimeSync() {
       }, 400);
     };
 
-    const channel = supabase.channel(`finance-sync-${user.id}`);
+    const channel = supabase.channel(`finance-sync-${activeUserId}`);
     for (const table of Object.keys(TABLE_TO_KEYS)) {
       channel.on(
         "postgres_changes" as never,
-        { event: "*", schema: "public", table, filter: `user_id=eq.${user.id}` },
+        { event: "*", schema: "public", table, filter: `user_id=eq.${activeUserId}` },
         () => schedule(table),
       );
     }
@@ -82,7 +82,7 @@ export function RealtimeSync() {
       if (timer) clearTimeout(timer);
       void supabase.removeChannel(channel);
     };
-  }, [user?.id, qc]);
+  }, [activeUserId, qc]);
 
   return null;
 }

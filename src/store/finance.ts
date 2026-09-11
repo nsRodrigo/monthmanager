@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
+import { useActiveUserId } from "./account-view";
 import { history } from "./history";
 
 // =======================
@@ -173,14 +174,15 @@ export const PAYMENT_METHOD_BADGES: Record<Exclude<PaymentMethod, null>, string>
 export type CustomPaymentMethod = { id: string; name: string };
 
 export function useCustomPaymentMethods() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["payment-methods", user?.id],
-    enabled: !!user,
+    queryKey: ["payment-methods", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<CustomPaymentMethod[]> => {
       const { data, error } = await supabase
         .from("payment_methods")
         .select("id,name")
+        .eq("user_id", activeUserId!)
         .order("name", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((r) => ({ id: r.id as string, name: r.name as string }));
@@ -189,14 +191,14 @@ export function useCustomPaymentMethods() {
 }
 
 export function useAddPaymentMethod() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { name: string }) => {
-      if (!user) throw new Error("Não autenticado.");
+      if (!activeUserId) throw new Error("Não autenticado.");
       const { data, error } = await supabase
         .from("payment_methods")
-        .insert({ user_id: user.id, name: args.name.trim() })
+        .insert({ user_id: activeUserId, name: args.name.trim() })
         .select("id")
         .single();
       if (error) throw error;
@@ -544,14 +546,15 @@ const num = (v: number | string) => (typeof v === "number" ? v : parseFloat(v));
 // Queries
 // =======================
 export function useAccounts() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["accounts", user?.id],
-    enabled: !!user,
+    queryKey: ["accounts", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from("accounts")
         .select("id,name,type,color,initial_balance")
+        .eq("user_id", activeUserId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((a) => ({
@@ -566,16 +569,17 @@ export function useAccounts() {
 }
 
 export function useCards() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["cards", user?.id],
-    enabled: !!user,
+    queryKey: ["cards", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<Card[]> => {
       const { data, error } = await supabase
         .from("cards")
         .select(
           "id,account_id,name,color,closing_day,due_day,start_year,start_month,end_year,end_month,excluded_months,position,created_at,notify_days_before",
         )
+        .eq("user_id", activeUserId!)
         .order("position", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -599,10 +603,10 @@ export function useCards() {
 }
 
 export function usePurchases() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["purchases", user?.id],
-    enabled: !!user,
+    queryKey: ["purchases", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<Purchase[]> => {
       const data = await fetchAllRows<{
         id: string;
@@ -616,7 +620,8 @@ export function usePurchases() {
       }>(() =>
         supabase
           .from("purchases")
-          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id,notify_days_before"),
+          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id,notify_days_before")
+          .eq("user_id", activeUserId!),
       );
       return data.map((p) => ({
         id: p.id,
@@ -633,10 +638,10 @@ export function usePurchases() {
 }
 
 export function useInstallments() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["installments", user?.id],
-    enabled: !!user,
+    queryKey: ["installments", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<Installment[]> => {
       const data = await fetchAllRows<{
         id: string;
@@ -657,6 +662,7 @@ export function useInstallments() {
           .select(
             "id,parent_type,parent_id,purchase_id,number,total,amount,due_date,reference_date,year,month,paid",
           )
+          .eq("user_id", activeUserId!)
           .order("year", { ascending: true })
           .order("month", { ascending: true })
           .order("number", { ascending: true })
@@ -686,10 +692,10 @@ export function useInstallments() {
 }
 
 export function useDebits() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["debits", user?.id],
-    enabled: !!user,
+    queryKey: ["debits", activeUserId],
+    enabled: !!activeUserId,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async ({ signal }): Promise<Debit[]> => {
@@ -716,6 +722,7 @@ export function useDebits() {
             .select(
               "id,account_id,description,amount,date,required,paid,payment_method,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before",
             )
+            .eq("user_id", activeUserId!)
             .order("date", { ascending: true })
             .order("id", { ascending: true });
           return abortSignal ? query.abortSignal(abortSignal) : query;
@@ -747,10 +754,10 @@ export function useDebits() {
 }
 
 export function useIncomes() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["incomes", user?.id],
-    enabled: !!user,
+    queryKey: ["incomes", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<Income[]> => {
       const data = await fetchAllRows<{
         id: string;
@@ -772,6 +779,7 @@ export function useIncomes() {
           .select(
             "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before,payment_method",
           )
+          .eq("user_id", activeUserId!)
           .order("date", { ascending: true }),
       );
       return data.map((d) => ({
@@ -794,10 +802,10 @@ export function useIncomes() {
 }
 
 export function useInvestments() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["investments", user?.id],
-    enabled: !!user,
+    queryKey: ["investments", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<Investment[]> => {
       const data = await fetchAllRows<{
         id: string;
@@ -816,7 +824,8 @@ export function useInvestments() {
           .from("investments")
           .select(
             "id,account_id,type,amount,percentage,date,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
-          ),
+          )
+          .eq("user_id", activeUserId!),
       );
       return data.map((i) => ({
         id: i.id,
@@ -836,17 +845,17 @@ export function useInvestments() {
 }
 
 export function useCardPayments() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["card_payments", user?.id],
-    enabled: !!user,
+    queryKey: ["card_payments", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async () => {
       const data = await fetchAllRows<{
         card_id: string;
         year: number;
         month: number;
         paid: boolean;
-      }>(() => supabase.from("card_payments").select("card_id,year,month,paid"));
+      }>(() => supabase.from("card_payments").select("card_id,year,month,paid").eq("user_id", activeUserId!));
       const map: Record<string, boolean> = {};
       for (const r of data) {
         map[`${r.card_id}-${r.year}-${r.month}`] = r.paid;
@@ -866,12 +875,12 @@ function useInvalidate() {
 }
 
 export function useAddAccount() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (a: Omit<Account, "id">) => {
       const { error } = await supabase.from("accounts").insert({
-        user_id: user!.id,
+        user_id: activeUserId!,
         name: a.name,
         type: a.type,
         color: a.color,
@@ -991,7 +1000,7 @@ export function useUpdateAccount() {
 // Mutations — Cards / Purchases
 // =======================
 export function useAddCard() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (
@@ -1011,7 +1020,7 @@ export function useAddCard() {
         .maybeSingle();
       const nextPosition = ((maxRow?.position as number | null) ?? 0) + 1;
       const { error } = await supabase.from("cards").insert({
-        user_id: user!.id,
+        user_id: activeUserId!,
         account_id: c.accountId,
         name: c.name,
         color: c.color,
@@ -1192,7 +1201,7 @@ export function useReorderCards() {
 
 
 export function useDuplicateCard() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
@@ -1208,7 +1217,7 @@ export function useDuplicateCard() {
       const { data: created, error: e2 } = await supabase
         .from("cards")
         .insert({
-          user_id: user!.id,
+          user_id: activeUserId!,
           account_id: src.account_id,
           name: `${src.name} (cópia)`,
           color: src.color,
@@ -1233,7 +1242,7 @@ export function useDuplicateCard() {
         const { data: np, error: ep } = await supabase
           .from("purchases")
           .insert({
-            user_id: user!.id,
+            user_id: activeUserId!,
             card_id: newCardId,
             description: p.description,
             total_amount: p.total_amount,
@@ -1254,7 +1263,7 @@ export function useDuplicateCard() {
         .eq("parent_type", "purchase");
       if (insts && insts.length > 0) {
         const rows = insts.map((i) => ({
-          user_id: user!.id,
+          user_id: activeUserId!,
           parent_type: "purchase",
           parent_id: idMap.get(i.parent_id as string)!,
           purchase_id: idMap.get((i.purchase_id as string) ?? (i.parent_id as string)) ?? null,
@@ -1275,7 +1284,7 @@ export function useDuplicateCard() {
 }
 
 export function useAddPurchase() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (p: {
@@ -1302,7 +1311,7 @@ export function useAddPurchase() {
         .from("purchases")
         .insert({
           id: purchaseId,
-          user_id: user!.id,
+          user_id: activeUserId!,
           card_id: p.cardId,
           description: p.description,
           total_amount: p.totalAmount,
@@ -1316,7 +1325,7 @@ export function useAddPurchase() {
       const anchorDate = p.invoiceAnchorDate ?? p.date;
       const inst = buildInstallmentsAnchored(
         purchaseId,
-        user!.id,
+        activeUserId!,
         p.totalAmount,
         p.installmentsCount,
         anchor,
@@ -1346,7 +1355,7 @@ export function useAddPurchase() {
         if (dates.length) {
           const purchaseRows = dates.map(({ dateStr }) => ({
             id: crypto.randomUUID(),
-            user_id: user!.id,
+            user_id: activeUserId!,
             card_id: p.cardId,
             description: p.description,
             total_amount: p.totalAmount,
@@ -1357,7 +1366,7 @@ export function useAddPurchase() {
           }));
           const installmentRows = dates.map(({ dateStr, year: ry, month: rm }, idx) => ({
             id: crypto.randomUUID(),
-            user_id: user!.id,
+            user_id: activeUserId!,
             parent_id: purchaseRows[idx].id,
             parent_type: "purchase" as ParentType,
             purchase_id: purchaseRows[idx].id,
@@ -1382,7 +1391,7 @@ export function useAddPurchase() {
       inv(["purchases", "installments", "card_payments"]);
       if (result.recurring) return; // série gerada em massa — sem histórico de undo item a item
       const { purchaseId, installmentRows } = result;
-      const userId = user!.id;
+      const userId = activeUserId!;
       history.push({
         label: `Adicionar compra "${p.description}"`,
         undo: async () => {
@@ -1757,7 +1766,7 @@ export function useUpdateInstallmentDateScope() {
  * ao usuário, distinto do undo/redo de sessão).
  */
 export function useUpdateInstallmentAmountScope() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -1835,9 +1844,9 @@ export function useUpdateInstallmentAmountScope() {
         if (error) throw error;
       }
 
-      if (user) {
+      if (activeUserId) {
         await (supabase.from("amount_adjustments" as any) as any).insert({
-          user_id: user.id,
+          user_id: activeUserId,
           parent_type: installment.parentType,
           parent_id: installment.parentId,
           previous_total: previousTotal,
@@ -1869,10 +1878,10 @@ export function useLatestAmountAdjustment(
   parentId: string | null | undefined,
   parentType: ParentType | null | undefined,
 ) {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
     queryKey: ["amount_adjustments", parentType, parentId],
-    enabled: !!user?.id && !!parentId && !!parentType,
+    enabled: !!activeUserId && !!parentId && !!parentType,
     queryFn: async (): Promise<AmountAdjustment | null> => {
       const { data, error } = await (supabase.from("amount_adjustments" as any) as any)
         .select("id,parent_type,parent_id,previous_total,new_total,created_at")
@@ -2219,7 +2228,7 @@ export function useDeleteRecurringByScope() {
 }
 
 export function useSetCardPaid() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   const qc = useQueryClient();
   return useMutation({
@@ -2256,7 +2265,7 @@ export function useSetCardPaid() {
       }
       const { error: e3 } = await supabase.from("card_payments").upsert(
         {
-          user_id: user!.id,
+          user_id: activeUserId!,
           card_id: args.cardId,
           year: args.year,
           month: args.month,
@@ -2306,7 +2315,7 @@ export function useSetCardPaid() {
 // Debits
 // =======================
 export function useAddDebit() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (d: {
@@ -2345,7 +2354,7 @@ export function useAddDebit() {
       const applyPaidNow = !!d.paidNow && count === 1;
       const baseRow = {
         id: debitId,
-        user_id: user!.id,
+        user_id: activeUserId!,
         account_id: d.accountId,
         description: d.description,
         amount: d.amount,
@@ -2377,11 +2386,11 @@ export function useAddDebit() {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                debitId, user!.id, d.amount, count, anchor, anchorIso,
+                debitId, activeUserId!, d.amount, count, anchor, anchorIso,
                 "debit", true, d.markCurrentPaid ?? false,
               )
             : buildInstallments(
-                debitId, "debit", user!.id, d.amount, count, anchorIso,
+                debitId, "debit", activeUserId!, d.amount, count, anchorIso,
                 d.markCurrentPaid ?? false,
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
@@ -2392,7 +2401,7 @@ export function useAddDebit() {
         const dates = stepMonthDates(anchorIso, totalMonths - 1, 1);
         if (dates.length) {
           const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
-            user_id: user!.id,
+            user_id: activeUserId!,
             account_id: d.accountId,
             description: d.description,
             amount: d.amount,
@@ -2505,7 +2514,7 @@ export function useRemoveDebit() {
 // Incomes
 // =======================
 export function useAddIncome() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (i: {
@@ -2538,7 +2547,7 @@ export function useAddIncome() {
       const applyReceivedNow = !!i.receivedNow && count === 1;
       const baseRow = {
         id: incomeId,
-        user_id: user!.id,
+        user_id: activeUserId!,
         account_id: i.accountId,
         description: i.description,
         amount: i.amount,
@@ -2566,11 +2575,11 @@ export function useAddIncome() {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                incomeId, user!.id, i.amount, count, anchor, anchorIso,
+                incomeId, activeUserId!, i.amount, count, anchor, anchorIso,
                 "income", true, i.markCurrentPaid ?? false,
               )
             : buildInstallments(
-                incomeId, "income", user!.id, i.amount, count, anchorIso,
+                incomeId, "income", activeUserId!, i.amount, count, anchorIso,
                 i.markCurrentPaid ?? false,
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
@@ -2581,7 +2590,7 @@ export function useAddIncome() {
         const dates = stepMonthDates(anchorIso, totalMonths - 1, 1);
         if (dates.length) {
           const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
-            user_id: user!.id,
+            user_id: activeUserId!,
             account_id: i.accountId,
             description: i.description,
             amount: i.amount,
@@ -2715,7 +2724,7 @@ export function useRemoveIncome() {
 // Investments
 // =======================
 export function useAddInvestment() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (i: {
@@ -2741,7 +2750,7 @@ export function useAddInvestment() {
       const refMonth = i.referenceMonth ?? (_bm || 1) - 1;
       const baseRow = {
         id: investmentId,
-        user_id: user!.id,
+        user_id: activeUserId!,
         account_id: i.accountId,
         type: i.type,
         amount: i.amount,
@@ -2764,11 +2773,11 @@ export function useAddInvestment() {
         const inst =
           anchor > 1
             ? buildInstallmentsAnchored(
-                investmentId, user!.id, i.amount, count, anchor, anchorIso,
+                investmentId, activeUserId!, i.amount, count, anchor, anchorIso,
                 "investment", true, false,
               )
             : buildInstallments(
-                investmentId, "investment", user!.id, i.amount, count, anchorIso,
+                investmentId, "investment", activeUserId!, i.amount, count, anchorIso,
                 false,
               );
         const { error: e2 } = await supabase.from("installments").insert(inst);
@@ -2779,7 +2788,7 @@ export function useAddInvestment() {
         const dates = stepMonthDates(anchorIso, totalMonths - 1, 1);
         if (dates.length) {
           const rows = dates.map(({ dateStr, year: ry, month: rm }) => ({
-            user_id: user!.id,
+            user_id: activeUserId!,
             account_id: i.accountId,
             type: i.type,
             amount: i.amount,
@@ -2845,7 +2854,7 @@ export function resolveScopeMonths(scope: CardScope, anchorYear: number, anchorM
 }
 
 export function useDuplicateOverScope() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { source: DuplicateSource; scope: CardScope; anchorYear: number; anchorMonth: number }) => {
@@ -2860,7 +2869,7 @@ export function useDuplicateOverScope() {
       const src = args.source;
       if (src.kind === "debit") {
         const rows = targets.map((t) => ({
-          user_id: user!.id,
+          user_id: activeUserId!,
           account_id: src.accountId,
           description: src.description,
           amount: src.amount,
@@ -2879,7 +2888,7 @@ export function useDuplicateOverScope() {
         inv(["debits"]);
       } else if (src.kind === "income") {
         const rows = targets.map((t) => ({
-          user_id: user!.id,
+          user_id: activeUserId!,
           account_id: src.accountId,
           description: src.description,
           amount: src.amount,
@@ -2896,7 +2905,7 @@ export function useDuplicateOverScope() {
         inv(["incomes"]);
       } else if (src.kind === "investment") {
         const rows = targets.map((t) => ({
-          user_id: user!.id,
+          user_id: activeUserId!,
           account_id: src.accountId,
           type: src.type,
           amount: src.amount,
@@ -2917,7 +2926,7 @@ export function useDuplicateOverScope() {
           const { data: p, error: e1 } = await supabase
             .from("purchases")
             .insert({
-              user_id: user!.id,
+              user_id: activeUserId!,
               card_id: src.cardId,
               description: src.description,
               total_amount: src.totalAmount,
@@ -2929,7 +2938,7 @@ export function useDuplicateOverScope() {
           if (e1 || !p) throw e1 ?? new Error("Falha ao duplicar compra");
           const pid = (p as { id: string }).id;
           const { error: e2 } = await supabase.from("installments").insert({
-            user_id: user!.id,
+            user_id: activeUserId!,
             parent_type: "purchase",
             parent_id: pid,
             purchase_id: pid,
@@ -2955,7 +2964,7 @@ export function useDuplicateOverScope() {
 // but with brand new parent + installment ids and zero link to the source.
 // =======================
 export function useDuplicateInstallmentSeries() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -2988,13 +2997,13 @@ export function useDuplicateInstallmentSeries() {
       delete cloneRow.created_at;
       delete cloneRow.updated_at;
       cloneRow.id = newParentId;
-      cloneRow.user_id = user!.id;
+      cloneRow.user_id = activeUserId!;
       const { error: iep } = await supabase.from(parentTable).insert(cloneRow);
       if (iep) throw iep;
 
       const newInsts = originalInstallments.map((r) => ({
         id: crypto.randomUUID(),
-        user_id: user!.id,
+        user_id: activeUserId!,
         parent_id: newParentId,
         parent_type: parentType,
         purchase_id: parentType === "purchase" ? newParentId : null,
@@ -3020,7 +3029,7 @@ export function useDuplicateInstallmentSeries() {
 // keeping their paid status. The new series is renumbered 1..N with total=N.
 // =======================
 export function useDuplicateInstallmentsSelection() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -3055,7 +3064,7 @@ export function useDuplicateInstallmentsSelection() {
       delete cloneRow.created_at;
       delete cloneRow.updated_at;
       cloneRow.id = newParentId;
-      cloneRow.user_id = user!.id;
+      cloneRow.user_id = activeUserId!;
       cloneRow.installments_count = picked.length;
       const { error: iep } = await supabase.from(parentTable).insert(cloneRow);
       if (iep) throw iep;
@@ -3063,7 +3072,7 @@ export function useDuplicateInstallmentsSelection() {
       const total = picked.length;
       const newInsts = picked.map((r, idx) => ({
         id: crypto.randomUUID(),
-        user_id: user!.id,
+        user_id: activeUserId!,
         parent_id: newParentId,
         parent_type: parentType,
         purchase_id: parentType === "purchase" ? newParentId : null,
@@ -3097,6 +3106,7 @@ export type DeleteSource =
   | { kind: "purchase"; cardId: string; description: string; amount: number; groupId?: string | null };
 
 export function useDeleteOverScope() {
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { source: DeleteSource; scope: CardScope; anchorYear: number; anchorMonth: number }) => {
@@ -3207,8 +3217,7 @@ export function useDeleteOverScope() {
         src.groupId &&
         args.scope.kind !== "all"
       ) {
-        const { data: userData } = await supabase.auth.getUser();
-        const uid = userData.user?.id;
+        const uid = activeUserId;
         if (uid) {
           const rows = targets.map((t) => ({
             user_id: uid,
@@ -3235,24 +3244,24 @@ export function useDeleteOverScope() {
 // Purge — apaga TODAS as movimentações (mantém contas e cartões)
 // =======================
 export function usePurgeAllMovements() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("Não autenticado.");
+      if (!activeUserId) throw new Error("Não autenticado.");
       // Ordem importa: filhos antes de pais
-      await supabase.from("installments").delete().eq("user_id", user.id);
-      await supabase.from("card_payments").delete().eq("user_id", user.id);
-      await supabase.from("purchases").delete().eq("user_id", user.id);
-      await supabase.from("debits").delete().eq("user_id", user.id);
-      await supabase.from("incomes").delete().eq("user_id", user.id);
-      await supabase.from("investments").delete().eq("user_id", user.id);
+      await supabase.from("installments").delete().eq("user_id", activeUserId);
+      await supabase.from("card_payments").delete().eq("user_id", activeUserId);
+      await supabase.from("purchases").delete().eq("user_id", activeUserId);
+      await supabase.from("debits").delete().eq("user_id", activeUserId);
+      await supabase.from("incomes").delete().eq("user_id", activeUserId);
+      await supabase.from("investments").delete().eq("user_id", activeUserId);
       // Zera saldo inicial das contas — evita que apareça saldo residual
       // depois que todas as movimentações são apagadas.
       await supabase
         .from("accounts")
         .update({ initial_balance: 0 })
-        .eq("user_id", user.id);
+        .eq("user_id", activeUserId);
     },
     onSuccess: () =>
       inv([
@@ -4648,7 +4657,7 @@ export function useUpdatePurchase() {
  * redistribui o valor total proporcionalmente nas N novas parcelas.
  */
 export function useChangePurchaseInstallments() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -4660,7 +4669,7 @@ export function useChangePurchaseInstallments() {
       /** Número da parcela ATUAL (série antiga) que o usuário está vendo. */
       viewedInstallmentNumber?: number;
     }) => {
-      if (!user) throw new Error("Não autenticado.");
+      if (!activeUserId) throw new Error("Não autenticado.");
       const newCount = Math.max(1, Math.floor(args.newCount));
 
       // 1) Descobre a data da primeira parcela atual (para ancorar a nova série)
@@ -4708,7 +4717,7 @@ export function useChangePurchaseInstallments() {
       // 4) Cria as novas parcelas ancoradas na data da primeira
       const items = buildInstallmentsAnchored(
         args.purchaseId,
-        user.id,
+        activeUserId,
         args.totalAmount,
         newCount,
         1,
@@ -4726,7 +4735,7 @@ export function useChangePurchaseInstallments() {
 }
 
 export function useChangeInstallmentSeries() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -4735,7 +4744,7 @@ export function useChangeInstallmentSeries() {
       newCount: number;
       totalAmount: number;
     }) => {
-      if (!user) throw new Error("Nao autenticado.");
+      if (!activeUserId) throw new Error("Nao autenticado.");
       const newCount = Math.max(1, Math.floor(args.newCount));
       const { data: existing } = await supabase
         .from("installments")
@@ -4778,7 +4787,7 @@ export function useChangeInstallmentSeries() {
       }
 
       const items = buildInstallmentsAnchored(
-        args.parentId, user.id, args.totalAmount,
+        args.parentId, activeUserId, args.totalAmount,
         newCount, 1, firstDue, args.parentType, false,
       );
       if (items.length > 0) {
@@ -4808,7 +4817,7 @@ export function useChangeInstallmentSeries() {
  *     em meses consecutivos ancorados na própria parcela editada.
  */
 export function useRenumberInstallment() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: {
@@ -4889,7 +4898,7 @@ export function useRenumberInstallment() {
             const dd = Math.min(ad, lastDay);
             return {
               id: crypto.randomUUID(),
-              user_id: user!.id,
+              user_id: activeUserId!,
               parent_id: parentId,
               parent_type: parentType,
               purchase_id: parentType === "purchase" ? parentId : null,
@@ -5739,11 +5748,11 @@ const deleteEnsuredKey = (key: string) => {
 const hasEnsuredKey = (key: string) => getEnsuredKeys().has(key);
 
 export function useEnsureRecurringForMonth(year: number, month: number) {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const qc = useQueryClient();
   useEffect(() => {
-    if (!user) return;
-    const key = `${user.id}:${year}:${month}`;
+    if (!activeUserId) return;
+    const key = `${activeUserId}:${year}:${month}`;
     if (hasEnsuredKey(key)) return;
     // Mark immediately so concurrent mounts of the same route don't double-run.
     addEnsuredKey(key);
@@ -5760,6 +5769,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
         // Load tombstones for this exact month once, up front.
         const { data: tombstones } = await (supabase.from("recurring_deletions" as any) as any)
           .select("recurrence_group_id")
+          .eq("user_id", activeUserId)
           .eq("year", year)
           .eq("month", month);
         const tombstonedGroups = new Set<string>(
@@ -5772,6 +5782,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
           const { data: groupRows, error } = await supabase
             .from(table)
             .select("recurrence_group_id")
+            .eq("user_id", activeUserId)
             .not("recurrence_group_id", "is", null);
           if (error || cancelled) return;
 
@@ -5819,7 +5830,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
 
             const row: any = {
               id: await deterministicUuid(`recurring:${table}:${gid}:${year}:${month}`),
-              user_id: user.id,
+              user_id: activeUserId,
               account_id: t.account_id,
               amount: t.amount,
               date: newDate,
@@ -5857,6 +5868,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
           const { data: groupRows, error } = await supabase
             .from("purchases")
             .select("recurrence_group_id")
+            .eq("user_id", activeUserId)
             .not("recurrence_group_id", "is", null);
           if (!error && !cancelled) {
             const groupIds = Array.from(
@@ -5902,7 +5914,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               const newPurchaseId = await deterministicUuid(`recurring-purchase:${gid}:${year}:${month}`);
               const purchaseRow: any = {
                 id: newPurchaseId,
-                user_id: user.id,
+                user_id: activeUserId,
                 card_id: t.card_id,
                 description: t.description,
                 total_amount: t.total_amount,
@@ -5914,7 +5926,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               if (pe) continue;
               const instRow: any = {
                 id: await deterministicUuid(`recurring-purchase-inst:${gid}:${year}:${month}`),
-                user_id: user.id,
+                user_id: activeUserId,
                 parent_id: newPurchaseId,
                 parent_type: "purchase",
                 purchase_id: newPurchaseId,
@@ -5959,7 +5971,7 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, year, month]);
+  }, [activeUserId, year, month]);
 }
 
 // =======================
@@ -5980,14 +5992,15 @@ function normalizeCatalogName(name: string): string {
 }
 
 export function useCatalogItems() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   return useQuery({
-    queryKey: ["catalog-items", user?.id],
-    enabled: !!user,
+    queryKey: ["catalog-items", activeUserId],
+    enabled: !!activeUserId,
     queryFn: async (): Promise<CatalogItem[]> => {
       const { data, error } = await supabase
         .from("catalog_items")
         .select("id,name,usage_count,last_used_at")
+        .eq("user_id", activeUserId!)
         .order("name", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((r) => ({
@@ -6007,11 +6020,11 @@ export function useCatalogItems() {
  * qualquer lançamento — nenhuma tela de criação pede nada extra aqui.
  */
 export function useUpsertCatalogItem() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { name: string }) => {
-      if (!user) throw new Error("Não autenticado.");
+      if (!activeUserId) throw new Error("Não autenticado.");
       const name = args.name.trim();
       if (!name) return null;
       const normalized = normalizeCatalogName(name);
@@ -6019,7 +6032,7 @@ export function useUpsertCatalogItem() {
       const { data: existing, error: selErr } = await supabase
         .from("catalog_items")
         .select("id,usage_count")
-        .eq("user_id", user.id)
+        .eq("user_id", activeUserId)
         .eq("name_normalized", normalized)
         .maybeSingle();
       if (selErr) throw selErr;
@@ -6036,7 +6049,7 @@ export function useUpsertCatalogItem() {
       const { data: created, error } = await supabase
         .from("catalog_items")
         .insert({
-          user_id: user.id,
+          user_id: activeUserId,
           name,
           name_normalized: normalized,
           usage_count: 1,
@@ -6051,7 +6064,7 @@ export function useUpsertCatalogItem() {
           const { data: raced } = await supabase
             .from("catalog_items")
             .select("id,usage_count")
-            .eq("user_id", user.id)
+            .eq("user_id", activeUserId)
             .eq("name_normalized", normalized)
             .single();
           if (raced) {
@@ -6072,16 +6085,16 @@ export function useUpsertCatalogItem() {
 
 /** Cadastro manual na tela "Locais e Produtos". */
 export function useAddCatalogItem() {
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (args: { name: string }) => {
-      if (!user) throw new Error("Não autenticado.");
+      if (!activeUserId) throw new Error("Não autenticado.");
       const name = args.name.trim();
       const { data, error } = await supabase
         .from("catalog_items")
         .insert({
-          user_id: user.id,
+          user_id: activeUserId,
           name,
           name_normalized: normalizeCatalogName(name),
           usage_count: 1,
@@ -6130,7 +6143,7 @@ export function useDeleteCatalogItem() {
  */
 export function useReorganizeData() {
   const inv = useInvalidate();
-  const { user } = useAuth();
+  const activeUserId = useActiveUserId();
 
   return useMutation({
     mutationFn: async (args: {
@@ -6143,7 +6156,7 @@ export function useReorganizeData() {
       fromYearOnly: number;
       toYearOnly: number;
     }) => {
-      if (!user?.id) throw new Error("Nao autenticado");
+      if (!activeUserId) throw new Error("Nao autenticado");
 
       const deltaMonths =
         args.mode === "month"

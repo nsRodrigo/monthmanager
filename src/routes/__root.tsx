@@ -36,13 +36,16 @@ import { useAccounts } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
-import { CalculatorModal } from "@/components/CalculatorModal";
+import { FloatingCalculator } from "@/components/FloatingCalculator";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
 import { ConfirmProvider } from "@/store/confirm";
 import { UndoRedoBar } from "@/components/UndoRedoBar";
 import { history } from "@/store/history";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { AdminViewingBanner } from "@/components/AdminViewingBanner";
+import { useAccountAccessRealtime, useValidateViewingAs } from "@/store/account-access";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -346,33 +349,7 @@ function SidebarContent({
       </div>
 
       <div className="mt-4 border-t border-border pt-4">
-        <Link
-          to="/perfil"
-          onClick={onNavigate}
-          className={`flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors ${
-            loc.pathname === "/perfil" ? "bg-secondary text-foreground" : "hover:bg-secondary"
-          }`}
-          aria-label="Abrir meu perfil"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground">
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-              />
-            ) : (
-              initials || <User className="h-4 w-4" aria-hidden="true" />
-            )}
-          </div>
-          <div className={`min-w-0 flex-1 ${labelClass}`}>
-            <p className="truncate text-xs font-semibold whitespace-nowrap">{displayName}</p>
-            <p className="truncate text-[10px] text-muted-foreground whitespace-nowrap">
-              {user?.email}
-            </p>
-          </div>
-        </Link>
+        <AccountSwitcher variant="dropdown" />
         <button
           onClick={() => signOut()}
           className="mt-1 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -385,7 +362,7 @@ function SidebarContent({
       </div>
 
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <CalculatorModal open={calcOpen} onClose={() => setCalcOpen(false)} />
+      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
     </>
   );
 }
@@ -395,11 +372,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
+  useAccountAccessRealtime();
+  useValidateViewingAs();
 
   const isPublic =
     location.pathname === "/auth" ||
     location.pathname === "/reset-password" ||
-    location.pathname === "/privacidade";
+    location.pathname === "/privacidade" ||
+    location.pathname === "/sobre";
 
   useEffect(() => {
     if (loading) return;
@@ -448,6 +428,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
         </a>
+        <AdminViewingBanner />
         <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
           {children}
         </main>

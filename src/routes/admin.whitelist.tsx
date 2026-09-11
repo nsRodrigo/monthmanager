@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Trash2, Plus, ShieldCheck, ShieldOff, UserX, Users, Check, X, Bell, Clock } from "lucide-react";
+import { Trash2, Plus, ShieldCheck, ShieldOff, UserX, Users, Check, X, Bell, Clock, KeyRound } from "lucide-react";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useIsAdmin, useMyRoles, useWhitelist, useAddToWhitelist, useRemoveFromWhitelist } from "@/store/roles";
+import { useAuth } from "@/store/auth";
+import { useOutgoingGrants, useRequestAccess, useRevokeGrant } from "@/store/account-access";
 import { listUsers, deleteUser, setUserAdmin, type AdminUser } from "@/lib/admin-users.functions";
 import {
   listPendingRequests,
@@ -31,6 +33,10 @@ function WhitelistAdmin() {
   const list = Array.isArray(whitelistData) ? whitelistData : [];
   const addMut = useAddToWhitelist();
   const removeMut = useRemoveFromWhitelist();
+  const { user: me } = useAuth();
+  const { data: outgoingGrants = [] } = useOutgoingGrants();
+  const requestAccessMut = useRequestAccess();
+  const revokeGrantMut = useRevokeGrant();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -328,43 +334,80 @@ function WhitelistAdmin() {
           </p>
         ) : (
           <div className="space-y-2">
-            {usersList.map((u) => (
-              <div key={u.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium">{u.email ?? "(sem email)"}</p>
-                    {u.is_admin && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                        Admin
-                      </span>
-                    )}
+            {usersList.map((u) => {
+              const grant = outgoingGrants.find((g) => g.ownerId === u.id);
+              const isSelf = u.id === me?.id;
+              return (
+                <div key={u.id} className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium">{u.email ?? "(sem email)"}</p>
+                        {u.is_admin && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Último acesso: {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString("pt-BR") : "nunca"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onToggleAdmin(u)}
+                      disabled={setAdminMut.isPending}
+                      title={u.is_admin ? "Remover admin" : "Tornar admin"}
+                      className={`rounded-lg border p-2 disabled:opacity-50 ${
+                        u.is_admin
+                          ? "border-border text-muted-foreground hover:bg-secondary"
+                          : "border-primary/30 text-primary hover:bg-primary/10"
+                      }`}
+                    >
+                      {u.is_admin ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => onRevoke(u)}
+                      disabled={revokeMut.isPending}
+                      className="rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      aria-label="Revogar acesso (exclui a conta)"
+                      title="Revogar (exclui a conta)"
+                    >
+                      <UserX className="h-4 w-4" />
+                    </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Último acesso: {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString("pt-BR") : "nunca"}
-                  </p>
+                  {!isSelf && (
+                    <div className="mt-2.5 flex items-center gap-2 border-t border-border pt-2.5">
+                      {!grant || grant.status === "revoked" || grant.status === "rejected" ? (
+                        <button
+                          onClick={() => u.email && requestAccessMut.mutate(u.email)}
+                          disabled={requestAccessMut.isPending || !u.email}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" /> Solicitar acesso
+                        </button>
+                      ) : grant.status === "pending" ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning">
+                          <Clock className="h-3.5 w-3.5" /> Aguardando confirmação
+                        </span>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-[11px] font-semibold text-success">
+                            <ShieldCheck className="h-3.5 w-3.5" /> Acesso concedido
+                          </span>
+                          <button
+                            onClick={() => revokeGrantMut.mutate(grant.id)}
+                            disabled={revokeGrantMut.isPending}
+                            className="rounded-lg border border-destructive/30 px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                          >
+                            Revogar acesso admin
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => onToggleAdmin(u)}
-                  disabled={setAdminMut.isPending}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${
-                    u.is_admin
-                      ? "border-border text-muted-foreground hover:bg-secondary"
-                      : "border-primary/30 text-primary hover:bg-primary/10"
-                  }`}
-                >
-                  {u.is_admin ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                  {u.is_admin ? "Remover admin" : "Tornar admin"}
-                </button>
-                <button
-                  onClick={() => onRevoke(u)}
-                  disabled={revokeMut.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                  aria-label="Revogar acesso"
-                >
-                  <UserX className="h-4 w-4" /> Revogar
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

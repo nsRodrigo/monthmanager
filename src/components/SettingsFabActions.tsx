@@ -1,9 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft, MapPin, Calculator, Wallet, Bell } from "lucide-react";
+import { Settings, FileSpreadsheet, Cloud, ShieldCheck, User, LogOut, ChevronLeft, MapPin, Calculator, Wallet } from "lucide-react";
 import { FabAction } from "@/components/FabAction";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
-import { useUnreadNotificationsCount } from "@/store/notifications";
 
 /**
  * Lista de ações de configuração (mesmas do antigo menu lateral, exceto a
@@ -28,7 +27,6 @@ export function SettingsFabActions({
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const isAdmin = useIsAdmin();
-  const unreadCount = useUnreadNotificationsCount();
 
   return (
     <>
@@ -98,15 +96,6 @@ export function SettingsFabActions({
           }}
         />
       )}
-      <FabAction
-        icon={Bell}
-        label={unreadCount > 0 ? `Notificações (${unreadCount})` : "Notificações"}
-        tone="primary"
-        onClick={() => {
-          onNavigate();
-          navigate({ to: "/notificacoes" });
-        }}
-      />
       <FabAction
         icon={User}
         label="Perfil"

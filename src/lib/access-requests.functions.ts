@@ -136,6 +136,8 @@ export const reportPendingSignup = createServerFn({ method: "POST" })
         title: "Nova solicitação de acesso",
         body: email,
         url: "/admin/whitelist",
+        kind: "signup_request",
+        relatedId: requestId,
       });
       notifiedCount = result.sent;
       if (notifiedCount > 0) {
@@ -170,6 +172,8 @@ export const flushPendingNotifications = createServerFn({ method: "POST" }).hand
         title: "Nova solicitação de acesso",
         body: req.email,
         url: "/admin/whitelist",
+        kind: "signup_request",
+        relatedId: req.id,
       });
       if (result.sent > 0) {
         sent += result.sent;

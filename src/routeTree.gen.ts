@@ -13,6 +13,7 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as NotificacoesRouteImport } from './routes/notificacoes'
 import { Route as MeiosPagamentoRouteImport } from './routes/meios-pagamento'
 import { Route as LocaisProdutosRouteImport } from './routes/locais-produtos'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
@@ -42,6 +43,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PerfilRoute = PerfilRouteImport.update({
   id: '/perfil',
   path: '/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificacoesRoute = NotificacoesRouteImport.update({
+  id: '/notificacoes',
+  path: '/notificacoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeiosPagamentoRoute = MeiosPagamentoRouteImport.update({
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
+  '/notificacoes': typeof NotificacoesRoute
   '/perfil': typeof PerfilRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
+  '/notificacoes': typeof NotificacoesRoute
   '/perfil': typeof PerfilRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
+  '/notificacoes': typeof NotificacoesRoute
   '/perfil': typeof PerfilRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/importar-historico'
     | '/locais-produtos'
     | '/meios-pagamento'
+    | '/notificacoes'
     | '/perfil'
     | '/privacidade'
     | '/reset-password'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/importar-historico'
     | '/locais-produtos'
     | '/meios-pagamento'
+    | '/notificacoes'
     | '/perfil'
     | '/privacidade'
     | '/reset-password'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/importar-historico'
     | '/locais-produtos'
     | '/meios-pagamento'
+    | '/notificacoes'
     | '/perfil'
     | '/privacidade'
     | '/reset-password'
@@ -202,6 +214,7 @@ export interface RootRouteChildren {
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   LocaisProdutosRoute: typeof LocaisProdutosRoute
   MeiosPagamentoRoute: typeof MeiosPagamentoRoute
+  NotificacoesRoute: typeof NotificacoesRoute
   PerfilRoute: typeof PerfilRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/perfil'
       fullPath: '/perfil'
       preLoaderRoute: typeof PerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notificacoes': {
+      id: '/notificacoes'
+      path: '/notificacoes'
+      fullPath: '/notificacoes'
+      preLoaderRoute: typeof NotificacoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/meios-pagamento': {
@@ -322,6 +342,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportarHistoricoRoute: ImportarHistoricoRoute,
   LocaisProdutosRoute: LocaisProdutosRoute,
   MeiosPagamentoRoute: MeiosPagamentoRoute,
+  NotificacoesRoute: NotificacoesRoute,
   PerfilRoute: PerfilRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,

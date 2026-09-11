@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Check, ChevronDown, KeyRound, User } from "lucide-react";
@@ -44,15 +45,44 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
   const [formOpen, setFormOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; bottom: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
+  function computePos() {
+    const btn = triggerRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const width = 288;
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+    setPos({ left, bottom: window.innerHeight - rect.top + 6, width });
+  }
+
+  function openDropdown() {
+    computePos();
+    setOpen(true);
+  }
+
+  // Painel roda num portal (fora da sidebar, que tem overflow-hidden — sem
+  // isso o dropdown ficava cortado na borda da coluna). Por estar fora da
+  // subárvore do trigger, "clique fora" precisa checar os dois refs.
   useEffect(() => {
     if (variant !== "dropdown" || !open) return;
     function onClickOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onResize() {
+      computePos();
     }
     document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      window.removeEventListener("resize", onResize);
+    };
   }, [variant, open]);
 
   if (!user) return null;
@@ -216,10 +246,11 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openDropdown())}
         aria-label="Trocar de conta"
         className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-secondary"
       >
@@ -243,11 +274,18 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
         </span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 overflow-hidden rounded-xl border border-border bg-popover shadow-elevated">
-          {list}
-        </div>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={panelRef}
+            className="fixed z-[100] overflow-hidden rounded-xl border border-border bg-popover shadow-elevated"
+            style={{ left: pos.left, bottom: pos.bottom, width: pos.width }}
+          >
+            {list}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

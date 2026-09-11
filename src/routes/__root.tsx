@@ -19,6 +19,7 @@ import {
   MapPin,
   Calculator,
   Wallet,
+  Bell,
 } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { Logo } from "@/components/Logo";
@@ -46,6 +47,7 @@ import { history } from "@/store/history";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { AdminViewingBanner } from "@/components/AdminViewingBanner";
 import { useAccountAccessRealtime, useValidateViewingAs } from "@/store/account-access";
+import { useUnreadNotificationsCount, useNotificationsRealtime } from "@/store/notifications";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -165,6 +167,7 @@ function SidebarContent({
   const { data: accounts = [] } = useAccounts();
   const { data: profile } = useProfile();
   const isAdmin = useIsAdmin();
+  const unreadCount = useUnreadNotificationsCount();
   const [manageOpen, setManageOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
 
@@ -264,6 +267,28 @@ function SidebarContent({
       </nav>
 
       <div className="mt-4 space-y-1 border-t border-border pt-4">
+        <Link
+          to="/notificacoes"
+          onClick={onNavigate}
+          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
+            loc.pathname === "/notificacoes"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          }`}
+        >
+          <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+            <Bell className="h-3.5 w-3.5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
+            )}
+          </span>
+          <span className={`whitespace-nowrap ${labelClass}`}>Notificações</span>
+          {unreadCount > 0 && (
+            <span className={`ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground whitespace-nowrap ${labelClass}`}>
+              {unreadCount}
+            </span>
+          )}
+        </Link>
         <Link
           to="/importar-historico"
           onClick={onNavigate}
@@ -374,6 +399,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [redirected, setRedirected] = useState(false);
   useAccountAccessRealtime();
   useValidateViewingAs();
+  useNotificationsRealtime();
 
   const isPublic =
     location.pathname === "/auth" ||

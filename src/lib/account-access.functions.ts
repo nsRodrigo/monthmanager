@@ -41,20 +41,27 @@ export const requestAccountAccess = createServerFn({ method: "POST" })
     if (existing?.status === "active") throw new Error("Você já tem acesso a essa conta.");
     if (existing?.status === "pending") throw new Error("Já existe um pedido pendente para essa conta.");
 
+    let grantId: string;
     if (existing) {
+      grantId = existing.id;
       const { error: updateError } = await supabaseAdmin
         .from("account_access_grants")
         .update({ status: "pending", requested_at: new Date().toISOString(), decided_at: null })
         .eq("id", existing.id);
       if (updateError) throw new Error(updateError.message);
     } else {
-      const { error: insertError } = await supabaseAdmin.from("account_access_grants").insert({
-        requester_id: context.userId,
-        owner_id: owner.id,
-        requester_email: requesterEmail,
-        owner_email: email,
-      });
-      if (insertError) throw new Error(insertError.message);
+      const { data: created, error: insertError } = await supabaseAdmin
+        .from("account_access_grants")
+        .insert({
+          requester_id: context.userId,
+          owner_id: owner.id,
+          requester_email: requesterEmail,
+          owner_email: email,
+        })
+        .select("id")
+        .single();
+      if (insertError || !created) throw new Error(insertError?.message ?? "Falha ao criar o pedido.");
+      grantId = created.id;
     }
 
     try {
@@ -62,6 +69,8 @@ export const requestAccountAccess = createServerFn({ method: "POST" })
         title: "Pedido de acesso à sua conta",
         body: `${requesterEmail || "Alguém"} pediu acesso de leitura e escrita à sua conta no Gestão Financeira.`,
         url: "/perfil",
+        kind: "access_request",
+        relatedId: grantId,
       });
     } catch (err) {
       console.error("notifyUsers failed", err);

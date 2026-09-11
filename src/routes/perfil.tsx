@@ -132,9 +132,8 @@ function ProfilePage() {
 
       <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
       <div className="space-y-6 pt-6 pb-20">
-        <div className="grid gap-6 md:grid-cols-[1.3fr_1fr] md:items-start">
-          <div className="space-y-6">
-            <section className="rounded-xl border border-border bg-card/40 p-4">
+        <div className="columns-1 gap-6 md:columns-2">
+            <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <User className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Dados pessoais</h2>
@@ -202,7 +201,7 @@ function ProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-border bg-card/40 p-4">
+            <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Segurança</h2>
@@ -286,9 +285,8 @@ function ProfilePage() {
                 </div>
               )}
             </section>
-          </div>
 
-          <section className="rounded-xl border border-border bg-card/40 p-4">
+          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
             <div className="mb-3 flex items-center gap-2">
               <Palette className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold">Tema do app</h2>
@@ -320,9 +318,8 @@ function ProfilePage() {
               })}
             </div>
           </section>
-        </div>
 
-        <section className="rounded-xl border border-border bg-card/40 p-4">
+        <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
           <div className="mb-3 flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold">Contas</h2>
@@ -331,7 +328,7 @@ function ProfilePage() {
         </section>
 
         {pendingIncoming.length > 0 && (
-          <section className="rounded-xl border border-border bg-card/40 p-4">
+          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <Clock className="h-4 w-4 text-primary" /> Pedidos recebidos
               <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
@@ -371,7 +368,7 @@ function ProfilePage() {
         )}
 
         {activeIncoming.length > 0 && (
-          <section className="rounded-xl border border-border bg-card/40 p-4">
+          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <ShieldCheck className="h-4 w-4 text-primary" /> Acessos que você concedeu
             </h2>
@@ -399,6 +396,7 @@ function ProfilePage() {
             </div>
           </section>
         )}
+        </div>
 
         <div className="flex gap-2">
           <button

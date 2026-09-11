@@ -75,6 +75,7 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
+      { name: "google-site-verification", content: "EB3trm0Ix_rSERYttcd2qfOkdCJEWUQVH2PV1sJbYFQ" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#0a6e46" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },

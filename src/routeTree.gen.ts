@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PerfilRouteImport } from './routes/perfil'
@@ -23,6 +24,11 @@ import { Route as AdminWhitelistRouteImport } from './routes/admin.whitelist'
 import { Route as ApiCronNotifyDueDebitsRouteImport } from './routes/api.cron.notify-due-debits'
 import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaId_.$ano.$mes'
 
+const SobreRoute = SobreRouteImport.update({
+  id: '/sobre',
+  path: '/sobre',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof PerfilRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sobre': typeof SobreRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/api/cron/notify-due-debits': typeof ApiCronNotifyDueDebitsRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/perfil': typeof PerfilRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sobre': typeof SobreRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/api/cron/notify-due-debits': typeof ApiCronNotifyDueDebitsRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/perfil': typeof PerfilRoute
   '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sobre': typeof SobreRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
   '/api/cron/notify-due-debits': typeof ApiCronNotifyDueDebitsRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/privacidade'
     | '/reset-password'
+    | '/sobre'
     | '/admin/whitelist'
     | '/contas/$contaId'
     | '/api/cron/notify-due-debits'
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/privacidade'
     | '/reset-password'
+    | '/sobre'
     | '/admin/whitelist'
     | '/contas/$contaId'
     | '/api/cron/notify-due-debits'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/privacidade'
     | '/reset-password'
+    | '/sobre'
     | '/admin/whitelist'
     | '/contas/$contaId'
     | '/api/cron/notify-due-debits'
@@ -193,6 +205,7 @@ export interface RootRouteChildren {
   PerfilRoute: typeof PerfilRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SobreRoute: typeof SobreRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
   ApiCronNotifyDueDebitsRoute: typeof ApiCronNotifyDueDebitsRoute
@@ -201,6 +214,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sobre': {
+      id: '/sobre'
+      path: '/sobre'
+      fullPath: '/sobre'
+      preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -305,6 +325,7 @@ const rootRouteChildren: RootRouteChildren = {
   PerfilRoute: PerfilRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SobreRoute: SobreRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,
   ContasContaIdRoute: ContasContaIdRoute,
   ApiCronNotifyDueDebitsRoute: ApiCronNotifyDueDebitsRoute,

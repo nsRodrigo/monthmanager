@@ -45,6 +45,21 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           VITE_APP_VERSION: ${{ steps.version.outputs.value }}
 
+      # GOOGLE_CLIENT_SECRET não pode ser versionado, então não tem como o
+      # deploy recriá-lo sozinho — falha aqui, ANTES do deploy ir pro ar,
+      # em vez de deixar o usuário tomar o erro na tela de backup em produção.
+      - name: Verify required Worker secrets are set
+        run: |
+          WORKER_NAME="app"
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then WORKER_NAME="app-develop"; fi
+          HAS_SECRET=$(npx wrangler secret list --name "$WORKER_NAME" | jq -e 'any(.[]; .name=="GOOGLE_CLIENT_SECRET")' || echo "false")
+          if [ "$HAS_SECRET" != "true" ]; then
+            echo "::error::Falta o secret GOOGLE_CLIENT_SECRET no Worker '$WORKER_NAME'. Rode: npx wrangler secret put GOOGLE_CLIENT_SECRET --name $WORKER_NAME"
+            exit 1
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - name: Deploy to Cloudflare Workers (production)
         if: github.ref == 'refs/heads/main'
         run: npx wrangler deploy --name app

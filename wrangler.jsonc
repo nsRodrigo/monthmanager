@@ -4,4 +4,10 @@
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+  // GOOGLE_CLIENT_ID não é sigiloso (fica visível no fluxo OAuth do navegador),
+  // então vive aqui versionado — só GOOGLE_CLIENT_SECRET precisa de
+  // `wrangler secret put` manual por Worker (ver .github/workflows/deploy.yml).
+  "vars": {
+    "GOOGLE_CLIENT_ID": "836667069782-1q193vqmhgp6irdoknjo11lbqkhb1e2e.apps.googleusercontent.com",
+  },
 }

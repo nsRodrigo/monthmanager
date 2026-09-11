@@ -395,7 +395,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const location = useRouterState({ select: (s) => s.location });
   const [redirected, setRedirected] = useState(false);
 
-  const isPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
+  const isPublic =
+    location.pathname === "/auth" ||
+    location.pathname === "/reset-password" ||
+    location.pathname === "/privacidade";
 
   useEffect(() => {
     if (loading) return;

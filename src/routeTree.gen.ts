@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as MeiosPagamentoRouteImport } from './routes/meios-pagamento'
 import { Route as LocaisProdutosRouteImport } from './routes/locais-produtos'
@@ -25,6 +26,11 @@ import { Route as ContasContaIdAnoMesRouteImport } from './routes/contas.$contaI
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PerfilRoute = PerfilRouteImport.update({
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/locais-produtos': typeof LocaisProdutosRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
   '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/locais-produtos': typeof LocaisProdutosRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
   '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/locais-produtos': typeof LocaisProdutosRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
   '/perfil': typeof PerfilRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/whitelist': typeof AdminWhitelistRoute
   '/contas/$contaId': typeof ContasContaIdRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/locais-produtos'
     | '/meios-pagamento'
     | '/perfil'
+    | '/privacidade'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/locais-produtos'
     | '/meios-pagamento'
     | '/perfil'
+    | '/privacidade'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/locais-produtos'
     | '/meios-pagamento'
     | '/perfil'
+    | '/privacidade'
     | '/reset-password'
     | '/admin/whitelist'
     | '/contas/$contaId'
@@ -179,6 +191,7 @@ export interface RootRouteChildren {
   LocaisProdutosRoute: typeof LocaisProdutosRoute
   MeiosPagamentoRoute: typeof MeiosPagamentoRoute
   PerfilRoute: typeof PerfilRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminWhitelistRoute: typeof AdminWhitelistRoute
   ContasContaIdRoute: typeof ContasContaIdRoute
@@ -193,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/perfil': {
@@ -283,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   LocaisProdutosRoute: LocaisProdutosRoute,
   MeiosPagamentoRoute: MeiosPagamentoRoute,
   PerfilRoute: PerfilRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminWhitelistRoute: AdminWhitelistRoute,
   ContasContaIdRoute: ContasContaIdRoute,

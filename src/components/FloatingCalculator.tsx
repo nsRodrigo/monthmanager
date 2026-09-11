@@ -74,6 +74,7 @@ export function FloatingCalculator({
 
     const onMove = (e: PointerEvent) => {
       if (!mode) return;
+      e.preventDefault();
       const dx = e.clientX - sx;
       const dy = e.clientY - sy;
       if (mode === "drag") {
@@ -92,35 +93,53 @@ export function FloatingCalculator({
         }));
       }
     };
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
       if (!mode) return;
       mode = null;
       saveRect(rectRef.current);
+      const target = e.currentTarget as Element | null;
+      if (target?.hasPointerCapture?.(e.pointerId)) target.releasePointerCapture(e.pointerId);
     };
+    // `setPointerCapture` prende TODO o gesto (mouse/touch/caneta) neste
+    // elemento até soltar o dedo/botão — sem isso, arrastar no celular também
+    // rola a página por baixo (o toque "vaza" pro conteúdo atrás do painel,
+    // que é `position: fixed` mas não bloqueia touch-scroll sozinho).
     const onHeadDown = (e: PointerEvent) => {
       if ((e.target as HTMLElement).closest("button")) return;
+      e.preventDefault();
       mode = "drag";
       sx = e.clientX;
       sy = e.clientY;
       start = rectRef.current;
+      head.setPointerCapture(e.pointerId);
     };
     const onHandleDown = (e: PointerEvent) => {
       e.stopPropagation();
+      e.preventDefault();
       mode = "resize";
       sx = e.clientX;
       sy = e.clientY;
       start = rectRef.current;
+      handle.setPointerCapture(e.pointerId);
     };
 
     head.addEventListener("pointerdown", onHeadDown);
     handle.addEventListener("pointerdown", onHandleDown);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    head.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointermove", onMove);
+    head.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointerup", onUp);
+    head.addEventListener("pointercancel", onUp);
+    handle.addEventListener("pointercancel", onUp);
     return () => {
       head.removeEventListener("pointerdown", onHeadDown);
       handle.removeEventListener("pointerdown", onHandleDown);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      head.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointermove", onMove);
+      head.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointerup", onUp);
+      head.removeEventListener("pointercancel", onUp);
+      handle.removeEventListener("pointercancel", onUp);
     };
   }, [open]);
 
@@ -149,7 +168,7 @@ export function FloatingCalculator({
     >
       <div
         ref={headRef}
-        className="flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-border bg-secondary px-3 py-2 active:cursor-grabbing"
+        className="flex shrink-0 cursor-grab touch-none items-center justify-between gap-2 border-b border-border bg-secondary px-3 py-2 active:cursor-grabbing"
       >
         <span className="flex items-center gap-1.5 text-xs font-semibold">
           <CalculatorIcon className="h-3.5 w-3.5 text-primary" /> Calculadora
@@ -177,7 +196,7 @@ export function FloatingCalculator({
       </div>
       <div
         ref={handleRef}
-        className="absolute right-0.5 bottom-0.5 flex h-4 w-4 cursor-nwse-resize items-center justify-center text-muted-foreground"
+        className="absolute right-0.5 bottom-0.5 flex h-4 w-4 touch-none cursor-nwse-resize items-center justify-center text-muted-foreground"
         aria-hidden="true"
       >
         <GripHorizontal className="h-3 w-3 rotate-45" />

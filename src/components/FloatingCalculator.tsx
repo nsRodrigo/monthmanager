@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Calculator as CalculatorIcon, GripHorizontal, X } from "lucide-react";
 import { Calculator } from "./Calculator";
+import { useHasActiveValueField, consumeActiveValueField } from "@/store/active-value-field";
 
 const STORAGE_KEY = "floating-calculator:rect";
 const MIN_WIDTH = 220;
@@ -56,6 +57,11 @@ export function FloatingCalculator({
 }) {
   const [result, setResult] = useState<number | null>(0);
   const [rect, setRect] = useState<Rect>(() => loadRect());
+  // Sem `onUse` fixo (calculadora avulsa do FAB), "Usar este valor" só fica
+  // disponível se algum campo Valor foi focado antes de abrir a calculadora
+  // — o setter real só é consumido no clique (handlePrimary), não aqui.
+  const hasActiveField = useHasActiveValueField();
+  const canUseField = !!onUse || hasActiveField;
   const panelRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
@@ -147,8 +153,9 @@ export function FloatingCalculator({
 
   async function handlePrimary() {
     if (result === null) return;
-    if (onUse) {
-      onUse(result);
+    const fieldSetter = onUse ?? (hasActiveField ? consumeActiveValueField() : null);
+    if (fieldSetter) {
+      fieldSetter(result);
       onClose();
     } else {
       try {
@@ -191,7 +198,7 @@ export function FloatingCalculator({
           disabled={result === null}
           className="mt-3 w-full shrink-0 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {onUse ? "Usar este valor" : "Copiar resultado"}
+          {canUseField ? "Usar este valor" : "Copiar resultado"}
         </button>
       </div>
       <div

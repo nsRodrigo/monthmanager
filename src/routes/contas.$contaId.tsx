@@ -625,7 +625,15 @@ function AccountPane({
           contaId={contaId}
           year={view.year}
           month={view.month}
-          onBack={() => withNavLoading(() => onViewChange({ type: "months" }))}
+          onBack={() =>
+            withNavLoading(() => {
+              // Sem isso, a lista de meses reabriria no ano em que o painel foi
+              // montado, não no ano pro qual o usuário navegou dentro do mês.
+              setYear(view.year);
+              sessionStorage.setItem(yearStorageKey, String(view.year));
+              onViewChange({ type: "months" });
+            })
+          }
           onMonthChange={(y, m) => withNavLoading(() => onViewChange({ type: "month", year: y, month: m }))}
           embedded
           fabPortalTarget={fabPortalTarget}

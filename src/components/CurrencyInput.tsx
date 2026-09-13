@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { inputClass } from "./Modal";
 import { FloatingCalculator } from "./FloatingCalculator";
 import { Calculator as CalculatorIcon } from "lucide-react";
+import { setActiveValueField, clearActiveValueField } from "@/store/active-value-field";
 
 /**
  * Masked BRL currency input.
@@ -28,6 +29,15 @@ export function CurrencyInput({
 }) {
   const [text, setText] = useState<string>("");
   const lastEmitted = useRef<number | undefined>(undefined);
+  const fieldToken = useRef<symbol | undefined>(undefined);
+  if (fieldToken.current === undefined) fieldToken.current = Symbol("value-field");
+  const onValueChangeRef = useRef(onValueChange);
+  onValueChangeRef.current = onValueChange;
+
+  useEffect(() => {
+    const token = fieldToken.current!;
+    return () => clearActiveValueField(token);
+  }, []);
 
   useEffect(() => {
     if (value === undefined || value === null || Number.isNaN(value)) {
@@ -51,6 +61,7 @@ export function CurrencyInput({
       className={className ?? inputClass}
       placeholder={placeholder}
       value={text}
+      onFocus={() => setActiveValueField(fieldToken.current!, (n) => onValueChangeRef.current(n))}
       onChange={(e) => {
         const raw = e.target.value;
         const isNeg = allowNegative && /-/.test(raw);

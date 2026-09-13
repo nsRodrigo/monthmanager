@@ -52,7 +52,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
+import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode, useAccordionScrollClose, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -166,6 +166,9 @@ export function MonthDetailPane({
 }) {
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
   useBandScrollProgress(bandAnchor, { collapseRange: 130, frameRange: 68 });
+  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
+  const [cardsHeaderNode, cardsHeaderRef] = useAnchorNode<HTMLDivElement>();
+  const showCardsHeader = useStickySectionSpy(bandAnchor, cardsHeaderNode);
   useResetScrollOnChange(bandAnchor, [contaId, year, month]);
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
@@ -1124,7 +1127,7 @@ export function MonthDetailPane({
       {/* Top nav — sticky so the year picker stays accessible while scrolling.
           Quando embutido num painel, o cabeçalho da conta (ícone/nome/saldo)
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
-      <div ref={bandAnchorRef} className={`sticky top-0 z-10 ${embedded ? "" : "relative"}`}>
+      <div ref={bandAnchorRef} className={`sticky top-0 z-10 ${embedded ? "" : "relative"} bg-background`}>
         <HeaderBand
           collapsible
           title="Lançamentos"
@@ -1142,42 +1145,66 @@ export function MonthDetailPane({
             />
           }
         />
+        <div className="mx-auto max-w-5xl px-4 md:px-6">
+          {/* Frame com saldo atual e gastos totais — preso na mesma faixa
+              fixa da HeaderBand (igual Home): Saldo Final sempre visível,
+              Saldo Inicial/Gastos Totais encolhem ao rolar. */}
+          <MonthSummaryFrame
+            saldoAtual={normalizeZero(saldoAtual)}
+            gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
+            detailWrapperRef={accordionWrapperRef}
+            detailContentRef={accordionContentRef}
+          />
+
+          {/* Título fixo logo abaixo do resumo — mesma regra do "Suas
+              contas" da Home. Troca sozinho pra "Cartões de crédito" quando
+              a lista rola até essa seção (useStickySectionSpy, comparado
+              contra o cabeçalho de verdade mais abaixo, marcado com
+              cardsHeaderRef). */}
+          <div className="mt-4 flex items-center justify-between gap-3 px-1 pb-2">
+            {showCardsHeader ? (
+              <>
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">CARTÕES DE CRÉDITO</h2>
+                  <p className="truncate text-[11px] text-muted-foreground">Faturas e compras no crédito</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">CONTA CORRENTE</h2>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    Recebimentos − débitos − investimentos
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p
+                    className={`text-sm font-bold ${
+                      totalIncomeNet - totalDebits - totalInvested >= 0
+                        ? "text-foreground"
+                        : "text-destructive"
+                    }`}
+                  >
+                    {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
-      {/* Frame com saldo atual e gastos totais */}
-      <MonthSummaryFrame
-        saldoAtual={normalizeZero(saldoAtual)}
-        gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
-      />
-
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
           pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
           o último card ao rolar até embaixo. */}
       <div className="mt-4 space-y-4 pb-24">
-        {/* CONTA CORRENTE header — recebimentos, débitos e investimentos são
-            todos movimentação da mesma conta corrente, por isso o cabeçalho
-            vem antes de recebimentos (não só entre investimentos/débitos). */}
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">CONTA CORRENTE</h2>
-            <p className="truncate text-[11px] text-muted-foreground">
-              Recebimentos − débitos − investimentos
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p
-              className={`text-sm font-bold ${
-                totalIncomeNet - totalDebits - totalInvested >= 0
-                  ? "text-foreground"
-                  : "text-destructive"
-              }`}
-            >
-              {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
-            </p>
-          </div>
-        </div>
-
         {/* INCOMES */}
         <GroupedSection
           icon={Download}
@@ -1656,7 +1683,10 @@ export function MonthDetailPane({
 
           return (
             <section className="space-y-3 pt-2">
-              <div className="flex items-center justify-between gap-3 px-1">
+              {/* cardsHeaderRef marca onde a seção "de verdade" começa — é
+                  contra ele que useStickySectionSpy compara a posição do
+                  bloco fixo, pra saber quando trocar o título lá em cima. */}
+              <div ref={cardsHeaderRef} className="flex items-center justify-between gap-3 px-1">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-bold uppercase tracking-wider">
                     CARTÕES DE CRÉDITO
@@ -2175,49 +2205,60 @@ export function MonthDetailPane({
 
 /* ───────── MONTH SUMMARY FRAME ───────── */
 
+/**
+ * "Saldo Final" fica sempre visível (é o número que o título fixo mostra
+ * mesmo depois de rolar); "Saldo Inicial" e "Gastos Totais" ficam no bloco
+ * que `useAccordionScrollClose` encolhe por gesto — mesmo padrão do card da
+ * Home (saldo previsto sempre visível, gráfico+stats encolhem).
+ */
 function MonthSummaryFrame({
   saldoAtual,
   gastosTotais,
+  detailWrapperRef,
+  detailContentRef,
 }: {
   saldoAtual: number;
   gastosTotais: number;
+  detailWrapperRef: (el: HTMLDivElement | null) => void;
+  detailContentRef: (el: HTMLDivElement | null) => void;
 }) {
   const saldoFinal = saldoAtual - gastosTotais;
   const inicialTone = saldoAtual >= 0 ? "text-primary" : "text-destructive";
   const inicialBg =
     saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   const finalTone = saldoFinal >= 0 ? "text-primary" : "text-destructive";
-  const finalBg =
-    saldoFinal >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
   return (
-    <div className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4 md:grid-cols-3">
-      <div className={`rounded-xl border p-3 ${inicialBg}`}>
-        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
-          <Wallet className="h-3 w-3" /> Saldo Inicial
-        </div>
-        <p className={`mt-1 text-base font-bold sm:text-lg ${inicialTone}`}>
-          {formatCurrency(saldoAtual)}
-        </p>
+    <div className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4">
+      <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${finalTone}`}>
+        <Check className="h-3 w-3" /> Saldo Final
       </div>
-      <div className={`rounded-xl border p-3 ${finalBg}`}>
-        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${finalTone}`}>
-          <Check className="h-3 w-3" /> Saldo Final
+      <p className={`mt-1 text-xl font-bold sm:text-2xl ${finalTone}`}>
+        {formatCurrency(saldoFinal)}
+      </p>
+      <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
+
+      <div ref={detailWrapperRef} className="overflow-hidden">
+        <div ref={detailContentRef} className="mt-3 grid grid-cols-2 gap-3">
+          <div className={`rounded-xl border p-3 ${inicialBg}`}>
+            <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
+              <Wallet className="h-3 w-3" /> Saldo Inicial
+            </div>
+            <p className={`mt-1 text-base font-bold sm:text-lg ${inicialTone}`}>
+              {formatCurrency(saldoAtual)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-debit">
+              <ArrowDownRight className="h-3 w-3" /> Gastos Totais
+            </div>
+            <p className="mt-1 text-base font-bold text-debit sm:text-lg">
+              {formatCurrency(gastosTotais)}
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              débitos + investimentos + cartões
+            </p>
+          </div>
         </div>
-        <p className={`mt-1 text-base font-bold sm:text-lg ${finalTone}`}>
-          {formatCurrency(saldoFinal)}
-        </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
-      </div>
-      <div className="col-span-2 rounded-xl border border-debit/20 bg-debit/10 p-3 md:col-span-1">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-debit">
-          <ArrowDownRight className="h-3 w-3" /> Gastos Totais
-        </div>
-        <p className="mt-1 text-base font-bold text-debit sm:text-lg">
-          {formatCurrency(gastosTotais)}
-        </p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">
-          débitos + investimentos + cartões
-        </p>
       </div>
     </div>
   );

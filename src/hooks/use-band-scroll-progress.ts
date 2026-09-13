@@ -106,6 +106,48 @@ export function useResetScrollOnChange(anchor: HTMLElement | null, deps: unknown
 }
 
 /**
+ * Observa se `markerNode` já passou por baixo do fim de `anchor` (o bloco
+ * sticky) — usado pra trocar o conteúdo de um título fixo conforme a seção
+ * que está "por baixo" dele muda (ex.: Lançamento troca "Conta corrente" por
+ * "Cartões de crédito" quando a lista rola até ali). Retorna `true` assim
+ * que o topo do marcador cruza o fim do anchor; volta a `false` ao rolar de
+ * volta pra cima — reversível, sem histerese (a seção "atual" é sempre a que
+ * está mais perto do topo visível).
+ *
+ * `markerNode` também vem de `useAnchorNode` (não `useRef` puro) pelo mesmo
+ * motivo documentado lá em cima: o elemento marcado só existe a partir da
+ * segunda renderização (dados ainda carregando na primeira).
+ */
+export function useStickySectionSpy(anchor: HTMLElement | null, markerNode: HTMLElement | null) {
+  const [past, setPast] = useState(false);
+
+  useEffect(() => {
+    if (!anchor || !markerNode) return;
+    const scrollEl = findScrollAncestor(anchor);
+
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const anchorBottom = anchor.getBoundingClientRect().bottom;
+      const markerTop = markerNode.getBoundingClientRect().top;
+      setPast(markerTop <= anchorBottom);
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    };
+
+    update();
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollEl.removeEventListener("scroll", onScroll);
+  }, [anchor, markerNode]);
+
+  return past;
+}
+
+/**
  * Booleano com histerese (não fica "piscando" na fronteira): vira `true`
  * quando o scroll passa de `enterAt`, só volta a `false` quando cai abaixo
  * de `exitAt`.

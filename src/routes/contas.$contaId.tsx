@@ -41,7 +41,7 @@ import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
+import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode, useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -208,6 +208,7 @@ function AccountPane({
   const { data: investments = [] } = useInvestments();
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
   useBandScrollProgress(bandAnchor, { collapseRange: 130, frameRange: 68 });
+  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
   useResetScrollOnChange(bandAnchor, [
     contaId,
     view.type,
@@ -448,7 +449,7 @@ function AccountPane({
         <>
           {/* Mesma faixa de identidade da tela de Lançamentos — os dois
               "topos de tela" usam exatamente o mesmo componente visual. */}
-          <div ref={bandAnchorRef} className="sticky top-0 z-10">
+          <div ref={bandAnchorRef} className="sticky top-0 z-10 bg-background">
             <HeaderBand
               collapsible
               title={account.name}
@@ -468,46 +469,57 @@ function AccountPane({
               right={<YearPickerChip compact />}
               onClose={onClose}
             />
+            <div className="mx-auto max-w-5xl px-4 md:px-6">
+              {/* HERO + DASHBOARD — só na lista de meses; a tela de
+                  lançamentos (um mês específico) não repete o card da conta,
+                  já visto aqui. Nome/tipo já aparecem na HeaderBand acima,
+                  então aqui só o saldo (mesmo padrão do "hero" da Home) +
+                  tendência. Preso na mesma faixa fixa da HeaderBand (igual a
+                  Home) — só o gráfico/"Reorganizar dados" encolhem ao rolar,
+                  o saldo continua sempre visível. */}
+              <header className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Saldo atual</p>
+                    <p
+                      className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
+                        balance >= 0 ? "text-foreground" : "text-destructive"
+                      }`}
+                    >
+                      {formatCurrency(balance)}
+                    </p>
+                  </div>
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: account.color + "33", color: account.color }}
+                  >
+                    <Wallet className="h-[18px] w-[18px]" />
+                  </div>
+                </div>
+
+                <div ref={accordionWrapperRef} className="overflow-hidden">
+                  <div ref={accordionContentRef}>
+                    <Sparkline points={trend} className="mt-3" />
+
+                    <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setOpenReorganize(true)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                        Reorganizar dados
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </header>
+              <div className="h-2" />
+              <h2 className="px-1 text-lg font-semibold">Meses</h2>
+              <div className="h-2" />
+            </div>
           </div>
           <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
-          {/* HERO + DASHBOARD — só na lista de meses; a tela de lançamentos
-              (um mês específico) não repete o card da conta, já visto aqui.
-              Nome/tipo já aparecem na HeaderBand acima, então aqui só o
-              saldo (mesmo padrão do "hero" da Home) + tendência. */}
-          <header className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Saldo atual</p>
-                <p
-                  className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
-                    balance >= 0 ? "text-foreground" : "text-destructive"
-                  }`}
-                >
-                  {formatCurrency(balance)}
-                </p>
-              </div>
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                style={{ backgroundColor: account.color + "33", color: account.color }}
-              >
-                <Wallet className="h-[18px] w-[18px]" />
-              </div>
-            </div>
-
-            <Sparkline points={trend} className="mt-3" />
-
-            <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
-              <button
-                type="button"
-                onClick={() => setOpenReorganize(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5" />
-                Reorganizar dados
-              </button>
-            </div>
-          </header>
-
           <div key="months" className="animate-fade-slide-in">
       {/* MONTHS LIST — only months that have any value */}
       <div className="mt-5 space-y-2">

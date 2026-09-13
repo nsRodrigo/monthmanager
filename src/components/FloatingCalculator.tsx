@@ -170,7 +170,7 @@ export function FloatingCalculator({
   return createPortal(
     <div
       ref={panelRef}
-      className="fixed z-[9998] flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-elevated"
+      className="fixed z-[10000] flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-elevated"
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
     >
       <div

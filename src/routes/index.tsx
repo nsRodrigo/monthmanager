@@ -367,7 +367,7 @@ function Consolidated() {
         </div>
       </section>
       <p className="mt-8 text-center text-[10px] text-muted-foreground/60">v{APP_VERSION}</p>
-      <AccountSettingsFab />
+      <AccountSettingsFab showNotifications />
       </div>
     </div>
   );

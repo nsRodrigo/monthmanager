@@ -35,12 +35,14 @@ import {
   useIncomes,
   useInvestments,
   useLatestAmountAdjustment,
+  useConvertFinanceEntry,
   PAYMENT_METHOD_OPTIONS,
   type Installment,
   type InstallmentScope,
   type CardScope,
   type DeleteSource,
   type PaymentMethod,
+  type ParentType,
 } from "@/store/finance";
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
@@ -48,6 +50,7 @@ import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
 import { Trash2, Copy, FastForward, Rewind, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
+import { toast } from "sonner";
 
 
 export type SingleEditTarget =
@@ -98,6 +101,7 @@ export function EditInstallmentDialog({
   const { data: customPaymentMethods = [] } = useCustomPaymentMethods();
   const changeInstSeries = useChangeInstallmentSeries();
   const renumberInstallment = useRenumberInstallment();
+  const convertEntry = useConvertFinanceEntry();
   const addDebit = useAddDebit();
   const addIncome = useAddIncome();
   const addPurchase = useAddPurchase();
@@ -186,6 +190,9 @@ export function EditInstallmentDialog({
   const [purchInstallments, setPurchInstallments] = useState("2");
   const [purchInstNumber, setPurchInstNumber] = useState("1");
   const [purchMode, setPurchMode] = useState<"total" | "perInstallment">("total");
+  // Mover lançamento para outro tipo (débito/compra/recebimento/investimento).
+  const [moveToType, setMoveToType] = useState<ParentType | "">("");
+  const [moveCardId, setMoveCardId] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -227,6 +234,8 @@ export function EditInstallmentDialog({
     setAskDateScope(false);
     setAdvanceCount("");
     setManageView("none");
+    setMoveToType("");
+    setMoveCardId("");
     // parentPaymentMethod/parentAutoDebitDay ficam de fora de propósito — igual
     // parentDate, são derivados de listas que podem re-fetchar com o modal
     // aberto, e re-rodar isso apagaria o que o usuário já digitou.
@@ -248,6 +257,92 @@ export function EditInstallmentDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, startAction, installment, single]);
+
+  const MOVE_TYPE_LABEL: Record<ParentType, string> = {
+    purchase: "Compra no cartão",
+    debit: "Débito",
+    income: "Recebimento",
+    investment: "Investimento",
+  };
+
+  /**
+   * Seção "Mover para outro tipo" (débito ↔ compra ↔ recebimento ↔
+   * investimento), compartilhada pelos modos `single` e `installment`. É uma
+   * ação isolada — não se mistura com outras edições pendentes no mesmo
+   * formulário: ao mover, o id/tipo atual deixa de existir, então fechamos o
+   * dialog imediatamente em vez de tentar aplicar as duas coisas juntas.
+   */
+  function renderMoveTypeSection(fromType: ParentType, fromId: string, accountId: string | undefined) {
+    const otherTypes = (["purchase", "debit", "income", "investment"] as ParentType[]).filter((t) => t !== fromType);
+    const accountCards = cards.filter((c) => c.accountId === accountId);
+
+    async function doMove() {
+      if (!moveToType) return;
+      const ok = await confirm({
+        title: "Mover lançamento",
+        description: `Mover este lançamento para "${MOVE_TYPE_LABEL[moveToType]}"? Esta ação não pode ser desfeita.`,
+        variant: "destructive",
+        confirmLabel: "Mover",
+      });
+      if (!ok) return;
+      try {
+        await convertEntry.mutateAsync({
+          fromType,
+          fromId,
+          toType: moveToType,
+          cardId: moveToType === "purchase" ? moveCardId : undefined,
+        });
+        toast.success(`Lançamento movido para ${MOVE_TYPE_LABEL[moveToType].toLowerCase()}.`);
+        onClose();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível mover o lançamento.");
+      }
+    }
+
+    return (
+      <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3">
+        <span className="block text-xs font-medium text-muted-foreground">Mover para outro tipo</span>
+        <Select
+          className={inputClass}
+          value={moveToType}
+          onChange={(e) => {
+            setMoveToType(e.target.value as ParentType | "");
+            setMoveCardId("");
+          }}
+        >
+          <option value="">Manter como está</option>
+          {otherTypes.map((t) => (
+            <option key={t} value={t}>
+              {MOVE_TYPE_LABEL[t]}
+            </option>
+          ))}
+        </Select>
+        {moveToType === "purchase" && (
+          <Select className={inputClass} value={moveCardId} onChange={(e) => setMoveCardId(e.target.value)}>
+            <option value="">Selecione um cartão</option>
+            {accountCards.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        {moveToType && (
+          <>
+            <p className="text-[11px] text-amber-500/90">⚠ Esta ação não pode ser desfeita.</p>
+            <button
+              type="button"
+              onClick={doMove}
+              disabled={convertEntry.isPending || (moveToType === "purchase" && !moveCardId)}
+              className="w-full rounded-lg border border-destructive/40 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            >
+              {convertEntry.isPending ? "Movendo…" : `Mover para ${MOVE_TYPE_LABEL[moveToType].toLowerCase()}`}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (!installment && !single) return null;
 
@@ -538,6 +633,8 @@ export function EditInstallmentDialog({
               )}
             </div>
           )}
+
+          {canConvert && singleType === "cash" && renderMoveTypeSection(single.kind, single.id, single.accountId)}
 
           {single.kind === "debit" && singleType === "cash" && paymentMethod === "auto_debit" && (
             <Accordion
@@ -910,6 +1007,20 @@ export function EditInstallmentDialog({
               </Select>
             </Field>
           )}
+
+          {(inst.parentType !== "purchase" || purchType === "cash") &&
+            renderMoveTypeSection(
+              inst.parentType,
+              inst.parentId,
+              inst.parentType === "purchase"
+                ? cards.find((c) => c.id === purchaseForInst?.cardId)?.accountId
+                : inst.parentType === "debit"
+                ? debits.find((d) => d.id === inst.parentId)?.accountId
+                : inst.parentType === "income"
+                ? incomes.find((i) => i.id === inst.parentId)?.accountId
+                : investments.find((i) => i.id === inst.parentId)?.accountId,
+            )}
+
           <p className="-mt-2 text-[11px] text-muted-foreground">
             Valor atual da parcela: {formatCurrency(inst.amount)}.
           </p>

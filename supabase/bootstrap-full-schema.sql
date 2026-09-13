@@ -2291,3 +2291,177 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.account_access_grants;
 
 ALTER TABLE public.notifications REPLICA IDENTITY FULL;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260913000000_convert_finance_entry.sql
+-- ──────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.convert_finance_entry(
+  _from_type text,
+  _from_id uuid,
+  _to_type text,
+  _card_id uuid DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _uid uuid := auth.uid();
+  _owner_id uuid;
+  _account_id uuid;
+  _new_id uuid := gen_random_uuid();
+  _description text;
+  _amount numeric;
+  _date date;
+  _installments_count int;
+  _ref_year int;
+  _ref_month int;
+  _paid boolean;
+  _payment_method text;
+  _from_uses boolean;
+  _to_uses boolean;
+  _inst RECORD;
+BEGIN
+  IF _uid IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  IF _from_type NOT IN ('purchase','debit','income','investment') THEN
+    RAISE EXCEPTION 'Tipo de origem inválido: %', _from_type;
+  END IF;
+  IF _to_type NOT IN ('purchase','debit','income','investment') THEN
+    RAISE EXCEPTION 'Tipo de destino inválido: %', _to_type;
+  END IF;
+  IF _from_type = _to_type THEN
+    RAISE EXCEPTION 'Tipo de origem e destino são iguais';
+  END IF;
+
+  IF _from_type = 'purchase' THEN
+    SELECT p.user_id, c.account_id, p.description, p.total_amount, p.purchase_date, p.installments_count
+      INTO _owner_id, _account_id, _description, _amount, _date, _installments_count
+      FROM public.purchases p
+      JOIN public.cards c ON c.id = p.card_id
+      WHERE p.id = _from_id AND p.recurrence_group_id IS NULL;
+  ELSIF _from_type = 'debit' THEN
+    SELECT user_id, account_id, description, amount, date, installments_count, reference_year, reference_month, paid, payment_method
+      INTO _owner_id, _account_id, _description, _amount, _date, _installments_count, _ref_year, _ref_month, _paid, _payment_method
+      FROM public.debits WHERE id = _from_id AND recurrence_group_id IS NULL;
+  ELSIF _from_type = 'income' THEN
+    SELECT user_id, account_id, description, amount, date, installments_count, reference_year, reference_month, received, payment_method
+      INTO _owner_id, _account_id, _description, _amount, _date, _installments_count, _ref_year, _ref_month, _paid, _payment_method
+      FROM public.incomes WHERE id = _from_id AND recurrence_group_id IS NULL;
+  ELSIF _from_type = 'investment' THEN
+    SELECT user_id, account_id, type, amount, date, installments_count, reference_year, reference_month
+      INTO _owner_id, _account_id, _description, _amount, _date, _installments_count, _ref_year, _ref_month
+      FROM public.investments WHERE id = _from_id AND recurrence_group_id IS NULL;
+    _paid := false;
+  END IF;
+
+  IF _owner_id IS NULL THEN
+    RAISE EXCEPTION 'Lançamento de origem não encontrado ou é recorrente';
+  END IF;
+
+  IF NOT app_private.has_account_access(_owner_id) THEN
+    RAISE EXCEPTION 'Sem permissão para mover este lançamento';
+  END IF;
+
+  IF _to_type = 'purchase' THEN
+    IF _card_id IS NULL THEN
+      RAISE EXCEPTION 'Selecione um cartão para mover para compra';
+    END IF;
+    PERFORM 1 FROM public.cards WHERE id = _card_id AND account_id = _account_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Cartão inválido para esta conta';
+    END IF;
+  END IF;
+
+  _from_uses := (_from_type = 'purchase') OR (_installments_count > 1);
+  _to_uses := (_to_type = 'purchase') OR (_installments_count > 1);
+
+  IF _to_type = 'purchase' THEN
+    INSERT INTO public.purchases (id, user_id, card_id, description, total_amount, purchase_date, installments_count)
+    VALUES (_new_id, _owner_id, _card_id, _description, _amount, _date, _installments_count);
+  ELSIF _to_type = 'debit' THEN
+    INSERT INTO public.debits (
+      id, user_id, account_id, description, amount, date, required, paid, payment_method,
+      installments_count, is_parent, reference_year, reference_month
+    ) VALUES (
+      _new_id, _owner_id, _account_id, _description, _amount, _date, false, COALESCE(_paid, false),
+      CASE WHEN _from_type = 'income' THEN _payment_method ELSE NULL END,
+      _installments_count, _installments_count > 1,
+      CASE WHEN _to_uses THEN NULL ELSE COALESCE(_ref_year, EXTRACT(YEAR FROM _date)::int) END,
+      CASE WHEN _to_uses THEN NULL ELSE COALESCE(_ref_month, EXTRACT(MONTH FROM _date)::int - 1) END
+    );
+  ELSIF _to_type = 'income' THEN
+    INSERT INTO public.incomes (
+      id, user_id, account_id, description, amount, date, received, payment_method,
+      installments_count, is_parent, reference_year, reference_month
+    ) VALUES (
+      _new_id, _owner_id, _account_id, _description, _amount, _date, COALESCE(_paid, false),
+      CASE WHEN _from_type = 'debit' THEN _payment_method ELSE NULL END,
+      _installments_count, _installments_count > 1,
+      CASE WHEN _to_uses THEN NULL ELSE COALESCE(_ref_year, EXTRACT(YEAR FROM _date)::int) END,
+      CASE WHEN _to_uses THEN NULL ELSE COALESCE(_ref_month, EXTRACT(MONTH FROM _date)::int - 1) END
+    );
+  ELSIF _to_type = 'investment' THEN
+    INSERT INTO public.investments (
+      id, user_id, account_id, type, amount, percentage, date,
+      installments_count, is_parent, reference_year, reference_month
+    ) VALUES (
+      _new_id, _owner_id, _account_id, _description, _amount, 0, _date,
+      _installments_count, _installments_count > 1,
+      CASE WHEN _to_uses THEN NULL ELSE COALESCE(_ref_year, EXTRACT(YEAR FROM _date)::int) END,
+      CASE WHEN _to_uses THEN NULL ELSE COALESCE(_ref_month, EXTRACT(MONTH FROM _date)::int - 1) END
+    );
+  END IF;
+
+  IF _from_uses AND _to_uses THEN
+    UPDATE public.installments
+       SET parent_id = _new_id,
+           parent_type = _to_type,
+           purchase_id = CASE WHEN _to_type = 'purchase' THEN _new_id ELSE NULL END
+     WHERE parent_id = _from_id AND parent_type = _from_type;
+
+  ELSIF _from_uses AND NOT _to_uses THEN
+    SELECT * INTO _inst FROM public.installments
+      WHERE parent_id = _from_id AND parent_type = _from_type LIMIT 1;
+    IF FOUND THEN
+      IF _to_type = 'debit' THEN
+        UPDATE public.debits SET amount = _inst.amount, date = _inst.due_date, paid = _inst.paid,
+               reference_year = _inst.year, reference_month = _inst.month WHERE id = _new_id;
+      ELSIF _to_type = 'income' THEN
+        UPDATE public.incomes SET amount = _inst.amount, date = _inst.due_date, received = _inst.paid,
+               reference_year = _inst.year, reference_month = _inst.month WHERE id = _new_id;
+      ELSIF _to_type = 'investment' THEN
+        UPDATE public.investments SET amount = _inst.amount, date = _inst.due_date,
+               reference_year = _inst.year, reference_month = _inst.month WHERE id = _new_id;
+      END IF;
+      DELETE FROM public.installments WHERE id = _inst.id;
+    END IF;
+
+  ELSIF NOT _from_uses AND _to_uses THEN
+    INSERT INTO public.installments (id, user_id, parent_id, parent_type, purchase_id, number, total, amount, due_date, year, month, paid)
+    VALUES (
+      gen_random_uuid(), _owner_id, _new_id, 'purchase', _new_id, 1, 1, _amount, _date,
+      COALESCE(_ref_year, EXTRACT(YEAR FROM _date)::int),
+      COALESCE(_ref_month, EXTRACT(MONTH FROM _date)::int - 1),
+      COALESCE(_paid, false)
+    );
+  END IF;
+
+  IF _from_type = 'purchase' THEN
+    DELETE FROM public.purchases WHERE id = _from_id;
+  ELSIF _from_type = 'debit' THEN
+    DELETE FROM public.debits WHERE id = _from_id;
+  ELSIF _from_type = 'income' THEN
+    DELETE FROM public.incomes WHERE id = _from_id;
+  ELSIF _from_type = 'investment' THEN
+    DELETE FROM public.investments WHERE id = _from_id;
+  END IF;
+
+  RETURN _new_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.convert_finance_entry(text, uuid, text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.convert_finance_entry(text, uuid, text, uuid) TO authenticated;

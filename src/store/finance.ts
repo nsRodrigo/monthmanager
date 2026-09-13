@@ -4652,6 +4652,41 @@ export function useUpdatePurchase() {
 }
 
 /**
+ * Move um lançamento (compra/débito/recebimento/investimento) para outro
+ * tipo, via RPC `convert_finance_entry` — preserva cada parcela no mês em
+ * que já estava cadastrada (ver comentário da migration). `cardId` é
+ * obrigatório quando `toType === "purchase"`, e só aceita cartões da mesma
+ * conta do lançamento de origem (trocar de conta continua sendo a troca de
+ * cartão já existente, feita à parte).
+ *
+ * Sem undo/redo (diferente de `useUpdatePurchase`/`useUpdateDebit`) — é uma
+ * operação cross-table (cria linha nova, apaga a antiga, re-aponta parcelas),
+ * reverter exigiria desfazer a transação inteira. A UI compensa pedindo
+ * confirmação explícita antes de chamar isso.
+ */
+export function useConvertFinanceEntry() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      fromType: ParentType;
+      fromId: string;
+      toType: ParentType;
+      cardId?: string;
+    }): Promise<string> => {
+      const { data, error } = await supabase.rpc("convert_finance_entry", {
+        _from_type: args.fromType,
+        _from_id: args.fromId,
+        _to_type: args.toType,
+        _card_id: args.cardId ?? null,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSettled: () => inv(["purchases", "debits", "incomes", "investments", "installments", "card_payments"]),
+  });
+}
+
+/**
  * Recria as parcelas de uma compra (parcelada) mudando o número de parcelas.
  * Mantém o mês da PRIMEIRA parcela igual à atual (ou ao anchor informado) e
  * redistribui o valor total proporcionalmente nas N novas parcelas.

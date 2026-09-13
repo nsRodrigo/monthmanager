@@ -990,6 +990,15 @@ export type Database = {
     }
     Functions: {
       bulk_insert_finance: { Args: { _payload: Json }; Returns: Json }
+      convert_finance_entry: {
+        Args: {
+          _from_type: string
+          _from_id: string
+          _to_type: string
+          _card_id?: string | null
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

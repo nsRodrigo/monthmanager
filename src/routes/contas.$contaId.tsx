@@ -41,7 +41,7 @@ import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode, useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
+import { useResetScrollOnChange, useAnchorNode, useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -206,8 +206,9 @@ function AccountPane({
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
   const { data: investments = [] } = useInvestments();
+  // Faixa 100% estática, igual à Home — nunca encolhe (sem `useBandScrollProgress`
+  // nem `collapsible`). Só o resumo abaixo dela encolhe (useAccordionScrollClose).
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  useBandScrollProgress(bandAnchor, { collapseRange: 130, frameRange: 68 });
   const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
   useResetScrollOnChange(bandAnchor, [
     contaId,
@@ -451,7 +452,6 @@ function AccountPane({
               "topos de tela" usam exatamente o mesmo componente visual. */}
           <div ref={bandAnchorRef} className="sticky top-0 z-10 bg-background">
             <HeaderBand
-              collapsible
               title={account.name}
               eyebrow={<span className="capitalize">{account.type}</span>}
               avatar={

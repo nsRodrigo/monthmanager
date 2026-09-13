@@ -52,7 +52,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useBandScrollProgress, useResetScrollOnChange, useAnchorNode, useAccordionScrollClose, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
+import { useResetScrollOnChange, useAnchorNode, useAccordionScrollClose, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -164,8 +164,9 @@ export function MonthDetailPane({
   /** Só passado quando há mais de 1 painel aberto — fecha este painel inteiro (distinto de "voltar aos meses"). */
   onClose?: () => void;
 }) {
+  // Faixa 100% estática, igual à Home — nunca encolhe (sem `useBandScrollProgress`
+  // nem `collapsible`). Só o resumo abaixo dela encolhe (useAccordionScrollClose).
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  useBandScrollProgress(bandAnchor, { collapseRange: 130, frameRange: 68 });
   const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
   const [cardsHeaderNode, cardsHeaderRef] = useAnchorNode<HTMLDivElement>();
   const showCardsHeader = useStickySectionSpy(bandAnchor, cardsHeaderNode);
@@ -1129,7 +1130,6 @@ export function MonthDetailPane({
           já aparece logo acima (AccountPane) — repetir o nome aqui só duplicaria. */}
       <div ref={bandAnchorRef} className={`sticky top-0 z-10 ${embedded ? "" : "relative"} bg-background`}>
         <HeaderBand
-          collapsible
           title="Lançamentos"
           eyebrow={account?.name}
           onBack={onBack}

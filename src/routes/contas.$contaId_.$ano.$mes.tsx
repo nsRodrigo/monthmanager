@@ -78,6 +78,7 @@ import {
   CalendarClock,
   Banknote,
   FileText,
+  Calculator,
 } from "lucide-react";
 import { AddDebitDialog } from "@/components/AddDebitDialog";
 import { AddIncomeDialog } from "@/components/AddIncomeDialog";
@@ -1989,6 +1990,15 @@ export function MonthDetailPane({
                     tone="income"
                     onClick={() => {
                       setOpenIncome(true);
+                      setFabOpen(false);
+                    }}
+                  />
+                  <FabAction
+                    icon={Calculator}
+                    label="Calculadora"
+                    tone="credit"
+                    onClick={() => {
+                      setCalcOpen(true);
                       setFabOpen(false);
                     }}
                   />

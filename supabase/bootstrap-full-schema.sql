@@ -2253,3 +2253,41 @@ DROP POLICY IF EXISTS "Users can delete their own amount adjustments" ON public.
 CREATE POLICY "Users can view their own amount adjustments" ON public.amount_adjustments FOR SELECT USING (app_private.has_account_access(user_id));
 CREATE POLICY "Users can insert their own amount adjustments" ON public.amount_adjustments FOR INSERT WITH CHECK (app_private.has_account_access(user_id));
 CREATE POLICY "Users can delete their own amount adjustments" ON public.amount_adjustments FOR DELETE USING (app_private.has_account_access(user_id));
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260911020000_notifications.sql
+-- ──────────────────────────────────────────────────────────
+CREATE TABLE public.notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  body text NOT NULL,
+  url text,
+  kind text NOT NULL DEFAULT 'generic',
+  related_id uuid,
+  read boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_notifications_user ON public.notifications (user_id, created_at DESC);
+
+GRANT SELECT, UPDATE, DELETE ON public.notifications TO authenticated;
+GRANT ALL ON public.notifications TO service_role;
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "own notifications select" ON public.notifications
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "own notifications update" ON public.notifications
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own notifications delete" ON public.notifications
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- ──────────────────────────────────────────────────────────
+-- Origem: 20260911030000_realtime_access_notifications.sql
+-- ──────────────────────────────────────────────────────────
+ALTER TABLE public.account_access_grants REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.account_access_grants;
+
+ALTER TABLE public.notifications REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;

@@ -238,25 +238,27 @@ function PersonalizarMenuPage() {
               );
             })}
           </nav>
-          <Select
-            className={`${inputClass} md:hidden`}
-            value={currentScreen}
-            onChange={(e) => switchScreen(e.target.value as ScreenId)}
-          >
-            {SCREEN_SECTIONS.map((section) => {
-              const items = screens.filter((s) => s.section === section);
-              if (!items.length) return null;
-              return (
-                <optgroup key={section} label={section}>
-                  {items.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </Select>
+          <div className="md:hidden">
+            <Select
+              className={inputClass}
+              value={currentScreen}
+              onChange={(e) => switchScreen(e.target.value as ScreenId)}
+            >
+              {SCREEN_SECTIONS.map((section) => {
+                const items = screens.filter((s) => s.section === section);
+                if (!items.length) return null;
+                return (
+                  <optgroup key={section} label={section}>
+                    {items.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </Select>
+          </div>
 
           {/* Painel de edição */}
           {!draft ? (

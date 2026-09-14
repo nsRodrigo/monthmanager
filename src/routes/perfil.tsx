@@ -413,6 +413,16 @@ function ProfilePage() {
         )}
         </div>
 
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pb-1 text-xs text-muted-foreground">
+          <button type="button" onClick={() => navigate({ to: "/sobre" })} className="underline hover:text-foreground">
+            Sobre o app
+          </button>
+          <span aria-hidden="true">·</span>
+          <button type="button" onClick={() => navigate({ to: "/privacidade" })} className="underline hover:text-foreground">
+            Privacidade
+          </button>
+        </div>
+
         <div className="flex gap-2">
           <button
             onClick={goBack}

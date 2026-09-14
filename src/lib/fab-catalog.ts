@@ -36,9 +36,9 @@ import type { Tone } from "@/components/FabAction";
 
 export type IconComponent = ComponentType<{ className?: string }>;
 
-/** As 10 telas que podem ter um menu flutuante próprio — Sobre/Privacidade
- * ficam de fora porque não renderizam dentro do shell autenticado
- * (AuthGate), não têm onde montar um FAB sem mexer na estrutura de layout. */
+/** As 12 telas que podem ter um menu flutuante próprio. Sobre/Privacidade só
+ * ganham shell (e portanto FAB) quando há usuário logado — deslogadas elas
+ * continuam públicas, sem sidebar/FAB (ver AuthGate em src/routes/__root.tsx). */
 export type ScreenId =
   | "inicio"
   | "meses"
@@ -49,7 +49,9 @@ export type ScreenId =
   | "locais"
   | "meios"
   | "notificacoes"
-  | "whitelist";
+  | "whitelist"
+  | "sobre"
+  | "privacidade";
 
 export type ActionId =
   | "novo_cartao"
@@ -160,8 +162,16 @@ export const CATALOG: CatalogEntry[] = [
     to: "/notificacoes",
     screenRef: "notificacoes",
   },
-  { id: "sobre", label: "Sobre o app", icon: Info, tone: "primary", kind: "navigate", to: "/sobre" },
-  { id: "privacidade", label: "Privacidade", icon: Lock, tone: "primary", kind: "navigate", to: "/privacidade" },
+  { id: "sobre", label: "Sobre o app", icon: Info, tone: "primary", kind: "navigate", to: "/sobre", screenRef: "sobre" },
+  {
+    id: "privacidade",
+    label: "Privacidade",
+    icon: Lock,
+    tone: "primary",
+    kind: "navigate",
+    to: "/privacidade",
+    screenRef: "privacidade",
+  },
 ];
 
 export const CATALOG_BY_ID: Record<ActionId, CatalogEntry> = Object.fromEntries(
@@ -255,6 +265,18 @@ export const SCREENS: ScreenDef[] = [
     section: "Telas de configuração",
     adminOnly: true,
   },
+  {
+    id: "sobre",
+    label: "Sobre o App",
+    hint: "Versão e informações do app (só logado tem FAB aqui).",
+    section: "Telas de configuração",
+  },
+  {
+    id: "privacidade",
+    label: "Privacidade",
+    hint: "Política de privacidade (só logado tem FAB aqui).",
+    section: "Telas de configuração",
+  },
 ];
 
 export const SCREEN_SECTIONS: ScreenSection[] = ["Telas principais", "Telas de configuração"];
@@ -318,6 +340,8 @@ export const DEFAULTS: Record<ScreenId, FabConfigValue> = {
   meios: { icon: "apps", actions: [], folders: {} },
   notificacoes: { icon: "apps", actions: [], folders: {} },
   whitelist: { icon: "apps", actions: [], folders: {} },
+  sobre: { icon: "apps", actions: [], folders: {} },
+  privacidade: { icon: "apps", actions: [], folders: {} },
 };
 
 /** Mapeia o pathname atual pra uma tela configurável, ou `null` se não houver
@@ -334,5 +358,7 @@ export function screenIdForPathname(pathname: string): ScreenId | null {
   if (pathname === "/meios-pagamento") return "meios";
   if (pathname === "/notificacoes") return "notificacoes";
   if (pathname === "/admin/whitelist") return "whitelist";
+  if (pathname === "/sobre") return "sobre";
+  if (pathname === "/privacidade") return "privacidade";
   return null;
 }

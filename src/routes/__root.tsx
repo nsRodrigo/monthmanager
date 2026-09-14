@@ -403,11 +403,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useValidateViewingAs();
   useNotificationsRealtime();
 
-  const isPublic =
-    location.pathname === "/auth" ||
-    location.pathname === "/reset-password" ||
-    location.pathname === "/privacidade" ||
-    location.pathname === "/sobre";
+  // /auth e /reset-password nunca têm shell. /privacidade e /sobre servem
+  // também pra visitante deslogado, então só ficam "públicas" (sem
+  // sidebar/FAB) enquanto não há usuário logado — logado, passam a
+  // renderizar dentro do layout normal, como qualquer outra tela.
+  const alwaysPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
+  const conditionallyPublic = location.pathname === "/privacidade" || location.pathname === "/sobre";
+  const isPublic = alwaysPublic || (conditionallyPublic && !user);
   const fabScreenId = screenIdForPathname(location.pathname);
 
   useEffect(() => {

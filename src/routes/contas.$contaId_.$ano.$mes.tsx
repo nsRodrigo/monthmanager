@@ -93,9 +93,13 @@ import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
-import { SettingsFabActions } from "@/components/SettingsFabActions";
+import { FabMenuContent, type ResolvedFabEntry } from "@/components/FabMenuContent";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { FloatingCalculator } from "@/components/FloatingCalculator";
+import { useFabConfig } from "@/store/fab-config";
+import { useIsAdmin } from "@/store/roles";
+import { useAuth } from "@/store/auth";
+import { CATALOG_BY_ID, ICON_BY_NAME, type ActionId } from "@/lib/fab-catalog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
 
@@ -171,6 +175,10 @@ export function MonthDetailPane({
   const [cardsHeaderNode, cardsHeaderRef] = useAnchorNode<HTMLDivElement>();
   const showCardsHeader = useStickySectionSpy(bandAnchor, cardsHeaderNode);
   useResetScrollOnChange(bandAnchor, [contaId, year, month]);
+  const navigate = useNavigate();
+  const { data: fabCfg } = useFabConfig("lancamento");
+  const isAdminUser = useIsAdmin();
+  const { signOut } = useAuth();
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases } = usePurchases();
@@ -223,7 +231,7 @@ export function MonthDetailPane({
   const [openPurchase, setOpenPurchase] = useState(false);
   const [openCard, setOpenCard] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
-  const [fabView, setFabView] = useState<"create" | "settings">("create");
+  const [fabFolder, setFabFolder] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
@@ -1964,108 +1972,86 @@ export function MonthDetailPane({
           return embedded && fabPortalTarget ? createPortal(bulkUi, fabPortalTarget) : bulkUi;
         }
 
+        if (!fabCfg) return null;
+
+        // As 5 ações "locais" (só fazem sentido aqui, dependem dos diálogos
+        // de criar já montados nesta tela) — únicas que ConfigurableFab
+        // (usado nas outras 9 telas) não sabe executar sozinho.
+        const localHandlers: Partial<Record<ActionId, () => void>> = {
+          novo_cartao: () => setOpenCard(true),
+          nova_compra: () => setOpenPurchase(true),
+          novo_debito: () => setOpenDebit(true),
+          novo_investimento: () => setOpenInvest(true),
+          novo_recebimento: () => setOpenIncome(true),
+        };
+
+        const resolveFabAction = (id: string): ResolvedFabEntry | null => {
+          if (id.startsWith("folder:")) {
+            const fid = id.slice(7);
+            const folder = fabCfg.folders[fid];
+            if (!folder) return null;
+            const Icon = ICON_BY_NAME[folder.icon] ?? ICON_BY_NAME.folder;
+            return { kind: "folder", id: fid, label: folder.label, icon: Icon, onOpen: () => setFabFolder(fid) };
+          }
+          const entry = CATALOG_BY_ID[id as ActionId];
+          if (!entry) return null;
+          if (entry.adminOnly && !isAdminUser) return null;
+          const close = () => setFabOpen(false);
+          const local = localHandlers[entry.id];
+          let onClick: () => void;
+          if (local) {
+            onClick = () => {
+              close();
+              local();
+            };
+          } else if (entry.kind === "navigate") {
+            onClick = () => {
+              close();
+              navigate({ to: entry.to! });
+            };
+          } else if (entry.kind === "signout") {
+            onClick = () => {
+              close();
+              signOut();
+            };
+          } else if (entry.kind === "calculator") {
+            onClick = () => {
+              close();
+              setCalcOpen(true);
+            };
+          } else if (entry.kind === "manage-account") {
+            onClick = () => {
+              close();
+              setManageOpen(true);
+            };
+          } else {
+            onClick = close;
+          }
+          return { kind: "action", id: entry.id, label: entry.label, icon: entry.icon, tone: entry.tone, onClick };
+        };
+
+        const fabCurrentIds = fabFolder ? fabCfg.folders[fabFolder]?.actionIds ?? [] : fabCfg.actions;
+        const fabEntries = fabCurrentIds
+          .map(resolveFabAction)
+          .filter((e): e is ResolvedFabEntry => !!e);
+        if (!fabFolder && fabEntries.length === 0) return null;
+
+        const fabMainIcon = ICON_BY_NAME[fabCfg.icon] ?? ICON_BY_NAME.add;
+
         const fabUi = (
-          <>
-            {fabOpen && (
-              <div
-                className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
-                onClick={() => setFabOpen(false)}
-                aria-hidden="true"
-              />
-            )}
-            <div
-              className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
-            >
-              {fabOpen && fabView === "create" && (
-                <div className="flex flex-col items-end gap-2.5">
-                  <FabAction
-                    icon={CreditCard}
-                    label="Novo cartão"
-                    tone="credit"
-                    onClick={() => {
-                      setOpenCard(true);
-                      setFabOpen(false);
-                    }}
-                  />
-                  <FabAction
-                    icon={ShoppingBag}
-                    label="Nova compra"
-                    tone="credit"
-                    onClick={() => {
-                      setOpenPurchase(true);
-                      setFabOpen(false);
-                    }}
-                  />
-                  <FabAction
-                    icon={ArrowDownRight}
-                    label="Novo débito"
-                    tone="debit"
-                    onClick={() => {
-                      setOpenDebit(true);
-                      setFabOpen(false);
-                    }}
-                  />
-                  <FabAction
-                    icon={TrendingUp}
-                    label="Novo investimento"
-                    tone="primary"
-                    onClick={() => {
-                      setOpenInvest(true);
-                      setFabOpen(false);
-                    }}
-                  />
-                  <FabAction
-                    icon={Download}
-                    label="Novo recebimento"
-                    tone="income"
-                    onClick={() => {
-                      setOpenIncome(true);
-                      setFabOpen(false);
-                    }}
-                  />
-                  <FabAction
-                    icon={Calculator}
-                    label="Calculadora"
-                    tone="credit"
-                    onClick={() => {
-                      setCalcOpen(true);
-                      setFabOpen(false);
-                    }}
-                  />
-                  <FabAction
-                    icon={Settings}
-                    label="Configurações"
-                    tone="primary"
-                    onClick={() => setFabView("settings")}
-                  />
-                </div>
-              )}
-              {fabOpen && fabView === "settings" && (
-                <div className="flex flex-col items-end gap-2.5">
-                  <SettingsFabActions
-                    onNavigate={() => setFabOpen(false)}
-                    onBack={() => setFabView("create")}
-                    onManageAccounts={() => setManageOpen(true)}
-                    onOpenCalculator={() => setCalcOpen(true)}
-                  />
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setFabOpen((v) => !v);
-                  setFabView("create");
-                }}
-                aria-label={fabOpen ? "Fechar menu de adicionar" : "Adicionar novo item"}
-                aria-expanded={fabOpen}
-                className={`flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-primary shadow-elevated transition-transform duration-200 hover:border-primary/50 ${
-                  fabOpen ? "rotate-45" : ""
-                }`}
-              >
-                <Plus className="h-6 w-6" />
-              </button>
-            </div>
-          </>
+          <FabMenuContent
+            mainIcon={fabMainIcon}
+            open={fabOpen}
+            onOpenChange={(v) => {
+              setFabOpen(v);
+              if (!v) setFabFolder(null);
+            }}
+            entries={fabEntries}
+            isSubLevel={!!fabFolder}
+            onBack={() => setFabFolder(null)}
+            positionClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+            backdropClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
+          />
         );
         return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;
       })()}

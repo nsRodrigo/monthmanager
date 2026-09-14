@@ -23,7 +23,7 @@ import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
 import { formatCurrency, MONTHS } from "@/lib/format";
 import { Sparkline } from "@/components/Sparkline";
-import { AccountSettingsFab } from "@/components/AccountSettingsFab";
+import { NotificationBellButton } from "@/components/NotificationBellButton";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
@@ -367,7 +367,7 @@ function Consolidated() {
         </div>
       </section>
       <p className="mt-8 text-center text-[10px] text-muted-foreground/60">v{APP_VERSION}</p>
-      <AccountSettingsFab showNotifications />
+      <NotificationBellButton />
       </div>
     </div>
   );

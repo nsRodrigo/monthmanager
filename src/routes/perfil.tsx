@@ -4,7 +4,7 @@ import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck } from "lucide-react";
+import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
@@ -285,6 +285,21 @@ function ProfilePage() {
                 </div>
               )}
             </section>
+
+          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/personalizar-menu" })}
+              className="flex w-full items-center gap-2 text-left"
+            >
+              <Sliders className="h-4 w-4 text-primary" />
+              <span className="flex-1">
+                <span className="block text-sm font-semibold">Personalizar menu flutuante</span>
+                <span className="block text-xs text-muted-foreground">Ícone e atalhos do botão de cada tela (só no celular)</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </section>
 
           <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
             <div className="mb-3 flex items-center gap-2">

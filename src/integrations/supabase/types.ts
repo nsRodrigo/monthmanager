@@ -362,6 +362,33 @@ export type Database = {
           },
         ]
       }
+      fab_menu_configs: {
+        Row: {
+          config: Json
+          icon: string
+          id: string
+          screen_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          icon?: string
+          id?: string
+          screen_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          icon?: string
+          id?: string
+          screen_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_drive_tokens: {
         Row: {
           connected_at: string

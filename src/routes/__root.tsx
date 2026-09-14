@@ -46,6 +46,8 @@ import { UndoRedoBar } from "@/components/UndoRedoBar";
 import { history } from "@/store/history";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { AdminViewingBanner } from "@/components/AdminViewingBanner";
+import { ConfigurableFab } from "@/components/ConfigurableFab";
+import { screenIdForPathname } from "@/lib/fab-catalog";
 import { useAccountAccessRealtime, useValidateViewingAs } from "@/store/account-access";
 import { useUnreadNotificationsCount, useNotificationsRealtime } from "@/store/notifications";
 
@@ -406,6 +408,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     location.pathname === "/reset-password" ||
     location.pathname === "/privacidade" ||
     location.pathname === "/sobre";
+  const fabScreenId = screenIdForPathname(location.pathname);
 
   useEffect(() => {
     if (loading) return;
@@ -459,6 +462,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      {/* Menu flutuante configurável — montado uma única vez aqui (igual
+          AdminViewingBanner), pra não precisar editar rota por rota. A tela
+          de Lançamento fica de fora (screenId null-ish "lancamento"):
+          mantém o próprio FAB local, porque as ações de criar dependem de
+          estado só dela. `key` força reiniciar aberto/fechado ao trocar de
+          tela. */}
+      {fabScreenId && fabScreenId !== "lancamento" && <ConfigurableFab key={fabScreenId} screenId={fabScreenId} />}
     </div>
   );
 }

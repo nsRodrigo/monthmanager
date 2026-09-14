@@ -38,7 +38,6 @@ import {
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
-import { AccountSettingsFab } from "@/components/AccountSettingsFab";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useResetScrollOnChange, useAnchorNode, useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
@@ -628,7 +627,6 @@ function AccountPane({
         )}
       </div>
           </div>
-          <AccountSettingsFab />
           </div>
         </>
       )}

@@ -106,13 +106,19 @@ export function useResetScrollOnChange(anchor: HTMLElement | null, deps: unknown
 }
 
 /**
- * Observa se `markerNode` já passou por baixo do fim de `anchor` (o bloco
- * sticky) — usado pra trocar o conteúdo de um título fixo conforme a seção
- * que está "por baixo" dele muda (ex.: Lançamento troca "Conta corrente" por
- * "Cartões de crédito" quando a lista rola até ali). Retorna `true` assim
- * que o topo do marcador cruza o fim do anchor; volta a `false` ao rolar de
- * volta pra cima — reversível, sem histerese (a seção "atual" é sempre a que
- * está mais perto do topo visível).
+ * Observa se `markerNode` já passou POR INTEIRO por baixo do fim de `anchor`
+ * (o bloco sticky) — usado pra trocar o conteúdo de um título fixo conforme
+ * a seção que está "por baixo" dele muda (ex.: Lançamento troca "Conta
+ * corrente" por "Cartões de crédito" quando a lista rola até ali). Retorna
+ * `true` assim que a BASE do marcador cruza o fim do anchor (não o topo) —
+ * ou seja, só troca quando o cabeçalho de verdade já sumiu inteiro atrás da
+ * faixa fixa. Comparar pelo topo faria a troca acontecer com o cabeçalho
+ * real ainda visível por baixo da faixa: se a seção for curta (poucos
+ * cartões) o scroll acaba antes dele sumir de vez, e os dois títulos ("Conta
+ * corrente"/"Cartões de crédito" fixo + o cabeçalho real da seção) ficam
+ * visíveis ao mesmo tempo. Volta a `false` ao rolar de volta pra cima —
+ * reversível, sem histerese (a seção "atual" é sempre a que está mais perto
+ * do topo visível).
  *
  * `markerNode` também vem de `useAnchorNode` (não `useRef` puro) pelo mesmo
  * motivo documentado lá em cima: o elemento marcado só existe a partir da
@@ -129,8 +135,8 @@ export function useStickySectionSpy(anchor: HTMLElement | null, markerNode: HTML
     const update = () => {
       ticking = false;
       const anchorBottom = anchor.getBoundingClientRect().bottom;
-      const markerTop = markerNode.getBoundingClientRect().top;
-      setPast(markerTop <= anchorBottom);
+      const markerBottom = markerNode.getBoundingClientRect().bottom;
+      setPast(markerBottom <= anchorBottom);
     };
     const onScroll = () => {
       if (!ticking) {

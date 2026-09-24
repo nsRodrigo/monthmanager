@@ -475,7 +475,7 @@ const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
           mantém o próprio FAB local, porque as ações de criar dependem de
           estado só dela. `key` força reiniciar aberto/fechado ao trocar de
           tela. */}
-      {fabScreenId && fabScreenId !== "lancamento" && <ConfigurableFab key={fabScreenId} screenId={fabScreenId} />}
+      {fabScreenId && fabScreenId !== "lancamento" && !anyMonthPaneOpen && <ConfigurableFab key={fabScreenId} screenId={fabScreenId} />}
     </div>
   );
 }

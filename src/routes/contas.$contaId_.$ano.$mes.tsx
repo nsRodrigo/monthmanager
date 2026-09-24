@@ -1159,7 +1159,8 @@ export function MonthDetailPane({
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
           pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
           o último card ao rolar até embaixo. */}
-      <div className="mt-16">
+      <div className="mt-16 grid gap-4 @4xl:grid-cols-[380px_minmax(0,1fr)] @4xl:items-start">
+      <div className="@4xl:sticky @4xl:top-36">
         <MonthSummaryPanel
           saldoInicial={normalizeZero(saldoAtual)}
           income={totalIncome}
@@ -1169,7 +1170,7 @@ export function MonthDetailPane({
           monthName={MONTHS[month]}
         />
       </div>
-      <div className="mt-6 space-y-4 pb-24">
+      <div className="min-w-0 space-y-4 pb-24">
         {/* Segmento 1: conta corrente */}
         <div className="flex items-center justify-between gap-3 px-1">
           <div className="min-w-0">
@@ -1852,6 +1853,7 @@ export function MonthDetailPane({
           );
         })()}
       </div>
+      </div>
 
       {(() => {
         // Some enquanto qualquer diálogo aberto por ele estiver na tela — senão
@@ -2231,7 +2233,7 @@ function MonthSummaryPanel({
         Saldo final · {monthName}
       </div>
 
-      <div className="grid gap-x-8 gap-y-4 @2xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] @2xl:items-center">
+      <div className="grid gap-y-5">
         <div>
           <p className={`font-display text-[44px] leading-none font-semibold tracking-tight tabular-nums ${finalTone}`}>
             {formatCurrency(saldoFinal)}

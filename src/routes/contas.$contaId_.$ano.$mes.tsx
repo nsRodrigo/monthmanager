@@ -2226,43 +2226,43 @@ function MonthSummaryPanel({
   }
 
   return (
-    <section className="animate-fade-slide-in overflow-hidden rounded-2xl border border-border bg-gradient-hero p-4 sm:p-5">
-      <div className="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+    <section className="animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-hero p-6">
+      <div className="mb-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Saldo final · {monthName}
       </div>
 
       <div className="grid gap-x-8 gap-y-4 @2xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] @2xl:items-center">
         <div>
-          <p className={`font-display text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl ${finalTone}`}>
+          <p className={`font-display text-[44px] leading-none font-semibold tracking-tight tabular-nums ${finalTone}`}>
             {formatCurrency(saldoFinal)}
           </p>
           <span
-            className={`mt-3 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+            className={`mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${
               net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
             }`}
           >
-            {net >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+            {net >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
             {net >= 0 ? "+" : "−"} {formatCurrency(Math.abs(net))} no mês
           </span>
         </div>
 
-        <div className="flex flex-col gap-2.5" aria-label="Como o saldo se forma">
+        <div className="flex flex-col gap-3.5" aria-label="Como o saldo se forma">
           {steps.map((s) => (
-            <div key={s.label} className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 text-xs">
+            <div key={s.label} className="grid grid-cols-[100px_minmax(0,1fr)_auto] items-center gap-3 text-sm">
               <span className="text-muted-foreground">{s.label}</span>
-              <div className="relative h-3.5 rounded-[5px] border border-border bg-background">
+              <div className="relative h-4 rounded-md border border-border bg-background">
                 <i
-                  className="absolute inset-y-px rounded-[3px]"
+                  className="absolute inset-y-px rounded-[4px]"
                   style={{ left: pos(s.left), width: pos(s.width), background: s.color }}
                 />
               </div>
-              <b className={`min-w-24 text-right tabular-nums ${s.tone}`}>{s.value}</b>
+              <b className={`text-right font-bold tabular-nums ${s.tone}`}>{s.value}</b>
             </div>
           ))}
-          <div className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border pt-2.5 text-xs">
-            <span className="font-semibold">Saldo final</span>
+          <div className="grid grid-cols-[100px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border pt-3.5 text-sm">
+            <span>Saldo final</span>
             <span />
-            <b className={`min-w-24 text-right tabular-nums ${finalTone}`}>{formatCurrency(saldoFinal)}</b>
+            <b className={`text-right font-bold tabular-nums ${finalTone}`}>{formatCurrency(saldoFinal)}</b>
           </div>
         </div>
       </div>

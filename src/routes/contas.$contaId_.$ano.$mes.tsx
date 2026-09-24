@@ -1139,20 +1139,10 @@ export function MonthDetailPane({
           onBack={onBack}
           onClose={onClose}
         />
-      </div>
-
-      <div className="mx-auto max-w-6xl px-4 pb-6 md:px-6 md:pb-10 @container">
-      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
-          pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
-          o último card ao rolar até embaixo. */}
-      <div className="mt-4">
-        <MonthSummaryPanel
-          saldoInicial={normalizeZero(saldoAtual)}
-          income={totalIncome}
-          debits={totalDebits}
-          cards={totalCards}
-          invested={totalInvested}
-          picker={
+        {/* Seletor de mês/ano flutuante: fixo logo abaixo da linha do cabeçalho,
+            por cima do conteúdo (não ocupa altura — o resumo tem folga acima). */}
+        <div className="pointer-events-none absolute inset-x-0 top-full z-10 flex justify-center px-4 pt-2.5">
+          <div className="pointer-events-auto rounded-full shadow-elevated">
             <MonthYearPicker
               contaId={contaId}
               year={year}
@@ -1161,7 +1151,22 @@ export function MonthDetailPane({
               next={nextMonth}
               onNavigate={onMonthChange}
             />
-          }
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 pb-6 md:px-6 md:pb-10 @container">
+      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
+          pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
+          o último card ao rolar até embaixo. */}
+      <div className="mt-16">
+        <MonthSummaryPanel
+          saldoInicial={normalizeZero(saldoAtual)}
+          income={totalIncome}
+          debits={totalDebits}
+          cards={totalCards}
+          invested={totalInvested}
+          monthName={MONTHS[month]}
         />
       </div>
       <div className="mt-6 space-y-4 pb-24">
@@ -2168,14 +2173,14 @@ function MonthSummaryPanel({
   debits,
   cards,
   invested,
-  picker,
+  monthName,
 }: {
   saldoInicial: number;
   income: number;
   debits: number;
   cards: number;
   invested: number;
-  picker: React.ReactNode;
+  monthName: string;
 }) {
   const gastos = debits + cards + invested;
   const saldoFinal = saldoInicial - gastos;
@@ -2189,7 +2194,7 @@ function MonthSummaryPanel({
   let run = saldoInicial;
   const steps: { label: string; left: number; width: number; color: string; value: string; tone: string }[] = [];
   steps.push({
-    label: "Saldo anterior",
+    label: "Saldo inicial",
     left: 0,
     width: Math.max(saldoAnterior, 0),
     color: "var(--color-muted-foreground)",
@@ -2222,14 +2227,11 @@ function MonthSummaryPanel({
 
   return (
     <section className="animate-fade-slide-in overflow-hidden rounded-2xl border border-border bg-gradient-hero p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          <Check className="h-3 w-3" /> Saldo final
-        </div>
-        {picker}
+      <div className="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+        Saldo final · {monthName}
       </div>
 
-      <div className="mt-3 grid gap-x-8 gap-y-4 @2xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] @2xl:items-center">
+      <div className="grid gap-x-8 gap-y-4 @2xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] @2xl:items-center">
         <div>
           <p className={`font-display text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl ${finalTone}`}>
             {formatCurrency(saldoFinal)}
@@ -2242,26 +2244,9 @@ function MonthSummaryPanel({
             {net >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
             {net >= 0 ? "+" : "−"} {formatCurrency(Math.abs(net))} no mês
           </span>
-          <p className="mt-1.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
-
-          {/* Tela estreita: dois totais; a ponte completa só aparece em tela larga. */}
-          <div className="mt-3 grid grid-cols-2 gap-2.5 @2xl:hidden">
-            <div className="rounded-xl border border-border bg-background/50 p-3">
-              <p className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-                <Wallet className="h-3 w-3" /> Saldo inicial
-              </p>
-              <p className="mt-0.5 text-base font-bold tabular-nums">{formatCurrency(saldoInicial)}</p>
-            </div>
-            <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
-              <p className="flex items-center gap-1 text-[11px] font-semibold text-debit">
-                <ArrowDownRight className="h-3 w-3" /> Gastos totais
-              </p>
-              <p className="mt-0.5 text-base font-bold text-debit tabular-nums">{formatCurrency(gastos)}</p>
-            </div>
-          </div>
         </div>
 
-        <div className="hidden flex-col gap-2.5 @2xl:flex" aria-label="Como o saldo se forma">
+        <div className="flex flex-col gap-2.5" aria-label="Como o saldo se forma">
           {steps.map((s) => (
             <div key={s.label} className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 text-xs">
               <span className="text-muted-foreground">{s.label}</span>

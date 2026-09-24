@@ -227,14 +227,13 @@ function BackupPage() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
-          compact
           title="Backup e Sincronização"
           subtitle="Exporte, restaure e mantenha versões dos seus dados financeiros."
           onBack={goBack}
         />
       </div>
-      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
-      <div className="space-y-6 pt-6 pb-20">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <div className="columns-1 gap-4 pt-5 pb-24 lg:columns-2 [&>*]:mb-4 [&>*]:break-inside-avoid">
         {error && (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {error}
@@ -246,10 +245,10 @@ function BackupPage() {
           </div>
         )}
 
-        <section className="rounded-xl border border-border bg-card/40 p-4">
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-3 flex items-center gap-2">
-            <Cloud className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Sincronização multi-device</h2>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary"><Cloud className="h-4 w-4" /></span>
+            <h2 className="font-display text-[15px] font-semibold">Sincronização multi-device</h2>
           </div>
           <p className="text-xs text-muted-foreground">
             Seus dados ficam salvos na nuvem associados ao seu login. Alterações feitas em qualquer
@@ -258,10 +257,10 @@ function BackupPage() {
           </p>
         </section>
 
-        <section className="rounded-xl border border-border bg-card/40 p-4">
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-3 flex items-center gap-2">
-            <Download className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Backup manual</h2>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary"><Download className="h-4 w-4" /></span>
+            <h2 className="font-display text-[15px] font-semibold">Backup manual</h2>
           </div>
           <p className="mb-3 text-xs text-muted-foreground">Selecione os formatos desejados:</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -305,10 +304,10 @@ function BackupPage() {
           onRestoreFromPayload={(payload, source) => setRestoreOpen({ payload, source })}
         />
 
-        <section className="rounded-xl border border-border bg-card/40 p-4">
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-3 flex items-center gap-2">
-            <RefreshCw className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Backup automático (neste dispositivo)</h2>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary"><RefreshCw className="h-4 w-4" /></span>
+            <h2 className="font-display text-[15px] font-semibold">Backup automático (neste dispositivo)</h2>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {FREQ_OPTIONS.map((opt) => (
@@ -332,10 +331,10 @@ function BackupPage() {
           </p>
         </section>
 
-        <section className="rounded-xl border border-border bg-card/40 p-4">
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-3 flex items-center gap-2">
-            <Upload className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Restaurar de arquivo</h2>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary"><Upload className="h-4 w-4" /></span>
+            <h2 className="font-display text-[15px] font-semibold">Restaurar de arquivo</h2>
           </div>
           <input
             ref={fileRef}
@@ -358,11 +357,11 @@ function BackupPage() {
           </button>
         </section>
 
-        <section className="rounded-xl border border-border bg-card/40 p-4">
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Snapshots (rollback)</h2>
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary"><History className="h-4 w-4" /></span>
+              <h2 className="font-display text-[15px] font-semibold">Snapshots (rollback)</h2>
             </div>
             <button
               onClick={onCreateSnapshot}
@@ -604,10 +603,10 @@ function GoogleDriveSection({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card/40 p-4">
+    <section className="rounded-2xl border border-border bg-card p-5">
       <div className="mb-3 flex items-center gap-2">
-        <Cloud className="h-4 w-4 text-primary" />
-        <h2 className="text-sm font-semibold">Google Drive</h2>
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary"><Cloud className="h-4 w-4" /></span>
+        <h2 className="font-display text-[15px] font-semibold">Google Drive</h2>
       </div>
 
       {error && (

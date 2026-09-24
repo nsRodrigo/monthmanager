@@ -186,19 +186,50 @@ function HistoricalImportPage() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
-          compact
           title="Importar planilha histórica"
           subtitle="Carregue sua planilha XLSX completa — detectamos contas, cartões, parcelas e seções."
           onBack={goBack}
         />
       </div>
-      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
-      <div className="space-y-6 pt-6 pb-20">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6">
+      <div className="space-y-4 pt-5 pb-24">
+      {/* Passos: o atual sai do estado da página (planilha lida → Revisar) */}
+      <ol className="flex flex-wrap gap-2" aria-label="Etapas da importação">
+        {(["Preparar", "Enviar arquivo", "Revisar"] as const).map((label, i) => {
+          const current = results.length > 0 ? 3 : fileName || parsing ? 2 : 1;
+          const n = i + 1;
+          const state = n < current ? "done" : n === current ? "on" : "todo";
+          return (
+            <li
+              key={label}
+              aria-current={state === "on" ? "step" : undefined}
+              className={`flex items-center gap-2.5 rounded-full border py-1.5 pr-4 pl-1.5 text-sm font-medium ${
+                state === "on"
+                  ? "border-border bg-card text-foreground"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  state === "on"
+                    ? "bg-primary text-primary-foreground"
+                    : state === "done"
+                      ? "bg-primary/20 text-primary"
+                      : "bg-secondary"
+                }`}
+              >
+                {state === "done" ? "✓" : n}
+              </span>
+              {label}
+            </li>
+          );
+        })}
+      </ol>
 
       {/* Zona perigosa */}
-      <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+      <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
         <div className="flex items-start gap-3">
-          <Database className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive"><Database className="h-[18px] w-[18px]" aria-hidden="true" /></span>
           <div className="flex-1">
             <h2 className="text-sm font-semibold text-destructive">Antes de importar: limpe o banco</h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -237,7 +268,7 @@ function HistoricalImportPage() {
       </section>
 
       {/* Upload */}
-      <section className="rounded-xl border border-border bg-card/40 p-4">
+      <section className="rounded-2xl border border-border bg-card p-5">
         {/* Seletor de conta destino padrão */}
         <div className="mb-5 grid gap-3 rounded-xl border border-border bg-background/40 p-4 md:grid-cols-2">
           <div>
@@ -332,7 +363,7 @@ function HistoricalImportPage() {
 
           {/* Plano de criação */}
           {plan && (
-            <section className="rounded-xl border border-border bg-card/40 p-4">
+            <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="text-sm font-semibold">O que será criado</h2>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>

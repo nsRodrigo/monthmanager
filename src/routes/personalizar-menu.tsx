@@ -203,7 +203,7 @@ function PersonalizarMenuPage() {
         <HeaderBand compact title="Personalizar menu flutuante" subtitle="Escolha o ícone e os atalhos de cada tela." onBack={goBack} />
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 pb-16 pt-6">
+      <div className="mx-auto max-w-6xl px-4 pt-5 pb-24 sm:px-6">
         <p className="mb-5 text-xs text-muted-foreground">
           Vale só no celular — no computador a barra lateral já mostra tudo. Uma tela sem nenhum atalho fica sem botão flutuante.
         </p>

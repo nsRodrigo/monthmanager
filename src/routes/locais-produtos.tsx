@@ -94,178 +94,193 @@ function LocaisProdutosPage() {
     toast.success("Item removido.");
   }
 
+  const maxUsage = Math.max(1, ...items.map((i) => i.usageCount));
+
   return (
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
-          compact
-          title="Locais e Produtos"
+          title="Locais e produtos"
           subtitle={`${items.length} ${items.length === 1 ? "item cadastrado" : "itens cadastrados"}`}
           onBack={goBack}
         />
       </div>
-      <div className="mx-auto max-w-2xl px-5 pb-8 md:pb-12">
-        <div className="space-y-4 pt-6 pb-20">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="mx-auto max-w-3xl px-4 pt-5 pb-24 sm:px-6">
+        <div className="mb-4 flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-52 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar item..."
-              className={`${inputClass} pl-9`}
+              placeholder="Buscar item…"
+              aria-label="Buscar item"
+              className={`${inputClass} pl-10`}
             />
           </div>
-
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Ordenar por</p>
-            <div className="flex gap-1 rounded-full bg-secondary p-1">
+          <div role="group" aria-label="Ordenar" className="inline-flex gap-0.5 rounded-xl border border-border bg-card p-[3px]">
+            {(
+              [
+                ["name", "Nome", ArrowDownAZ],
+                ["usage", "Mais usados", Flame],
+              ] as const
+            ).map(([k, label, Icon]) => (
               <button
+                key={k}
                 type="button"
-                onClick={() => setSort("name")}
-                className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  sort === "name" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                aria-pressed={sort === k}
+                onClick={() => setSort(k)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  sort === k ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <ArrowDownAZ className="h-3.5 w-3.5" /> Nome
+                <Icon className="h-3.5 w-3.5" /> {label}
               </button>
-              <button
-                type="button"
-                onClick={() => setSort("usage")}
-                className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  sort === "usage" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <Flame className="h-3.5 w-3.5" /> Mais usados
-              </button>
-            </div>
+            ))}
           </div>
-
-          {!adding ? (
+          {!adding && (
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-semibold text-muted-foreground hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
-              <Plus className="h-4 w-4" /> Adicionar item
+              <Plus className="h-4 w-4" strokeWidth={2.2} /> Adicionar item
             </button>
-          ) : (
-            <div className="space-y-3 rounded-xl border border-border bg-card p-3">
-              <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Novo item</p>
-              <input
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Nome (ex.: Posto Shell)"
-                className={inputClass}
-              />
-
-              {duplicate && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-debit/40 bg-debit/10 p-3">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-debit" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-foreground">Já existe: &ldquo;{duplicate.name}&rdquo;</p>
-                    <p className="mt-0.5 text-muted-foreground">
-                      Usado {duplicate.usageCount}x. Escolha outro nome ou cancele pra reaproveitar esse.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdding(false);
-                    setNewName("");
-                  }}
-                  className="rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAdd}
-                  disabled={!newName.trim() || !!duplicate || addItem.isPending}
-                  className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  Salvar
-                </button>
-              </div>
-            </div>
           )}
+        </div>
 
+        {adding && (
+          <div className="mb-4 space-y-3 rounded-2xl border border-border bg-card p-4">
+            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Novo item</p>
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nome (ex.: Posto Shell)"
+              className={inputClass}
+            />
+
+            {duplicate && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-debit/40 bg-debit/10 p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-debit" />
+                <div className="text-xs">
+                  <p className="font-semibold text-foreground">Já existe: &ldquo;{duplicate.name}&rdquo;</p>
+                  <p className="mt-0.5 text-muted-foreground">
+                    Usado {duplicate.usageCount}x. Escolha outro nome ou cancele pra reaproveitar esse.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdding(false);
+                  setNewName("");
+                }}
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleAdd}
+                disabled={!newName.trim() || !!duplicate || addItem.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
           {visible.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
+            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
               {items.length === 0
                 ? "Nenhum item ainda — cadastre um acima, ou ele entra sozinho quando você usar a descrição num lançamento."
                 : "Nenhum item encontrado com essa busca."}
             </p>
           ) : (
-            <div className="space-y-2">
-              {visible.map((item) => {
-                const isEditing = editingId === item.id;
-                return (
-                  <div key={item.id} className="rounded-xl border border-border bg-card p-3">
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <input
-                          autoFocus
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className={inputClass}
-                        />
-                        <div className="flex justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-secondary"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => saveEdit(item)}
-                            className="rounded p-1.5 text-primary hover:bg-secondary"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                        </div>
+            visible.map((item) => {
+              const isEditing = editingId === item.id;
+              return (
+                <div key={item.id} className="border-t border-border first:border-t-0">
+                  {isEditing ? (
+                    <div className="space-y-2 p-3.5">
+                      <input
+                        autoFocus
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className={inputClass}
+                      />
+                      <div className="flex justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          aria-label="Cancelar edição"
+                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => saveEdit(item)}
+                          aria-label="Salvar"
+                          className="rounded-lg p-1.5 text-primary hover:bg-secondary"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                          <Tag className="h-[18px] w-[18px]" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            usado {item.usageCount}x · último em {formatDate(item.lastUsedAt)}
-                          </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/30">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+                        <Tag className="h-[17px] w-[17px]" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{item.name}</p>
+                        <div className="mt-1.5 h-1.5 max-w-64 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
+                          <i
+                            className="block h-full rounded-full bg-primary"
+                            style={{ width: `${(item.usageCount / maxUsage) * 100}%` }}
+                          />
                         </div>
-                        <div className="flex shrink-0 flex-col gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(item)}
-                            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(item)}
-                            className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          último em {formatDate(item.lastUsedAt)}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      <span className="hidden shrink-0 rounded-full bg-secondary px-2.5 py-0.5 text-[11.5px] font-semibold text-muted-foreground sm:inline">
+                        {item.usageCount}× usado
+                      </span>
+                      <div className="flex shrink-0 items-center">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          aria-label={`Editar ${item.name}`}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item)}
+                          aria-label={`Excluir ${item.name}`}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Itens novos entram sozinhos quando você usa uma descrição em um lançamento.
+        </p>
       </div>
     </div>
   );

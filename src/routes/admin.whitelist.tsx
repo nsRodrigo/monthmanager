@@ -202,17 +202,35 @@ function WhitelistAdmin() {
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
-          compact
           title="Administração"
           subtitle="Whitelist de cadastros e usuários ativos."
           onBack={goBack}
         />
       </div>
-      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
-      <div className="space-y-6 pt-6 pb-20">
+      <div className="mx-auto max-w-6xl px-4 pt-5 pb-24 sm:px-6">
+      {/* Resumo */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { label: "Usuários ativos", value: usersList.length, icon: Users, tone: "bg-income/20 text-income" },
+          { label: "Aguardando aprovação", value: pendingList.length, icon: Clock, tone: "bg-debit/20 text-debit" },
+          { label: "Administradores", value: usersList.filter((u) => u.is_admin).length, icon: ShieldCheck, tone: "bg-primary/15 text-primary" },
+        ].map((k) => (
+          <div key={k.label} className="rounded-2xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{k.label}</span>
+              <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${k.tone}`}>
+                <k.icon className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </div>
+            <p className="mt-2 font-display text-2xl font-semibold tabular-nums">{k.value}</p>
+          </div>
+        ))}
+      </div>
 
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+      <div className="space-y-4">
       {/* Push notifications */}
-      <section className="rounded-xl border border-border bg-card/40 p-4">
+      <section className="rounded-2xl border border-border bg-card p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />
@@ -233,7 +251,7 @@ function WhitelistAdmin() {
       </section>
 
       {/* Pending requests */}
-      <section className="rounded-xl border border-border bg-card/40 p-4">
+      <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Clock className="h-4 w-4 text-primary" /> Solicitações pendentes
           {pendingList.length > 0 && (
@@ -282,7 +300,7 @@ function WhitelistAdmin() {
         )}
       </section>
 
-      <section className="rounded-xl border border-border bg-card/40 p-4">
+      <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="mb-3 text-sm font-semibold">Whitelist</h2>
         <form onSubmit={onAdd} className="flex gap-2 rounded-lg border border-border bg-background p-2">
           <input
@@ -326,7 +344,9 @@ function WhitelistAdmin() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card/40 p-4">
+      </div>
+      <div className="space-y-4">
+      <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Users className="h-4 w-4 text-primary" /> Usuários cadastrados
         </h2>
@@ -429,6 +449,7 @@ function WhitelistAdmin() {
           </div>
         )}
       </section>
+      </div>
       </div>
       </div>
     </div>

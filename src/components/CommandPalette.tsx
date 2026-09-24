@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Command as CommandPrimitive } from "cmdk";
 import {
   Bell,
   Cloud,
@@ -9,20 +11,12 @@ import {
   LayoutDashboard,
   Lock,
   MapPin,
+  Search,
   ShieldCheck,
   Sliders,
   User,
   Wallet,
 } from "lucide-react";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { searchPalette, useSearchOpen } from "@/store/search";
 import { useAccounts } from "@/store/finance";
 import { usePanes } from "@/store/panes";
@@ -58,12 +52,14 @@ const PAGES: Page[] = [
   { label: "Privacidade", to: "/privacidade", icon: Lock },
 ];
 
-const iconTile =
-  "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground";
+/** Linha da lista: ícone, nome e a etiqueta do tipo ("conta" / "tela") à direita. */
+const itemCls =
+  "flex w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-sm text-muted-foreground outline-none data-[selected=true]:bg-secondary data-[selected=true]:text-foreground";
 
 /**
- * Busca global — Ctrl/Cmd+K (ou o ícone de lupa no cabeçalho). Vai para
- * qualquer tela ou conta digitando parte do nome.
+ * Busca global — Ctrl/Cmd+K (ou o ícone de lupa no cabeçalho). Layout do
+ * protótipo: painel no alto da tela, campo com "Esc", lista simples com o tipo
+ * de cada resultado à direita. No celular ocupa a tela toda.
  */
 export function CommandPalette() {
   const open = useSearchOpen();
@@ -89,65 +85,77 @@ export function CommandPalette() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={searchPalette.setOpen}>
-      <DialogTitle className="sr-only">Buscar</DialogTitle>
-      <DialogDescription className="sr-only">Vá para uma tela ou conta digitando o nome.</DialogDescription>
-      <CommandInput placeholder="Buscar tela ou conta…" />
-      <CommandList>
-        <CommandEmpty>Nada encontrado.</CommandEmpty>
-        {accounts.length > 0 && (
-          <CommandGroup heading="Contas">
-            {accounts.map((a) => (
-              <CommandItem
-                key={a.id}
-                value={`conta ${a.name}`}
-                keywords={[a.type]}
-                onSelect={() =>
-                  go(() => {
-                    panes.openSingle(a.id, { resetView: true });
-                    navigate({ to: "/contas/$contaId", params: { contaId: a.id } });
-                  })
-                }
-              >
-                <span
-                  className="mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: a.color + "33", color: a.color }}
+    <DialogPrimitive.Root open={open} onOpenChange={searchPalette.setOpen}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[rgba(2,5,4,0.66)] backdrop-blur-[4px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content
+          aria-describedby={undefined}
+          className="fixed top-[8vh] left-1/2 z-50 w-[min(560px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-[18px] border border-border bg-card shadow-[0_30px_80px_rgba(0,0,0,0.6)] outline-none max-sm:top-0 max-sm:h-dvh max-sm:w-full max-sm:rounded-none max-sm:border-0"
+        >
+          <DialogPrimitive.Title className="sr-only">Buscar</DialogPrimitive.Title>
+          <CommandPrimitive className="flex h-full flex-col">
+            <div className="flex items-center gap-2.5 border-b border-border px-4 py-3.5 text-muted-foreground">
+              <Search className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <CommandPrimitive.Input
+                autoFocus
+                placeholder="Buscar tela ou ação…"
+                className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
+              />
+              <kbd className="rounded-[5px] border border-border px-1.5 py-px text-[11px] font-medium text-muted-foreground">
+                Esc
+              </kbd>
+            </div>
+            <CommandPrimitive.List className="max-h-[340px] overflow-auto p-2 max-sm:max-h-none max-sm:flex-1">
+              <CommandPrimitive.Empty className="p-6 text-center text-sm text-muted-foreground">
+                Nada encontrado.
+              </CommandPrimitive.Empty>
+
+              {PAGES.map((p) => (
+                <CommandPrimitive.Item
+                  key={p.to}
+                  value={p.label}
+                  keywords={p.keywords ? p.keywords.split(" ") : undefined}
+                  onSelect={() => go(() => navigate({ to: p.to }))}
+                  className={itemCls}
                 >
-                  <Wallet className="h-3.5 w-3.5" />
-                </span>
-                {a.name}
-                <span className="ml-auto text-xs text-muted-foreground capitalize">{a.type}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-        <CommandGroup heading="Telas">
-          {PAGES.map((p) => (
-            <CommandItem
-              key={p.to}
-              value={p.label}
-              keywords={p.keywords ? p.keywords.split(" ") : undefined}
-              onSelect={() => go(() => navigate({ to: p.to }))}
-            >
-              <span className={iconTile}>
-                <p.icon className="h-3.5 w-3.5" />
-              </span>
-              {p.label}
-            </CommandItem>
-          ))}
-          {isAdmin && (
-            <CommandItem
-              value="Administração whitelist usuários"
-              onSelect={() => go(() => navigate({ to: "/admin/whitelist" }))}
-            >
-              <span className={iconTile}>
-                <ShieldCheck className="h-3.5 w-3.5" />
-              </span>
-              Administração
-            </CommandItem>
-          )}
-        </CommandGroup>
-      </CommandList>
-    </CommandDialog>
+                  <p.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                  {p.label}
+                  <small className="ml-auto text-xs text-muted-foreground">tela</small>
+                </CommandPrimitive.Item>
+              ))}
+              {isAdmin && (
+                <CommandPrimitive.Item
+                  value="Administração whitelist usuários"
+                  onSelect={() => go(() => navigate({ to: "/admin/whitelist" }))}
+                  className={itemCls}
+                >
+                  <ShieldCheck className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                  Administração
+                  <small className="ml-auto text-xs text-muted-foreground">tela</small>
+                </CommandPrimitive.Item>
+              )}
+              {accounts.map((a) => (
+                <CommandPrimitive.Item
+                  key={a.id}
+                  value={`conta ${a.name}`}
+                  keywords={[a.type]}
+                  onSelect={() =>
+                    go(() => {
+                      panes.openSingle(a.id, { resetView: true });
+                      navigate({ to: "/contas/$contaId", params: { contaId: a.id } });
+                    })
+                  }
+                  className={itemCls}
+                >
+                  <Wallet className="h-[18px] w-[18px] shrink-0" style={{ color: a.color }} aria-hidden="true" />
+                  Conta {a.name}
+                  <small className="ml-auto text-xs text-muted-foreground">conta</small>
+                </CommandPrimitive.Item>
+              ))}
+            </CommandPrimitive.List>
+          </CommandPrimitive>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

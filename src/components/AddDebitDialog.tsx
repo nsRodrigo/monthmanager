@@ -73,7 +73,7 @@ export function AddDebitDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultYear, defaultMonth, accounts, filterAccountId, fixedAccountId]);
 
-  const isValid = description.trim() !== "" && amount !== 0 && !!accountId && !!date;
+  const isValid = description.trim() !== "" && !!accountId && !!date;
 
   const submit = async (after: "close" | "another" | "duplicate" = "close") => {
     if (!isValid) return;

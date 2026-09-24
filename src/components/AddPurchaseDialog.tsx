@@ -65,7 +65,7 @@ export function AddPurchaseDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultYear, defaultMonth, selectableCards, fixedCardId]);
 
-  const isValid = description.trim() !== "" && amount !== 0 && !!cardId && !!date;
+  const isValid = description.trim() !== "" && !!cardId && !!date;
 
   const submit = async (after: "close" | "another" | "duplicate" = "close") => {
     if (!isValid) return;

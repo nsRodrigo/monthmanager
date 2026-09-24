@@ -69,7 +69,7 @@ export function AddInvestmentDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, fixedAccountId, filterAccountId]);
 
-  const isValid = !!accountId && amount > 0 && !!date;
+  const isValid = !!accountId && amount >= 0 && !!date;
   const n = isInstallment ? Math.max(1, parseInt(installments) || 1) : 1;
   const total = mode === "perInstallment" && n > 1 ? amount * n : amount;
   const per = n > 0 ? total / n : 0;

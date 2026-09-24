@@ -190,7 +190,7 @@ export function EditRecurringDialog({
   };
 
   const handleSave = () => {
-    if (!description.trim() || amount === 0 || !dirty) return;
+    if (!description.trim() || !dirty) return;
     setAskSaveScope(true);
   };
 
@@ -349,7 +349,7 @@ export function EditRecurringDialog({
           </button>
           <button
             onClick={handleSave}
-            disabled={updating || !dirty || !description.trim() || amount === 0}
+            disabled={updating || !dirty || !description.trim()}
             className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {updating ? "Salvando…" : "Salvar"}

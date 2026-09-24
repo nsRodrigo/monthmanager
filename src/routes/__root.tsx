@@ -411,6 +411,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const conditionallyPublic = location.pathname === "/privacidade" || location.pathname === "/sobre";
   const isPublic = alwaysPublic || (conditionallyPublic && !user);
   const fabScreenId = screenIdForPathname(location.pathname);
+// Quando um painel de mês está aberto em modo embedded, o FAB local
+// da LancamentosPage já está ativo (via portal). Suprimir o
+// ConfigurableFab do root para não sobrepor os dois.
+const { panes } = usePanes();
+const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
 
   useEffect(() => {
     if (loading) return;

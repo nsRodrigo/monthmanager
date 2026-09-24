@@ -143,7 +143,7 @@ function NotificationsPage() {
                       className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
                       <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                           n.read ? "bg-secondary text-muted-foreground" : "bg-primary/15 text-primary"
                         }`}
                       >

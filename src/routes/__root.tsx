@@ -59,6 +59,7 @@ import { ConfirmProvider } from "@/store/confirm";
 import { UndoRedoBar } from "@/components/UndoRedoBar";
 import { history } from "@/store/history";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { CommandPalette } from "@/components/CommandPalette";
 import { AdminViewingBanner } from "@/components/AdminViewingBanner";
 import { ConfigurableFab } from "@/components/ConfigurableFab";
 import { screenIdForPathname } from "@/lib/fab-catalog";
@@ -559,6 +560,7 @@ const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
         </main>
       </div>
       <BottomNav />
+      <CommandPalette />
       {/* Menu flutuante configurável — montado uma única vez aqui (igual
           AdminViewingBanner), pra não precisar editar rota por rota. A tela
           de Lançamento fica de fora (screenId null-ish "lancamento"):

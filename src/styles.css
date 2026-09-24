@@ -122,6 +122,64 @@
   --foreground: #e9f2ee;
 }
 
+/* === Paleta escura "Índigo Grafite" (usa a classe .dark junto, p/ variantes dark:) === */
+.theme-indigo {
+  --background: #0b0d14;
+  --foreground: #e8ebf5;
+  --card: #12151f;
+  --card-foreground: #e8ebf5;
+  --popover: #181c29;
+  --popover-foreground: #e8ebf5;
+  --primary: #7c9cff;
+  --primary-foreground: #0a1030;
+  --secondary: #1f2436;
+  --secondary-foreground: #e8ebf5;
+  --muted: #181c29;
+  --muted-foreground: #9aa3bd;
+  --accent: #1f2436;
+  --accent-foreground: #e8ebf5;
+  --border: #262c40;
+  --input: #181c29;
+  --ring: #7c9cff;
+  --gradient-primary: linear-gradient(135deg, #7c9cff, #6a8af0);
+  --gradient-card: linear-gradient(135deg, #12151f, #0b0d14);
+  --gradient-hero:
+    radial-gradient(90% 120% at 100% 0%, rgba(124, 156, 255, 0.13), transparent 60%), #12151f;
+  --gradient-band:
+    radial-gradient(70% 60% at 82% 35%, rgba(124, 156, 255, 0.13), transparent 60%),
+    linear-gradient(180deg, #0b0d14 0%, #12151f 100%);
+  --shadow-glow: 0 0 24px rgba(124, 156, 255, 0.13);
+}
+
+/* === Paleta escura "Grafite Marfim" (usa a classe .dark junto, p/ variantes dark:) === */
+.theme-grafite {
+  --background: #0d0d0c;
+  --foreground: #efede6;
+  --card: #151514;
+  --card-foreground: #efede6;
+  --popover: #1b1b19;
+  --popover-foreground: #efede6;
+  --primary: #e8dfc8;
+  --primary-foreground: #14130f;
+  --secondary: #242421;
+  --secondary-foreground: #efede6;
+  --muted: #1b1b19;
+  --muted-foreground: #a7a49b;
+  --accent: #242421;
+  --accent-foreground: #efede6;
+  --border: #2b2b28;
+  --input: #1b1b19;
+  --ring: #e8dfc8;
+  --gradient-primary: linear-gradient(135deg, #e8dfc8, #d8ceb2);
+  --gradient-card: linear-gradient(135deg, #151514, #0d0d0c);
+  --gradient-hero:
+    radial-gradient(90% 120% at 100% 0%, rgba(232, 223, 200, 0.10), transparent 60%), #151514;
+  --gradient-band:
+    radial-gradient(70% 60% at 82% 35%, rgba(232, 223, 200, 0.10), transparent 60%),
+    linear-gradient(180deg, #0d0d0c 0%, #151514 100%);
+  --shadow-glow: 0 0 24px rgba(232, 223, 200, 0.10);
+}
+
 /* === Tema CLARO === */
 .theme-light {
   --background: oklch(0.99 0.003 155);

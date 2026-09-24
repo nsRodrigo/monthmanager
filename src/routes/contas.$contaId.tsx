@@ -367,14 +367,6 @@ function AccountPane({
   );
 
   const accountCards = cards.filter((c) => c.accountId === contaId);
-  /** Total da fatura de um cartão no mês corrente. */
-  const cardInvoiceTotal = (cardId: string) => {
-    const ids = new Set(purchases.filter((p) => p.cardId === cardId).map((p) => p.id));
-    return getMonthInstallments(installments, eff.year, eff.month)
-      .filter((i) => i.parentType === "purchase" && ids.has(i.parentId))
-      .reduce((s, i) => s + i.amount, 0);
-  };
-
   // Um cartão por mês do ano selecionado (só meses com algum valor).
   const monthCards = monthsForYear.map((m) => {
     const visibleCards = cards.filter((c) => c.accountId === contaId && isCardVisibleInMonth(c, year, m));
@@ -495,14 +487,13 @@ function AccountPane({
                   </Link>
                 )
               }
-              right={<YearPickerChip compact />}
               onClose={onClose}
             />
           </div>
           <div className="mx-auto max-w-6xl px-4 pt-5 pb-8 md:px-6 md:pb-10">
             <div className="grid grid-cols-12 gap-4">
               {/* Saldo atual + evolução */}
-              <section className="col-span-12 overflow-hidden rounded-2xl border border-border bg-gradient-hero p-5 @3xl:col-span-8">
+              <section className="col-span-12 overflow-hidden rounded-2xl border border-border bg-gradient-hero p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -554,50 +545,13 @@ function AccountPane({
                 </div>
               </section>
 
-              {/* Cartões da conta: fatura do mês atual */}
-              <section className="col-span-12 rounded-2xl border border-border bg-card p-5 @3xl:col-span-4">
-                <h2 className="font-display text-[15px] font-semibold">Cartões</h2>
-                <p className="text-xs text-muted-foreground">Faturas de {MONTHS[eff.month].toLowerCase()}</p>
-                <div className="mt-4 flex flex-col gap-3">
-                  {accountCards.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
-                      Esta conta não tem cartões.
-                    </p>
-                  )}
-                  {accountCards.map((c) => {
-                    const total = cardInvoiceTotal(c.id);
-                    return (
-                      <div
-                        key={c.id}
-                        className="relative flex min-h-32 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 p-4 text-white"
-                        style={{
-                          background: `linear-gradient(135deg, ${c.color}, color-mix(in oklab, ${c.color} 45%, #000))`,
-                        }}
-                      >
-                        <span className="pointer-events-none absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/10" />
-                        <div className="relative flex items-center justify-between gap-2">
-                          <span className="truncate font-display text-[15px] font-semibold">{c.name}</span>
-                          <CreditCard className="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
-                        </div>
-                        <div className="relative flex items-end justify-between gap-2 text-[11.5px]">
-                          <div>
-                            <p className="opacity-80">Fatura</p>
-                            <p className="font-display text-lg font-semibold tabular-nums">{formatCurrency(total)}</p>
-                          </div>
-                          <div className="text-right opacity-90">
-                            <p>fecha dia {c.closingDay}</p>
-                            <p>vence dia {c.dueDay}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
             </div>
 
             <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-display text-[17px] font-semibold tracking-tight">Meses de {year}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-[17px] font-semibold tracking-tight">Meses de {year}</h2>
+                <YearPickerChip compact />
+              </div>
               <div className="flex gap-4 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <i className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--series-income)" }} />

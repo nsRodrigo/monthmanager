@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { ChevronLeft, X } from "lucide-react";
+import { HeaderActions } from "@/components/HeaderActions";
 
 /**
  * Cabeçalho de página do painel escuro: fino, na cor do fundo, com uma
  * borda inferior — em vez da antiga faixa de marca (~130px + card
- * sobreposto). Puramente apresentacional: recebe tudo via props, não busca
- * dados nem contém lógica de negócio.
+ * sobreposto). Não contém lógica de negócio.
  *
- * `right` recebe controles no canto direito (seletor de mês/ano etc.);
- * `avatar` fica antes do título; `onClose` fecha um painel dividido.
+ * `right` recebe controles próprios da tela; no canto direito ficam sempre a
+ * busca e o perfil (`HeaderActions`) — exceto em painel dividido (`onClose`),
+ * onde cada painel teria os seus repetidos. `avatar` fica antes do título.
  */
 export function HeaderBand({
   title,
@@ -19,6 +20,7 @@ export function HeaderBand({
   right,
   onClose,
   className = "",
+  actions,
 }: {
   title: string;
   eyebrow?: ReactNode;
@@ -29,9 +31,12 @@ export function HeaderBand({
   /** Botão de fechar painel, no canto superior direito (distinto de `onBack`). */
   onClose?: () => void;
   className?: string;
-  /** Mantidos só por compatibilidade com telas antigas — não têm mais efeito. */
+  /** Mostra busca + perfil no canto direito. Padrão: sim, salvo em painel dividido. */
+  actions?: boolean;
+  /** Mantido só por compatibilidade com telas antigas — não tem mais efeito. */
   compact?: boolean;
 }) {
+  const showActions = actions ?? !onClose;
   return (
     <div
       className={`relative border-b border-border bg-background px-4 pb-3.5 sm:px-6 ${className}`}
@@ -72,6 +77,7 @@ export function HeaderBand({
           {subtitle && <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         {right}
+        {showActions && <HeaderActions />}
       </div>
     </div>
   );

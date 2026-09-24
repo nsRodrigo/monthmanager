@@ -343,26 +343,6 @@ function Consolidated() {
               {MONTHS[month]} de {year}
             </span>
           }
-          avatar={
-            <Link
-              to="/perfil"
-              aria-label="Meu perfil"
-              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary text-xs font-bold text-primary md:hidden"
-            >
-              {profile?.avatarUrl ? (
-                <img
-                  src={profile.avatarUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ) : (
-                initials || <User className="h-4 w-4" aria-hidden="true" />
-              )}
-            </Link>
-          }
         />
       </div>
 

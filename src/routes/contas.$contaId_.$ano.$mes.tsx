@@ -52,7 +52,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useResetScrollOnChange, useAnchorNode, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
+import { useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -92,7 +92,7 @@ import { EditRecurringDialog, type RecurringEditTarget } from "@/components/Edit
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
-import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
+import { FabAction, toneText, toneBg, type Tone } from "@/components/FabAction";
 import { FabMenuContent, type ResolvedFabEntry } from "@/components/FabMenuContent";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { FloatingCalculator } from "@/components/FloatingCalculator";
@@ -170,8 +170,6 @@ export function MonthDetailPane({
 }) {
   // Cabeçalho fino e fixo, igual às demais telas.
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  const [cardsHeaderNode, cardsHeaderRef] = useAnchorNode<HTMLDivElement>();
-  const showCardsHeader = useStickySectionSpy(bandAnchor, cardsHeaderNode);
   useResetScrollOnChange(bandAnchor, [contaId, year, month]);
   const navigate = useNavigate();
   const { data: fabCfg } = useFabConfig("lancamento");
@@ -1140,7 +1138,21 @@ export function MonthDetailPane({
           eyebrow={account?.name}
           onBack={onBack}
           onClose={onClose}
-          right={
+        />
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 pb-6 md:px-6 md:pb-10 @container">
+      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
+          pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
+          o último card ao rolar até embaixo. */}
+      <div className="mt-4">
+        <MonthSummaryPanel
+          saldoInicial={normalizeZero(saldoAtual)}
+          income={totalIncome}
+          debits={totalDebits}
+          cards={totalCards}
+          invested={totalInvested}
+          picker={
             <MonthYearPicker
               contaId={contaId}
               year={year}
@@ -1151,69 +1163,26 @@ export function MonthDetailPane({
             />
           }
         />
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          {/* Título fixo logo abaixo do cabeçalho. Troca sozinho pra "Cartões de crédito" quando
-              a lista rola até essa seção (useStickySectionSpy, comparado
-              contra o cabeçalho de verdade mais abaixo, marcado com
-              cardsHeaderRef). */}
-          <div className="mt-4 flex items-center justify-between gap-3 px-1 pb-2">
-            {showCardsHeader ? (
-              <>
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">CARTÕES DE CRÉDITO</h2>
-                  <p className="truncate text-[11px] text-muted-foreground">Faturas e compras no crédito</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">CONTA CORRENTE</h2>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    Recebimentos − débitos − investimentos
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p
-                    className={`text-sm font-bold ${
-                      totalIncomeNet - totalDebits - totalInvested >= 0
-                        ? "text-foreground"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
       </div>
-
-      <div className="mx-auto max-w-6xl px-4 pb-6 md:px-6 md:pb-10 @container">
-      {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
-          pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
-          o último card ao rolar até embaixo. */}
-      <div className="mt-4 grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_340px] @4xl:items-start">
-      <aside className="@4xl:sticky @4xl:top-40 @4xl:order-last" aria-label="Resumo do mês">
-        <MonthSummaryPanel
-          saldoInicial={normalizeZero(saldoAtual)}
-          income={totalIncome}
-          debits={totalDebits}
-          cards={totalCards}
-          invested={totalInvested}
-        />
-      </aside>
-      <div className="space-y-4 pb-24">
+      <div className="mt-6 space-y-4 pb-24">
+        {/* Segmento 1: conta corrente */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-sm font-semibold tracking-wider uppercase">Conta corrente</h2>
+            <p className="truncate text-[11px] text-muted-foreground">Recebimentos − débitos − investimentos</p>
+          </div>
+          <p
+            className={`shrink-0 text-sm font-bold tabular-nums ${
+              totalIncomeNet - totalDebits - totalInvested >= 0 ? "text-foreground" : "text-destructive"
+            }`}
+          >
+            {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
+          </p>
+        </div>
         {/* INCOMES */}
         <GroupedSection
           icon={Download}
-          title="RECEBIMENTOS"
+          title="Recebimentos"
           description="Entradas de dinheiro na conta"
           tone="income"
           total={totalIncomeNet}
@@ -1355,7 +1324,7 @@ export function MonthDetailPane({
         {/* INVESTMENTS */}
         <GroupedSection
           icon={TrendingUp}
-          title="INVESTIMENTOS"
+          title="Investimentos"
           description="Aplicações e resgates"
           tone="primary"
           total={totalInvested}
@@ -1469,7 +1438,7 @@ export function MonthDetailPane({
 
         <GroupedSection
           icon={Building2}
-          title="DÉBITOS"
+          title="Débitos"
           description="Gastos diretos da conta corrente"
           tone="debit"
           total={totalDebitsNet}
@@ -1688,13 +1657,11 @@ export function MonthDetailPane({
 
           return (
             <section className="space-y-3 pt-2">
-              {/* cardsHeaderRef marca onde a seção "de verdade" começa — é
-                  contra ele que useStickySectionSpy compara a posição do
-                  bloco fixo, pra saber quando trocar o título lá em cima. */}
-              <div ref={cardsHeaderRef} className="flex items-center justify-between gap-3 px-1">
+              {/* Segmento 2: cartões de crédito */}
+              <div className="flex items-center justify-between gap-3 px-1">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-                    CARTÕES DE CRÉDITO
+                  <h2 className="truncate font-display text-sm font-semibold tracking-wider uppercase">
+                    Cartões de crédito
                   </h2>
                   <p className="truncate text-[11px] text-muted-foreground">
                     {reorderMode
@@ -1800,14 +1767,13 @@ export function MonthDetailPane({
                     return (
                       <div
                         key={c.id}
-                        className={`rounded-2xl border border-l-4 bg-card transition-colors ${
+                        className={`rounded-2xl border bg-card transition-colors ${
                           cardState === "paid"
-                            ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+                            ? "border-success/40"
                             : cardState === "allChecked"
-                              ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
-                              : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
+                              ? "border-credit/40"
+                              : "border-border"
                         }`}
-                        style={{ borderLeftColor: c.color }}
                       >
                         <CardRowSorted
                           card={c}
@@ -1880,7 +1846,6 @@ export function MonthDetailPane({
             </section>
           );
         })()}
-      </div>
       </div>
 
       {(() => {
@@ -2190,11 +2155,12 @@ export function MonthDetailPane({
 /* ───────── MONTH SUMMARY FRAME ───────── */
 
 /**
- * Resumo do mês. Regras de saldo (inalteradas):
+ * Resumo do mês, no começo da tela. Regras de saldo (inalteradas):
  *   Saldo Inicial = saldo final do mês anterior + recebíveis do mês
  *   Saldo Final   = Saldo Inicial − (débitos + investimentos + cartões)
- * Em tela larga é uma coluna fixa ao lado das listas, com a "ponte" que mostra
- * como o saldo se forma; em tela estreita vira um cartão compacto no topo.
+ * Em tela larga mostra a "ponte" que explica como o saldo se forma, ao lado
+ * do número; em tela estreita, só o número e dois totais. `picker` é o
+ * seletor de mês/ano (antes ficava no cabeçalho, que agora tem busca/perfil).
  */
 function MonthSummaryPanel({
   saldoInicial,
@@ -2202,12 +2168,14 @@ function MonthSummaryPanel({
   debits,
   cards,
   invested,
+  picker,
 }: {
   saldoInicial: number;
   income: number;
   debits: number;
   cards: number;
   invested: number;
+  picker: React.ReactNode;
 }) {
   const gastos = debits + cards + invested;
   const saldoFinal = saldoInicial - gastos;
@@ -2254,55 +2222,63 @@ function MonthSummaryPanel({
 
   return (
     <section className="animate-fade-slide-in overflow-hidden rounded-2xl border border-border bg-gradient-hero p-4 sm:p-5">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-        <Check className="h-3 w-3" /> Saldo final
-      </div>
-      <p className={`mt-1.5 font-display text-3xl leading-none font-semibold tracking-tight tabular-nums ${finalTone}`}>
-        {formatCurrency(saldoFinal)}
-      </p>
-      <span
-        className={`mt-2.5 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-          net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
-        }`}
-      >
-        {net >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-        {net >= 0 ? "+" : "−"} {formatCurrency(Math.abs(net))} no mês
-      </span>
-      <p className="mt-1.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
-
-      {/* Tela estreita: dois números; a ponte completa só aparece em tela larga. */}
-      <div className="mt-3 grid grid-cols-2 gap-2.5 @4xl:hidden">
-        <div className="rounded-xl border border-border bg-background/50 p-3">
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-            <Wallet className="h-3 w-3" /> Saldo inicial
-          </p>
-          <p className="mt-0.5 text-base font-bold tabular-nums">{formatCurrency(saldoInicial)}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          <Check className="h-3 w-3" /> Saldo final
         </div>
-        <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
-          <p className="flex items-center gap-1 text-[11px] font-semibold text-debit">
-            <ArrowDownRight className="h-3 w-3" /> Gastos totais
-          </p>
-          <p className="mt-0.5 text-base font-bold text-debit tabular-nums">{formatCurrency(gastos)}</p>
-        </div>
+        {picker}
       </div>
 
-      <div className="mt-4 hidden flex-col gap-2.5 @4xl:flex" aria-label="Como o saldo se forma">
-        {steps.map((s) => (
-          <div key={s.label} className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-2.5 text-xs">
-            <span className="text-muted-foreground">{s.label}</span>
-            <div className="relative h-3.5 rounded-[5px] border border-border bg-background">
-              <i
-                className="absolute inset-y-px rounded-[3px]"
-                style={{ left: pos(s.left), width: pos(s.width), background: s.color }}
-              />
+      <div className="mt-3 grid gap-x-8 gap-y-4 @2xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] @2xl:items-center">
+        <div>
+          <p className={`font-display text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl ${finalTone}`}>
+            {formatCurrency(saldoFinal)}
+          </p>
+          <span
+            className={`mt-3 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {net >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+            {net >= 0 ? "+" : "−"} {formatCurrency(Math.abs(net))} no mês
+          </span>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
+
+          {/* Tela estreita: dois totais; a ponte completa só aparece em tela larga. */}
+          <div className="mt-3 grid grid-cols-2 gap-2.5 @2xl:hidden">
+            <div className="rounded-xl border border-border bg-background/50 p-3">
+              <p className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                <Wallet className="h-3 w-3" /> Saldo inicial
+              </p>
+              <p className="mt-0.5 text-base font-bold tabular-nums">{formatCurrency(saldoInicial)}</p>
             </div>
-            <b className={`text-right tabular-nums ${s.tone}`}>{s.value}</b>
+            <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
+              <p className="flex items-center gap-1 text-[11px] font-semibold text-debit">
+                <ArrowDownRight className="h-3 w-3" /> Gastos totais
+              </p>
+              <p className="mt-0.5 text-base font-bold text-debit tabular-nums">{formatCurrency(gastos)}</p>
+            </div>
           </div>
-        ))}
-        <div className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-border pt-2.5 text-xs">
-          <span className="font-semibold">Saldo final</span>
-          <span />
-          <b className={`text-right tabular-nums ${finalTone}`}>{formatCurrency(saldoFinal)}</b>
+        </div>
+
+        <div className="hidden flex-col gap-2.5 @2xl:flex" aria-label="Como o saldo se forma">
+          {steps.map((s) => (
+            <div key={s.label} className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 text-xs">
+              <span className="text-muted-foreground">{s.label}</span>
+              <div className="relative h-3.5 rounded-[5px] border border-border bg-background">
+                <i
+                  className="absolute inset-y-px rounded-[3px]"
+                  style={{ left: pos(s.left), width: pos(s.width), background: s.color }}
+                />
+              </div>
+              <b className={`min-w-24 text-right tabular-nums ${s.tone}`}>{s.value}</b>
+            </div>
+          ))}
+          <div className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border pt-2.5 text-xs">
+            <span className="font-semibold">Saldo final</span>
+            <span />
+            <b className={`min-w-24 text-right tabular-nums ${finalTone}`}>{formatCurrency(saldoFinal)}</b>
+          </div>
         </div>
       </div>
     </section>
@@ -2353,25 +2329,25 @@ function GroupedSection({
   const toggle = () => setOpen((o) => !o);
   const stateClass =
     paidState === "paid"
-      ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
+      ? "border-success/40"
       : paidState === "open"
-        ? "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
+        ? "border-warning/40"
         : "border-border";
   return (
     <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
       {/* Header */}
-      <div className={`flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5 ${toneWash[tone]}`}>
+      <div className={`flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5`}>
         {/* Linha 1: ícone + título (+ valor/controles no desktop) */}
         <div className="flex items-center gap-2.5 md:gap-3">
           <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
             <div
-              className={`flex h-9 w-9 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl ${toneBg[tone]} ${toneText[tone]}`}
             >
               <Icon className="h-4 w-4" />
             </div>
           </button>
           <button onClick={toggle} className="min-w-0 flex-1 text-left">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
+            <h2 className="truncate font-display text-[14.5px] font-semibold tracking-tight">{title}</h2>
             <p className="truncate text-[11px] text-muted-foreground">{description}</p>
           </button>
           {typeof total === "number" && (
@@ -2653,9 +2629,11 @@ function CardRow({
         {/* Linha 1: cor + nome + (desktop: valor + controles) */}
         <div className="flex items-center gap-2.5 md:gap-3">
           <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
             style={{ backgroundColor: cardColor }}
-          />
+          >
+            <CreditCard className="h-4 w-4" aria-hidden="true" />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{cardName}</p>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{dueLabel}</p>
@@ -2998,7 +2976,7 @@ function DebitRow({
       className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-debit/15 text-debit">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-debit/15 text-debit">
         <ArrowDownRight className="h-3.5 w-3.5" />
       </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
@@ -3087,7 +3065,7 @@ function IncomeRow({
       className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/15 text-success">
         <ArrowUpRight className="h-3.5 w-3.5" />
       </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
@@ -3193,7 +3171,7 @@ function ParcelledRow({
       {...lp.handlers}
     >
       <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${iconWrapClass}`}
       >
         {kind === "debit" ? (
           <ArrowDownRight className="h-3.5 w-3.5" />
@@ -3295,7 +3273,7 @@ function InvestmentRow({
       className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
         <TrendingUp className="h-3.5 w-3.5" />
       </div>
       <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">

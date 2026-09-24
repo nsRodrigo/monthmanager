@@ -16,7 +16,7 @@ function applyTheme(t: Theme) {
   // Atualiza meta theme-color para a status bar do mobile
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    const color = t === "light" ? "#fafafa" : t === "high-contrast" ? "#000000" : "#0f172a";
+    const color = t === "light" ? "#fafafa" : t === "high-contrast" ? "#000000" : "#0a6e46";
     meta.setAttribute("content", color);
   }
 }

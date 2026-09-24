@@ -52,7 +52,7 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useResetScrollOnChange, useAnchorNode, useAccordionScrollClose, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
+import { useResetScrollOnChange, useAnchorNode, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
 import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
 import {
   ChevronDown,
@@ -168,10 +168,8 @@ export function MonthDetailPane({
   /** Só passado quando há mais de 1 painel aberto — fecha este painel inteiro (distinto de "voltar aos meses"). */
   onClose?: () => void;
 }) {
-  // Faixa 100% estática, igual à Home — nunca encolhe (sem `useBandScrollProgress`
-  // nem `collapsible`). Só o resumo abaixo dela encolhe (useAccordionScrollClose).
+  // Cabeçalho fino e fixo, igual às demais telas.
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
   const [cardsHeaderNode, cardsHeaderRef] = useAnchorNode<HTMLDivElement>();
   const showCardsHeader = useStickySectionSpy(bandAnchor, cardsHeaderNode);
   useResetScrollOnChange(bandAnchor, [contaId, year, month]);
@@ -1153,19 +1151,8 @@ export function MonthDetailPane({
             />
           }
         />
-        <div className="mx-auto max-w-5xl px-4 md:px-6">
-          {/* Frame com saldo atual e gastos totais — preso na mesma faixa
-              fixa da HeaderBand (igual Home): Saldo Final sempre visível,
-              Saldo Inicial/Gastos Totais encolhem ao rolar. */}
-          <MonthSummaryFrame
-            saldoAtual={normalizeZero(saldoAtual)}
-            gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
-            detailWrapperRef={accordionWrapperRef}
-            detailContentRef={accordionContentRef}
-          />
-
-          {/* Título fixo logo abaixo do resumo — mesma regra do "Suas
-              contas" da Home. Troca sozinho pra "Cartões de crédito" quando
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
+          {/* Título fixo logo abaixo do cabeçalho. Troca sozinho pra "Cartões de crédito" quando
               a lista rola até essa seção (useStickySectionSpy, comparado
               contra o cabeçalho de verdade mais abaixo, marcado com
               cardsHeaderRef). */}
@@ -1208,11 +1195,21 @@ export function MonthDetailPane({
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
+      <div className="mx-auto max-w-6xl px-4 pb-6 md:px-6 md:pb-10 @container">
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
           pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
           o último card ao rolar até embaixo. */}
-      <div className="mt-4 space-y-4 pb-24">
+      <div className="mt-4 grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_340px] @4xl:items-start">
+      <aside className="@4xl:sticky @4xl:top-40 @4xl:order-last" aria-label="Resumo do mês">
+        <MonthSummaryPanel
+          saldoInicial={normalizeZero(saldoAtual)}
+          income={totalIncome}
+          debits={totalDebits}
+          cards={totalCards}
+          invested={totalInvested}
+        />
+      </aside>
+      <div className="space-y-4 pb-24">
         {/* INCOMES */}
         <GroupedSection
           icon={Download}
@@ -1884,6 +1881,7 @@ export function MonthDetailPane({
           );
         })()}
       </div>
+      </div>
 
       {(() => {
         // Some enquanto qualquer diálogo aberto por ele estiver na tela — senão
@@ -1904,7 +1902,7 @@ export function MonthDetailPane({
                 />
               )}
               <div
-                className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+                className={`pointer-events-auto ${embedded ? "absolute bottom-10" : "fixed bottom-[calc(var(--bnav-h)+2.5rem)]"} right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
               >
                 {bulkMenuOpen && (
                   <div className="flex flex-col items-end gap-2.5">
@@ -2049,7 +2047,7 @@ export function MonthDetailPane({
             entries={fabEntries}
             isSubLevel={!!fabFolder}
             onBack={() => setFabFolder(null)}
-            positionClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+            positionClassName={`pointer-events-auto ${embedded ? "absolute bottom-10" : "fixed bottom-[calc(var(--bnav-h)+2.5rem)]"} right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
             backdropClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
           />
         );
@@ -2192,61 +2190,122 @@ export function MonthDetailPane({
 /* ───────── MONTH SUMMARY FRAME ───────── */
 
 /**
- * "Saldo Final" fica sempre visível (é o número que o título fixo mostra
- * mesmo depois de rolar); "Saldo Inicial" e "Gastos Totais" ficam no bloco
- * que `useAccordionScrollClose` encolhe por gesto — mesmo padrão do card da
- * Home (saldo previsto sempre visível, gráfico+stats encolhem).
+ * Resumo do mês. Regras de saldo (inalteradas):
+ *   Saldo Inicial = saldo final do mês anterior + recebíveis do mês
+ *   Saldo Final   = Saldo Inicial − (débitos + investimentos + cartões)
+ * Em tela larga é uma coluna fixa ao lado das listas, com a "ponte" que mostra
+ * como o saldo se forma; em tela estreita vira um cartão compacto no topo.
  */
-function MonthSummaryFrame({
-  saldoAtual,
-  gastosTotais,
-  detailWrapperRef,
-  detailContentRef,
+function MonthSummaryPanel({
+  saldoInicial,
+  income,
+  debits,
+  cards,
+  invested,
 }: {
-  saldoAtual: number;
-  gastosTotais: number;
-  detailWrapperRef: (el: HTMLDivElement | null) => void;
-  detailContentRef: (el: HTMLDivElement | null) => void;
+  saldoInicial: number;
+  income: number;
+  debits: number;
+  cards: number;
+  invested: number;
 }) {
-  const saldoFinal = saldoAtual - gastosTotais;
-  const inicialTone = saldoAtual >= 0 ? "text-primary" : "text-destructive";
-  const inicialBg =
-    saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
-  const finalTone = saldoFinal >= 0 ? "text-primary" : "text-destructive";
+  const gastos = debits + cards + invested;
+  const saldoFinal = saldoInicial - gastos;
+  const saldoAnterior = saldoInicial - income;
+  const finalTone = saldoFinal >= 0 ? "text-foreground" : "text-destructive";
+  const net = income - gastos;
+
+  // Ponte: cada linha é uma barra posicionada no eixo do saldo (0 → topo).
+  const scaleMax = Math.max(saldoInicial, saldoAnterior, 1);
+  const pos = (v: number) => `${Math.max(0, Math.min(100, (v / scaleMax) * 100))}%`;
+  let run = saldoInicial;
+  const steps: { label: string; left: number; width: number; color: string; value: string; tone: string }[] = [];
+  steps.push({
+    label: "Saldo anterior",
+    left: 0,
+    width: Math.max(saldoAnterior, 0),
+    color: "var(--color-muted-foreground)",
+    value: formatCurrency(saldoAnterior),
+    tone: "",
+  });
+  steps.push({
+    label: "+ Recebíveis",
+    left: Math.max(saldoAnterior, 0),
+    width: income,
+    color: "var(--series-income)",
+    value: `+ ${formatCurrency(income)}`,
+    tone: "text-income",
+  });
+  for (const [label, v, color, tone] of [
+    ["− Débitos", debits, "var(--series-debit)", "text-debit"],
+    ["− Faturas", cards, "var(--series-credit)", "text-credit"],
+    ["− Investim.", invested, "var(--series-invest)", "text-invest"],
+  ] as const) {
+    run -= v;
+    steps.push({
+      label,
+      left: Math.max(run, 0),
+      width: Math.max(0, Math.min(v, run + v)),
+      color,
+      value: `− ${formatCurrency(v)}`,
+      tone,
+    });
+  }
+
   return (
-    <div className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4">
-      <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${finalTone}`}>
-        <Check className="h-3 w-3" /> Saldo Final
+    <section className="animate-fade-slide-in overflow-hidden rounded-2xl border border-border bg-gradient-hero p-4 sm:p-5">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+        <Check className="h-3 w-3" /> Saldo final
       </div>
-      <p className={`mt-1 text-xl font-bold sm:text-2xl ${finalTone}`}>
+      <p className={`mt-1.5 font-display text-3xl leading-none font-semibold tracking-tight tabular-nums ${finalTone}`}>
         {formatCurrency(saldoFinal)}
       </p>
-      <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
+      <span
+        className={`mt-2.5 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+          net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+        }`}
+      >
+        {net >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+        {net >= 0 ? "+" : "−"} {formatCurrency(Math.abs(net))} no mês
+      </span>
+      <p className="mt-1.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
 
-      <div ref={detailWrapperRef} className="overflow-hidden">
-        <div ref={detailContentRef} className="mt-3 grid grid-cols-2 gap-3">
-          <div className={`rounded-xl border p-3 ${inicialBg}`}>
-            <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
-              <Wallet className="h-3 w-3" /> Saldo Inicial
-            </div>
-            <p className={`mt-1 text-base font-bold sm:text-lg ${inicialTone}`}>
-              {formatCurrency(saldoAtual)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-debit">
-              <ArrowDownRight className="h-3 w-3" /> Gastos Totais
-            </div>
-            <p className="mt-1 text-base font-bold text-debit sm:text-lg">
-              {formatCurrency(gastosTotais)}
-            </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              débitos + investimentos + cartões
-            </p>
-          </div>
+      {/* Tela estreita: dois números; a ponte completa só aparece em tela larga. */}
+      <div className="mt-3 grid grid-cols-2 gap-2.5 @4xl:hidden">
+        <div className="rounded-xl border border-border bg-background/50 p-3">
+          <p className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+            <Wallet className="h-3 w-3" /> Saldo inicial
+          </p>
+          <p className="mt-0.5 text-base font-bold tabular-nums">{formatCurrency(saldoInicial)}</p>
+        </div>
+        <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
+          <p className="flex items-center gap-1 text-[11px] font-semibold text-debit">
+            <ArrowDownRight className="h-3 w-3" /> Gastos totais
+          </p>
+          <p className="mt-0.5 text-base font-bold text-debit tabular-nums">{formatCurrency(gastos)}</p>
         </div>
       </div>
-    </div>
+
+      <div className="mt-4 hidden flex-col gap-2.5 @4xl:flex" aria-label="Como o saldo se forma">
+        {steps.map((s) => (
+          <div key={s.label} className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-2.5 text-xs">
+            <span className="text-muted-foreground">{s.label}</span>
+            <div className="relative h-3.5 rounded-[5px] border border-border bg-background">
+              <i
+                className="absolute inset-y-px rounded-[3px]"
+                style={{ left: pos(s.left), width: pos(s.width), background: s.color }}
+              />
+            </div>
+            <b className={`text-right tabular-nums ${s.tone}`}>{s.value}</b>
+          </div>
+        ))}
+        <div className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-border pt-2.5 text-xs">
+          <span className="font-semibold">Saldo final</span>
+          <span />
+          <b className={`text-right tabular-nums ${finalTone}`}>{formatCurrency(saldoFinal)}</b>
+        </div>
+      </div>
+    </section>
   );
 }
 

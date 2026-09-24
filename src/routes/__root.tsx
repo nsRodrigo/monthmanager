@@ -1,5 +1,6 @@
 import {
   Link,
+  type LinkProps,
   Outlet,
   createRootRoute,
   HeadContent,
@@ -11,7 +12,8 @@ import {
 import {
   LogOut,
   FileSpreadsheet,
-  Settings,
+  Plus,
+  Menu,
   LayoutDashboard,
   User,
   Cloud,
@@ -25,7 +27,9 @@ import { RealtimeSync } from "@/components/RealtimeSync";
 import { Logo } from "@/components/Logo";
 import { AppLoader } from "@/components/AppLoader";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { formatCompactCurrency } from "@/lib/format";
 
 import appCss from "../styles.css?url";
 import { AuthProvider, useAuth } from "@/store/auth";
@@ -33,7 +37,17 @@ import { ThemeProvider } from "@/store/theme";
 import { AccountFilterProvider } from "@/store/account-filter";
 import { PanesRegistryProvider, usePanes } from "@/store/panes";
 import { LockSettingsProvider } from "@/store/lock-settings";
-import { useAccounts } from "@/store/finance";
+import {
+  useAccounts,
+  useCards,
+  usePurchases,
+  useInstallments,
+  useDebits,
+  useIncomes,
+  useInvestments,
+  computeAccountBalanceUntilNow,
+  normalizeZero,
+} from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
@@ -84,7 +98,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "google-site-verification", content: "EB3trm0Ix_rSERYttcd2qfOkdCJEWUQVH2PV1sJbYFQ" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#0a6e46" },
+      { name: "theme-color", content: "#0a0f0e" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
@@ -128,7 +142,7 @@ export const Route = createRootRoute({
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap",
       },
     ],
   }),
@@ -152,21 +166,58 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Conteúdo da navegação, compartilhado pelas duas apresentações — desktop
- * (sidebar fixa, sempre expandida) e mobile (gaveta) — ambas sempre com os
- * rótulos visíveis.
+ * Item de navegação — mesma aparência em qualquer lugar (sidebar larga,
+ * trilho de ícones, gaveta mobile). `labelClass` esconde o rótulo no trilho.
+ */
+function navItemClass(active: boolean, rail: boolean) {
+  return `relative flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors ${
+    rail ? "md:justify-center xl:justify-start" : ""
+  } ${
+    active
+      ? "bg-muted text-foreground [&_svg]:text-primary"
+      : "text-muted-foreground hover:bg-card hover:text-foreground"
+  }`;
+}
+
+function NavGroup({ label, rail, labelClass }: { label: string; rail: boolean; labelClass: string }) {
+  return (
+    <>
+      {rail && <div className="mx-2 my-3 h-px bg-border xl:hidden" aria-hidden="true" />}
+      <p
+        className={`px-2.5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] whitespace-nowrap text-muted-foreground ${labelClass} ${
+          rail ? "hidden xl:block" : ""
+        }`}
+      >
+        {label}
+      </p>
+    </>
+  );
+}
+
+/**
+ * Conteúdo da navegação, compartilhado pelas apresentações — sidebar larga
+ * (xl), trilho de ícones (md–xl, `rail`) e gaveta mobile (aberta pelo "Mais"
+ * da barra inferior). O trilho esconde só os rótulos (`labelClass`).
  */
 function SidebarContent({
   onNavigate,
   labelClass = "",
+  rail = false,
 }: {
   onNavigate?: () => void;
   labelClass?: string;
+  rail?: boolean;
 }) {
   const loc = useLocation();
   const { signOut, user } = useAuth();
   const panes = usePanes();
   const { data: accounts = [] } = useAccounts();
+  const { data: cards = [] } = useCards();
+  const { data: purchases = [] } = usePurchases();
+  const { data: installments = [] } = useInstallments();
+  const { data: debits = [] } = useDebits();
+  const { data: incomes = [] } = useIncomes();
+  const { data: investments = [] } = useInvestments();
   const { data: profile } = useProfile();
   const isAdmin = useIsAdmin();
   const unreadCount = useUnreadNotificationsCount();
@@ -184,50 +235,70 @@ function SidebarContent({
     .join("")
     .toUpperCase();
 
+  // Saldo atual de cada conta, no fim do item — vê o dinheiro sem abrir a conta.
+  const balances = useMemo(() => {
+    const today = new Date();
+    const map = new Map<string, number>();
+    for (const a of accounts) {
+      map.set(
+        a.id,
+        normalizeZero(
+          computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
+        ),
+      );
+    }
+    return map;
+  }, [accounts, cards, purchases, installments, debits, incomes, investments]);
+
+  const link = (to: LinkProps["to"], label: string, Icon: typeof Bell, extra?: React.ReactNode) => (
+    <Link
+      to={to}
+      onClick={onNavigate}
+      title={label}
+      className={navItemClass(loc.pathname === to, rail)}
+    >
+      <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+      <span className={`flex-1 truncate whitespace-nowrap ${labelClass}`}>{label}</span>
+      {extra}
+    </Link>
+  );
+
   return (
     <>
-      <div className="mb-6 flex items-center gap-3">
+      <div className={`mb-3 flex items-center gap-2.5 px-1 ${rail ? "md:justify-center xl:justify-start" : ""}`}>
         <Logo size="sm" />
-        <span className={`text-lg font-bold tracking-tight whitespace-nowrap ${labelClass}`}>
-          Gestão Financeira
+        <span className={`font-display text-lg font-semibold tracking-tight whitespace-nowrap ${labelClass}`}>
+          Gestão
         </span>
       </div>
 
       <Link
         to="/"
         onClick={onNavigate}
-        className={`mb-4 flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-all ${
-          isConsolidated
-            ? "bg-gradient-primary text-primary-foreground shadow-glow"
-            : "border border-border text-foreground hover:bg-secondary"
-        }`}
+        title="Home"
+        className={navItemClass(isConsolidated, rail)}
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-          <LayoutDashboard className="h-4 w-4" />
-        </span>
-        <span className={`whitespace-nowrap ${labelClass}`}>Home</span>
+        <LayoutDashboard className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+        <span className={`flex-1 whitespace-nowrap ${labelClass}`}>Home</span>
       </Link>
 
-      <p
-        className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap ${labelClass}`}
-      >
-        Contas
-      </p>
-      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
+      <NavGroup label="Contas" rail={rail} labelClass={labelClass} />
+      <nav className="space-y-0.5 overflow-x-hidden">
         {accounts.length === 0 && (
           <p className={`px-2 py-3 text-xs text-muted-foreground whitespace-nowrap ${labelClass}`}>
-            Nenhuma conta. Clique em <strong>Adicionar conta</strong>.
+            Nenhuma conta. Clique em <strong>Gerenciar contas</strong>.
           </p>
         )}
         {accounts.map((a) => {
           const active =
             loc.pathname.startsWith("/contas/") && panes.panes.some((p) => p.contaId === a.id);
+          const bal = balances.get(a.id) ?? 0;
           return (
             <Link
               key={a.id}
               to="/contas/$contaId"
               params={{ contaId: a.id }}
-              title="Ctrl/Cmd+clique abre ao lado da conta atual"
+              title={`${a.name} — Ctrl/Cmd+clique abre ao lado da conta atual`}
               onClick={(e) => {
                 if ((e.ctrlKey || e.metaKey) && loc.pathname.startsWith("/contas/")) {
                   panes.splitIn(a.id);
@@ -242,154 +313,168 @@ function SidebarContent({
                 panes.openSingle(a.id);
                 onNavigate?.();
               }}
-              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all ${
-                active
-                  ? "bg-secondary text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-              }`}
+              className={navItemClass(active, rail)}
             >
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: a.color }}
+                  aria-hidden="true"
+                />
+              </span>
+              <span className={`flex-1 truncate whitespace-nowrap ${labelClass}`}>{a.name}</span>
               <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: a.color }}
-                aria-hidden="true"
-              />
-              <span className={`truncate whitespace-nowrap ${labelClass}`}>{a.name}</span>
+                className={`text-xs font-normal tabular-nums ${
+                  bal < 0 ? "text-destructive" : "text-muted-foreground"
+                } ${labelClass}`}
+              >
+                {formatCompactCurrency(bal)}
+              </span>
             </Link>
           );
         })}
         <button
           onClick={() => setManageOpen(true)}
-          className="mt-2 flex w-full items-center gap-3 rounded-lg border border-dashed border-border px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          title="Gerenciar contas"
+          className={navItemClass(false, rail)}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <Settings className="h-3.5 w-3.5" />
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Gerenciar Conta</span>
+          <Plus className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+          <span className={`whitespace-nowrap ${labelClass}`}>Gerenciar contas</span>
         </button>
       </nav>
 
-      <div className="mt-4 space-y-1 border-t border-border pt-4">
-        <Link
-          to="/notificacoes"
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/notificacoes"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
-            <Bell className="h-3.5 w-3.5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
-            )}
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Notificações</span>
-          {unreadCount > 0 && (
-            <span className={`ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground whitespace-nowrap ${labelClass}`}>
+      <NavGroup label="Ferramentas" rail={rail} labelClass={labelClass} />
+      <div className="space-y-0.5">
+        {link(
+          "/notificacoes",
+          "Notificações",
+          Bell,
+          unreadCount > 0 ? (
+            <span
+              className={`rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground whitespace-nowrap ${labelClass}`}
+            >
               {unreadCount}
             </span>
-          )}
-        </Link>
-        <Link
-          to="/importar-historico"
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/importar-historico"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <FileSpreadsheet className="h-3.5 w-3.5" />
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Importar planilha</span>
-        </Link>
-        <Link
-          to="/backup"
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/backup"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <Cloud className="h-3.5 w-3.5" />
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Backup e sync</span>
-        </Link>
-        <Link
-          to="/locais-produtos"
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/locais-produtos"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <MapPin className="h-3.5 w-3.5" />
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Locais e Produtos</span>
-        </Link>
-        <Link
-          to="/meios-pagamento"
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-            loc.pathname === "/meios-pagamento"
-              ? "bg-secondary text-foreground"
-              : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <Wallet className="h-3.5 w-3.5" />
-          </span>
-          <span className={`whitespace-nowrap ${labelClass}`}>Meios de Pagamento</span>
-        </Link>
+          ) : null,
+        )}
+        {link("/importar-historico", "Importar planilha", FileSpreadsheet)}
+        {link("/backup", "Backup e sync", Cloud)}
+        {link("/locais-produtos", "Locais e produtos", MapPin)}
+        {link("/meios-pagamento", "Meios de pagamento", Wallet)}
         <button
           type="button"
           onClick={() => setCalcOpen(true)}
-          className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-secondary/50 hover:text-foreground"
+          title="Calculadora"
+          className={navItemClass(false, rail)}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <Calculator className="h-3.5 w-3.5" />
-          </span>
+          <Calculator className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
           <span className={`whitespace-nowrap ${labelClass}`}>Calculadora</span>
         </button>
-        {isAdmin && (
-          <Link
-            to="/admin/whitelist"
-            onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
-              loc.pathname === "/admin/whitelist"
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-            }`}
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-              <ShieldCheck className="h-3.5 w-3.5" />
-            </span>
-            <span className={`whitespace-nowrap ${labelClass}`}>Whitelist e usuários</span>
-          </Link>
-        )}
+        {isAdmin && link("/admin/whitelist", "Administração", ShieldCheck)}
       </div>
 
-      <div className="mt-4 border-t border-border pt-4">
-        <AccountSwitcher variant="dropdown" />
+      <div className="mt-auto space-y-0.5 border-t border-border pt-3">
+        <div className={rail ? "hidden xl:block" : ""}>
+          <AccountSwitcher variant="dropdown" />
+        </div>
+        {rail && (
+          <Link
+            to="/perfil"
+            title="Meu perfil"
+            className="flex items-center justify-center rounded-xl py-2 hover:bg-card xl:hidden"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-secondary text-[11px] font-bold text-primary">
+              {initials || <User className="h-4 w-4" aria-hidden="true" />}
+            </span>
+          </Link>
+        )}
         <button
           onClick={() => signOut()}
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+          title="Sair"
+          className={navItemClass(false, rail)}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-          </span>
+          <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
           <span className={`whitespace-nowrap ${labelClass}`}>Sair</span>
         </button>
       </div>
 
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
       <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
+    </>
+  );
+}
+
+/**
+ * Navegação inferior — só mobile (o desktop tem a sidebar). Home, Contas,
+ * Alertas e "Mais" (abre a mesma navegação da sidebar numa gaveta). Os FABs
+ * e os painéis descontam a altura dela via `--bnav-h` (styles.css).
+ */
+function BottomNav() {
+  const loc = useLocation();
+  const panes = usePanes();
+  const { data: accounts = [] } = useAccounts();
+  const unreadCount = useUnreadNotificationsCount();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // Última conta aberta (ou a primeira) — o atalho "Contas" leva direto a ela.
+  const lastId = panes.panes[0]?.contaId ?? accounts[0]?.id;
+  const onAccounts = loc.pathname.startsWith("/contas/");
+  const onNotif = loc.pathname === "/notificacoes";
+  const onHome = loc.pathname === "/";
+
+  const item = (active: boolean) =>
+    `relative flex min-w-16 flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[10.5px] font-medium transition-colors ${
+      active ? "text-primary" : "text-muted-foreground"
+    }`;
+
+  return (
+    <>
+      <nav
+        aria-label="Navegação"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-background/90 px-2 pt-2 backdrop-blur md:hidden"
+        style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
+      >
+        <Link to="/" className={item(onHome)} aria-current={onHome ? "page" : undefined}>
+          <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
+          Home
+        </Link>
+        {lastId ? (
+          <Link
+            to="/contas/$contaId"
+            params={{ contaId: lastId }}
+            onClick={() => panes.openSingle(lastId)}
+            className={item(onAccounts)}
+            aria-current={onAccounts ? "page" : undefined}
+          >
+            <Wallet className="h-5 w-5" aria-hidden="true" />
+            Contas
+          </Link>
+        ) : (
+          <button type="button" onClick={() => setMoreOpen(true)} className={item(false)}>
+            <Wallet className="h-5 w-5" aria-hidden="true" />
+            Contas
+          </button>
+        )}
+        <Link to="/notificacoes" className={item(onNotif)} aria-current={onNotif ? "page" : undefined}>
+          <Bell className="h-5 w-5" aria-hidden="true" />
+          Alertas
+          {unreadCount > 0 && (
+            <span className="absolute top-0.5 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Link>
+        <button type="button" onClick={() => setMoreOpen(true)} className={item(moreOpen)}>
+          <Menu className="h-5 w-5" aria-hidden="true" />
+          Mais
+        </button>
+      </nav>
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent side="left" className="flex w-[84%] max-w-xs flex-col gap-0 overflow-y-auto p-4">
+          <SheetTitle className="sr-only">Menu</SheetTitle>
+          <SidebarContent onNavigate={() => setMoreOpen(false)} />
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
@@ -456,8 +541,8 @@ const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
       {/* Desktop/tablet: sempre expandida (240px), sem recolher. No mobile a
           navegação vive nos botões flutuantes de cada tela (☰ na Home/Meses,
           "Configurações" dentro do "+" no Lançamento) em vez de uma gaveta. */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start overflow-hidden border-r border-border bg-card/40 p-5 md:flex">
-        <SidebarContent />
+      <aside className="sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-y-auto overflow-x-hidden border-r border-border bg-background p-3 md:flex md:w-[72px] xl:w-64 xl:p-4">
+        <SidebarContent rail labelClass="hidden xl:inline" />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -465,10 +550,15 @@ const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
           Pular para o conteúdo
         </a>
         <AdminViewingBanner />
-        <main id="main-content" className="min-w-0 overflow-x-clip" tabIndex={-1}>
+        <main
+          id="main-content"
+          className="min-w-0 overflow-x-clip pb-[var(--bnav-h)] md:pb-0"
+          tabIndex={-1}
+        >
           {children}
         </main>
       </div>
+      <BottomNav />
       {/* Menu flutuante configurável — montado uma única vez aqui (igual
           AdminViewingBanner), pra não precisar editar rota por rota. A tela
           de Lançamento fica de fora (screenId null-ish "lancamento"):

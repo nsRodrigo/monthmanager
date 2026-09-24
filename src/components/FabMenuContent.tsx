@@ -37,7 +37,7 @@ export function FabMenuContent({
       {open && (
         <div className={backdropClassName ?? "fixed inset-0 z-30"} onClick={() => onOpenChange(false)} aria-hidden="true" />
       )}
-      <div className={positionClassName ?? "fixed bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8"}>
+      <div className={positionClassName ?? "fixed bottom-[calc(var(--bnav-h)+2.5rem)] right-4 z-40 flex flex-col items-end gap-3 md:right-8"}>
         {open && (
           <div className="flex flex-col items-end gap-2.5">
             {isSubLevel && <FabAction icon={ChevronLeft} label="Voltar" tone="primary" onClick={onBack} />}

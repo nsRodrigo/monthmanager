@@ -98,7 +98,7 @@ function NotificationsPage() {
               <button
                 type="button"
                 onClick={() => markAllRead.mutate()}
-                className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
               >
                 Marcar todas como lidas
               </button>

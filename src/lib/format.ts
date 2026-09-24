@@ -33,3 +33,12 @@ export const formatDate = (iso: string) => {
 };
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
+
+/** Valor compacto pra espaços apertados: 3,2 mil · 310 · -1,2 mil. */
+export const formatCompactCurrency = (value: number) => {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
+  if (abs >= 1000) return `${sign}${(abs / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`;
+  return `${sign}${Math.round(abs).toLocaleString("pt-BR")}`;
+};

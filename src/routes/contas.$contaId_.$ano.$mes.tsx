@@ -2823,14 +2823,123 @@ type SelectionRowProps = {
   onLongPress: () => void;
 };
 
+/* ───────── LINHAS DE LANÇAMENTO (layout do protótipo) ─────────
+   Caixa de seleção · descrição + etiquetas · valor · status. A caixa alterna
+   pago/recebido/validado (mesmas ações de antes); clicar no texto edita; segurar
+   seleciona (lp/guard). No celular o status vira só a própria caixa. */
+
+const rowChip = "rounded-full px-1.5 py-px text-[10px] font-bold tracking-wide uppercase";
+
+function useRowGuard(
+  onLongPress: SelectionRowProps["onLongPress"],
+  selectionMode: SelectionRowProps["selectionMode"],
+  onSelectToggle: SelectionRowProps["onSelectToggle"],
+) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
+  return { lp, guard };
+}
+
+function RowShell({
+  lp,
+  guard,
+  selected,
+  checked,
+  onCheck,
+  checkLabel,
+  leadingIcon,
+  title,
+  titleClass = "",
+  done,
+  meta,
+  amount,
+  amountClass,
+  status,
+  onEdit,
+}: {
+  lp: ReturnType<typeof useLongPress>;
+  guard: (fn: () => void) => (e: React.MouseEvent) => void;
+  selected?: boolean;
+  /** Estado da caixa. `undefined` + `leadingIcon` = linha sem caixa (ex.: investimento). */
+  checked?: boolean;
+  onCheck?: () => void;
+  checkLabel?: string;
+  leadingIcon?: React.ReactNode;
+  title: string;
+  titleClass?: string;
+  done?: boolean;
+  meta: React.ReactNode;
+  amount: string;
+  amountClass: string;
+  /** Texto do status à direita (some no celular). */
+  status?: string;
+  onEdit: () => void;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:grid-cols-[26px_minmax(0,1fr)_auto_auto] md:px-4 ${
+        selected ? "bg-primary/10" : ""
+      }`}
+      {...lp.handlers}
+    >
+      {leadingIcon ?? (
+        <button
+          type="button"
+          onClick={guard(onCheck ?? (() => {}))}
+          aria-label={checkLabel}
+          aria-pressed={!!checked}
+          className={`flex h-[22px] w-[22px] items-center justify-center rounded-[7px] border-[1.5px] transition-colors ${
+            checked
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border hover:border-primary"
+          }`}
+        >
+          {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+        </button>
+      )}
+      <button type="button" onClick={guard(onEdit)} className="min-w-0 text-left">
+        <p className={`truncate text-sm font-semibold ${done ? "text-muted-foreground" : ""} ${titleClass}`}>
+          {title}
+        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{meta}</div>
+      </button>
+      <p className={`text-right text-sm font-semibold whitespace-nowrap tabular-nums ${amountClass}`}>{amount}</p>
+      {status !== undefined && (
+        <span
+          className={`hidden min-w-[78px] items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold md:inline-flex ${
+            checked ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground"
+          }`}
+        >
+          {checked && <Check className="h-3 w-3" strokeWidth={2.6} />}
+          {status}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Etiqueta de meio de pagamento (PIX, BOL…) usada nas linhas. */
+function MethodChip({ method }: { method: Exclude<Debit["paymentMethod"], null | "auto_debit"> }) {
+  return <span className={`${rowChip} bg-invest/15 text-invest`}>{PAYMENT_METHOD_BADGES[method]}</span>;
+}
+
 function PurchaseInstRow({
   inst,
   purchase,
-  cardColor,
   onToggle,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2850,78 +2959,35 @@ function PurchaseInstRow({
   onRemove?: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const isInstallment = inst.total > 1;
   const isRecurring = !isInstallment && !!purchase.recurrenceGroupId;
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <span
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: cardColor }}
-        aria-hidden="true"
-      />
-      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <p className={`truncate text-sm font-semibold ${inst.paid ? "text-muted-foreground" : ""}`}>
-          {purchase.description}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={inst.paid}
+      onCheck={onToggle}
+      checkLabel={inst.paid ? "Desmarcar validação" : "Marcar como revisado"}
+      title={purchase.description}
+      done={inst.paid}
+      onEdit={onEdit}
+      amount={formatCurrency(inst.amount)}
+      amountClass="text-credit"
+      status={inst.paid ? "Validado" : "Revisar"}
+      meta={
+        <>
           <span>{formatDate(inst.referenceDate || purchase.date)}</span>
           {isInstallment && (
-            <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-              PAR
-            </span>
-          )}
-          {isInstallment && (
-            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
+            <span className={`${rowChip} bg-credit/15 text-credit`}>
               {inst.number}/{inst.total}
             </span>
           )}
-          {isRecurring && (
-            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-credit">
-              REC
-            </span>
-          )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
-          <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
-        </div>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            inst.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
-          title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
-        >
-          {inst.paid ? (
-            <>
-              <Check className="h-3 w-3" /> Validado
-            </>
-          ) : (
-            "Não validado"
-          )}
-        </button>
-      </div>
-    </div>
+          {isRecurring && <span className={`${rowChip} bg-credit/15 text-credit`}>REC</span>}
+        </>
+      }
+    />
   );
 }
 
@@ -2929,8 +2995,6 @@ function DebitRow({
   debit,
   onToggle,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2942,75 +3006,36 @@ function DebitRow({
   onRemove: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-debit/15 text-debit">
-        <ArrowDownRight className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${debit.paid ? "text-muted-foreground" : ""}`}
-        >
-          {debit.description}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={debit.paid}
+      onCheck={onToggle}
+      checkLabel={debit.paid ? "Desmarcar pagamento" : "Marcar como pago"}
+      title={debit.description}
+      done={debit.paid}
+      onEdit={onEdit}
+      amount={`− ${formatCurrency(debit.amount)}`}
+      amountClass="text-debit"
+      status={debit.paid ? "Pago" : "Pendente"}
+      meta={
+        <>
           <span>{formatDate(debit.date)}</span>
-          {debit.required && (
-            <span className="rounded-full bg-debit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-debit">
-              REC
-            </span>
-          )}
+          {debit.required && <span className={`${rowChip} bg-debit/15 text-debit`}>REC</span>}
           {debit.paymentMethod === "auto_debit" ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
+            <span className={`${rowChip} inline-flex items-center gap-1 bg-primary/15 text-primary`}>
               <Zap className="h-2.5 w-2.5" />
               AUT{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
           ) : (
-            debit.paymentMethod && (
-              <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
-                {PAYMENT_METHOD_BADGES[debit.paymentMethod]}
-              </span>
-            )
+            debit.paymentMethod && <MethodChip method={debit.paymentMethod} />
           )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            debit.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
-        >
-          {debit.paid ? (
-            <>
-              <Check className="h-3 w-3" /> Pago
-            </>
-          ) : (
-            "Marcar pago"
-          )}
-        </button>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 
@@ -3018,8 +3043,6 @@ function IncomeRow({
   income,
   onToggle,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -3031,70 +3054,31 @@ function IncomeRow({
   onRemove: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/15 text-success">
-        <ArrowUpRight className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            income.received ? "text-muted-foreground" : ""
-          }`}
-        >
-          {income.description}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={income.received}
+      onCheck={onToggle}
+      checkLabel={income.received ? "Desmarcar recebimento" : "Marcar como recebido"}
+      title={income.description}
+      done={income.received}
+      onEdit={onEdit}
+      amount={`+ ${formatCurrency(income.amount)}`}
+      amountClass="text-income"
+      status={income.received ? "Recebido" : "Pendente"}
+      meta={
+        <>
           <span>{formatDate(income.date)}</span>
-          {income.recurrenceGroupId && (
-            <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
-              REC
-            </span>
+          {income.recurrenceGroupId && <span className={`${rowChip} bg-success/15 text-success`}>REC</span>}
+          {income.paymentMethod && income.paymentMethod !== "auto_debit" && (
+            <MethodChip method={income.paymentMethod} />
           )}
-          {income.paymentMethod && (
-            <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
-              {PAYMENT_METHOD_BADGES[income.paymentMethod]}
-            </span>
-          )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            income.received
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
-        >
-          {income.received ? (
-            <>
-              <Check className="h-3 w-3" /> Recebido
-            </>
-          ) : (
-            "Marcar recebido"
-          )}
-        </button>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 
@@ -3104,7 +3088,6 @@ function ParcelledRow({
   parent,
   onToggle,
   onEdit,
-  onRemove,
   selectionMode,
   selected,
   onSelectToggle,
@@ -3117,118 +3100,83 @@ function ParcelledRow({
   onEdit: () => void;
   onRemove?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
-  const tone =
-    kind === "debit" ? "text-debit" : kind === "income" ? "text-success" : "text-primary";
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
-  const otherMethod =
-    kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
-  const label =
-    kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
-  const badgeClass =
+  const otherMethod = kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
+  const label = kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
+  const badge =
     kind === "debit"
       ? "bg-debit/15 text-debit"
       : kind === "income"
         ? "bg-success/15 text-success"
-        : "bg-primary/15 text-primary";
-  const iconWrapClass =
-    kind === "debit"
-      ? "bg-debit/15 text-debit"
-      : kind === "income"
-        ? "bg-success/15 text-success"
-        : "bg-primary/15 text-primary";
+        : "bg-invest/15 text-invest";
+  const amountClass = kind === "debit" ? "text-debit" : kind === "income" ? "text-income" : "text-invest";
+  const sign = kind === "income" ? "+ " : "− ";
+  const meta = (
+    <>
+      <span>{formatDate(installment.referenceDate || parent.date)}</span>
+      <span className={`${rowChip} bg-secondary text-muted-foreground`}>PAR</span>
+      <span className={`${rowChip} ${badge}`}>
+        {installment.number}/{installment.total}
+      </span>
+      {auto && (
+        <span className={`${rowChip} inline-flex items-center gap-1 bg-primary/15 text-primary`}>
+          <Zap className="h-2.5 w-2.5" />
+          AUT
+        </span>
+      )}
+      {otherMethod && otherMethod !== "auto_debit" && <MethodChip method={otherMethod} />}
+    </>
+  );
+  if (kind === "investment") {
+    return (
+      <RowShell
+        lp={lp}
+        guard={guard}
+        selected={selected}
+        leadingIcon={
+          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
+            <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        }
+        title={label}
+        onEdit={onEdit}
+        amount={`${sign}${formatCurrency(installment.amount)}`}
+        amountClass={amountClass}
+        meta={meta}
+      />
+    );
+  }
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${iconWrapClass}`}
-      >
-        {kind === "debit" ? (
-          <ArrowDownRight className="h-3.5 w-3.5" />
-        ) : kind === "income" ? (
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        ) : (
-          <TrendingUp className="h-3.5 w-3.5" />
-        )}
-      </div>
-      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            kind !== "investment" && installment.paid ? "text-muted-foreground" : ""
-          }`}
-        >
-          {label}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span>{formatDate(installment.referenceDate || parent.date)}</span>
-          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-            PAR
-          </span>
-          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${badgeClass}`}>
-            {installment.number}/{installment.total}
-          </span>
-          {auto && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
-              <Zap className="h-2.5 w-2.5" />
-              AUT
-            </span>
-          )}
-          {otherMethod && (
-            <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
-              {PAYMENT_METHOD_BADGES[otherMethod]}
-            </span>
-          )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
-          <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
-        </div>
-        {kind !== "investment" && (
-          <button
-            onClick={guard(onToggle)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-              installment.paid
-                ? "bg-success/15 text-success hover:bg-success/25"
-                : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-            }`}
-          >
-            {installment.paid ? (
-              <>
-                <Check className="h-3 w-3" /> {kind === "income" ? "Recebido" : "Pago"}
-              </>
-            ) : kind === "income" ? (
-              "Marcar recebido"
-            ) : (
-              "Marcar pago"
-            )}
-          </button>
-        )}
-      </div>
-    </div>
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={installment.paid}
+      onCheck={onToggle}
+      checkLabel={
+        installment.paid
+          ? kind === "income"
+            ? "Desmarcar recebimento"
+            : "Desmarcar pagamento"
+          : kind === "income"
+            ? "Marcar como recebido"
+            : "Marcar como pago"
+      }
+      title={label}
+      done={installment.paid}
+      onEdit={onEdit}
+      amount={`${sign}${formatCurrency(installment.amount)}`}
+      amountClass={amountClass}
+      status={installment.paid ? (kind === "income" ? "Recebido" : "Pago") : "Pendente"}
+      meta={meta}
+    />
   );
 }
 
 function InvestmentRow({
   inv,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -3239,42 +3187,30 @@ function InvestmentRow({
   onRemove: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-        <TrendingUp className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      leadingIcon={
+        <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
+          <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+      }
+      title={inv.type}
+      titleClass="capitalize"
+      onEdit={onEdit}
+      amount={`− ${formatCurrency(inv.amount)}`}
+      amountClass="text-invest"
+      meta={
+        <>
           <span>{formatDate(inv.date)}</span>
           <span>· {inv.percentage}% rendimento</span>
-          {inv.recurrenceGroupId && (
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
-              REC
-            </span>
-          )}
-        </p>
-      </button>
-      <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
-    </div>
+          {inv.recurrenceGroupId && <span className={`${rowChip} bg-invest/15 text-invest`}>REC</span>}
+        </>
+      }
+    />
   );
 }
 

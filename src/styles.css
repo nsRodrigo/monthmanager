@@ -104,8 +104,10 @@
   --gradient-debit: linear-gradient(135deg, #b0700c, #c48412);
   --gradient-income: linear-gradient(135deg, #17885a, #1da56b);
   --gradient-card: linear-gradient(135deg, #101816, #0e1513);
+  /* background-image não aceita cor sólida solta: a base vai como gradiente de 1 cor. */
   --gradient-hero:
-    radial-gradient(90% 120% at 100% 0%, rgba(61, 220, 151, 0.11), transparent 60%), #101816;
+    radial-gradient(90% 120% at 100% 0%, rgba(61, 220, 151, 0.11), transparent 60%),
+    linear-gradient(#101816, #101816);
   /* Faixa de identidade só nas telas de marca (login, 404, splash). */
   --gradient-band:
     radial-gradient(70% 60% at 82% 35%, rgba(61, 220, 151, 0.16), transparent 60%),
@@ -144,7 +146,8 @@
   --gradient-primary: linear-gradient(135deg, #7c9cff, #6a8af0);
   --gradient-card: linear-gradient(135deg, #12151f, #0b0d14);
   --gradient-hero:
-    radial-gradient(90% 120% at 100% 0%, rgba(124, 156, 255, 0.13), transparent 60%), #12151f;
+    radial-gradient(90% 120% at 100% 0%, rgba(124, 156, 255, 0.13), transparent 60%),
+    linear-gradient(#12151f, #12151f);
   --gradient-band:
     radial-gradient(70% 60% at 82% 35%, rgba(124, 156, 255, 0.13), transparent 60%),
     linear-gradient(180deg, #0b0d14 0%, #12151f 100%);
@@ -173,7 +176,8 @@
   --gradient-primary: linear-gradient(135deg, #e8dfc8, #d8ceb2);
   --gradient-card: linear-gradient(135deg, #151514, #0d0d0c);
   --gradient-hero:
-    radial-gradient(90% 120% at 100% 0%, rgba(232, 223, 200, 0.10), transparent 60%), #151514;
+    radial-gradient(90% 120% at 100% 0%, rgba(232, 223, 200, 0.10), transparent 60%),
+    linear-gradient(#151514, #151514);
   --gradient-band:
     radial-gradient(70% 60% at 82% 35%, rgba(232, 223, 200, 0.10), transparent 60%),
     linear-gradient(180deg, #0d0d0c 0%, #151514 100%);

@@ -53,7 +53,8 @@ import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
-import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
+import { formatCurrency, MONTHS, MONTHS_SHORT, formatDate } from "@/lib/format";
+import { SpendDonut, type DonutSlice } from "@/components/dashboard/charts";
 import {
   ChevronDown,
   Plus,
@@ -1080,6 +1081,60 @@ export function MonthDetailPane({
     .filter((i) => i.parentType === "purchase")
     .reduce((s, i) => s + (i.paid ? i.amount : 0), 0);
 
+  // Composição das saídas do mês — mesmo componente e cores da Home.
+  const donutSlices: DonutSlice[] = [
+    { name: "Débitos", value: totalDebits, color: "var(--series-debit)" },
+    { name: "Faturas", value: totalCards, color: "var(--series-credit)" },
+    { name: "Investimentos", value: totalInvested, color: "var(--series-invest)" },
+  ].filter((d) => d.value > 0);
+  const donutTotal = donutSlices.reduce((s, d) => s + d.value, 0);
+
+  // Ainda em aberto: débitos/recebimentos deste mês ainda não marcados, os 4 mais cedo.
+  const stillOpen = [
+    ...monthDebits.single
+      .filter((d) => !d.paid)
+      .map((d) => ({
+        key: `d-${d.id}`,
+        day: Number(d.date.slice(8, 10)),
+        label: d.description,
+        sub: "a pagar",
+        amount: d.amount,
+        kind: "debit" as const,
+      })),
+    ...monthDebits.parcelled
+      .filter((p) => !p.installment.paid)
+      .map((p) => ({
+        key: `di-${p.installment.id}`,
+        day: Number((p.installment.referenceDate ?? p.installment.dueDate).slice(8, 10)),
+        label: `${p.debit.description} (${p.installment.number}/${p.installment.total})`,
+        sub: "a pagar",
+        amount: p.installment.amount,
+        kind: "debit" as const,
+      })),
+    ...monthIncomes.single
+      .filter((i) => !i.received)
+      .map((i) => ({
+        key: `i-${i.id}`,
+        day: Number(i.date.slice(8, 10)),
+        label: i.description,
+        sub: "a receber",
+        amount: i.amount,
+        kind: "income" as const,
+      })),
+    ...monthIncomes.parcelled
+      .filter((p) => !p.installment.paid)
+      .map((p) => ({
+        key: `ii-${p.installment.id}`,
+        day: Number((p.installment.referenceDate ?? p.installment.dueDate).slice(8, 10)),
+        label: `${p.income.description} (${p.installment.number}/${p.installment.total})`,
+        sub: "a receber",
+        amount: p.installment.amount,
+        kind: "income" as const,
+      })),
+  ]
+    .sort((a, b) => a.day - b.day)
+    .slice(0, 4);
+
   // Saldo Atual = saldo final do mês anterior + recebíveis do mês atual
   const saldoAtual = (() => {
     if (!account) return 0;
@@ -1169,6 +1224,58 @@ export function MonthDetailPane({
           invested={totalInvested}
           monthName={MONTHS[month]}
         />
+
+        {/* Composição das saídas — mesmo padrão visual da Home, restrito a este mês/conta. */}
+        <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+          <h2 className="font-display text-[15px] font-semibold">Composição das saídas</h2>
+          <div className="mt-4 flex items-center gap-5">
+            <SpendDonut data={donutSlices} size={130} />
+            <div className="min-w-0 flex-1">
+              {donutSlices.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem saídas neste mês.</p>
+              ) : (
+                donutSlices.map((d) => (
+                  <div key={d.name} className="flex items-center gap-2.5 py-1.5 text-sm">
+                    <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: d.color }} />
+                    <span className="flex-1 truncate text-muted-foreground">{d.name}</span>
+                    <em className="text-xs text-muted-foreground not-italic">
+                      {Math.round((d.value / donutTotal) * 100)}%
+                    </em>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Ainda em aberto: o que falta marcar neste mês, os próximos primeiro. */}
+        <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+          <h2 className="font-display text-[15px] font-semibold">Ainda em aberto</h2>
+          <p className="text-xs text-muted-foreground">Próximos itens deste mês</p>
+          {stillOpen.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">Tudo em dia neste mês.</p>
+          ) : (
+            <div className="mt-3 flex flex-col">
+              {stillOpen.map((x) => (
+                <div key={x.key} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
+                  <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-background leading-tight">
+                    <b className="font-display text-sm">{String(x.day).padStart(2, "0")}</b>
+                    <small className="text-[8px] font-semibold tracking-wider text-muted-foreground uppercase">
+                      {MONTHS_SHORT[month]}
+                    </small>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{x.label}</p>
+                    <p className="text-xs text-muted-foreground">{x.sub}</p>
+                  </div>
+                  <b className={`text-sm tabular-nums ${x.kind === "income" ? "text-income" : ""}`}>
+                    {formatCurrency(x.amount)}
+                  </b>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <div className="min-w-0 space-y-4 pb-24">
         {/* Segmento 1: conta corrente */}

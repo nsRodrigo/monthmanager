@@ -2580,7 +2580,7 @@ function CardRow({
         className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
       >
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
           style={{
             backgroundColor: `color-mix(in oklab, ${cardColor} 24%, transparent)`,
             color: `color-mix(in oklab, ${cardColor} 55%, white)`,

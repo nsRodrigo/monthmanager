@@ -549,7 +549,7 @@ function AccountPane({
 
             <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
-                <h2 className="font-display text-[17px] font-semibold tracking-tight">Meses de {year}</h2>
+                <h2 className="font-display text-[17px] font-semibold tracking-tight">Meses de</h2>
                 <YearPickerChip compact />
               </div>
               <div className="flex gap-4 text-xs text-muted-foreground">

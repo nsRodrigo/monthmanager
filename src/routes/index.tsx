@@ -39,8 +39,8 @@ import {
   ArrowUpRight,
   Clock,
   CreditCard,
+  Plus,
   TrendingUp,
-  ChevronRight,
   Wallet,
   Building2,
   Smartphone,
@@ -228,7 +228,7 @@ function Consolidated() {
   const donutTotal = donut.reduce((s, d) => s + d.value, 0);
 
   // Próximos vencimentos: débitos e recebíveis em aberto + faturas não pagas.
-  const upcoming = useMemo<Due[]>(() => {
+  const upcomingAll = useMemo<Due[]>(() => {
     const list: Due[] = [];
     const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const accName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "";
@@ -278,10 +278,14 @@ function Consolidated() {
     }
     return list
       .filter((x) => x.date.getTime() >= t0.getTime())
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-      .slice(0, 6);
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur.md, cur.mi, cur.inst, cards, purchases, accounts, cardPayments, year, month]);
+  const upcoming = upcomingAll.slice(0, 6);
+  // "Esta semana" = vence nos próximos 7 dias (inclui hoje). Não usa `today` direto
+  // (tem hora/minuto) pra não recalcular errado — zera num Date novo, sem mutar `today`.
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const upcomingThisWeek = upcomingAll.filter((u) => (u.date.getTime() - todayMidnight) / 86_400_000 < 7).length;
 
   if (accounts.length === 0) {
     return (
@@ -522,9 +526,9 @@ function Consolidated() {
               <button
                 type="button"
                 onClick={() => setManageOpen(true)}
-                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
               >
-                + Gerenciar contas
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar conta
               </button>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -535,12 +539,6 @@ function Consolidated() {
                 const accCardIds = new Set(cards.filter((c) => c.accountId === a.id).map((c) => c.id));
                 const accDebits = debits.filter((d) => d.accountId === a.id);
                 const accIncomes = incomes.filter((i) => i.accountId === a.id);
-                const accInvested = sumMonthInvestments(
-                  investments.filter((i) => i.accountId === a.id),
-                  installments,
-                  year,
-                  month,
-                );
                 const md = getMonthDebits(accDebits, installments, year, month);
                 const mi = getMonthIncomes(accIncomes, installments, year, month);
                 const accDebitsTotal =
@@ -593,20 +591,32 @@ function Consolidated() {
                         </p>
                         <p className="text-[10px] text-muted-foreground">saldo atual</p>
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                     </div>
                     <Sparkline points={accTrend} color={a.color} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <MiniStat label="A receber" value={accIncomesTotal} tone="income" />
-                      <MiniStat label="A pagar" value={accDebitsTotal} tone="debit" />
-                      <MiniStat label="Faturas" value={accCardsTotal} tone="credit" />
-                      <MiniStat label="Balanço do mês" value={accMonthBalance} tone={accMonthBalance >= 0 ? "income" : "debit"} />
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5">
+                        <p className="truncate text-[10px] font-semibold tracking-wider text-income uppercase">A receber</p>
+                        <p className="truncate text-xs font-semibold tabular-nums">{formatCurrency(accIncomesTotal)}</p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5">
+                        <p className="truncate text-[10px] font-semibold tracking-wider text-debit uppercase">A pagar</p>
+                        <p className="truncate text-xs font-semibold tabular-nums">
+                          {formatCurrency(accDebitsTotal + accCardsTotal)}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5">
+                        <p className="truncate text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                          Balanço
+                        </p>
+                        <p
+                          className={`truncate text-xs font-semibold tabular-nums ${
+                            accMonthBalance >= 0 ? "text-income" : "text-debit"
+                          }`}
+                        >
+                          {formatCurrency(accMonthBalance)}
+                        </p>
+                      </div>
                     </div>
-                    {accInvested > 0 && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Investido: <span className="font-semibold text-invest">{formatCurrency(accInvested)}</span>
-                      </p>
-                    )}
                   </Link>
                 );
               })}
@@ -615,12 +625,17 @@ function Consolidated() {
 
           {/* Próximos vencimentos */}
           <section className="col-span-12 self-start rounded-2xl border border-border bg-card p-5 lg:col-span-4" aria-label="Próximos vencimentos">
-            <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-display text-[15px] font-semibold">Próximos vencimentos</h2>
-                <p className="text-xs text-muted-foreground">O que ainda está em aberto</p>
+                <p className="text-xs text-muted-foreground">Nos próximos dias</p>
               </div>
-              <Clock className="mt-1 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              {upcomingThisWeek > 0 && (
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-debit/15 px-2.5 py-1 text-[11px] font-semibold text-debit">
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  {upcomingThisWeek} esta semana
+                </span>
+              )}
             </div>
             {upcoming.length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">Nada pendente pelos próximos dias. 🎉</p>
@@ -712,24 +727,6 @@ function KpiTile({
         <span className="truncate">{sub}</span>
         {progress !== undefined && <span>{progress}%</span>}
       </div>
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "income" | "debit" | "credit";
-}) {
-  const c = tone === "income" ? "text-income" : tone === "debit" ? "text-debit" : "text-credit";
-  return (
-    <div className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-1.5">
-      <p className={`truncate text-[10px] font-semibold tracking-wider uppercase ${c}`}>{label}</p>
-      <p className="truncate text-xs font-semibold tabular-nums">{formatCurrency(value)}</p>
     </div>
   );
 }

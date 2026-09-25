@@ -1773,13 +1773,7 @@ export function MonthDetailPane({
                     return (
                       <div
                         key={c.id}
-                        className={`rounded-2xl border bg-card transition-colors ${
-                          cardState === "paid"
-                            ? "border-success/40"
-                            : cardState === "allChecked"
-                              ? "border-credit/40"
-                              : "border-border"
-                        }`}
+                        className="rounded-2xl border border-border bg-card transition-colors"
                       >
                         <CardRowSorted
                           card={c}
@@ -1790,7 +1784,7 @@ export function MonthDetailPane({
                           cardState={cardState}
                           countRevisado={countRevisado}
                           paymentPending={setCardPaid.isPending}
-                          dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
+                          dueLabel={`fecha ${fmtDayMonth(new Date(year, month - 1, Math.min((c as { closingDay?: number }).closingDay ?? 1, 28)))} · vence ${fmtDayMonth(dueDate)}`}
                           onTogglePaid={() => {
                             if (!setCardPaid.isPending) {
                               const newPaid = !faturaIsPaid;
@@ -2397,6 +2391,10 @@ type Card = ReturnType<typeof useCards>["data"] extends infer T
     : never
   : never;
 
+/** "28/09" — dia/mês sem ano (rótulo de fechamento/vencimento do cartão). */
+const fmtDayMonth = (d: Date) =>
+  `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
 function CardRowSorted({
   card,
   cardInst,
@@ -2565,9 +2563,12 @@ function CardRow({
 
   return (
     <div className="relative">
+      {/* Cabeçalho: ícone do cartão · nome + fechamento/vencimento · total + revisados.
+          Clicar abre/fecha; segurar abre o menu do cartão. */}
       <div
         role="button"
         tabIndex={0}
+        aria-expanded={open}
         onClick={toggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -2576,103 +2577,26 @@ function CardRow({
           }
         }}
         {...lp.handlers}
-        className="flex w-full cursor-pointer flex-col gap-1.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:px-4 md:py-3.5"
+        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
       >
-        {/* Linha 1: cor + nome + (desktop: valor + controles) */}
-        <div className="flex items-center gap-2.5 md:gap-3">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
-            style={{ backgroundColor: cardColor }}
-          >
-            <CreditCard className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{cardName}</p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{dueLabel}</p>
-          </div>
-          <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
-            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {cardState === "paid"
-                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
-                : cardState === "allChecked"
-                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={paymentPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!paymentPending) onTogglePaid();
-            }}
-            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
-              cardState === "paid"
-                ? "bg-success/15 text-success hover:bg-success/25"
-                : cardState === "allChecked"
-                  ? "bg-credit/15 text-credit hover:bg-credit/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-            }`}
-          >
-            {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
-          </button>
-          {open && sortControl ? (
-            <div className="hidden shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
-              {sortControl}
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen((o) => !o);
-            }}
-            aria-label={open ? "Recolher" : "Expandir"}
-            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-          >
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
-          </button>
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: `color-mix(in oklab, ${cardColor} 24%, transparent)`,
+            color: `color-mix(in oklab, ${cardColor} 55%, white)`,
+          }}
+        >
+          <CreditCard className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-[15px] font-semibold tracking-tight">{cardName}</p>
+          <p className="truncate text-[12.5px] text-muted-foreground">{dueLabel}</p>
         </div>
-
-        {/* Linha 2 (mobile only): valor + controles */}
-        <div className="flex items-center justify-between gap-2 md:hidden">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {cardState === "paid"
-                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
-                : cardState === "allChecked"
-                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
-              }}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                cardState === "paid"
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : cardState === "allChecked"
-                    ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
-                    : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
-            </button>
-            {open && sortControl ? (
-              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                {sortControl}
-              </div>
-            ) : null}
-          </div>
+        <div className="shrink-0 text-right">
+          <p className="font-display text-[17px] font-bold text-credit tabular-nums">{formatCurrency(total)}</p>
+          <p className="text-xs text-muted-foreground">
+            {cardState === "paid" ? "fatura paga" : `${countRevisado}/${count} revisados`}
+          </p>
         </div>
       </div>
 
@@ -2714,6 +2638,37 @@ function CardRow({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border bg-background/30">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 md:px-4">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
+                  cardState === "paid"
+                    ? "bg-success/15 text-success"
+                    : cardState === "allChecked"
+                      ? "bg-credit/15 text-credit"
+                      : "bg-warning/15 text-warning"
+                }`}
+              >
+                {cardState === "paid" ? "Fatura paga" : cardState === "allChecked" ? "Todos revisados" : "Fatura em aberto"}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={paymentPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!paymentPending) onTogglePaid();
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                    cardState === "paid"
+                      ? "border border-border bg-secondary hover:bg-muted"
+                      : "bg-primary text-primary-foreground hover:opacity-90"
+                  }`}
+                >
+                  {paymentPending ? "Salvando..." : cardState === "paid" ? "Reabrir fatura" : "Marcar fatura como paga"}
+                </button>
+                {sortControl}
+              </div>
+            </div>
             {selectionBar}
 
             {items.length === 0 ? (
@@ -2992,7 +2947,9 @@ function DebitRow({
       meta={
         <>
           <span>{formatDate(debit.date)}</span>
-          {debit.required && <span className={`${rowChip} bg-debit/15 text-debit`}>REC</span>}
+          {(debit.required || !!debit.recurrenceGroupId) && (
+            <span className={`${rowChip} bg-debit/15 text-debit`}>REC</span>
+          )}
           {debit.paymentMethod === "auto_debit" ? (
             <span className={`${rowChip} inline-flex items-center gap-1 bg-primary/15 text-primary`}>
               <Zap className="h-2.5 w-2.5" />

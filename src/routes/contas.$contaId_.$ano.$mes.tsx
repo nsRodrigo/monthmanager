@@ -1187,7 +1187,7 @@ export function MonthDetailPane({
         </div>
         {/* INCOMES */}
         <GroupedSection
-          icon={Download}
+          icon={ArrowUpRight}
           title="Recebimentos"
           description="Entradas de dinheiro na conta"
           tone="income"
@@ -1443,7 +1443,7 @@ export function MonthDetailPane({
         {/* DEBITS */}
 
         <GroupedSection
-          icon={Building2}
+          icon={ArrowDownRight}
           title="Débitos"
           description="Gastos diretos da conta corrente"
           tone="debit"
@@ -1662,52 +1662,46 @@ export function MonthDetailPane({
           };
 
           return (
-            <section className="space-y-3 pt-2">
-              {/* Segmento 2: cartões de crédito */}
-              <div className="flex items-center justify-between gap-3 px-1">
-                <div className="min-w-0">
-                  <h2 className="truncate font-display text-sm font-semibold tracking-wider uppercase">
-                    Cartões de crédito
-                  </h2>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {reorderMode
-                      ? "Arraste a ordem dos cartões — vale para a conta inteira"
-                      : "Faturas e compras no crédito"}
-                  </p>
-                </div>
-                {reorderMode ? (
-                  <div className="flex shrink-0 items-center gap-2">
+            <GroupedSection
+              icon={CreditCard}
+              title="Cartões de crédito"
+              description={
+                reorderMode ? "Arraste a ordem dos cartões — vale para a conta inteira" : "Faturas e compras no crédito"
+              }
+              tone="credit"
+              total={totalCards}
+              count={cardsAll.reduce((s, x) => s + x.items.length, 0)}
+              empty={!reorderMode && cardsAll.length === 0}
+              emptyText={
+                accountCards.length === 0
+                  ? "Nenhum cartão vinculado a esta conta."
+                  : "Nenhum cartão com movimento neste mês."
+              }
+              headerBar={
+                reorderMode ? (
+                  <div className="flex items-center justify-end gap-2 px-3 py-2.5 md:px-4">
                     <button
                       onClick={cancelReorder}
-                      className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-semibold hover:bg-secondary"
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={saveReorder}
                       disabled={reorderCards.isPending}
-                      className="rounded-full bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
                     >
                       {reorderCards.isPending ? "Salvando..." : "Concluir"}
                     </button>
                   </div>
-                ) : (
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
-                    </p>
-                  </div>
-                )}
-              </div>
-
+                ) : undefined
+              }
+            >
               {reorderMode ? (
                 orderedAllCards.length === 0 ? (
-                  <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
-                    Nenhum cartão para reordenar.
-                  </p>
+                  <p className="px-4 py-3 text-center text-xs text-muted-foreground">Nenhum cartão para reordenar.</p>
                 ) : (
-                  <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                  <div>
                     {orderedAllCards.map((c, idx) => (
                       <div
                         key={c.id}
@@ -1743,14 +1737,8 @@ export function MonthDetailPane({
                     ))}
                   </div>
                 )
-              ) : cardsAll.length === 0 ? (
-                <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-xs text-muted-foreground">
-                  {accountCards.length === 0
-                    ? "Nenhum cartão vinculado a esta conta."
-                    : "Nenhum cartão com movimento neste mês."}
-                </p>
-              ) : (
-                <div className="grid gap-3">
+              ) : cardsAll.length === 0 ? null : (
+                <>
                   {cardsAll.map(({ card: c, items: cardInst }) => {
                     const total = cardInst.reduce((s, i) => s + i.amount, 0);
                     const faturaIsPaid = isCardFullyPaid(
@@ -1771,16 +1759,7 @@ export function MonthDetailPane({
                     const dueDay = (c as { dueDay?: number }).dueDay ?? 5;
                     const dueDate = new Date(year, month, Math.min(dueDay, 28));
                     return (
-                      <div
-                        key={c.id}
-                        className={`rounded-2xl border bg-card transition-colors ${
-                          cardState === "paid"
-                            ? "border-success/40"
-                            : cardState === "allChecked"
-                              ? "border-credit/40"
-                              : "border-border"
-                        }`}
-                      >
+                      <div key={c.id}>
                         <CardRowSorted
                           card={c}
                           cardInst={cardInst}
@@ -1847,9 +1826,9 @@ export function MonthDetailPane({
                       </div>
                     );
                   })}
-                </div>
+                </>
               )}
-            </section>
+            </GroupedSection>
           );
         })()}
       </div>
@@ -2290,7 +2269,6 @@ function GroupedSection({
   headerBar,
   sortControl,
   paidControl,
-  paidState,
   children,
 }: {
   icon: typeof Building2;
@@ -2314,78 +2292,38 @@ function GroupedSection({
   const [open, setOpen] = useState(defaultOpen);
   const totalColor = toneText[totalTone ?? tone];
   const toggle = () => setOpen((o) => !o);
-  const stateClass =
-    paidState === "paid"
-      ? "border-success/40"
-      : paidState === "open"
-        ? "border-warning/40"
-        : "border-border";
   return (
-    <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
-      {/* Header */}
-      <div className={`flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5`}>
-        {/* Linha 1: ícone + título (+ valor/controles no desktop) */}
-        <div className="flex items-center gap-2.5 md:gap-3">
-          <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl ${toneBg[tone]} ${toneText[tone]}`}
-            >
-              <Icon className="h-4 w-4" />
-            </div>
-          </button>
-          <button onClick={toggle} className="min-w-0 flex-1 text-left">
-            <h2 className="truncate font-display text-[14.5px] font-semibold tracking-tight">{title}</h2>
-            <p className="truncate text-[11px] text-muted-foreground">{description}</p>
-          </button>
-          {typeof total === "number" && (
-            <div className="hidden shrink-0 flex-col items-end md:flex">
-              <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
-              {typeof count === "number" && (
-                <p className="text-[10px] text-muted-foreground">
-                  {count} {count === 1 ? "item" : "itens"}
-                </p>
-              )}
-            </div>
-          )}
-          {open && paidControl ? (
-            <div className="hidden shrink-0 md:block">{paidControl}</div>
-          ) : null}
-          {open && sortControl ? (
-            <div className="hidden shrink-0 md:block">{sortControl}</div>
-          ) : null}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={open ? "Recolher" : "Expandir"}
-            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-          >
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
-          </button>
-        </div>
-
-        {/* Linha 2 (mobile only): valor + controles */}
-        {(typeof total === "number" || (open && (paidControl || sortControl))) && (
-          <div className="flex items-center justify-between gap-2 md:hidden">
-            {typeof total === "number" ? (
-              <div className="flex flex-col">
-                <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
-                {typeof count === "number" && (
-                  <p className="text-[10px] text-muted-foreground">
-                    {count} {count === 1 ? "item" : "itens"}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div />
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      {/* Cabeçalho (igual ao protótipo): uma linha só em qualquer largura —
+          ícone quadrado · título/descrição · total + nº de itens · seta. */}
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
+          <div className={`flex h-9 w-9 items-center justify-center rounded-[11px] ${toneBg[tone]} ${toneText[tone]}`}>
+            <Icon className="h-[18px] w-[18px]" />
+          </div>
+        </button>
+        <button onClick={toggle} className="min-w-0 flex-1 text-left">
+          <h2 className="truncate font-display text-[14.5px] font-semibold tracking-tight">{title}</h2>
+          <p className="truncate text-xs text-muted-foreground">{description}</p>
+        </button>
+        {typeof total === "number" && (
+          <div className="shrink-0 text-right">
+            <p className={`font-display text-base font-semibold tabular-nums ${totalColor}`}>{formatCurrency(total)}</p>
+            {typeof count === "number" && (
+              <p className="text-[11.5px] text-muted-foreground">
+                {count} {count === 1 ? "item" : "itens"}
+              </p>
             )}
-            <div className="flex items-center gap-2">
-              {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
-              {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
-            </div>
           </div>
         )}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          <ChevronDown className={`h-[18px] w-[18px] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
       {/* Body — grid-rows 0fr/1fr anima a altura sem precisar medir nada em JS. */}
@@ -2395,6 +2333,12 @@ function GroupedSection({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border">
+            {(paidControl || sortControl) && (
+              <div className="flex items-center justify-end gap-2 px-3 py-2.5 md:px-4">
+                {paidControl}
+                {sortControl}
+              </div>
+            )}
             {headerBar}
             {empty ? (
               <Empty text={emptyText} />
@@ -2600,6 +2544,8 @@ function CardRow({
 
   return (
     <div className="relative">
+      {/* Cabeçalho (igual ao protótipo): uma linha só — ícone do cartão · nome,
+          vencimento e barra de revisados · total e "x/y revisados" · seta. */}
       <div
         role="button"
         tabIndex={0}
@@ -2611,104 +2557,46 @@ function CardRow({
           }
         }}
         {...lp.handlers}
-        className="flex w-full cursor-pointer flex-col gap-1.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:px-4 md:py-3.5"
+        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
       >
-        {/* Linha 1: cor + nome + (desktop: valor + controles) */}
-        <div className="flex items-center gap-2.5 md:gap-3">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
-            style={{ backgroundColor: cardColor }}
-          >
-            <CreditCard className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{cardName}</p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{dueLabel}</p>
-          </div>
-          <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
-            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {cardState === "paid"
-                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
-                : cardState === "allChecked"
-                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={paymentPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!paymentPending) onTogglePaid();
-            }}
-            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
-              cardState === "paid"
-                ? "bg-success/15 text-success hover:bg-success/25"
-                : cardState === "allChecked"
-                  ? "bg-credit/15 text-credit hover:bg-credit/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-            }`}
-          >
-            {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
-          </button>
-          {open && sortControl ? (
-            <div className="hidden shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
-              {sortControl}
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen((o) => !o);
-            }}
-            aria-label={open ? "Recolher" : "Expandir"}
-            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-          >
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
-          </button>
-        </div>
-
-        {/* Linha 2 (mobile only): valor + controles */}
-        <div className="flex items-center justify-between gap-2 md:hidden">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {cardState === "paid"
-                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
-                : cardState === "allChecked"
-                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] text-white"
+          style={{ backgroundColor: cardColor }}
+        >
+          <CreditCard className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-[14.5px] font-semibold tracking-tight">{cardName}</p>
+          <p className="truncate text-xs text-muted-foreground">{dueLabel}</p>
+          <div className="mt-1.5 h-1.5 max-w-[220px] overflow-hidden rounded-full bg-secondary" aria-hidden="true">
+            <i
+              className="block h-full rounded-full"
+              style={{
+                width: `${count > 0 ? (cardState === "paid" ? 100 : (countRevisado / count) * 100) : 0}%`,
+                background: "var(--series-credit)",
               }}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                cardState === "paid"
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : cardState === "allChecked"
-                    ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
-                    : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
-            </button>
-            {open && sortControl ? (
-              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                {sortControl}
-              </div>
-            ) : null}
+            />
           </div>
         </div>
+        <div className="shrink-0 text-right">
+          <p className="font-display text-base font-semibold text-credit tabular-nums">{formatCurrency(total)}</p>
+          <p className="text-[11.5px] text-muted-foreground">
+            {cardState === "paid"
+              ? "fatura paga"
+              : `${countRevisado}/${count} revisados`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((o) => !o);
+          }}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          <ChevronDown className={`h-[18px] w-[18px] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
       {menuOpen && (
@@ -2749,6 +2637,35 @@ function CardRow({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border bg-background/30">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 md:px-4">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
+                  cardState === "paid"
+                    ? "bg-success/15 text-success"
+                    : cardState === "allChecked"
+                      ? "bg-credit/15 text-credit"
+                      : "bg-warning/15 text-warning"
+                }`}
+              >
+                {cardState === "paid" ? "Fatura paga" : cardState === "allChecked" ? "Todos revisados" : "Fatura em aberto"}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={paymentPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!paymentPending) onTogglePaid();
+                  }}
+                  className={`rounded-lg border border-border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                    cardState === "paid" ? "bg-secondary hover:bg-muted" : "bg-primary text-primary-foreground hover:opacity-90"
+                  }`}
+                >
+                  {paymentPending ? "Salvando..." : cardState === "paid" ? "Reabrir fatura" : "Marcar fatura como paga"}
+                </button>
+                {sortControl}
+              </div>
+            </div>
             {selectionBar}
 
             {items.length === 0 ? (

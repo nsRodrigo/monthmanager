@@ -2150,6 +2150,8 @@ export function MonthDetailPane({
                 ? "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:absolute md:left-auto md:right-4 md:bottom-10 md:translate-x-0 md:items-end"
                 : undefined
             }
+            onMainClick={() => openEntryTab("deb")}
+            mainLabel="Novo lançamento"
           />
         );
         return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;

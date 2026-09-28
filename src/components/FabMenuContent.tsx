@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import type { IconComponent } from "@/lib/fab-catalog";
 import type { Tone } from "./FabAction";
@@ -23,6 +23,8 @@ export function FabMenuContent({
   onBack,
   positionClassName,
   title = "Adicionar",
+  onMainClick,
+  mainLabel,
 }: {
   mainIcon: IconComponent;
   open: boolean;
@@ -32,6 +34,14 @@ export function FabMenuContent({
   onBack: () => void;
   positionClassName?: string;
   title?: string;
+  /**
+   * Quando informado, o botão principal executa essa ação direto (ex.: abrir
+   * o modal de novo lançamento) em vez de abrir a gaveta — que passa a ser
+   * alcançada por um botão menor ao lado, com as demais opções.
+   */
+  onMainClick?: () => void;
+  /** Rótulo acessível do botão principal quando `onMainClick` está definido. */
+  mainLabel?: string;
 }) {
   return (
     <>
@@ -41,10 +51,21 @@ export function FabMenuContent({
           "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:left-auto md:right-8 md:bottom-10 md:translate-x-0 md:items-end"
         }
       >
+        {onMainClick && (
+          <button
+            type="button"
+            onClick={() => onOpenChange(true)}
+            aria-label="Mais opções"
+            title="Mais opções"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-elevated hover:text-foreground"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => onOpenChange(true)}
-          aria-label="Abrir menu"
+          onClick={() => (onMainClick ? onMainClick() : onOpenChange(true))}
+          aria-label={onMainClick ? mainLabel : "Abrir menu"}
           className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-elevated"
         >
           <MainIcon className="h-6 w-6" />

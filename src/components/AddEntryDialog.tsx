@@ -3,6 +3,7 @@ import { Plus, Copy, ArrowDownRight, ArrowUpRight, CreditCard, TrendingUp } from
 import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal";
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
+import { FitLabel } from "./FitLabel";
 import {
   useAddDebit,
   useAddIncome,
@@ -319,7 +320,7 @@ export function AddEntryDialog({
                 <Icon
                   className={`h-[18px] w-[18px] ${active ? "text-primary" : "text-muted-foreground"}`}
                 />
-                <span className="truncate">{t.label}</span>
+                <FitLabel text={t.label} />
               </button>
             );
           })}

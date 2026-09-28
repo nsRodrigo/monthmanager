@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { Logo } from "@/components/Logo";
+import { FitLabel } from "@/components/FitLabel";
 import { AppLoader } from "@/components/AppLoader";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -181,7 +182,15 @@ function navItemClass(active: boolean, rail: boolean) {
   }`;
 }
 
-function NavGroup({ label, rail, labelClass }: { label: string; rail: boolean; labelClass: string }) {
+function NavGroup({
+  label,
+  rail,
+  labelClass,
+}: {
+  label: string;
+  rail: boolean;
+  labelClass: string;
+}) {
   return (
     <>
       {rail && <div className="mx-2 my-3 h-px bg-border xl:hidden" aria-hidden="true" />}
@@ -245,7 +254,16 @@ function SidebarContent({
       map.set(
         a.id,
         normalizeZero(
-          computeAccountBalanceUntilNow(a, cards, purchases, installments, debits, incomes, investments, today),
+          computeAccountBalanceUntilNow(
+            a,
+            cards,
+            purchases,
+            installments,
+            debits,
+            incomes,
+            investments,
+            today,
+          ),
         ),
       );
     }
@@ -267,19 +285,18 @@ function SidebarContent({
 
   return (
     <>
-      <div className={`mb-3 flex items-center gap-2.5 px-1 ${rail ? "md:justify-center xl:justify-start" : ""}`}>
+      <div
+        className={`mb-3 flex items-center gap-2.5 px-1 ${rail ? "md:justify-center xl:justify-start" : ""}`}
+      >
         <Logo size="sm" />
-        <span className={`font-display text-lg font-semibold tracking-tight whitespace-nowrap ${labelClass}`}>
+        <span
+          className={`font-display text-lg font-semibold tracking-tight whitespace-nowrap ${labelClass}`}
+        >
           Gestão
         </span>
       </div>
 
-      <Link
-        to="/"
-        onClick={onNavigate}
-        title="Home"
-        className={navItemClass(isConsolidated, rail)}
-      >
+      <Link to="/" onClick={onNavigate} title="Home" className={navItemClass(isConsolidated, rail)}>
         <HomeIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
         <span className={`flex-1 whitespace-nowrap ${labelClass}`}>Home</span>
       </Link>
@@ -390,11 +407,7 @@ function SidebarContent({
             </span>
           </Link>
         )}
-        <button
-          onClick={() => signOut()}
-          title="Sair"
-          className={navItemClass(false, rail)}
-        >
+        <button onClick={() => signOut()} title="Sair" className={navItemClass(false, rail)}>
           <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
           <span className={`whitespace-nowrap ${labelClass}`}>Sair</span>
         </button>
@@ -429,7 +442,7 @@ function BottomNav() {
   const { year: curYear, month: curMonth } = getEffectiveCurrentMonth();
 
   const item = (active: boolean) =>
-    `relative flex min-w-16 flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[10.5px] font-medium transition-colors ${
+    `relative flex w-16 flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[10.5px] font-medium transition-colors ${
       active ? "text-primary" : "text-muted-foreground"
     }`;
 
@@ -441,7 +454,7 @@ function BottomNav() {
     >
       <Link to="/" className={item(onHome)} aria-current={onHome ? "page" : undefined}>
         <HomeIcon className="h-5 w-5" aria-hidden="true" />
-        Home
+        <FitLabel text="Home" />
       </Link>
       {lastId ? (
         <Link
@@ -452,12 +465,12 @@ function BottomNav() {
           aria-current={onAccounts ? "page" : undefined}
         >
           <Wallet className="h-5 w-5" aria-hidden="true" />
-          Contas
+          <FitLabel text="Contas" />
         </Link>
       ) : (
         <button type="button" onClick={() => navigate({ to: "/mais" })} className={item(false)}>
           <Wallet className="h-5 w-5" aria-hidden="true" />
-          Contas
+          <FitLabel text="Contas" />
         </button>
       )}
       {/* Espaço reservado pro FAB central (botão "+" flutuante, ver
@@ -472,17 +485,17 @@ function BottomNav() {
           aria-current={onLancamentos ? "page" : undefined}
         >
           <Receipt className="h-5 w-5" aria-hidden="true" />
-          Lançamentos
+          <FitLabel text="Lançamentos" />
         </Link>
       ) : (
         <button type="button" onClick={() => navigate({ to: "/mais" })} className={item(false)}>
           <Receipt className="h-5 w-5" aria-hidden="true" />
-          Lançamentos
+          <FitLabel text="Lançamentos" />
         </button>
       )}
       <Link to="/mais" className={item(onMais)} aria-current={onMais ? "page" : undefined}>
         <Menu className="h-5 w-5" aria-hidden="true" />
-        Mais
+        <FitLabel text="Mais" />
       </Link>
     </nav>
   );
@@ -502,14 +515,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // sidebar/FAB) enquanto não há usuário logado — logado, passam a
   // renderizar dentro do layout normal, como qualquer outra tela.
   const alwaysPublic = location.pathname === "/auth" || location.pathname === "/reset-password";
-  const conditionallyPublic = location.pathname === "/privacidade" || location.pathname === "/sobre";
+  const conditionallyPublic =
+    location.pathname === "/privacidade" || location.pathname === "/sobre";
   const isPublic = alwaysPublic || (conditionallyPublic && !user);
   const fabScreenId = screenIdForPathname(location.pathname);
-// Quando um painel de mês está aberto em modo embedded, o FAB local
-// da LancamentosPage já está ativo (via portal). Suprimir o
-// ConfigurableFab do root para não sobrepor os dois.
-const { panes } = usePanes();
-const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
+  // Quando um painel de mês está aberto em modo embedded, o FAB local
+  // da LancamentosPage já está ativo (via portal). Suprimir o
+  // ConfigurableFab do root para não sobrepor os dois.
+  const { panes } = usePanes();
+  const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
 
   useEffect(() => {
     if (loading) return;
@@ -575,7 +589,9 @@ const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
           mantém o próprio FAB local, porque as ações de criar dependem de
           estado só dela. `key` força reiniciar aberto/fechado ao trocar de
           tela. */}
-      {fabScreenId && fabScreenId !== "lancamento" && !anyMonthPaneOpen && <ConfigurableFab key={fabScreenId} screenId={fabScreenId} />}
+      {fabScreenId && fabScreenId !== "lancamento" && !anyMonthPaneOpen && (
+        <ConfigurableFab key={fabScreenId} screenId={fabScreenId} />
+      )}
     </div>
   );
 }

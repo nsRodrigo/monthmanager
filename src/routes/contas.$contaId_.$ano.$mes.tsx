@@ -2793,7 +2793,7 @@ function CardRow({
                       : "bg-primary text-primary-foreground hover:opacity-90"
                   }`}
                 >
-                  {paymentPending ? "Salvando..." : cardState === "paid" ? "Reabrir fatura" : "Marcar fatura como paga"}
+                  {paymentPending ? "Salvando..." : cardState === "paid" ? "Reabrir fatura" : "Marcar paga"}
                 </button>
                 {sortControl}
               </div>

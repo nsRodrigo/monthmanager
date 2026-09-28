@@ -8,6 +8,7 @@ import { useIsAdmin } from "@/store/roles";
 import { useAccounts } from "@/store/finance";
 import { User, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight, Info, Lock } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
@@ -22,7 +23,7 @@ function ProfilePage() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, navSystemBg, setNavSystemBg } = useTheme();
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
   const { data: accounts = [] } = useAccounts();
@@ -348,6 +349,17 @@ function ProfilePage() {
                     );
                   })}
                 </div>
+
+                <label className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium">Barra inferior no tom do sistema</span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                      Fundo preto (ou branco, no claro) igual à faixa de gestos do celular, em vez da
+                      cor deste tema.
+                    </span>
+                  </span>
+                  <Switch checked={navSystemBg} onCheckedChange={setNavSystemBg} />
+                </label>
               </section>
 
             </div>

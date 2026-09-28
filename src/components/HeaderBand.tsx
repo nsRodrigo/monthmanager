@@ -22,7 +22,8 @@ export function HeaderBand({
   className = "",
   actions,
 }: {
-  title: string;
+  /** Normalmente um texto; aceita ReactNode pra casos como o seletor de conta na tela Contas. */
+  title: ReactNode;
   eyebrow?: ReactNode;
   subtitle?: ReactNode;
   onBack?: () => void;

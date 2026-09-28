@@ -27,6 +27,7 @@ import { BalanceTrendChart } from "@/components/dashboard/charts";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
+  ChevronDown,
   Wallet,
   ChevronLeft,
   Plus,
@@ -34,6 +35,7 @@ import {
   ArrowDownRight,
   CreditCard,
   TrendingUp,
+  Check,
   X,
 } from "lucide-react";
 import { AddMonthDialog } from "@/components/AddMonthDialog";
@@ -302,6 +304,46 @@ function AccountPane({
   const [openYear, setOpenYear] = useState(false);
   const [openAddMonth, setOpenAddMonth] = useState(false);
   const [openReorganize, setOpenReorganize] = useState(false);
+  const [openAcctSwitch, setOpenAcctSwitch] = useState(false);
+
+  /** Nome da conta como combo: abre a lista das suas contas sem passar pela Home. */
+  const AccountTitleSwitcher = () => (
+    <Popover open={openAcctSwitch} onOpenChange={setOpenAcctSwitch}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="-ml-1.5 flex items-center gap-1 rounded-lg px-1.5 py-0.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+          aria-label="Trocar de conta"
+        >
+          <span className="truncate font-display text-[22px] leading-tight font-semibold tracking-tight text-foreground sm:text-2xl">
+            {account?.name}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-1">
+        <ul className="max-h-72 overflow-y-auto">
+          {accounts.map((a) => (
+            <li key={a.id}>
+              <Link
+                to="/contas/$contaId"
+                params={{ contaId: a.id }}
+                onClick={() => setOpenAcctSwitch(false)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-secondary",
+                  a.id === contaId && "bg-secondary font-semibold",
+                )}
+              >
+                <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                {a.id === contaId && <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
 
   const monthlyBalances = useMemo(() => {
     if (!account) return new Map<string, number>();
@@ -473,7 +515,7 @@ function AccountPane({
           {/* Mesmo cabeçalho fino das demais telas; só ele fica fixo no topo. */}
           <div ref={bandAnchorRef} className="sticky top-0 z-10 bg-background">
             <HeaderBand
-              title={account.name}
+              title={<AccountTitleSwitcher />}
               eyebrow={<span className="capitalize">{account.type}</span>}
               avatar={
                 !onClose && (

@@ -80,7 +80,7 @@ import {
   CalendarClock,
   Banknote,
   FileText,
-  Calculator,
+  X,
 } from "lucide-react";
 import { AddEntryDialog, type EntryTab } from "@/components/AddEntryDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
@@ -92,13 +92,13 @@ import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
 import { toneText, toneBg, type Tone } from "@/components/FabAction";
-import { FabMenuContent, type ResolvedFabEntry } from "@/components/FabMenuContent";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
-import { FloatingCalculator } from "@/components/FloatingCalculator";
-import { useFabConfig } from "@/store/fab-config";
-import { useIsAdmin } from "@/store/roles";
-import { useAuth } from "@/store/auth";
-import { CATALOG_BY_ID, ICON_BY_NAME, type ActionId } from "@/lib/fab-catalog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
 
@@ -171,9 +171,6 @@ export function MonthDetailPane({
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
   useResetScrollOnChange(bandAnchor, [contaId, year, month]);
   const navigate = useNavigate();
-  const { data: fabCfg } = useFabConfig("lancamento");
-  const isAdminUser = useIsAdmin();
-  const { signOut } = useAuth();
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: purchases } = usePurchases();
@@ -227,11 +224,7 @@ export function MonthDetailPane({
     setOpenEntry(true);
   };
   const [openCard, setOpenCard] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
-  const [fabFolder, setFabFolder] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
-  const [calcOpen, setCalcOpen] = useState(false);
-  const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
   const [moveMonthOpen, setMoveMonthOpen] = useState(false);
   const [askMoveSeries, setAskMoveSeries] = useState<{
     ops: MoveMonthOp[];
@@ -420,7 +413,6 @@ export function MonthDetailPane({
     });
   const clearSelection = () => {
     setSelection(null);
-    setBulkMenuOpen(false);
   };
 
   const selProps = (key: SelectionKey, id: string) => ({
@@ -1259,9 +1251,12 @@ export function MonthDetailPane({
           onBack={onBack}
           onClose={onClose}
         />
-        {/* Seletor de mês/ano flutuante: fixo logo abaixo da linha do cabeçalho,
-            por cima do conteúdo (não ocupa altura — o resumo tem folga acima). */}
-        <div className="pointer-events-none absolute inset-x-0 top-full z-10 flex justify-center px-4 pt-2.5">
+        {/* Seletor de mês/ano + ação principal: fixo logo abaixo da linha do
+            cabeçalho, por cima do conteúdo (não ocupa altura — o resumo tem
+            folga acima). Mesma linha vai de ponta a ponta: mês/ano à
+            esquerda, "+ Novo" à direita — que vira "N selecionados" + "•••"
+            durante a seleção múltipla, em vez de um FAB flutuando à parte. */}
+        <div className="pointer-events-none absolute inset-x-0 top-full z-10 flex items-center justify-between gap-2 px-4 pt-2.5">
           <div className="pointer-events-auto rounded-full shadow-elevated">
             <MonthYearPicker
               contaId={contaId}
@@ -1271,6 +1266,64 @@ export function MonthDetailPane({
               next={nextMonth}
               onNavigate={onMonthChange}
             />
+          </div>
+          <div className="pointer-events-auto">
+            {selection ? (
+              <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-1 pr-1 pl-3.5 shadow-elevated">
+                <span className="text-xs font-semibold whitespace-nowrap">
+                  {selection.ids.size} selecionado{selection.ids.size > 1 ? "s" : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  aria-label="Cancelar seleção"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Ações da seleção"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-secondary"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {(selection.key === "debits" || selection.key.startsWith("card:")) && (
+                      <DropdownMenuItem onClick={() => bulkGenerateReceivable(selection.key)}>
+                        <Banknote className="h-4 w-4" /> Gerar recebível
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => bulkGeneratePdf(selection.key)}>
+                      <FileText className="h-4 w-4" /> Gerar PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => bulkDuplicate(selection.key)}>
+                      <Copy className="h-4 w-4" /> Duplicar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setMoveMonthOpen(true)}>
+                      <CalendarClock className="h-4 w-4" /> Mover para outro mês
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => bulkDelete(selection.key)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openEntryTab("deb")}
+                className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[13px] font-semibold shadow-elevated hover:bg-secondary"
+              >
+                <span className="text-primary text-[15px] leading-none font-bold">+</span> Novo
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1979,184 +2032,6 @@ export function MonthDetailPane({
       </div>
       </div>
 
-      {(() => {
-        // Some enquanto qualquer diálogo aberto por ele estiver na tela — senão
-        // fica flutuando por cima dos botões do próprio diálogo (ex.: Cancelar/Adicionar).
-        const anyFabDialogOpen = openEntry || openCard;
-        if (anyFabDialogOpen) return null;
-
-        // Modo seleção múltipla: o FAB (+) vira um menu "•••" com Duplicar/Mover/Excluir
-        // dos itens selecionados, em vez do menu de "adicionar novo item".
-        if (selection) {
-          const bulkEntries: ResolvedFabEntry[] = [
-            ...(selection.key === "debits" || selection.key.startsWith("card:")
-              ? [
-                  {
-                    kind: "action" as const,
-                    id: "gerar_recebivel",
-                    label: "Gerar recebível",
-                    icon: Banknote,
-                    tone: "income" as const,
-                    onClick: () => {
-                      bulkGenerateReceivable(selection.key);
-                      setBulkMenuOpen(false);
-                    },
-                  },
-                ]
-              : []),
-            {
-              kind: "action",
-              id: "gerar_pdf",
-              label: "Gerar PDF",
-              icon: FileText,
-              tone: "primary",
-              onClick: () => {
-                bulkGeneratePdf(selection.key);
-                setBulkMenuOpen(false);
-              },
-            },
-            {
-              kind: "action",
-              id: "duplicar",
-              label: "Duplicar",
-              icon: Copy,
-              tone: "primary",
-              onClick: () => {
-                bulkDuplicate(selection.key);
-                setBulkMenuOpen(false);
-              },
-            },
-            {
-              kind: "action",
-              id: "mover_mes",
-              label: "Mover para outro mês",
-              icon: CalendarClock,
-              tone: "credit",
-              onClick: () => {
-                setMoveMonthOpen(true);
-                setBulkMenuOpen(false);
-              },
-            },
-            {
-              kind: "action",
-              id: "excluir",
-              label: "Excluir",
-              icon: Trash2,
-              tone: "destructive",
-              onClick: () => {
-                bulkDelete(selection.key);
-                setBulkMenuOpen(false);
-              },
-            },
-          ];
-          const bulkUi = (
-            <FabMenuContent
-              mainIcon={MoreHorizontal}
-              open={bulkMenuOpen}
-              onOpenChange={setBulkMenuOpen}
-              entries={bulkEntries}
-              isSubLevel={false}
-              onBack={() => {}}
-              title="Ações da seleção"
-              positionClassName={
-                embedded
-                  ? "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:absolute md:left-auto md:right-4 md:bottom-10 md:translate-x-0 md:items-end"
-                  : undefined
-              }
-            />
-          );
-          return embedded && fabPortalTarget ? createPortal(bulkUi, fabPortalTarget) : bulkUi;
-        }
-
-        if (!fabCfg) return null;
-
-        // As 5 ações "locais" (só fazem sentido aqui, dependem dos diálogos
-        // de criar já montados nesta tela) — únicas que ConfigurableFab
-        // (usado nas outras 9 telas) não sabe executar sozinho.
-        const localHandlers: Partial<Record<ActionId, () => void>> = {
-          novo_cartao: () => setOpenCard(true),
-          nova_compra: () => openEntryTab("card"),
-          novo_debito: () => openEntryTab("deb"),
-          novo_investimento: () => openEntryTab("inv"),
-          novo_recebimento: () => openEntryTab("inc"),
-        };
-
-        const resolveFabAction = (id: string): ResolvedFabEntry | null => {
-          if (id.startsWith("folder:")) {
-            const fid = id.slice(7);
-            const folder = fabCfg.folders[fid];
-            if (!folder) return null;
-            const Icon = ICON_BY_NAME[folder.icon] ?? ICON_BY_NAME.folder;
-            return { kind: "folder", id: fid, label: folder.label, icon: Icon, onOpen: () => setFabFolder(fid) };
-          }
-          const entry = CATALOG_BY_ID[id as ActionId];
-          if (!entry) return null;
-          if (entry.adminOnly && !isAdminUser) return null;
-          const close = () => setFabOpen(false);
-          const local = localHandlers[entry.id];
-          let onClick: () => void;
-          if (local) {
-            onClick = () => {
-              close();
-              local();
-            };
-          } else if (entry.kind === "navigate") {
-            onClick = () => {
-              close();
-              navigate({ to: entry.to! });
-            };
-          } else if (entry.kind === "signout") {
-            onClick = () => {
-              close();
-              signOut();
-            };
-          } else if (entry.kind === "calculator") {
-            onClick = () => {
-              close();
-              setCalcOpen(true);
-            };
-          } else if (entry.kind === "manage-account") {
-            onClick = () => {
-              close();
-              setManageOpen(true);
-            };
-          } else {
-            onClick = close;
-          }
-          return { kind: "action", id: entry.id, label: entry.label, icon: entry.icon, tone: entry.tone, onClick };
-        };
-
-        const fabCurrentIds = fabFolder ? fabCfg.folders[fabFolder]?.actionIds ?? [] : fabCfg.actions;
-        const fabEntries = fabCurrentIds
-          .map(resolveFabAction)
-          .filter((e): e is ResolvedFabEntry => !!e);
-        if (!fabFolder && fabEntries.length === 0) return null;
-
-        const fabMainIcon = ICON_BY_NAME[fabCfg.icon] ?? ICON_BY_NAME.add;
-
-        const fabUi = (
-          <FabMenuContent
-            mainIcon={fabMainIcon}
-            open={fabOpen}
-            onOpenChange={(v) => {
-              setFabOpen(v);
-              if (!v) setFabFolder(null);
-            }}
-            entries={fabEntries}
-            isSubLevel={!!fabFolder}
-            onBack={() => setFabFolder(null)}
-            positionClassName={
-              embedded
-                ? "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:absolute md:left-auto md:right-4 md:bottom-10 md:translate-x-0 md:items-end"
-                : undefined
-            }
-            onMainClick={() => openEntryTab("deb")}
-            mainLabel="Novo lançamento"
-          />
-        );
-        return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;
-      })()}
-
       <AddEntryDialog
         open={openEntry}
         onClose={() => setOpenEntry(false)}
@@ -2269,7 +2144,6 @@ export function MonthDetailPane({
         }}
       />
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
       </div>
     </div>
   );

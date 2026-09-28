@@ -13,8 +13,17 @@ const THEME_COLOR: Record<Theme, string> = {
 };
 
 const STORAGE_KEY = "gf:theme";
+const NAV_BG_STORAGE_KEY = "gf:nav-system-bg";
 
-type Ctx = { theme: Theme; setTheme: (t: Theme) => void };
+type Ctx = {
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+  /** Fundo da barra inferior segue o tema (claro/escuro) do sistema/navegador
+   * — preto ou branco puro, igual à faixa de gestos nativa — em vez da
+   * paleta escura fixa do app. Opcional, desligado por padrão. */
+  navSystemBg: boolean;
+  setNavSystemBg: (v: boolean) => void;
+};
 const ThemeCtx = createContext<Ctx | null>(null);
 
 function applyTheme(t: Theme) {
@@ -38,13 +47,26 @@ function readInitial(): Theme {
   return "dark";
 }
 
+function readInitialNavSystemBg(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(NAV_BG_STORAGE_KEY) === "1";
+}
+
+function applyNavSystemBg(v: boolean) {
+  document.documentElement.classList.toggle("nav-system-bg", v);
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("dark");
+  const [navSystemBg, setNavSystemBgState] = useState(false);
 
   useEffect(() => {
     const t = readInitial();
     setThemeState(t);
     applyTheme(t);
+    const nb = readInitialNavSystemBg();
+    setNavSystemBgState(nb);
+    applyNavSystemBg(nb);
   }, []);
 
   const setTheme = (t: Theme) => {
@@ -57,7 +79,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  return <ThemeCtx.Provider value={{ theme, setTheme }}>{children}</ThemeCtx.Provider>;
+  const setNavSystemBg = (v: boolean) => {
+    setNavSystemBgState(v);
+    applyNavSystemBg(v);
+    try {
+      window.localStorage.setItem(NAV_BG_STORAGE_KEY, v ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <ThemeCtx.Provider value={{ theme, setTheme, navSystemBg, setNavSystemBg }}>
+      {children}
+    </ThemeCtx.Provider>
+  );
 }
 
 export function useTheme() {

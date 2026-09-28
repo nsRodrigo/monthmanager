@@ -12,6 +12,9 @@ import {
   LogOut,
   Settings,
   Calculator as CalculatorIcon,
+  Bell,
+  Info,
+  Lock,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -19,7 +22,7 @@ import { HeaderBand } from "@/components/HeaderBand";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
-import { FloatingCalculator } from "@/components/FloatingCalculator";
+import { openFloatingCalculator } from "@/store/floating-calculator";
 
 export const Route = createFileRoute("/mais")({
   head: () => ({ meta: [{ title: "Mais — Finanças" }] }),
@@ -36,7 +39,6 @@ function MaisPage() {
   const { signOut } = useAuth();
   const isAdmin = useIsAdmin();
   const [manageOpen, setManageOpen] = useState(false);
-  const [calcOpen, setCalcOpen] = useState(false);
 
   const rowClass =
     "flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left text-[15px] font-medium hover:bg-secondary";
@@ -67,11 +69,14 @@ function MaisPage() {
           {actionRow("Gerenciar conta", Settings, () => setManageOpen(true))}
           {row("/locais-produtos", "Locais e produtos", MapPin)}
           {row("/meios-pagamento", "Meios de pagamento", Wallet)}
-          {actionRow("Calculadora", CalculatorIcon, () => setCalcOpen(true))}
+          {actionRow("Calculadora", CalculatorIcon, () => openFloatingCalculator())}
+          {row("/notificacoes", "Notificações", Bell)}
           {row("/perfil", "Meu perfil", User)}
           {row("/personalizar-menu", "Atalhos rápidos", Sliders)}
           {isAdmin && row("/admin/whitelist", "Administração", ShieldCheck)}
           {row("/perfil", "Sistema visual", Palette)}
+          {row("/sobre", "Sobre o app", Info)}
+          {row("/privacidade", "Privacidade", Lock)}
           <button
             type="button"
             onClick={() => signOut()}
@@ -87,7 +92,6 @@ function MaisPage() {
         </div>
       </div>
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
     </div>
   );
 }

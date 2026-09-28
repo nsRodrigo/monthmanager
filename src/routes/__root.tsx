@@ -54,6 +54,7 @@ import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { FloatingCalculator } from "@/components/FloatingCalculator";
+import { openFloatingCalculator, closeFloatingCalculator, useFloatingCalculatorOpen } from "@/store/floating-calculator";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
@@ -233,7 +234,6 @@ function SidebarContent({
   const isAdmin = useIsAdmin();
   const unreadCount = useUnreadNotificationsCount();
   const [manageOpen, setManageOpen] = useState(false);
-  const [calcOpen, setCalcOpen] = useState(false);
 
   const isConsolidated = loc.pathname === "/";
 
@@ -382,7 +382,7 @@ function SidebarContent({
         {link("/meios-pagamento", "Meios de pagamento", Wallet)}
         <button
           type="button"
-          onClick={() => setCalcOpen(true)}
+          onClick={() => openFloatingCalculator()}
           title="Calculadora"
           className={navItemClass(false, rail)}
         >
@@ -414,7 +414,6 @@ function SidebarContent({
       </div>
 
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
     </>
   );
 }
@@ -449,7 +448,7 @@ function BottomNav() {
   return (
     <nav
       aria-label="Navegação"
-      className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-background/90 px-2 pt-2 backdrop-blur md:hidden"
+      className="bottom-nav fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-background/90 px-2 pt-2 backdrop-blur md:hidden"
       style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
     >
       <Link to="/" className={item(onHome)} aria-current={onHome ? "page" : undefined}>
@@ -509,6 +508,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useAccountAccessRealtime();
   useValidateViewingAs();
   useNotificationsRealtime();
+  const calcOpen = useFloatingCalculatorOpen();
 
   // /auth e /reset-password nunca têm shell. /privacidade e /sobre servem
   // também pra visitante deslogado, então só ficam "públicas" (sem
@@ -583,6 +583,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
       <BottomNav />
       <CommandPalette />
+      {/* Instância única e global da calculadora avulsa — montada aqui (fora
+          da árvore de rotas) pra continuar aberta ao navegar entre telas.
+          Ver src/store/floating-calculator.ts. */}
+      <FloatingCalculator open={calcOpen} onClose={closeFloatingCalculator} />
       {/* Menu flutuante configurável — montado uma única vez aqui (igual
           AdminViewingBanner), pra não precisar editar rota por rota. A tela
           de Lançamento fica de fora (screenId null-ish "lancamento"):

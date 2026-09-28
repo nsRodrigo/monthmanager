@@ -444,6 +444,29 @@
     animation-fill-mode: none;
   }
 
+  /* Fundo da barra inferior "seguindo o tema do sistema" (opcional, ver
+     Aparência em /perfil e store/theme.tsx): preto ou branco puro, igual à
+     faixa de gestos nativa por baixo dela, em vez da paleta escura fixa do
+     app — só o fundo/borda e o texto (que precisa continuar legível nos
+     dois casos) mudam; o item ativo mantém a cor de destaque do tema. */
+  html.nav-system-bg .bottom-nav {
+    background: #000;
+    border-top-color: #000;
+  }
+  html.nav-system-bg .bottom-nav a,
+  html.nav-system-bg .bottom-nav button {
+    color: #8a8a8a;
+  }
+  html.nav-system-bg .bottom-nav .text-primary {
+    color: var(--color-primary);
+  }
+  @media (prefers-color-scheme: light) {
+    html.nav-system-bg .bottom-nav {
+      background: #fff;
+      border-top-color: #e6e6e6;
+    }
+  }
+
   .bg-gradient-primary { background-image: var(--gradient-primary); }
   .bg-gradient-credit { background-image: var(--gradient-credit); }
   .bg-gradient-debit { background-image: var(--gradient-debit); }

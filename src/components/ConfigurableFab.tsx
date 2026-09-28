@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { FabMenuContent, type ResolvedFabEntry } from "./FabMenuContent";
 import { ManageAccountsDialog } from "./ManageAccountsDialog";
-import { FloatingCalculator } from "./FloatingCalculator";
+import { openFloatingCalculator } from "@/store/floating-calculator";
 import { useFabConfig } from "@/store/fab-config";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
@@ -23,7 +23,6 @@ export function ConfigurableFab({ screenId }: { screenId: ScreenId }) {
   const [open, setOpen] = useState(false);
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
-  const [calcOpen, setCalcOpen] = useState(false);
 
   if (!cfg) return null;
 
@@ -57,7 +56,7 @@ export function ConfigurableFab({ screenId }: { screenId: ScreenId }) {
       case "calculator":
         onClick = () => {
           close();
-          setCalcOpen(true);
+          openFloatingCalculator();
         };
         break;
       case "manage-account":
@@ -100,7 +99,6 @@ export function ConfigurableFab({ screenId }: { screenId: ScreenId }) {
         onBack={() => setActiveFolder(null)}
       />
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
-      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
     </div>
   );
 }

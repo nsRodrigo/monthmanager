@@ -7,8 +7,8 @@ const SIZES = {
 } as const;
 
 /**
- * Selo do app (ícone Wallet em box com o gradiente primário) — antes
- * duplicado em cada tela que precisava exibir a marca.
+ * Selo do app (ícone Wallet em box com o gradiente primário, igual ao ícone
+ * do app/PWA) — antes duplicado em cada tela que precisava exibir a marca.
  */
 export function Logo({ size = "sm" }: { size?: keyof typeof SIZES }) {
   const s = SIZES[size];

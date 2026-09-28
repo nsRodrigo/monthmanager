@@ -52,8 +52,9 @@ import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useResetScrollOnChange, useAnchorNode, useAccordionScrollClose, useStickySectionSpy } from "@/hooks/use-band-scroll-progress";
-import { formatCurrency, MONTHS, formatDate } from "@/lib/format";
+import { useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
+import { formatCurrency, MONTHS, MONTHS_SHORT, formatDate } from "@/lib/format";
+import { SpendDonut, type DonutSlice } from "@/components/dashboard/charts";
 import {
   ChevronDown,
   Plus,
@@ -92,7 +93,7 @@ import { EditRecurringDialog, type RecurringEditTarget } from "@/components/Edit
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
-import { FabAction, toneText, toneBg, toneWash, type Tone } from "@/components/FabAction";
+import { FabAction, toneText, toneBg, type Tone } from "@/components/FabAction";
 import { FabMenuContent, type ResolvedFabEntry } from "@/components/FabMenuContent";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { FloatingCalculator } from "@/components/FloatingCalculator";
@@ -168,12 +169,8 @@ export function MonthDetailPane({
   /** Só passado quando há mais de 1 painel aberto — fecha este painel inteiro (distinto de "voltar aos meses"). */
   onClose?: () => void;
 }) {
-  // Faixa 100% estática, igual à Home — nunca encolhe (sem `useBandScrollProgress`
-  // nem `collapsible`). Só o resumo abaixo dela encolhe (useAccordionScrollClose).
+  // Cabeçalho fino e fixo, igual às demais telas.
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
-  const [cardsHeaderNode, cardsHeaderRef] = useAnchorNode<HTMLDivElement>();
-  const showCardsHeader = useStickySectionSpy(bandAnchor, cardsHeaderNode);
   useResetScrollOnChange(bandAnchor, [contaId, year, month]);
   const navigate = useNavigate();
   const { data: fabCfg } = useFabConfig("lancamento");
@@ -1084,6 +1081,60 @@ export function MonthDetailPane({
     .filter((i) => i.parentType === "purchase")
     .reduce((s, i) => s + (i.paid ? i.amount : 0), 0);
 
+  // Composição das saídas do mês — mesmo componente e cores da Home.
+  const donutSlices: DonutSlice[] = [
+    { name: "Débitos", value: totalDebits, color: "var(--series-debit)" },
+    { name: "Faturas", value: totalCards, color: "var(--series-credit)" },
+    { name: "Investimentos", value: totalInvested, color: "var(--series-invest)" },
+  ].filter((d) => d.value > 0);
+  const donutTotal = donutSlices.reduce((s, d) => s + d.value, 0);
+
+  // Ainda em aberto: débitos/recebimentos deste mês ainda não marcados, os 4 mais cedo.
+  const stillOpen = [
+    ...monthDebits.single
+      .filter((d) => !d.paid)
+      .map((d) => ({
+        key: `d-${d.id}`,
+        day: Number(d.date.slice(8, 10)),
+        label: d.description,
+        sub: "a pagar",
+        amount: d.amount,
+        kind: "debit" as const,
+      })),
+    ...monthDebits.parcelled
+      .filter((p) => !p.installment.paid)
+      .map((p) => ({
+        key: `di-${p.installment.id}`,
+        day: Number((p.installment.referenceDate ?? p.installment.dueDate).slice(8, 10)),
+        label: `${p.debit.description} (${p.installment.number}/${p.installment.total})`,
+        sub: "a pagar",
+        amount: p.installment.amount,
+        kind: "debit" as const,
+      })),
+    ...monthIncomes.single
+      .filter((i) => !i.received)
+      .map((i) => ({
+        key: `i-${i.id}`,
+        day: Number(i.date.slice(8, 10)),
+        label: i.description,
+        sub: "a receber",
+        amount: i.amount,
+        kind: "income" as const,
+      })),
+    ...monthIncomes.parcelled
+      .filter((p) => !p.installment.paid)
+      .map((p) => ({
+        key: `ii-${p.installment.id}`,
+        day: Number((p.installment.referenceDate ?? p.installment.dueDate).slice(8, 10)),
+        label: `${p.income.description} (${p.installment.number}/${p.installment.total})`,
+        sub: "a receber",
+        amount: p.installment.amount,
+        kind: "income" as const,
+      })),
+  ]
+    .sort((a, b) => a.day - b.day)
+    .slice(0, 4);
+
   // Saldo Atual = saldo final do mês anterior + recebíveis do mês atual
   const saldoAtual = (() => {
     if (!account) return 0;
@@ -1126,6 +1177,64 @@ export function MonthDetailPane({
   const prevMonth = month === 0 ? { y: year - 1, m: 11 } : { y: year, m: month - 1 };
   const nextMonth = month === 11 ? { y: year + 1, m: 0 } : { y: year, m: month + 1 };
 
+  // "Composição das saídas" e "Ainda em aberto" — no mobile ficam no fim da
+  // tela (depois dos cartões), no desktop continuam na coluna lateral fixa
+  // logo abaixo do resumo. Mesmo bloco renderizado nos dois lugares; só a
+  // visibilidade muda por breakpoint (ver `hidden`/`@4xl:hidden` abaixo).
+  const spendCompositionCards = (
+    <>
+      <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-[15px] font-semibold">Composição das saídas</h2>
+        <div className="mt-4 flex items-center gap-5">
+          <SpendDonut data={donutSlices} size={130} />
+          <div className="min-w-0 flex-1">
+            {donutSlices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sem saídas neste mês.</p>
+            ) : (
+              donutSlices.map((d) => (
+                <div key={d.name} className="flex items-center gap-2.5 py-1.5 text-sm">
+                  <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: d.color }} />
+                  <span className="flex-1 truncate text-muted-foreground">{d.name}</span>
+                  <em className="text-xs text-muted-foreground not-italic">
+                    {Math.round((d.value / donutTotal) * 100)}%
+                  </em>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-[15px] font-semibold">Ainda em aberto</h2>
+        <p className="text-xs text-muted-foreground">Próximos itens deste mês</p>
+        {stillOpen.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">Tudo em dia neste mês.</p>
+        ) : (
+          <div className="mt-3 flex flex-col">
+            {stillOpen.map((x) => (
+              <div key={x.key} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
+                <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-background leading-tight">
+                  <b className="font-display text-sm">{String(x.day).padStart(2, "0")}</b>
+                  <small className="text-[8px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {MONTHS_SHORT[month]}
+                  </small>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{x.label}</p>
+                  <p className="text-xs text-muted-foreground">{x.sub}</p>
+                </div>
+                <b className={`text-sm tabular-nums ${x.kind === "income" ? "text-income" : ""}`}>
+                  {formatCurrency(x.amount)}
+                </b>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div>
       {!embedded && maxPanes > 1 && panes.length > 0 && (
@@ -1142,7 +1251,11 @@ export function MonthDetailPane({
           eyebrow={account?.name}
           onBack={onBack}
           onClose={onClose}
-          right={
+        />
+        {/* Seletor de mês/ano flutuante: fixo logo abaixo da linha do cabeçalho,
+            por cima do conteúdo (não ocupa altura — o resumo tem folga acima). */}
+        <div className="pointer-events-none absolute inset-x-0 top-full z-10 flex justify-center px-4 pt-2.5">
+          <div className="pointer-events-auto rounded-full shadow-elevated">
             <MonthYearPicker
               contaId={contaId}
               year={year}
@@ -1151,72 +1264,49 @@ export function MonthDetailPane({
               next={nextMonth}
               onNavigate={onMonthChange}
             />
-          }
-        />
-        <div className="mx-auto max-w-5xl px-4 md:px-6">
-          {/* Frame com saldo atual e gastos totais — preso na mesma faixa
-              fixa da HeaderBand (igual Home): Saldo Final sempre visível,
-              Saldo Inicial/Gastos Totais encolhem ao rolar. */}
-          <MonthSummaryFrame
-            saldoAtual={normalizeZero(saldoAtual)}
-            gastosTotais={normalizeZero(totalDebits + totalInvested + totalCards)}
-            detailWrapperRef={accordionWrapperRef}
-            detailContentRef={accordionContentRef}
-          />
-
-          {/* Título fixo logo abaixo do resumo — mesma regra do "Suas
-              contas" da Home. Troca sozinho pra "Cartões de crédito" quando
-              a lista rola até essa seção (useStickySectionSpy, comparado
-              contra o cabeçalho de verdade mais abaixo, marcado com
-              cardsHeaderRef). */}
-          <div className="mt-4 flex items-center justify-between gap-3 px-1 pb-2">
-            {showCardsHeader ? (
-              <>
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">CARTÕES DE CRÉDITO</h2>
-                  <p className="truncate text-[11px] text-muted-foreground">Faturas e compras no crédito</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">CONTA CORRENTE</h2>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    Recebimentos − débitos − investimentos
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p
-                    className={`text-sm font-bold ${
-                      totalIncomeNet - totalDebits - totalInvested >= 0
-                        ? "text-foreground"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
-                  </p>
-                </div>
-              </>
-            )}
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
+      <div className="mx-auto max-w-6xl px-4 pb-6 md:px-6 md:pb-10 @container">
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
           pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
           o último card ao rolar até embaixo. */}
-      <div className="mt-4 space-y-4 pb-24">
+      <div className="mt-16 grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_380px] @4xl:items-start">
+      <div className="@4xl:order-2 @4xl:sticky @4xl:top-36">
+        <MonthSummaryPanel
+          saldoInicial={normalizeZero(saldoAtual)}
+          income={totalIncome}
+          debits={totalDebits}
+          cards={totalCards}
+          invested={totalInvested}
+          monthName={MONTHS[month]}
+        />
+
+        {/* Composição das saídas / Ainda em aberto — só desktop aqui (coluna
+            lateral fixa); no mobile o mesmo bloco vai pro fim da tela, depois
+            dos cartões (ver `hidden` mais abaixo). */}
+        <div className="hidden @4xl:block">{spendCompositionCards}</div>
+      </div>
+      <div className="min-w-0 space-y-4 pb-24 @4xl:order-1">
+        {/* Segmento 1: conta corrente */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-sm font-semibold tracking-wider uppercase">Conta corrente</h2>
+            <p className="truncate text-[11px] text-muted-foreground">Recebimentos − débitos − investimentos</p>
+          </div>
+          <p
+            className={`shrink-0 text-sm font-bold tabular-nums ${
+              totalIncomeNet - totalDebits - totalInvested >= 0 ? "text-foreground" : "text-destructive"
+            }`}
+          >
+            {formatCurrency(totalIncomeNet - totalDebits - totalInvested)}
+          </p>
+        </div>
         {/* INCOMES */}
         <GroupedSection
-          icon={Download}
-          title="RECEBIMENTOS"
+          icon={ArrowUpRight}
+          title="Recebimentos"
           description="Entradas de dinheiro na conta"
           tone="income"
           total={totalIncomeNet}
@@ -1358,7 +1448,7 @@ export function MonthDetailPane({
         {/* INVESTMENTS */}
         <GroupedSection
           icon={TrendingUp}
-          title="INVESTIMENTOS"
+          title="Investimentos"
           description="Aplicações e resgates"
           tone="primary"
           total={totalInvested}
@@ -1471,8 +1561,8 @@ export function MonthDetailPane({
         {/* DEBITS */}
 
         <GroupedSection
-          icon={Building2}
-          title="DÉBITOS"
+          icon={ArrowDownRight}
+          title="Débitos"
           description="Gastos diretos da conta corrente"
           tone="debit"
           total={totalDebitsNet}
@@ -1691,13 +1781,11 @@ export function MonthDetailPane({
 
           return (
             <section className="space-y-3 pt-2">
-              {/* cardsHeaderRef marca onde a seção "de verdade" começa — é
-                  contra ele que useStickySectionSpy compara a posição do
-                  bloco fixo, pra saber quando trocar o título lá em cima. */}
-              <div ref={cardsHeaderRef} className="flex items-center justify-between gap-3 px-1">
+              {/* Segmento 2: cartões de crédito */}
+              <div className="flex items-center justify-between gap-3 px-1">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold uppercase tracking-wider">
-                    CARTÕES DE CRÉDITO
+                  <h2 className="truncate font-display text-sm font-semibold tracking-wider uppercase">
+                    Cartões de crédito
                   </h2>
                   <p className="truncate text-[11px] text-muted-foreground">
                     {reorderMode
@@ -1780,7 +1868,7 @@ export function MonthDetailPane({
                     : "Nenhum cartão com movimento neste mês."}
                 </p>
               ) : (
-                <div className="grid gap-3">
+                <div className="grid min-w-0 gap-3">
                   {cardsAll.map(({ card: c, items: cardInst }) => {
                     const total = cardInst.reduce((s, i) => s + i.amount, 0);
                     const faturaIsPaid = isCardFullyPaid(
@@ -1803,14 +1891,7 @@ export function MonthDetailPane({
                     return (
                       <div
                         key={c.id}
-                        className={`rounded-2xl border border-l-4 bg-card transition-colors ${
-                          cardState === "paid"
-                            ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
-                            : cardState === "allChecked"
-                              ? "border-credit/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--credit)_45%,transparent)]"
-                              : "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
-                        }`}
-                        style={{ borderLeftColor: c.color }}
+                        className="min-w-0 rounded-2xl border border-border bg-card transition-colors"
                       >
                         <CardRowSorted
                           card={c}
@@ -1821,7 +1902,7 @@ export function MonthDetailPane({
                           cardState={cardState}
                           countRevisado={countRevisado}
                           paymentPending={setCardPaid.isPending}
-                          dueLabel={`Vence: ${dueDate.toLocaleDateString("pt-BR")}`}
+                          dueLabel={`fecha ${fmtDayMonth(new Date(year, month - 1, Math.min((c as { closingDay?: number }).closingDay ?? 1, 28)))} · vence ${fmtDayMonth(dueDate)}`}
                           onTogglePaid={() => {
                             if (!setCardPaid.isPending) {
                               const newPaid = !faturaIsPaid;
@@ -1883,6 +1964,11 @@ export function MonthDetailPane({
             </section>
           );
         })()}
+
+        {/* Composição das saídas / Ainda em aberto — só mobile aqui, no fim
+            da tela; no desktop já aparece na coluna lateral fixa acima. */}
+        <div className="@4xl:hidden">{spendCompositionCards}</div>
+      </div>
       </div>
 
       {(() => {
@@ -1904,7 +1990,7 @@ export function MonthDetailPane({
                 />
               )}
               <div
-                className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
+                className={`pointer-events-auto ${embedded ? "absolute bottom-10" : "fixed bottom-[calc(var(--bnav-h)+2.5rem)]"} right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
               >
                 {bulkMenuOpen && (
                   <div className="flex flex-col items-end gap-2.5">
@@ -2049,8 +2135,11 @@ export function MonthDetailPane({
             entries={fabEntries}
             isSubLevel={!!fabFolder}
             onBack={() => setFabFolder(null)}
-            positionClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
-            backdropClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
+            positionClassName={
+              embedded
+                ? "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:absolute md:left-auto md:right-4 md:bottom-10 md:translate-x-0 md:items-end"
+                : undefined
+            }
           />
         );
         return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;
@@ -2192,61 +2281,113 @@ export function MonthDetailPane({
 /* ───────── MONTH SUMMARY FRAME ───────── */
 
 /**
- * "Saldo Final" fica sempre visível (é o número que o título fixo mostra
- * mesmo depois de rolar); "Saldo Inicial" e "Gastos Totais" ficam no bloco
- * que `useAccordionScrollClose` encolhe por gesto — mesmo padrão do card da
- * Home (saldo previsto sempre visível, gráfico+stats encolhem).
+ * Resumo do mês, no começo da tela. Regras de saldo (inalteradas):
+ *   Saldo Inicial = saldo final do mês anterior + recebíveis do mês
+ *   Saldo Final   = Saldo Inicial − (débitos + investimentos + cartões)
+ * Em tela larga mostra a "ponte" que explica como o saldo se forma, ao lado
+ * do número; em tela estreita, só o número e dois totais. `picker` é o
+ * seletor de mês/ano (antes ficava no cabeçalho, que agora tem busca/perfil).
  */
-function MonthSummaryFrame({
-  saldoAtual,
-  gastosTotais,
-  detailWrapperRef,
-  detailContentRef,
+function MonthSummaryPanel({
+  saldoInicial,
+  income,
+  debits,
+  cards,
+  invested,
+  monthName,
 }: {
-  saldoAtual: number;
-  gastosTotais: number;
-  detailWrapperRef: (el: HTMLDivElement | null) => void;
-  detailContentRef: (el: HTMLDivElement | null) => void;
+  saldoInicial: number;
+  income: number;
+  debits: number;
+  cards: number;
+  invested: number;
+  monthName: string;
 }) {
-  const saldoFinal = saldoAtual - gastosTotais;
-  const inicialTone = saldoAtual >= 0 ? "text-primary" : "text-destructive";
-  const inicialBg =
-    saldoAtual >= 0 ? "border-primary/20 bg-primary/10" : "border-destructive/20 bg-destructive/10";
-  const finalTone = saldoFinal >= 0 ? "text-primary" : "text-destructive";
-  return (
-    <div className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in rounded-3xl border border-border bg-card p-3 shadow-elegant sm:p-4">
-      <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${finalTone}`}>
-        <Check className="h-3 w-3" /> Saldo Final
-      </div>
-      <p className={`mt-1 text-xl font-bold sm:text-2xl ${finalTone}`}>
-        {formatCurrency(saldoFinal)}
-      </p>
-      <p className="mt-0.5 text-[10px] text-muted-foreground">saldo inicial − gastos totais</p>
+  const gastos = debits + cards + invested;
+  const saldoFinal = saldoInicial - gastos;
+  const saldoAnterior = saldoInicial - income;
+  const finalTone = saldoFinal >= 0 ? "text-foreground" : "text-destructive";
+  const net = income - gastos;
 
-      <div ref={detailWrapperRef} className="overflow-hidden">
-        <div ref={detailContentRef} className="mt-3 grid grid-cols-2 gap-3">
-          <div className={`rounded-xl border p-3 ${inicialBg}`}>
-            <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${inicialTone}`}>
-              <Wallet className="h-3 w-3" /> Saldo Inicial
+  // Ponte: cada linha é uma barra posicionada no eixo do saldo (0 → topo).
+  const scaleMax = Math.max(saldoInicial, saldoAnterior, 1);
+  const pos = (v: number) => `${Math.max(0, Math.min(100, (v / scaleMax) * 100))}%`;
+  let run = saldoInicial;
+  const steps: { label: string; left: number; width: number; color: string; value: string; tone: string }[] = [];
+  steps.push({
+    label: "Saldo inicial",
+    left: 0,
+    width: Math.max(saldoAnterior, 0),
+    color: "var(--color-muted-foreground)",
+    value: formatCurrency(saldoAnterior),
+    tone: "",
+  });
+  steps.push({
+    label: "+ Recebíveis",
+    left: Math.max(saldoAnterior, 0),
+    width: income,
+    color: "var(--series-income)",
+    value: `+ ${formatCurrency(income)}`,
+    tone: "text-income",
+  });
+  for (const [label, v, color, tone] of [
+    ["− Débitos", debits, "var(--series-debit)", "text-debit"],
+    ["− Faturas", cards, "var(--series-credit)", "text-credit"],
+    ["− Investim.", invested, "var(--series-invest)", "text-invest"],
+  ] as const) {
+    run -= v;
+    steps.push({
+      label,
+      left: Math.max(run, 0),
+      width: Math.max(0, Math.min(v, run + v)),
+      color,
+      value: `− ${formatCurrency(v)}`,
+      tone,
+    });
+  }
+
+  return (
+    <section className="animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-hero p-6">
+      <div className="mb-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        Saldo final · {monthName}
+      </div>
+
+      <div className="grid gap-y-5">
+        <div>
+          <p className={`font-display text-[44px] leading-none font-semibold tracking-tight tabular-nums ${finalTone}`}>
+            {formatCurrency(saldoFinal)}
+          </p>
+          <span
+            className={`mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${
+              net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {net >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+            {net >= 0 ? "+" : "−"} {formatCurrency(Math.abs(net))} no mês
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-3.5" aria-label="Como o saldo se forma">
+          {steps.map((s) => (
+            <div key={s.label} className="grid grid-cols-[100px_minmax(0,1fr)_auto] items-center gap-3 text-sm">
+              <span className="text-muted-foreground">{s.label}</span>
+              <div className="relative h-4 rounded-md border border-border bg-background">
+                <i
+                  className="absolute inset-y-px rounded-[4px]"
+                  style={{ left: pos(s.left), width: pos(s.width), background: s.color }}
+                />
+              </div>
+              <b className={`text-right font-bold tabular-nums ${s.tone}`}>{s.value}</b>
             </div>
-            <p className={`mt-1 text-base font-bold sm:text-lg ${inicialTone}`}>
-              {formatCurrency(saldoAtual)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-debit/20 bg-debit/10 p-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-debit">
-              <ArrowDownRight className="h-3 w-3" /> Gastos Totais
-            </div>
-            <p className="mt-1 text-base font-bold text-debit sm:text-lg">
-              {formatCurrency(gastosTotais)}
-            </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              débitos + investimentos + cartões
-            </p>
+          ))}
+          <div className="grid grid-cols-[100px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border pt-3.5 text-sm">
+            <span>Saldo final</span>
+            <span />
+            <b className={`text-right font-bold tabular-nums ${finalTone}`}>{formatCurrency(saldoFinal)}</b>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -2268,7 +2409,6 @@ function GroupedSection({
   headerBar,
   sortControl,
   paidControl,
-  paidState,
   children,
 }: {
   icon: typeof Building2;
@@ -2292,78 +2432,38 @@ function GroupedSection({
   const [open, setOpen] = useState(defaultOpen);
   const totalColor = toneText[totalTone ?? tone];
   const toggle = () => setOpen((o) => !o);
-  const stateClass =
-    paidState === "paid"
-      ? "border-success/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--success)_45%,transparent)]"
-      : paidState === "open"
-        ? "border-warning/50 shadow-[0_4px_18px_-6px_color-mix(in_oklab,var(--warning)_40%,transparent)]"
-        : "border-border";
   return (
-    <section className={`overflow-hidden rounded-2xl border bg-card ${stateClass}`}>
-      {/* Header */}
-      <div className={`flex flex-col gap-1.5 px-3 py-3 md:px-4 md:py-3.5 ${toneWash[tone]}`}>
-        {/* Linha 1: ícone + título (+ valor/controles no desktop) */}
-        <div className="flex items-center gap-2.5 md:gap-3">
-          <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}
-            >
-              <Icon className="h-4 w-4" />
-            </div>
-          </button>
-          <button onClick={toggle} className="min-w-0 flex-1 text-left">
-            <h2 className="truncate text-sm font-bold uppercase tracking-wider">{title}</h2>
-            <p className="truncate text-[11px] text-muted-foreground">{description}</p>
-          </button>
-          {typeof total === "number" && (
-            <div className="hidden shrink-0 flex-col items-end md:flex">
-              <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
-              {typeof count === "number" && (
-                <p className="text-[10px] text-muted-foreground">
-                  {count} {count === 1 ? "item" : "itens"}
-                </p>
-              )}
-            </div>
-          )}
-          {open && paidControl ? (
-            <div className="hidden shrink-0 md:block">{paidControl}</div>
-          ) : null}
-          {open && sortControl ? (
-            <div className="hidden shrink-0 md:block">{sortControl}</div>
-          ) : null}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={open ? "Recolher" : "Expandir"}
-            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-          >
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
-          </button>
-        </div>
-
-        {/* Linha 2 (mobile only): valor + controles */}
-        {(typeof total === "number" || (open && (paidControl || sortControl))) && (
-          <div className="flex items-center justify-between gap-2 md:hidden">
-            {typeof total === "number" ? (
-              <div className="flex flex-col">
-                <p className={`text-sm font-bold ${totalColor}`}>{formatCurrency(total)}</p>
-                {typeof count === "number" && (
-                  <p className="text-[10px] text-muted-foreground">
-                    {count} {count === 1 ? "item" : "itens"}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div />
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      {/* Cabeçalho (igual ao protótipo): uma linha só em qualquer largura —
+          ícone quadrado · título/descrição · total + nº de itens · seta. */}
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <button onClick={toggle} className="shrink-0" aria-label={open ? "Recolher" : "Expandir"}>
+          <div className={`flex h-9 w-9 items-center justify-center rounded-[11px] ${toneBg[tone]} ${toneText[tone]}`}>
+            <Icon className="h-[18px] w-[18px]" />
+          </div>
+        </button>
+        <button onClick={toggle} className="min-w-0 flex-1 text-left">
+          <h2 className="truncate font-display text-[14.5px] font-semibold tracking-tight">{title}</h2>
+          <p className="truncate text-xs text-muted-foreground">{description}</p>
+        </button>
+        {typeof total === "number" && (
+          <div className="shrink-0 text-right">
+            <p className={`font-display text-base font-semibold tabular-nums ${totalColor}`}>{formatCurrency(total)}</p>
+            {typeof count === "number" && (
+              <p className="text-[11.5px] text-muted-foreground">
+                {count} {count === 1 ? "item" : "itens"}
+              </p>
             )}
-            <div className="flex items-center gap-2">
-              {open && paidControl ? <div className="shrink-0">{paidControl}</div> : null}
-              {open && sortControl ? <div className="shrink-0">{sortControl}</div> : null}
-            </div>
           </div>
         )}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={open ? "Recolher" : "Expandir"}
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+        >
+          <ChevronDown className={`h-[18px] w-[18px] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
       {/* Body — grid-rows 0fr/1fr anima a altura sem precisar medir nada em JS. */}
@@ -2373,6 +2473,12 @@ function GroupedSection({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border">
+            {(paidControl || sortControl) && (
+              <div className="flex items-center justify-end gap-2 px-3 py-2.5 md:px-4">
+                {paidControl}
+                {sortControl}
+              </div>
+            )}
             {headerBar}
             {empty ? (
               <Empty text={emptyText} />
@@ -2409,6 +2515,10 @@ type Card = ReturnType<typeof useCards>["data"] extends infer T
     ? C
     : never
   : never;
+
+/** "28/09" — dia/mês sem ano (rótulo de fechamento/vencimento do cartão). */
+const fmtDayMonth = (d: Date) =>
+  `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 function CardRowSorted({
   card,
@@ -2578,9 +2688,12 @@ function CardRow({
 
   return (
     <div className="relative">
+      {/* Cabeçalho: ícone do cartão · nome + fechamento/vencimento · total + revisados.
+          Clicar abre/fecha; segurar abre o menu do cartão. */}
       <div
         role="button"
         tabIndex={0}
+        aria-expanded={open}
         onClick={toggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -2589,102 +2702,30 @@ function CardRow({
           }
         }}
         {...lp.handlers}
-        className="flex w-full cursor-pointer flex-col gap-1.5 px-3 py-3 text-left transition-colors hover:bg-secondary/30 md:px-4 md:py-3.5"
+        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
       >
-        {/* Linha 1: cor + nome + (desktop: valor + controles) */}
-        <div className="flex items-center gap-2.5 md:gap-3">
-          <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: cardColor }}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{cardName}</p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{dueLabel}</p>
-          </div>
-          <div className="hidden shrink-0 flex-col items-end gap-0.5 md:flex">
-            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {cardState === "paid"
-                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
-                : cardState === "allChecked"
-                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={paymentPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!paymentPending) onTogglePaid();
-            }}
-            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 md:inline-flex ${
-              cardState === "paid"
-                ? "bg-success/15 text-success hover:bg-success/25"
-                : cardState === "allChecked"
-                  ? "bg-credit/15 text-credit hover:bg-credit/25"
-                  : "bg-warning/15 text-warning hover:bg-warning/25"
-            }`}
-          >
-            {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
-          </button>
-          {open && sortControl ? (
-            <div className="hidden shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
-              {sortControl}
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen((o) => !o);
-            }}
-            aria-label={open ? "Recolher" : "Expandir"}
-            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-          >
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            />
-          </button>
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
+          style={{
+            backgroundColor: `color-mix(in oklab, ${cardColor} 24%, transparent)`,
+            color: `color-mix(in oklab, ${cardColor} 55%, white)`,
+          }}
+        >
+          <CreditCard className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-[15px] font-semibold tracking-tight">{cardName}</p>
+          <p className="truncate text-[12.5px] text-muted-foreground">{dueLabel}</p>
         </div>
-
-        {/* Linha 2 (mobile only): valor + controles */}
-        <div className="flex items-center justify-between gap-2 md:hidden">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-bold text-credit">{formatCurrency(total)}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {cardState === "paid"
-                ? `${count} ${count === 1 ? "item" : "itens"} · fatura paga`
-                : cardState === "allChecked"
-                  ? `${count} ${count === 1 ? "item" : "itens"} · todos revisados`
-                  : `${count} ${count === 1 ? "item" : "itens"} · ${countRevisado} revisados`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={paymentPending}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!paymentPending) onTogglePaid();
-              }}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-                cardState === "paid"
-                  ? "bg-success/15 text-success hover:bg-success/25"
-                  : cardState === "allChecked"
-                    ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"
-                    : "bg-warning/15 text-warning hover:bg-warning/25"
-              }`}
-            >
-              {paymentPending ? "Salvando..." : cardState === "paid" ? "Pago" : "Marcar pago"}
-            </button>
-            {open && sortControl ? (
-              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                {sortControl}
-              </div>
-            ) : null}
-          </div>
+        <div className="shrink-0 text-right">
+          <p className="font-display text-[17px] font-bold text-credit tabular-nums">{formatCurrency(total)}</p>
+          <p className="text-xs text-muted-foreground">
+            {cardState === "paid" ? "fatura paga" : `${countRevisado}/${count} revisados`}
+          </p>
         </div>
+        <ChevronDown
+          className={`h-[18px] w-[18px] shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
       </div>
 
       {menuOpen && (
@@ -2725,6 +2766,37 @@ function CardRow({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border bg-background/30">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 md:px-4">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
+                  cardState === "paid"
+                    ? "bg-success/15 text-success"
+                    : cardState === "allChecked"
+                      ? "bg-credit/15 text-credit"
+                      : "bg-warning/15 text-warning"
+                }`}
+              >
+                {cardState === "paid" ? "Fatura paga" : cardState === "allChecked" ? "Todos revisados" : "Fatura em aberto"}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={paymentPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!paymentPending) onTogglePaid();
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                    cardState === "paid"
+                      ? "border border-border bg-secondary hover:bg-muted"
+                      : "bg-primary text-primary-foreground hover:opacity-90"
+                  }`}
+                >
+                  {paymentPending ? "Salvando..." : cardState === "paid" ? "Reabrir fatura" : "Marcar fatura como paga"}
+                </button>
+                {sortControl}
+              </div>
+            </div>
             {selectionBar}
 
             {items.length === 0 ? (
@@ -2801,14 +2873,115 @@ type SelectionRowProps = {
   onLongPress: () => void;
 };
 
+/* ───────── LINHAS DE LANÇAMENTO (layout do protótipo) ─────────
+   Caixa de seleção · descrição + etiquetas · valor · status. A caixa alterna
+   pago/recebido/validado (mesmas ações de antes); clicar no texto edita; segurar
+   seleciona (lp/guard). No celular o status vira só a própria caixa. */
+
+const rowChip = "rounded-full px-1.5 py-px text-[10px] font-bold tracking-wide uppercase";
+
+function useRowGuard(
+  onLongPress: SelectionRowProps["onLongPress"],
+  selectionMode: SelectionRowProps["selectionMode"],
+  onSelectToggle: SelectionRowProps["onSelectToggle"],
+) {
+  const lp = useLongPress(onLongPress);
+  const guard = (fn: () => void) => (e: React.MouseEvent) => {
+    if (lp.didFire()) {
+      lp.reset();
+      e.preventDefault();
+      return;
+    }
+    if (selectionMode) {
+      e.preventDefault();
+      onSelectToggle();
+      return;
+    }
+    fn();
+  };
+  return { lp, guard };
+}
+
+function RowShell({
+  lp,
+  guard,
+  selected,
+  checked,
+  onCheck,
+  checkLabel,
+  leadingIcon,
+  title,
+  titleClass = "",
+  done,
+  meta,
+  amount,
+  amountClass,
+  status,
+  onEdit,
+}: {
+  lp: ReturnType<typeof useLongPress>;
+  guard: (fn: () => void) => (e: React.MouseEvent) => void;
+  selected?: boolean;
+  /** Estado da caixa. `undefined` + `leadingIcon` = linha sem caixa (ex.: investimento). */
+  checked?: boolean;
+  onCheck?: () => void;
+  checkLabel?: string;
+  leadingIcon?: React.ReactNode;
+  title: string;
+  titleClass?: string;
+  done?: boolean;
+  meta: React.ReactNode;
+  amount: string;
+  amountClass: string;
+  /** Texto do status à direita (some no celular). */
+  status?: string;
+  onEdit: () => void;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:px-4 ${
+        selected ? "bg-primary/10" : ""
+      }`}
+      {...lp.handlers}
+    >
+      {leadingIcon ?? <span aria-hidden="true" />}
+      <button type="button" onClick={guard(onEdit)} className="min-w-0 text-left">
+        <p className={`truncate text-sm font-semibold ${done ? "text-muted-foreground" : ""} ${titleClass}`}>
+          {title}
+        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{meta}</div>
+      </button>
+      <div className="flex flex-col items-end gap-1">
+        <p className={`text-right text-sm font-semibold whitespace-nowrap tabular-nums ${amountClass}`}>{amount}</p>
+        {status !== undefined && (
+          <button
+            type="button"
+            onClick={guard(onCheck ?? (() => {}))}
+            aria-label={checkLabel}
+            aria-pressed={!!checked}
+            className={`inline-flex min-w-[78px] items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold transition-colors ${
+              checked ? "bg-success/15 text-success hover:bg-success/25" : "bg-secondary text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {checked && <Check className="h-3 w-3" strokeWidth={2.6} />}
+            {status}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Etiqueta de meio de pagamento (PIX, BOL…) usada nas linhas. */
+function MethodChip({ method }: { method: Exclude<Debit["paymentMethod"], null | "auto_debit"> }) {
+  return <span className={`${rowChip} bg-invest/15 text-invest`}>{PAYMENT_METHOD_BADGES[method]}</span>;
+}
+
 function PurchaseInstRow({
   inst,
   purchase,
-  cardColor,
   onToggle,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2828,78 +3001,36 @@ function PurchaseInstRow({
   onRemove?: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const isInstallment = inst.total > 1;
   const isRecurring = !isInstallment && !!purchase.recurrenceGroupId;
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <span
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: cardColor }}
-        aria-hidden="true"
-      />
-      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <p className={`truncate text-sm font-semibold ${inst.paid ? "text-muted-foreground" : ""}`}>
-          {purchase.description}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={inst.paid}
+      onCheck={onToggle}
+      checkLabel={inst.paid ? "Desmarcar validação" : "Marcar como revisado"}
+      title={purchase.description}
+      done={inst.paid}
+      onEdit={onEdit}
+      amount={formatCurrency(inst.amount)}
+      amountClass="text-credit"
+      status={inst.paid ? "Validado" : "Revisar"}
+      meta={
+        <>
           <span>{formatDate(inst.referenceDate || purchase.date)}</span>
+          {isInstallment && <span className={`${rowChip} bg-secondary text-muted-foreground`}>PAR</span>}
           {isInstallment && (
-            <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-              PAR
-            </span>
-          )}
-          {isInstallment && (
-            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold text-credit">
+            <span className={`${rowChip} bg-credit/15 text-credit`}>
               {inst.number}/{inst.total}
             </span>
           )}
-          {isRecurring && (
-            <span className="rounded-full bg-credit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-credit">
-              REC
-            </span>
-          )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
-          <p className="text-sm font-bold">{formatCurrency(inst.amount)}</p>
-        </div>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            inst.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
-          title={inst.paid ? "Desmarcar" : "Marcar como revisado"}
-        >
-          {inst.paid ? (
-            <>
-              <Check className="h-3 w-3" /> Validado
-            </>
-          ) : (
-            "Não validado"
-          )}
-        </button>
-      </div>
-    </div>
+          {isRecurring && <span className={`${rowChip} bg-credit/15 text-credit`}>REC</span>}
+        </>
+      }
+    />
   );
 }
 
@@ -2907,8 +3038,6 @@ function DebitRow({
   debit,
   onToggle,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -2920,75 +3049,38 @@ function DebitRow({
   onRemove: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-debit/15 text-debit">
-        <ArrowDownRight className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${debit.paid ? "text-muted-foreground" : ""}`}
-        >
-          {debit.description}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={debit.paid}
+      onCheck={onToggle}
+      checkLabel={debit.paid ? "Desmarcar pagamento" : "Marcar como pago"}
+      title={debit.description}
+      done={debit.paid}
+      onEdit={onEdit}
+      amount={`− ${formatCurrency(debit.amount)}`}
+      amountClass="text-debit"
+      status={debit.paid ? "Pago" : "Pendente"}
+      meta={
+        <>
           <span>{formatDate(debit.date)}</span>
-          {debit.required && (
-            <span className="rounded-full bg-debit/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-debit">
-              REC
-            </span>
+          {(debit.required || !!debit.recurrenceGroupId) && (
+            <span className={`${rowChip} bg-debit/15 text-debit`}>REC</span>
           )}
           {debit.paymentMethod === "auto_debit" ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
+            <span className={`${rowChip} inline-flex items-center gap-1 bg-primary/15 text-primary`}>
               <Zap className="h-2.5 w-2.5" />
               AUT{debit.autoDebitDay ? ` d${debit.autoDebitDay}` : ""}
             </span>
           ) : (
-            debit.paymentMethod && (
-              <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
-                {PAYMENT_METHOD_BADGES[debit.paymentMethod]}
-              </span>
-            )
+            debit.paymentMethod && <MethodChip method={debit.paymentMethod} />
           )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <p className="text-sm font-bold text-debit">{formatCurrency(debit.amount)}</p>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            debit.paid
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
-        >
-          {debit.paid ? (
-            <>
-              <Check className="h-3 w-3" /> Pago
-            </>
-          ) : (
-            "Marcar pago"
-          )}
-        </button>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 
@@ -2996,8 +3088,6 @@ function IncomeRow({
   income,
   onToggle,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -3009,70 +3099,31 @@ function IncomeRow({
   onRemove: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
-        <ArrowUpRight className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            income.received ? "text-muted-foreground" : ""
-          }`}
-        >
-          {income.description}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={income.received}
+      onCheck={onToggle}
+      checkLabel={income.received ? "Desmarcar recebimento" : "Marcar como recebido"}
+      title={income.description}
+      done={income.received}
+      onEdit={onEdit}
+      amount={`+ ${formatCurrency(income.amount)}`}
+      amountClass="text-income"
+      status={income.received ? "Recebido" : "Pendente"}
+      meta={
+        <>
           <span>{formatDate(income.date)}</span>
-          {income.recurrenceGroupId && (
-            <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-success">
-              REC
-            </span>
+          {income.recurrenceGroupId && <span className={`${rowChip} bg-success/15 text-success`}>REC</span>}
+          {income.paymentMethod && income.paymentMethod !== "auto_debit" && (
+            <MethodChip method={income.paymentMethod} />
           )}
-          {income.paymentMethod && (
-            <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
-              {PAYMENT_METHOD_BADGES[income.paymentMethod]}
-            </span>
-          )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <p className="text-sm font-bold text-success">{formatCurrency(income.amount)}</p>
-        <button
-          onClick={guard(onToggle)}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-            income.received
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-          }`}
-        >
-          {income.received ? (
-            <>
-              <Check className="h-3 w-3" /> Recebido
-            </>
-          ) : (
-            "Marcar recebido"
-          )}
-        </button>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 
@@ -3082,7 +3133,6 @@ function ParcelledRow({
   parent,
   onToggle,
   onEdit,
-  onRemove,
   selectionMode,
   selected,
   onSelectToggle,
@@ -3095,118 +3145,83 @@ function ParcelledRow({
   onEdit: () => void;
   onRemove?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
-  const tone =
-    kind === "debit" ? "text-debit" : kind === "income" ? "text-success" : "text-primary";
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
-  const otherMethod =
-    kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
-  const label =
-    kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
-  const badgeClass =
+  const otherMethod = kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
+  const label = kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
+  const badge =
     kind === "debit"
       ? "bg-debit/15 text-debit"
       : kind === "income"
         ? "bg-success/15 text-success"
-        : "bg-primary/15 text-primary";
-  const iconWrapClass =
-    kind === "debit"
-      ? "bg-debit/15 text-debit"
-      : kind === "income"
-        ? "bg-success/15 text-success"
-        : "bg-primary/15 text-primary";
+        : "bg-invest/15 text-invest";
+  const amountClass = kind === "debit" ? "text-debit" : kind === "income" ? "text-income" : "text-invest";
+  const sign = kind === "income" ? "+ " : "− ";
+  const meta = (
+    <>
+      <span>{formatDate(installment.referenceDate || parent.date)}</span>
+      <span className={`${rowChip} bg-secondary text-muted-foreground`}>PAR</span>
+      <span className={`${rowChip} ${badge}`}>
+        {installment.number}/{installment.total}
+      </span>
+      {auto && (
+        <span className={`${rowChip} inline-flex items-center gap-1 bg-primary/15 text-primary`}>
+          <Zap className="h-2.5 w-2.5" />
+          AUT
+        </span>
+      )}
+      {otherMethod && otherMethod !== "auto_debit" && <MethodChip method={otherMethod} />}
+    </>
+  );
+  if (kind === "investment") {
+    return (
+      <RowShell
+        lp={lp}
+        guard={guard}
+        selected={selected}
+        leadingIcon={
+          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
+            <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        }
+        title={label}
+        onEdit={onEdit}
+        amount={`${sign}${formatCurrency(installment.amount)}`}
+        amountClass={amountClass}
+        meta={meta}
+      />
+    );
+  }
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
-      >
-        {kind === "debit" ? (
-          <ArrowDownRight className="h-3.5 w-3.5" />
-        ) : kind === "income" ? (
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        ) : (
-          <TrendingUp className="h-3.5 w-3.5" />
-        )}
-      </div>
-      <button onClick={guard(onEdit)} className="min-w-0 flex-1 text-left">
-        <p
-          className={`truncate text-sm font-semibold ${
-            kind !== "investment" && installment.paid ? "text-muted-foreground" : ""
-          }`}
-        >
-          {label}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span>{formatDate(installment.referenceDate || parent.date)}</span>
-          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-            PAR
-          </span>
-          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${badgeClass}`}>
-            {installment.number}/{installment.total}
-          </span>
-          {auto && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
-              <Zap className="h-2.5 w-2.5" />
-              AUT
-            </span>
-          )}
-          {otherMethod && (
-            <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-cyan-600 dark:text-cyan-400">
-              {PAYMENT_METHOD_BADGES[otherMethod]}
-            </span>
-          )}
-        </p>
-      </button>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
-          <p className={`text-sm font-bold ${tone}`}>{formatCurrency(installment.amount)}</p>
-        </div>
-        {kind !== "investment" && (
-          <button
-            onClick={guard(onToggle)}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-              installment.paid
-                ? "bg-success/15 text-success hover:bg-success/25"
-                : "bg-secondary text-muted-foreground hover:bg-secondary/70"
-            }`}
-          >
-            {installment.paid ? (
-              <>
-                <Check className="h-3 w-3" /> {kind === "income" ? "Recebido" : "Pago"}
-              </>
-            ) : kind === "income" ? (
-              "Marcar recebido"
-            ) : (
-              "Marcar pago"
-            )}
-          </button>
-        )}
-      </div>
-    </div>
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      checked={installment.paid}
+      onCheck={onToggle}
+      checkLabel={
+        installment.paid
+          ? kind === "income"
+            ? "Desmarcar recebimento"
+            : "Desmarcar pagamento"
+          : kind === "income"
+            ? "Marcar como recebido"
+            : "Marcar como pago"
+      }
+      title={label}
+      done={installment.paid}
+      onEdit={onEdit}
+      amount={`${sign}${formatCurrency(installment.amount)}`}
+      amountClass={amountClass}
+      status={installment.paid ? (kind === "income" ? "Recebido" : "Pago") : "Pendente"}
+      meta={meta}
+    />
   );
 }
 
 function InvestmentRow({
   inv,
   onEdit,
-  onRemove,
-  onDuplicate,
   selectionMode,
   selected,
   onSelectToggle,
@@ -3217,42 +3232,30 @@ function InvestmentRow({
   onRemove: () => void;
   onDuplicate?: () => void;
 } & SelectionRowProps) {
-  const lp = useLongPress(onLongPress);
-  const guard = (fn: () => void) => (e: React.MouseEvent) => {
-    if (lp.didFire()) {
-      lp.reset();
-      e.preventDefault();
-      return;
-    }
-    if (selectionMode) {
-      e.preventDefault();
-      onSelectToggle();
-      return;
-    }
-    fn();
-  };
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-3 transition-colors md:gap-3 md:px-4 ${selected ? "bg-primary/10" : ""}`}
-      {...lp.handlers}
-    >
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-        <TrendingUp className="h-3.5 w-3.5" />
-      </div>
-      <button onClick={guard(onEdit)} className="flex-1 min-w-0 text-left">
-        <p className="truncate text-sm font-semibold capitalize">{inv.type}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+    <RowShell
+      lp={lp}
+      guard={guard}
+      selected={selected}
+      leadingIcon={
+        <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
+          <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+      }
+      title={inv.type}
+      titleClass="capitalize"
+      onEdit={onEdit}
+      amount={`− ${formatCurrency(inv.amount)}`}
+      amountClass="text-invest"
+      meta={
+        <>
           <span>{formatDate(inv.date)}</span>
           <span>· {inv.percentage}% rendimento</span>
-          {inv.recurrenceGroupId && (
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
-              REC
-            </span>
-          )}
-        </p>
-      </button>
-      <p className="text-sm font-bold text-primary">{formatCurrency(inv.amount)}</p>
-    </div>
+          {inv.recurrenceGroupId && <span className={`${rowChip} bg-invest/15 text-invest`}>REC</span>}
+        </>
+      }
+    />
   );
 }
 

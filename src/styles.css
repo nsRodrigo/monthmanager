@@ -40,73 +40,148 @@
   --color-debit-foreground: var(--debit-foreground);
   --color-income: var(--income);
   --color-income-foreground: var(--income-foreground);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-invest: var(--invest);
+  --color-invest-foreground: var(--invest-foreground);
+  --color-series-income: var(--series-income);
+  --color-series-credit: var(--series-credit);
+  --color-series-debit: var(--series-debit);
+  --color-series-invest: var(--series-invest);
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Geist", ui-sans-serif, system-ui, sans-serif;
   --breakpoint-xs: 30rem;
 }
 
 :root {
   --radius: 0.875rem;
-  /* Dark theme by default — financial app feel */
-  --background: oklch(0.16 0.015 155);
-  --foreground: oklch(0.97 0.005 155);
-  --card: oklch(0.21 0.018 155);
-  --card-foreground: oklch(0.97 0.005 155);
-  --popover: oklch(0.21 0.018 155);
-  --popover-foreground: oklch(0.97 0.005 155);
-  --primary: oklch(0.72 0.18 155);
-  --primary-foreground: oklch(0.15 0.02 155);
-  --secondary: oklch(0.27 0.02 155);
-  --secondary-foreground: oklch(0.97 0.005 155);
-  --muted: oklch(0.24 0.018 155);
-  --muted-foreground: oklch(0.68 0.02 155);
-  --accent: oklch(0.3 0.04 280);
-  --accent-foreground: oklch(0.97 0.005 155);
-  --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.98 0.005 155);
-  --border: oklch(0.28 0.018 155);
-  --input: oklch(0.25 0.018 155);
-  --ring: oklch(0.72 0.18 155);
+  /* Painel escuro ("Esmeralda Noite"): superfícies em camadas quase pretas com
+     leve viés de matiz verde. Profundidade vem do tom + borda fina, não de
+     sombra. Uma cor de destaque (primary) e quatro cores de DADOS com
+     significado fixo: entrada / fatura / débito / investimento. */
+  --background: #0a0f0e;
+  --foreground: #e9f2ee;
+  --card: #101816;
+  --card-foreground: #e9f2ee;
+  --popover: #152020;
+  --popover-foreground: #e9f2ee;
+  --primary: #3ddc97;
+  --primary-foreground: #04140d;
+  --secondary: #1b2a27;
+  --secondary-foreground: #e9f2ee;
+  --muted: #152020;
+  --muted-foreground: #9db0a8;
+  --accent: #1b2a27;
+  --accent-foreground: #e9f2ee;
+  --destructive: #ff7a7a;
+  --destructive-foreground: #1a0606;
+  --border: #22332f;
+  --input: #152020;
+  --ring: #3ddc97;
 
-  --success: oklch(0.72 0.18 155);
-  --success-foreground: oklch(0.15 0.02 155);
-  --warning: oklch(0.78 0.16 75);
-  --warning-foreground: oklch(0.2 0.04 75);
+  --success: #4ade9e;
+  --success-foreground: #04140d;
+  --warning: #edb44b;
+  --warning-foreground: #241803;
 
-  --credit: oklch(0.7 0.18 285);
-  --credit-foreground: oklch(0.98 0.005 285);
-  --debit: oklch(0.78 0.16 75);
-  --debit-foreground: oklch(0.2 0.04 75);
-  --income: oklch(0.74 0.17 155);
-  --income-foreground: oklch(0.15 0.02 155);
+  /* Cores de texto/etiqueta (calibradas para ler sobre a superfície escura). */
+  --credit: #ac9dff;
+  --credit-foreground: #12092e;
+  --debit: #edb44b;
+  --debit-foreground: #241803;
+  --income: #4ade9e;
+  --income-foreground: #04140d;
+  --invest: #5cc4ee;
+  --invest-foreground: #04141c;
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.72 0.18 155), oklch(0.78 0.15 175));
-  --gradient-credit: linear-gradient(135deg, oklch(0.55 0.22 285), oklch(0.7 0.18 305));
-  --gradient-debit: linear-gradient(135deg, oklch(0.55 0.22 15), oklch(0.68 0.2 30));
-  --gradient-income: linear-gradient(135deg, oklch(0.5 0.18 155), oklch(0.7 0.17 170));
-  --gradient-card: linear-gradient(135deg, oklch(0.23 0.02 265), oklch(0.2 0.018 255));
-  --gradient-hero: linear-gradient(135deg, oklch(0.2 0.04 280) 0%, oklch(0.18 0.025 260) 50%, oklch(0.18 0.03 200) 100%);
-  /* Faixa de identidade (cabeçalho de página) — gradiente vertical
-     (escuro em cima → claro embaixo) com um brilho radial reposicionado
-     mais pro meio/direita, em vez de colado na borda de cima. A borda
-     superior fica então numa cor sólida só (#0a6e46, ponta a ponta),
-     medido renderizando e amostrando os pixels — é o que permite o
-     theme-color da barra de status (manifest.webmanifest + meta tag)
-     bater 100% com a faixa em qualquer largura de tela. Fixa entre temas
-     (claro/escuro/alto-contraste) de propósito: é a assinatura de marca,
-     não uma superfície que deva se adaptar. */
+  /* Cores de MARCAS dos gráficos — validadas no escuro (faixa de luminosidade,
+     croma, separação p/ daltonismo ΔE≥8 e contraste ≥3:1). Ordem fixa. */
+  --series-income: #1da56b;
+  --series-credit: #8470f2;
+  --series-debit: #c48412;
+  --series-invest: #2a9fcb;
+
+  --gradient-primary: linear-gradient(135deg, #3ddc97, #2fc985);
+  --gradient-credit: linear-gradient(135deg, #6b56e0, #8470f2);
+  --gradient-debit: linear-gradient(135deg, #b0700c, #c48412);
+  --gradient-income: linear-gradient(135deg, #17885a, #1da56b);
+  --gradient-card: linear-gradient(135deg, #101816, #0e1513);
+  /* background-image não aceita cor sólida solta: a base vai como gradiente de 1 cor. */
+  --gradient-hero:
+    radial-gradient(90% 120% at 100% 0%, rgba(61, 220, 151, 0.11), transparent 60%),
+    linear-gradient(#101816, #101816);
+  /* Faixa de identidade só nas telas de marca (login, 404, splash). */
   --gradient-band:
-    radial-gradient(70% 60% at 82% 35%, rgba(255, 255, 255, 0.14), transparent 60%),
-    linear-gradient(180deg, #0a6e46 0%, #0c8f74 52%, #12a68a 100%);
+    radial-gradient(70% 60% at 82% 35%, rgba(61, 220, 151, 0.16), transparent 60%),
+    linear-gradient(180deg, #0a0f0e 0%, #0e1a16 100%);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.35);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.3);
   --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.45);
-  --shadow-glow: 0 0 32px oklch(0.72 0.18 155 / 0.25);
+  --shadow-glow: 0 0 24px rgba(61, 220, 151, 0.12);
 }
 
 .dark {
-  --background: oklch(0.16 0.015 155);
-  --foreground: oklch(0.97 0.005 155);
+  --background: #0a0f0e;
+  --foreground: #e9f2ee;
+}
+
+/* === Paleta escura "Índigo Grafite" (usa a classe .dark junto, p/ variantes dark:) === */
+.theme-indigo {
+  --background: #0b0d14;
+  --foreground: #e8ebf5;
+  --card: #12151f;
+  --card-foreground: #e8ebf5;
+  --popover: #181c29;
+  --popover-foreground: #e8ebf5;
+  --primary: #7c9cff;
+  --primary-foreground: #0a1030;
+  --secondary: #1f2436;
+  --secondary-foreground: #e8ebf5;
+  --muted: #181c29;
+  --muted-foreground: #9aa3bd;
+  --accent: #1f2436;
+  --accent-foreground: #e8ebf5;
+  --border: #262c40;
+  --input: #181c29;
+  --ring: #7c9cff;
+  --gradient-primary: linear-gradient(135deg, #7c9cff, #6a8af0);
+  --gradient-card: linear-gradient(135deg, #12151f, #0b0d14);
+  --gradient-hero:
+    radial-gradient(90% 120% at 100% 0%, rgba(124, 156, 255, 0.13), transparent 60%),
+    linear-gradient(#12151f, #12151f);
+  --gradient-band:
+    radial-gradient(70% 60% at 82% 35%, rgba(124, 156, 255, 0.13), transparent 60%),
+    linear-gradient(180deg, #0b0d14 0%, #12151f 100%);
+  --shadow-glow: 0 0 24px rgba(124, 156, 255, 0.13);
+}
+
+/* === Paleta escura "Grafite Marfim" (usa a classe .dark junto, p/ variantes dark:) === */
+.theme-grafite {
+  --background: #0d0d0c;
+  --foreground: #efede6;
+  --card: #151514;
+  --card-foreground: #efede6;
+  --popover: #1b1b19;
+  --popover-foreground: #efede6;
+  --primary: #e8dfc8;
+  --primary-foreground: #14130f;
+  --secondary: #242421;
+  --secondary-foreground: #efede6;
+  --muted: #1b1b19;
+  --muted-foreground: #a7a49b;
+  --accent: #242421;
+  --accent-foreground: #efede6;
+  --border: #2b2b28;
+  --input: #1b1b19;
+  --ring: #e8dfc8;
+  --gradient-primary: linear-gradient(135deg, #e8dfc8, #d8ceb2);
+  --gradient-card: linear-gradient(135deg, #151514, #0d0d0c);
+  --gradient-hero:
+    radial-gradient(90% 120% at 100% 0%, rgba(232, 223, 200, 0.10), transparent 60%),
+    linear-gradient(#151514, #151514);
+  --gradient-band:
+    radial-gradient(70% 60% at 82% 35%, rgba(232, 223, 200, 0.10), transparent 60%),
+    linear-gradient(180deg, #0d0d0c 0%, #151514 100%);
+  --shadow-glow: 0 0 24px rgba(232, 223, 200, 0.10);
 }
 
 /* === Tema CLARO === */
@@ -140,6 +215,8 @@
   --debit-foreground: oklch(0.18 0.04 75);
   --income: oklch(0.55 0.18 155);
   --income-foreground: oklch(0.99 0.005 155);
+  --invest: oklch(0.5 0.12 230);
+  --invest-foreground: oklch(0.99 0.005 230);
   --gradient-card: linear-gradient(135deg, oklch(1 0 0), oklch(0.97 0.008 260));
   --gradient-hero: linear-gradient(135deg, oklch(0.96 0.02 280) 0%, oklch(0.98 0.01 260) 50%, oklch(0.95 0.02 200) 100%);
 }
@@ -175,9 +252,17 @@
   --debit-foreground: oklch(0 0 0);
   --income: oklch(0.92 0.2 155);
   --income-foreground: oklch(0 0 0);
+  --invest: oklch(0.88 0.12 230);
+  --invest-foreground: oklch(0 0 0);
   --gradient-primary: linear-gradient(135deg, oklch(0.95 0.2 155), oklch(0.95 0.18 175));
   --gradient-card: linear-gradient(135deg, oklch(0.06 0 0), oklch(0.04 0 0));
   --gradient-hero: linear-gradient(135deg, oklch(0.05 0 0), oklch(0.08 0 0));
+}
+
+/* Altura da navegação inferior (só mobile) — FABs e painéis descontam isso. */
+:root { --bnav-h: 0px; }
+@media (max-width: 767px) {
+  :root { --bnav-h: calc(4.25rem + env(safe-area-inset-bottom, 0px)); }
 }
 
 @layer base {

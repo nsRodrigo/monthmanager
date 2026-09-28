@@ -21,9 +21,9 @@ import {
 import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes, type PaneView } from "@/store/panes";
 import { withNavLoading } from "@/store/nav-loading";
-import { formatCurrency, MONTHS } from "@/lib/format";
+import { formatCurrency, MONTHS, MONTHS_SHORT } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sparkline } from "@/components/Sparkline";
+import { BalanceTrendChart } from "@/components/dashboard/charts";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
@@ -40,7 +40,7 @@ import { AddMonthDialog } from "@/components/AddMonthDialog";
 import { ReorganizeDataDialog } from "@/components/ReorganizeDataDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
-import { useResetScrollOnChange, useAnchorNode, useAccordionScrollClose } from "@/hooks/use-band-scroll-progress";
+import { useResetScrollOnChange, useAnchorNode } from "@/hooks/use-band-scroll-progress";
 import { MonthDetailPane } from "./contas.$contaId_.$ano.$mes";
 
 export const Route = createFileRoute("/contas/$contaId")({
@@ -84,7 +84,7 @@ function PanesWorkspace() {
   }, [maxPanes, capActive]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-[calc(100dvh-var(--bnav-h))] flex-col overflow-hidden md:h-screen">
       {maxPanes > 1 && (
         <div className="flex shrink-0 items-center border-b border-border/60 bg-muted px-4 py-2">
           <PaneTabsBar />
@@ -140,7 +140,7 @@ function PaneSlot({
           fabPortalTarget={fabPortalTarget}
         />
       </div>
-      <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-40" aria-hidden="true" />
+      <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-50" aria-hidden="true" />
     </div>
   );
 }
@@ -205,10 +205,8 @@ function AccountPane({
   const { data: debits = [] } = useDebits();
   const { data: incomes = [] } = useIncomes();
   const { data: investments = [] } = useInvestments();
-  // Faixa 100% estática, igual à Home — nunca encolhe (sem `useBandScrollProgress`
-  // nem `collapsible`). Só o resumo abaixo dela encolhe (useAccordionScrollClose).
+  // Cabeçalho fino e fixo, igual às demais telas.
   const [bandAnchor, bandAnchorRef] = useAnchorNode<HTMLDivElement>();
-  const { wrapperRef: accordionWrapperRef, contentRef: accordionContentRef } = useAccordionScrollClose(bandAnchor);
   useResetScrollOnChange(bandAnchor, [
     contaId,
     view.type,
@@ -332,20 +330,22 @@ function AccountPane({
     return map;
   }, [account, cards, purchases, installments, debits, incomes, investments, yearMonthMap]);
 
-  // Tendência dos últimos 6 meses do saldo desta conta (mesma métrica e
-  // componente usados no Home, aqui restritos a uma única conta).
+  // Evolução do saldo desta conta: 5 meses antes → mês corrente → 3 depois
+  // (projeção do que já está lançado). Mesma métrica e gráfico da Home.
   const trend = useMemo(() => {
     if (!account) return [];
-    const points: number[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(eff.year, eff.month - i, 1);
+    const points: { label: string; full: string; value: number }[] = [];
+    for (let i = -5; i <= 3; i++) {
+      const d = new Date(eff.year, eff.month + i, 1);
       const y = d.getFullYear();
       const m = d.getMonth();
-      points.push(
-        normalizeZero(
+      points.push({
+        label: MONTHS_SHORT[m],
+        full: `${MONTHS[m]} ${y}`,
+        value: normalizeZero(
           computeAccountBalanceAtMonth(account, cards, purchases, installments, debits, incomes, investments, y, m),
         ),
-      );
+      });
     }
     return points;
   }, [account, cards, purchases, installments, debits, incomes, investments, eff.year, eff.month]);
@@ -366,6 +366,29 @@ function AccountPane({
     computeAccountBalanceUntilNow(account, cards, purchases, installments, debits, incomes, investments, today),
   );
 
+  const accountCards = cards.filter((c) => c.accountId === contaId);
+  // Um cartão por mês do ano selecionado (só meses com algum valor).
+  const monthCards = monthsForYear.map((m) => {
+    const visibleCards = cards.filter((c) => c.accountId === contaId && isCardVisibleInMonth(c, year, m));
+    const visibleCardIds = new Set(visibleCards.map((c) => c.id));
+    const sum = currentMonthSummary(year, m, visibleCardIds, visibleCards, accountDebits, accountIncomes, purchases, installments);
+    const md = getMonthDebits(accountDebits, installments, year, m);
+    return {
+      m,
+      monthInv: sumMonthInvestments(accountInvestments, installments, year, m),
+      totalDebits: normalizeZero(
+        md.single.reduce((s, d) => s + d.amount, 0) + md.parcelled.reduce((s, p) => s + p.installment.amount, 0),
+      ),
+      totalIncome: normalizeZero(sum.income),
+      totalFaturas: normalizeZero(sum.cardsTotal),
+      saldoConta: normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0),
+      isCurrent: year === eff.year && m === currentMonth,
+      isFuture: year > eff.year || (year === eff.year && m > currentMonth),
+    };
+  });
+  // Escala única das barras Ent/Sai — comparáveis entre os cartões.
+  const monthMax = Math.max(1, ...monthCards.flatMap((c) => [c.totalIncome, c.totalDebits + c.totalFaturas + c.monthInv]));
+
   const canPrevYear = yearList.length > 0 && yearList.indexOf(year) > 0;
   const canNextYear =
     yearList.length > 0 && yearList.indexOf(year) >= 0 && yearList.indexOf(year) < yearList.length - 1;
@@ -385,12 +408,12 @@ function AccountPane({
   };
 
   const YearPickerChip = ({ compact = false }: { compact?: boolean }) => (
-    <div className="flex items-center gap-1 rounded-full border border-white/20 bg-white/15 p-1">
+    <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
       <button
         type="button"
         onClick={goPrevYear}
         disabled={!canPrevYear}
-        className="rounded-full p-1.5 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-white/80"
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         aria-label="Ano anterior"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -400,7 +423,7 @@ function AccountPane({
           <button
             type="button"
             className={cn(
-              "cursor-pointer rounded-md bg-transparent px-2 py-0.5 font-semibold text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/50",
+              "cursor-pointer rounded-md bg-transparent px-2 py-0.5 font-semibold text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50",
               compact ? "text-xs" : "text-sm",
             )}
             aria-label="Selecionar ano"
@@ -435,7 +458,7 @@ function AccountPane({
         type="button"
         onClick={goNextYear}
         disabled={!canNextYear}
-        className="rounded-full p-1.5 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-white/80"
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         aria-label="Próximo ano"
       >
         <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -444,11 +467,10 @@ function AccountPane({
   );
 
   return (
-    <div>
+    <div className="@container">
       {view.type !== "month" && (
         <>
-          {/* Mesma faixa de identidade da tela de Lançamentos — os dois
-              "topos de tela" usam exatamente o mesmo componente visual. */}
+          {/* Mesmo cabeçalho fino das demais telas; só ele fica fixo no topo. */}
           <div ref={bandAnchorRef} className="sticky top-0 z-10 bg-background">
             <HeaderBand
               title={account.name}
@@ -459,174 +481,183 @@ function AccountPane({
                     to="/"
                     aria-label="Voltar para a Home"
                     title="Voltar para a Home"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Link>
                 )
               }
-              right={<YearPickerChip compact />}
               onClose={onClose}
             />
-            <div className="mx-auto max-w-5xl px-4 md:px-6">
-              {/* HERO + DASHBOARD — só na lista de meses; a tela de
-                  lançamentos (um mês específico) não repete o card da conta,
-                  já visto aqui. Nome/tipo já aparecem na HeaderBand acima,
-                  então aqui só o saldo (mesmo padrão do "hero" da Home) +
-                  tendência. Preso na mesma faixa fixa da HeaderBand (igual a
-                  Home) — só o gráfico/"Reorganizar dados" encolhem ao rolar,
-                  o saldo continua sempre visível. */}
-              <header className="header-frame-fade relative z-20 -mt-6 animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-elegant sm:p-6">
-                <div className="flex items-center justify-between gap-3">
+          </div>
+          <div className="mx-auto max-w-6xl px-4 pt-5 pb-8 md:px-6 md:pb-10">
+            <div className="grid grid-cols-12 gap-4">
+              {/* Saldo atual + evolução */}
+              <section className="col-span-12 overflow-hidden rounded-2xl border border-border bg-gradient-hero p-5">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm text-muted-foreground">Saldo atual</p>
+                    <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                      Saldo atual · {account.name}
+                    </p>
                     <p
-                      className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
+                      className={`mt-2 font-display text-4xl leading-none font-semibold tracking-tight tabular-nums sm:text-5xl ${
                         balance >= 0 ? "text-foreground" : "text-destructive"
                       }`}
                     >
                       {formatCurrency(balance)}
                     </p>
-                  </div>
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: account.color + "33", color: account.color }}
-                  >
-                    <Wallet className="h-[18px] w-[18px]" />
-                  </div>
-                </div>
-
-                <div ref={accordionWrapperRef} className="overflow-hidden">
-                  <div ref={accordionContentRef}>
-                    <Sparkline points={trend} className="mt-3" />
-
-                    <div className="mt-3 flex justify-end border-t border-border/40 pt-3">
-                      <button
-                        type="button"
-                        onClick={() => setOpenReorganize(true)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      >
-                        <ArrowLeftRight className="h-3.5 w-3.5" />
-                        Reorganizar dados
-                      </button>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary capitalize">
+                        {account.type}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {accountCards.length} {accountCards.length === 1 ? "cartão vinculado" : "cartões vinculados"}
+                      </span>
                     </div>
                   </div>
-                </div>
-              </header>
-              <div className="h-2" />
-              <h2 className="px-1 text-lg font-semibold">Meses</h2>
-              <div className="h-2" />
-            </div>
-          </div>
-          <div className="mx-auto max-w-5xl px-4 pb-6 md:px-6 md:pb-10">
-          <div key="months" className="animate-fade-slide-in">
-      {/* MONTHS LIST — only months that have any value */}
-      <div className="mt-5 space-y-2">
-        {monthsForYear.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Nenhum lançamento em {year}.
-            </p>
-            <button
-              type="button"
-              onClick={() => setOpenAddMonth(true)}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow hover:opacity-90"
-            >
-              <Plus className="h-4 w-4" /> Adicionar mês
-            </button>
-            <p className="text-[11px] text-muted-foreground">
-              Comece adicionando o mês atual para lançar recebimentos, débitos, investimentos e cartões.
-            </p>
-          </div>
-        ) : (
-          monthsForYear.map((m) => {
-            const visibleCards = cards.filter(
-              (c) => c.accountId === contaId && isCardVisibleInMonth(c, year, m)
-            );
-            const visibleCardIds = new Set(visibleCards.map((c) => c.id));
-            const sum = currentMonthSummary(
-              year, m,
-              visibleCardIds,
-              visibleCards,
-              accountDebits,
-              accountIncomes,
-              purchases,
-              installments,
-            );
-            const monthInv = sumMonthInvestments(accountInvestments, installments, year, m);
-            const md = getMonthDebits(accountDebits, installments, year, m);
-            const totalDebits = normalizeZero(md.single.reduce((s, d) => s + d.amount, 0) + md.parcelled.reduce((s, p) => s + p.installment.amount, 0));
-            const totalIncome = normalizeZero(sum.income);
-            const totalFaturas = normalizeZero(sum.cardsTotal);
-            const saldoConta = normalizeZero(monthlyBalances.get(`${year}-${m}`) ?? 0);
-            const isCurrent = year === eff.year && m === currentMonth;
-            const isFuture = year > eff.year || (year === eff.year && m > currentMonth);
-
-
-            return (
-            <button
-              key={m}
-              type="button"
-              onClick={() => withNavLoading(() => onViewChange({ type: "month", year, month: m }))}
-              className={`group block w-full rounded-3xl border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-glow sm:p-5 ${
-                isCurrent ? "border-primary shadow-[0_0_0_1px_var(--primary)]" : "border-border"
-              }`}
-            >
-              {/* Mobile: stacked. Desktop (sm+): name+balanço left, saldo em conta right */}
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-bold ${
-                  isCurrent
-                    ? "bg-gradient-primary text-primary-foreground"
-                    : isFuture
-                      ? "bg-secondary/50 text-muted-foreground"
-                      : "bg-secondary text-foreground"
-                }`}>
-                  {String(m + 1).padStart(2, "0")}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <p className="truncate text-lg font-bold">{MONTHS[m]}</p>
-                    {isCurrent && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Atual</span>}
-                  </div>
-                  <p className={`mt-0.5 truncate text-xs font-semibold ${totalIncome >= 0 ? "text-success" : "text-destructive"}`}>
-                    RECEBÍVEIS: {formatCurrency(totalIncome)}
-                  </p>
-                </div>
-                <div className="hidden text-right sm:block">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
-                  <p
-                    className={`whitespace-nowrap text-lg font-bold ${
-                      saldoConta >= 0 ? "text-foreground" : "text-destructive"
-                    }`}
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: account.color + "33", color: account.color }}
                   >
-                    {formatCurrency(saldoConta)}
+                    <Wallet className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <BalanceTrendChart points={trend} currentIndex={5} height={220} />
+                </div>
+                <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setOpenReorganize(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    <ArrowLeftRight className="h-3.5 w-3.5" />
+                    Reorganizar dados
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpenAddMonth(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Adicionar mês
+                  </button>
+                </div>
+              </section>
+
+            </div>
+
+            <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-[17px] font-semibold tracking-tight">Meses de</h2>
+                <YearPickerChip compact />
+              </div>
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--series-income)" }} />
+                  Entradas
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--series-debit)" }} />
+                  Saídas
+                </span>
+              </div>
+            </div>
+
+            {/* MONTHS LIST — only months that have any value */}
+            <div key="months" className="animate-fade-slide-in">
+              {monthCards.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+                  <p className="text-sm text-muted-foreground">Nenhum lançamento em {year}.</p>
+                  <button
+                    type="button"
+                    onClick={() => setOpenAddMonth(true)}
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                  >
+                    <Plus className="h-4 w-4" /> Adicionar mês
+                  </button>
+                  <p className="text-[11px] text-muted-foreground">
+                    Comece adicionando o mês atual para lançar recebimentos, débitos, investimentos e cartões.
                   </p>
                 </div>
-              </div>
-
-              {/* Saldo em conta — mobile only, in its own row */}
-              <div className="mt-3 flex items-baseline justify-between gap-2 border-t border-border/60 pt-3 sm:hidden">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Saldo em conta</p>
-                <p
-                  className={`whitespace-nowrap text-base font-bold ${
-                    saldoConta >= 0 ? "text-foreground" : "text-destructive"
-                  }`}
-                >
-                  {formatCurrency(saldoConta)}
-                </p>
-              </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-3 sm:mt-4">
-                <Mini label="Débitos" value={totalDebits} tone="debit" icon={ArrowDownRight} />
-                <Mini label="Faturas" value={totalFaturas} tone="credit" icon={CreditCard} />
-                <Mini label="Invest." value={monthInv} tone="debit" icon={TrendingUp} />
-              </div>
-            </button>
-            );
-          })
-        )}
-      </div>
-          </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {monthCards.map((c) => (
+                    <button
+                      key={c.m}
+                      type="button"
+                      onClick={() => withNavLoading(() => onViewChange({ type: "month", year, month: c.m }))}
+                      className={`group flex w-full flex-col gap-3 rounded-2xl border p-4 text-left transition-colors hover:border-ring/40 ${
+                        c.isCurrent
+                          ? "border-primary/50 bg-gradient-to-b from-primary/10 to-card"
+                          : "border-border bg-card"
+                      } ${c.isFuture ? "opacity-75" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <b className="font-display text-base font-semibold">{MONTHS[c.m]}</b>
+                        {c.isCurrent ? (
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-primary uppercase">
+                            Atual
+                          </span>
+                        ) : c.isFuture ? (
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                            Previsto
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-success uppercase">
+                            Fechado
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                          Saldo em conta
+                        </p>
+                        <p
+                          className={`font-display text-xl font-semibold tracking-tight tabular-nums ${
+                            c.saldoConta >= 0 ? "text-foreground" : "text-destructive"
+                          }`}
+                        >
+                          {formatCurrency(c.saldoConta)}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1.5 text-[11.5px] text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <span className="w-7">Ent</span>
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+                            <i
+                              className="block h-full rounded-full"
+                              style={{ width: `${(c.totalIncome / monthMax) * 100}%`, background: "var(--series-income)" }}
+                            />
+                          </span>
+                          <span className="w-20 text-right tabular-nums text-income">{formatCurrency(c.totalIncome)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-7">Sai</span>
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+                            <i
+                              className="block h-full rounded-full"
+                              style={{
+                                width: `${((c.totalDebits + c.totalFaturas + c.monthInv) / monthMax) * 100}%`,
+                                background: "var(--series-debit)",
+                              }}
+                            />
+                          </span>
+                          <span className="w-20 text-right tabular-nums text-debit">
+                            {formatCurrency(c.totalDebits + c.totalFaturas + c.monthInv)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 border-t border-border/60 pt-3">
+                        <Mini label="Débitos" value={c.totalDebits} tone="debit" icon={ArrowDownRight} />
+                        <Mini label="Faturas" value={c.totalFaturas} tone="credit" icon={CreditCard} />
+                        <Mini label="Invest." value={c.monthInv} tone="debit" icon={TrendingUp} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

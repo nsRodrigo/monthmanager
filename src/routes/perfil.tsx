@@ -4,7 +4,9 @@ import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
-import { User, Sun, Moon, Contrast, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight } from "lucide-react";
+import { useIsAdmin } from "@/store/roles";
+import { useAccounts } from "@/store/finance";
+import { User, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight, Info, Lock } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
@@ -22,6 +24,8 @@ function ProfilePage() {
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
+  const { data: accounts = [] } = useAccounts();
   const { data: incomingGrants = [] } = useIncomingGrants();
   const decideGrant = useDecideGrant();
   const revokeGrant = useRevokeGrant();
@@ -113,82 +117,106 @@ function ProfilePage() {
     .join("")
     .toUpperCase();
 
-  const themes: { value: Theme; label: string; icon: typeof Sun; description: string }[] = [
-    { value: "light", label: "Claro", icon: Sun, description: "Fundo branco" },
-    { value: "dark", label: "Escuro", icon: Moon, description: "Padrão" },
-    { value: "high-contrast", label: "Alto contraste", icon: Contrast, description: "WCAG AAA" },
+  const themes: {
+    value: Theme;
+    label: string;
+    description: string;
+    accent: string;
+    bg: string;
+  }[] = [
+    { value: "dark", label: "Esmeralda Noite", description: "Verde profundo — padrão", accent: "#3ddc97", bg: "#0a0f0e" },
+    { value: "indigo", label: "Índigo Grafite", description: "Azul-noite, mais frio", accent: "#7c9cff", bg: "#0b0d14" },
+    { value: "grafite", label: "Grafite Marfim", description: "Neutro, cor só nos dados", accent: "#e8dfc8", bg: "#0d0d0c" },
+    { value: "light", label: "Claro", description: "Fundo branco", accent: "#1f9d6b", bg: "#fafcfb" },
+    { value: "high-contrast", label: "Alto contraste", description: "WCAG AAA", accent: "#e6ff00", bg: "#000000" },
   ];
+
+  const cardCls = "rounded-2xl border border-border bg-card p-5";
+  const SectionTitle = ({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) => (
+    <div className="mb-4 flex items-center gap-2.5">
+      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <h2 className="font-display text-[15px] font-semibold">{children}</h2>
+    </div>
+  );
 
   return (
     <div>
       <div className="sticky top-0 z-10">
         <HeaderBand
-          compact
           title="Meu perfil"
-          subtitle="Dados pessoais, tema e segurança."
+          subtitle="Dados pessoais, aparência e segurança."
           onBack={goBack}
         />
       </div>
 
-      <div className="mx-auto max-w-3xl px-5 pb-8 md:pb-12">
-      <div className="space-y-6 pt-6 pb-20">
-        <div className="columns-1 gap-6 md:columns-2">
-            <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <User className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Dados pessoais</h2>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="relative shrink-0">
-                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xl font-bold text-primary-foreground shadow-glow">
-                    {profile?.avatarUrl ? (
-                      <img
-                        src={profile.avatarUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      initials || <User className="h-7 w-7" />
-                    )}
-                    {avatarUploading && (
-                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      </div>
-                    )}
+      <div className="mx-auto max-w-4xl px-4 pt-5 pb-24 sm:px-6">
+        <div className="space-y-4">
+          {/* Identidade */}
+          <section className={`${cardCls} flex items-center gap-4 sm:gap-5`}>
+            <div className="relative shrink-0">
+              <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-2xl font-bold text-primary-foreground">
+                {profile?.avatarUrl ? (
+                  <img
+                    src={profile.avatarUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  initials || <User className="h-7 w-7" />
+                )}
+                {avatarUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   </div>
-                  <label
-                    className="absolute -right-1 -bottom-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-sm hover:opacity-90"
-                    title="Trocar foto"
-                    aria-label="Trocar foto de perfil"
-                  >
-                    <Camera className="h-3 w-3" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      disabled={avatarUploading}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        handleAvatarFile(file);
-                      }}
-                    />
-                  </label>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {profile?.displayName ?? "Sem nome"}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-                  {avatarError && <p className="mt-1 text-xs text-destructive">{avatarError}</p>}
-                </div>
+                )}
               </div>
+              <label
+                className="absolute -right-1 -bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground hover:opacity-90"
+                title="Trocar foto"
+                aria-label="Trocar foto de perfil"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={avatarUploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    handleAvatarFile(file);
+                  }}
+                />
+              </label>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-display text-xl font-semibold tracking-tight">
+                {profile?.displayName ?? "Sem nome"}
+              </p>
+              <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                    <ShieldCheck className="h-3 w-3" /> Administrador
+                  </span>
+                )}
+                <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  {accounts.length} {accounts.length === 1 ? "conta" : "contas"}
+                </span>
+              </div>
+              {avatarError && <p className="mt-1.5 text-xs text-destructive">{avatarError}</p>}
+            </div>
+          </section>
 
-              <div className="mt-4">
+          <div className="grid gap-4 md:grid-cols-2 md:items-start">
+            <div className="space-y-4">
+              <section className={cardCls}>
+                <SectionTitle icon={User}>Dados pessoais</SectionTitle>
                 <Field label="Nome de exibição">
                   <input
                     value={name}
@@ -198,247 +226,252 @@ function ProfilePage() {
                     maxLength={80}
                   />
                 </Field>
-              </div>
-            </section>
+              </section>
 
-            <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Segurança</h2>
-              </div>
+              <section className={cardCls}>
+                <SectionTitle icon={KeyRound}>Segurança</SectionTitle>
 
-              <PasskeyManager />
+                <PasskeyManager />
 
-              {hasPasswordLogin && (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowPwd((v) => !v)}
-                    className="flex w-full items-center justify-between rounded-lg border border-border bg-background p-3 text-left hover:bg-secondary/50"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <KeyRound className="h-4 w-4 text-primary" /> Alterar senha
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {showPwd ? "Fechar" : "Abrir"}
-                    </span>
-                  </button>
+                {hasPasswordLogin && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowPwd((v) => !v)}
+                      className="flex w-full items-center justify-between rounded-xl border border-border bg-background p-3 text-left hover:bg-secondary/50"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <KeyRound className="h-4 w-4 text-primary" /> Alterar senha
+                      </span>
+                      <span className="text-xs text-muted-foreground">{showPwd ? "Fechar" : "Abrir"}</span>
+                    </button>
 
-                  {showPwd && (
-                    <div className="mt-3 space-y-2 rounded-lg border border-border bg-background p-3">
-                      <Field label="Nova senha">
-                        <div className="relative">
+                    {showPwd && (
+                      <div className="mt-3 space-y-2 rounded-xl border border-border bg-background p-3">
+                        <Field label="Nova senha">
+                          <div className="relative">
+                            <input
+                              type={pwdVisible ? "text" : "password"}
+                              value={newPwd}
+                              onChange={(e) => setNewPwd(e.target.value)}
+                              className={inputClass}
+                              autoComplete="new-password"
+                              minLength={6}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setPwdVisible((v) => !v)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-secondary"
+                              aria-label={pwdVisible ? "Ocultar" : "Mostrar"}
+                            >
+                              {pwdVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </Field>
+                        <Field label="Confirmar nova senha">
                           <input
                             type={pwdVisible ? "text" : "password"}
-                            value={newPwd}
-                            onChange={(e) => setNewPwd(e.target.value)}
+                            value={confirmPwd}
+                            onChange={(e) => setConfirmPwd(e.target.value)}
                             className={inputClass}
                             autoComplete="new-password"
                             minLength={6}
                           />
-                          <button
-                            type="button"
-                            onClick={() => setPwdVisible((v) => !v)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-secondary"
-                            aria-label={pwdVisible ? "Ocultar" : "Mostrar"}
+                        </Field>
+
+                        {pwdMsg && (
+                          <p
+                            className={`rounded-lg p-2 text-xs ${
+                              pwdMsg.type === "ok"
+                                ? "bg-success/10 text-success"
+                                : "bg-destructive/10 text-destructive"
+                            }`}
                           >
-                            {pwdVisible ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </Field>
-                      <Field label="Confirmar nova senha">
-                        <input
-                          type={pwdVisible ? "text" : "password"}
-                          value={confirmPwd}
-                          onChange={(e) => setConfirmPwd(e.target.value)}
-                          className={inputClass}
-                          autoComplete="new-password"
-                          minLength={6}
-                        />
-                      </Field>
+                            {pwdMsg.text}
+                          </p>
+                        )}
 
-                      {pwdMsg && (
-                        <p
-                          className={`rounded-lg p-2 text-xs ${
-                            pwdMsg.type === "ok"
-                              ? "bg-success/10 text-success"
-                              : "bg-destructive/10 text-destructive"
-                          }`}
+                        <button
+                          onClick={changePassword}
+                          disabled={pwdSaving || !newPwd || !confirmPwd}
+                          className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                         >
-                          {pwdMsg.text}
-                        </p>
-                      )}
-
-                      <button
-                        onClick={changePassword}
-                        disabled={pwdSaving || !newPwd || !confirmPwd}
-                        className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                      >
-                        {pwdSaving ? "Salvando…" : "Atualizar senha"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/personalizar-menu" })}
-              className="flex w-full items-center gap-2 text-left"
-            >
-              <Sliders className="h-4 w-4 text-primary" />
-              <span className="flex-1">
-                <span className="block text-sm font-semibold">Personalizar menu flutuante</span>
-                <span className="block text-xs text-muted-foreground">Ícone e atalhos do botão de cada tela (só no celular)</span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </button>
-          </section>
-
-          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Palette className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Tema do app</h2>
-            </div>
-            <div role="radiogroup" aria-label="Tema do app" className="grid grid-cols-3 gap-2">
-              {themes.map((t) => {
-                const Icon = t.icon;
-                const active = theme === t.value;
-                return (
-                  <button
-                    key={t.value}
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setTheme(t.value)}
-                    className={`relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-all ${
-                      active
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                    }`}
-                  >
-                    {active && (
-                      <Check className="absolute right-1.5 top-1.5 h-3.5 w-3.5 text-primary" />
+                          {pwdSaving ? "Salvando…" : "Atualizar senha"}
+                        </button>
+                      </div>
                     )}
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                    <span>{t.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{t.description}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+                  </div>
+                )}
+              </section>
 
-        <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Contas</h2>
+              <section className={cardCls}>
+                <SectionTitle icon={Users}>Contas</SectionTitle>
+                <AccountSwitcher variant="inline" />
+              </section>
+            </div>
+
+            <div className="space-y-4">
+              <section className={cardCls}>
+                <SectionTitle icon={Palette}>Aparência</SectionTitle>
+                <div role="radiogroup" aria-label="Tema do app" className="grid grid-cols-2 gap-2.5">
+                  {themes.map((t) => {
+                    const active = theme === t.value;
+                    return (
+                      <button
+                        key={t.value}
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setTheme(t.value)}
+                        className={`flex flex-col gap-2.5 rounded-xl border p-3 text-left transition-colors ${
+                          active
+                            ? "border-primary bg-primary/5"
+                            : "border-border bg-background hover:border-ring/40"
+                        }`}
+                      >
+                        <span className="flex gap-1.5" aria-hidden="true">
+                          <i className="h-6 w-6 rounded-lg" style={{ background: t.accent }} />
+                          <i
+                            className="h-6 flex-1 rounded-lg border border-white/10"
+                            style={{ background: t.bg }}
+                          />
+                        </span>
+                        <span>
+                          <span className="flex items-center gap-1 text-[13px] font-semibold">
+                            {t.label}
+                            {active && <Check className="h-3.5 w-3.5 text-primary" />}
+                          </span>
+                          <span className="block text-[11px] leading-snug text-muted-foreground">
+                            {t.description}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+            </div>
           </div>
-          <AccountSwitcher variant="inline" />
-        </section>
 
-        {pendingIncoming.length > 0 && (
-          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <Clock className="h-4 w-4 text-primary" /> Pedidos recebidos
-              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-                {pendingIncoming.length}
-              </span>
-            </h2>
-            <div className="space-y-2">
-              {pendingIncoming.map((g) => (
-                <div
-                  key={g.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{g.requesterEmail}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Pediu acesso de leitura e escrita à sua conta
-                    </p>
+          {pendingIncoming.length > 0 && (
+            <section className={cardCls}>
+              <SectionTitle icon={Clock}>
+                Pedidos recebidos{" "}
+                <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                  {pendingIncoming.length}
+                </span>
+              </SectionTitle>
+              <div className="space-y-2">
+                {pendingIncoming.map((g) => (
+                  <div
+                    key={g.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{g.requesterEmail}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Pediu acesso de leitura e escrita à sua conta
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => decideGrant.mutate({ id: g.id, approve: true })}
+                      disabled={decideGrant.isPending}
+                      className="inline-flex items-center gap-1 rounded-lg bg-success/15 px-3 py-2 text-xs font-semibold text-success hover:bg-success/25 disabled:opacity-50"
+                    >
+                      <Check className="h-4 w-4" /> Permitir
+                    </button>
+                    <button
+                      onClick={() => decideGrant.mutate({ id: g.id, approve: false })}
+                      disabled={decideGrant.isPending}
+                      className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" /> Recusar
+                    </button>
                   </div>
-                  <button
-                    onClick={() => decideGrant.mutate({ id: g.id, approve: true })}
-                    disabled={decideGrant.isPending}
-                    className="inline-flex items-center gap-1 rounded-lg bg-success/15 px-3 py-2 text-xs font-semibold text-success hover:bg-success/25 disabled:opacity-50"
-                  >
-                    <Check className="h-4 w-4" /> Permitir
-                  </button>
-                  <button
-                    onClick={() => decideGrant.mutate({ id: g.id, approve: false })}
-                    disabled={decideGrant.isPending}
-                    className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                  >
-                    <X className="h-4 w-4" /> Recusar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+                ))}
+              </div>
+            </section>
+          )}
 
-        {activeIncoming.length > 0 && (
-          <section className="mb-6 break-inside-avoid rounded-xl border border-border bg-card/40 p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <ShieldCheck className="h-4 w-4 text-primary" /> Acessos que você concedeu
-            </h2>
-            <div className="space-y-2">
-              {activeIncoming.map((g) => (
-                <div
-                  key={g.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{g.requesterEmail}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Pode ver e editar sua conta — revogue quando quiser
-                    </p>
+          {activeIncoming.length > 0 && (
+            <section className={cardCls}>
+              <SectionTitle icon={ShieldCheck}>Acessos que você concedeu</SectionTitle>
+              <div className="space-y-2">
+                {activeIncoming.map((g) => (
+                  <div
+                    key={g.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{g.requesterEmail}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Pode ver e editar sua conta — revogue quando quiser
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => revokeGrant.mutate(g.id)}
+                      disabled={revokeGrant.isPending}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" /> Revogar
+                    </button>
                   </div>
-                  <button
-                    onClick={() => revokeGrant.mutate(g.id)}
-                    disabled={revokeGrant.isPending}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                  >
-                    <X className="h-4 w-4" /> Revogar
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Atalhos e páginas informativas */}
+          <section className="overflow-hidden rounded-2xl border border-border bg-card">
+            {[
+              {
+                icon: Sliders,
+                title: "Personalizar menu flutuante",
+                desc: "Ícone e atalhos do botão de cada tela (só no celular)",
+                to: "/personalizar-menu" as const,
+              },
+              { icon: Info, title: "Sobre o app", desc: "Versão e novidades", to: "/sobre" as const },
+              {
+                icon: Lock,
+                title: "Privacidade",
+                desc: "Como seus dados são guardados",
+                to: "/privacidade" as const,
+              },
+            ].map((l) => (
+              <button
+                key={l.to}
+                type="button"
+                onClick={() => navigate({ to: l.to })}
+                className="flex w-full items-center gap-3 border-t border-border px-4 py-3.5 text-left first:border-t-0 hover:bg-secondary/40"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+                  <l.icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{l.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{l.desc}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
           </section>
-        )}
-        </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pb-1 text-xs text-muted-foreground">
-          <button type="button" onClick={() => navigate({ to: "/sobre" })} className="underline hover:text-foreground">
-            Sobre o app
-          </button>
-          <span aria-hidden="true">·</span>
-          <button type="button" onClick={() => navigate({ to: "/privacidade" })} className="underline hover:text-foreground">
-            Privacidade
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={goBack}
+              className="flex-1 rounded-xl border border-border bg-card py-3 text-sm font-semibold hover:bg-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={save}
+              disabled={update.isPending}
+              className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {update.isPending ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
         </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={goBack}
-            className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={save}
-            disabled={update.isPending}
-            className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {update.isPending ? "Salvando…" : "Salvar"}
-          </button>
-        </div>
-      </div>
       </div>
     </div>
   );

@@ -6,12 +6,14 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   GripVertical,
   Folder as FolderIcon,
 } from "lucide-react";
 import { HeaderBand } from "@/components/HeaderBand";
 import { Modal, Field, inputClass, Select } from "@/components/Modal";
-import { FabMenuContent, type ResolvedFabEntry } from "@/components/FabMenuContent";
+import { type ResolvedFabEntry } from "@/components/FabMenuContent";
 import { toneBg, toneText } from "@/components/FabAction";
 import { useFabConfig, useSaveFabConfig } from "@/store/fab-config";
 import { useIsAdmin } from "@/store/roles";
@@ -203,7 +205,7 @@ function PersonalizarMenuPage() {
         <HeaderBand compact title="Personalizar menu flutuante" subtitle="Escolha o ícone e os atalhos de cada tela." onBack={goBack} />
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 pb-16 pt-6">
+      <div className="mx-auto max-w-6xl px-4 pt-5 pb-24 sm:px-6">
         <p className="mb-5 text-xs text-muted-foreground">
           Vale só no celular — no computador a barra lateral já mostra tudo. Uma tela sem nenhum atalho fica sem botão flutuante.
         </p>
@@ -407,19 +409,52 @@ function PersonalizarMenuPage() {
                 <div className="h-12 rounded-lg bg-secondary" />
               </div>
               {draft && (previewOpen ? previewEntries.length > 0 || previewFolder : previewEntries.length > 0) && (
-                <FabMenuContent
-                  mainIcon={PreviewMainIcon}
-                  open={previewOpen}
-                  onOpenChange={(v) => {
-                    setPreviewOpen(v);
-                    if (!v) setPreviewFolder(null);
-                  }}
-                  entries={previewEntries}
-                  isSubLevel={!!previewFolder}
-                  onBack={() => setPreviewFolder(null)}
-                  positionClassName="absolute bottom-3 right-3 z-40 flex flex-col items-end gap-2"
-                  backdropClassName="absolute inset-0 z-30"
-                />
+                <>
+                  {previewOpen && (
+                    <div
+                      className="absolute inset-0 z-30"
+                      onClick={() => setPreviewOpen(false)}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {previewOpen && (
+                    <div className="absolute inset-x-2 bottom-14 z-40 max-h-[300px] overflow-y-auto rounded-xl border border-border bg-popover p-2 shadow-elevated">
+                      <div className="mb-1 flex items-center gap-1 px-1 text-xs font-semibold">
+                        {previewFolder && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewFolder(null)}
+                            aria-label="Voltar"
+                            className="-ml-1 rounded p-0.5 text-muted-foreground hover:bg-secondary"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        Adicionar
+                      </div>
+                      {previewEntries.map((e) => (
+                        <button
+                          key={e.id}
+                          type="button"
+                          onClick={() => (e.kind === "folder" ? e.onOpen() : e.onClick())}
+                          className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-[11px] font-medium hover:bg-secondary"
+                        >
+                          <e.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <span className="flex-1 truncate">{e.label}</span>
+                          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOpen((v) => !v)}
+                    aria-label="Abrir menu"
+                    className="absolute bottom-3 right-3 z-40 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-elevated"
+                  >
+                    <PreviewMainIcon className="h-5 w-5" />
+                  </button>
+                </>
               )}
               {draft && previewEntries.length === 0 && !previewFolder && (
                 <p className="absolute bottom-4 right-4 max-w-[140px] text-right text-[10px] text-muted-foreground">

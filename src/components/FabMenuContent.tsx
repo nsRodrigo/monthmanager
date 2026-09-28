@@ -1,5 +1,5 @@
-import { ChevronLeft } from "lucide-react";
-import { FabAction } from "./FabAction";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import type { IconComponent } from "@/lib/fab-catalog";
 import type { Tone } from "./FabAction";
 
@@ -8,10 +8,11 @@ export type ResolvedFabEntry =
   | { kind: "folder"; id: string; label: string; icon: IconComponent; onOpen: () => void };
 
 /**
- * Botão redondo + pills em leque — presentacional puro, sem posicionamento
- * (`fixed`/`absolute` fica por conta de quem usa) e sem diálogos próprios.
- * Usado tanto por `ConfigurableFab` (telas simples) quanto direto pela tela
- * de Lançamento (que mantém seu próprio posicionamento/embedded/portal).
+ * Botão quadrado + gaveta inferior com a lista de opções — presentacional
+ * puro, sem posicionamento próprio pro botão (`fixed`/`absolute` fica por
+ * conta de quem usa) e sem diálogos de criar. A gaveta é igual ao "Mais" da
+ * barra inferior (ver `MoreSheetContent` em `__root.tsx`). Usado tanto por
+ * `ConfigurableFab` (telas simples) quanto direto pela tela de Lançamento.
  */
 export function FabMenuContent({
   mainIcon: MainIcon,
@@ -21,7 +22,7 @@ export function FabMenuContent({
   isSubLevel,
   onBack,
   positionClassName,
-  backdropClassName,
+  title = "Adicionar",
 }: {
   mainIcon: IconComponent;
   open: boolean;
@@ -30,38 +31,59 @@ export function FabMenuContent({
   isSubLevel: boolean;
   onBack: () => void;
   positionClassName?: string;
-  backdropClassName?: string;
+  title?: string;
 }) {
   return (
     <>
-      {open && (
-        <div className={backdropClassName ?? "fixed inset-0 z-30"} onClick={() => onOpenChange(false)} aria-hidden="true" />
-      )}
-      <div className={positionClassName ?? "fixed bottom-10 right-4 z-40 flex flex-col items-end gap-3 md:right-8"}>
-        {open && (
-          <div className="flex flex-col items-end gap-2.5">
-            {isSubLevel && <FabAction icon={ChevronLeft} label="Voltar" tone="primary" onClick={onBack} />}
-            {entries.map((e) =>
-              e.kind === "folder" ? (
-                <FabAction key={e.id} icon={e.icon} label={e.label} tone="primary" onClick={e.onOpen} />
-              ) : (
-                <FabAction key={e.id} icon={e.icon} label={e.label} tone={e.tone} onClick={e.onClick} />
-              ),
-            )}
-          </div>
-        )}
+      <div
+        className={
+          positionClassName ??
+          "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:left-auto md:right-8 md:bottom-10 md:translate-x-0 md:items-end"
+        }
+      >
         <button
           type="button"
-          onClick={() => onOpenChange(!open)}
-          aria-label={open ? "Fechar menu" : "Abrir menu"}
-          aria-expanded={open}
-          className={`flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-elevated transition-transform duration-200 ${
-            open ? "rotate-45" : ""
-          }`}
+          onClick={() => onOpenChange(true)}
+          aria-label="Abrir menu"
+          className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-elevated"
         >
           <MainIcon className="h-6 w-6" />
         </button>
       </div>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="bottom"
+          className="flex max-h-[80vh] flex-col gap-0 overflow-y-auto rounded-t-2xl p-4"
+        >
+          <SheetTitle className="mb-2 flex items-center gap-1.5 font-display text-lg font-semibold tracking-tight">
+            {isSubLevel && (
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label="Voltar"
+                className="-ml-1 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+            {title}
+          </SheetTitle>
+          <div className="space-y-0.5">
+            {entries.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => (e.kind === "folder" ? e.onOpen() : e.onClick())}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left text-[15px] font-medium hover:bg-secondary"
+              >
+                <e.icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="flex-1 truncate">{e.label}</span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

@@ -41,7 +41,7 @@ export function FabAction({
       className="flex items-center gap-2.5 rounded-full border border-border bg-card py-1.5 pl-4 pr-1.5 shadow-elevated transition-colors hover:border-primary/50"
     >
       <span className="whitespace-nowrap text-xs font-semibold">{label}</span>
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneBg[tone]} ${toneText[tone]}`}>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneBg[tone]} ${toneText[tone]}`}>
         <Icon className="h-4 w-4" />
       </span>
     </button>

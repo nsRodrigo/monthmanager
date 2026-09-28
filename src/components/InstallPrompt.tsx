@@ -99,7 +99,7 @@ export function InstallPrompt() {
     <div
       role="dialog"
       aria-label="Instalar aplicativo"
-      className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-border bg-card/95 p-4 shadow-2xl backdrop-blur md:left-auto md:right-4 md:bottom-4 md:mx-0"
+      className="fixed inset-x-3 bottom-[calc(var(--bnav-h)+0.75rem)] z-50 mx-auto max-w-md rounded-2xl border border-border bg-card/95 p-4 shadow-2xl backdrop-blur md:left-auto md:right-4 md:bottom-4 md:mx-0"
     >
       <button
         onClick={handleDismiss}

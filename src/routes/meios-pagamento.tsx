@@ -16,8 +16,10 @@ import {
   getEffectiveCurrentMonth,
   type Card,
   type CustomPaymentMethod,
+  PAYMENT_METHOD_OPTIONS,
+  PAYMENT_METHOD_BADGES,
 } from "@/store/finance";
-import { Plus, Pencil, Trash2, Check, X, Wallet, CreditCard } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, Info } from "lucide-react";
 
 export const Route = createFileRoute("/meios-pagamento")({
   component: MeiosPagamentoPage,
@@ -102,31 +104,32 @@ function MeiosPagamentoPage() {
   return (
     <div>
       <div className="sticky top-0 z-10">
-        <HeaderBand compact title="Meios de Pagamento" subtitle="Meios de pagamento e cartões" onBack={goBack} />
+        <HeaderBand title="Meios de pagamento" subtitle="Formas de pagar e cartões cadastrados" onBack={goBack} />
       </div>
-      <div className="mx-auto max-w-2xl px-5 pb-8 md:pb-12">
-        <div className="space-y-8 pt-6 pb-20">
+      <div className="mx-auto max-w-5xl px-4 pt-5 pb-24 sm:px-6">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
           {/* ───── Meios de pagamento ───── */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Meios de pagamento</h2>
+          <section className="overflow-hidden rounded-2xl border border-border bg-card">
+            <div className="flex items-start justify-between gap-3 p-4 pb-3">
+              <div>
+                <h2 className="font-display text-[15px] font-semibold">Meios de pagamento</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Aparecem como etiqueta nos lançamentos. Adicione outros que você usa (ex.: &ldquo;Vale-refeição&rdquo;).
+                </p>
+              </div>
+              {!addingMethod && (
+                <button
+                  type="button"
+                  onClick={() => setAddingMethod(true)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Novo
+                </button>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Pix, Débito automático, Boleto, Transferência, Dinheiro e Cartão de débito já vêm prontos.
-              Adicione aqui outros que você usa (ex.: "Vale-refeição").
-            </p>
 
-            {!addingMethod ? (
-              <button
-                type="button"
-                onClick={() => setAddingMethod(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-2.5 text-sm font-semibold text-muted-foreground hover:border-primary hover:text-primary"
-              >
-                <Plus className="h-4 w-4" /> Adicionar meio de pagamento
-              </button>
-            ) : (
-              <div className="space-y-3 rounded-xl border border-border bg-card p-3">
+            {addingMethod && (
+              <div className="space-y-3 border-t border-border p-4">
                 <input
                   autoFocus
                   value={newMethodName}
@@ -160,112 +163,131 @@ function MeiosPagamentoPage() {
               </div>
             )}
 
-            {methods.length > 0 && (
-              <div className="space-y-2">
-                {methods.map((m) => (
-                  <div key={m.id} className="rounded-xl border border-border bg-card p-3">
-                    {editingMethodId === m.id ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          autoFocus
-                          value={editMethodName}
-                          onChange={(e) => setEditMethodName(e.target.value)}
-                          className={`${inputClass} flex-1`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setEditingMethodId(null)}
-                          className="rounded p-1.5 text-muted-foreground hover:bg-secondary"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => saveEditMethod(m)}
-                          className="rounded p-1.5 text-primary hover:bg-secondary"
-                        >
-                          <Check className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <span className="min-w-0 flex-1 truncate font-semibold">{m.name}</span>
-                        <div className="flex shrink-0 gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => startEditMethod(m)}
-                            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMethod(m)}
-                            className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+            {/* Meios que já vêm prontos */}
+            {PAYMENT_METHOD_OPTIONS.map((o) => (
+              <div key={o.value} className="flex items-center gap-3 border-t border-border px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-[10.5px] font-bold tracking-wide text-muted-foreground">
+                  {PAYMENT_METHOD_BADGES[o.value]}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-semibold">{o.label}</span>
+                <span className="text-xs text-muted-foreground">padrão</span>
               </div>
-            )}
+            ))}
+
+            {/* Os seus */}
+            {methods.map((m) => (
+              <div key={m.id} className="border-t border-border">
+                {editingMethodId === m.id ? (
+                  <div className="flex items-center gap-2 p-3">
+                    <input
+                      autoFocus
+                      value={editMethodName}
+                      onChange={(e) => setEditMethodName(e.target.value)}
+                      className={`${inputClass} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingMethodId(null)}
+                      aria-label="Cancelar edição"
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveEditMethod(m)}
+                      aria-label="Salvar"
+                      className="rounded-lg p-1.5 text-primary hover:bg-secondary"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                      <Wallet className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">{m.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => startEditMethod(m)}
+                      aria-label={`Editar ${m.name}`}
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMethod(m)}
+                      aria-label={`Excluir ${m.name}`}
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </section>
 
           {/* ───── Cartões ───── */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Cartões</h2>
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-[17px] font-semibold tracking-tight">Cartões</h2>
+              <button
+                type="button"
+                onClick={() => setAddCardOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+              >
+                <Plus className="h-3.5 w-3.5" /> Novo cartão
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setAddCardOpen(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-2.5 text-sm font-semibold text-muted-foreground hover:border-primary hover:text-primary"
-            >
-              <Plus className="h-4 w-4" /> Novo cartão
-            </button>
-
             {cardsByAccount.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">Nenhum cartão cadastrado ainda.</p>
+              <p className="rounded-2xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                Nenhum cartão cadastrado ainda.
+              </p>
             ) : (
-              <div className="space-y-4">
-                {cardsByAccount.map(({ account, cards: accCards }) => (
-                  <div key={account.id}>
-                    <p className="mb-2 px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                      {account.name}
-                    </p>
-                    <div className="space-y-2">
-                      {accCards.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => setEditingCard(c)}
-                          className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left hover:border-primary/40"
-                        >
-                          <span
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                            style={{ backgroundColor: c.color + "33", color: c.color }}
-                          >
-                            <CreditCard className="h-[18px] w-[18px]" />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-semibold">{c.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Fecha dia {c.closingDay} · vence dia {c.dueDay}
-                            </p>
-                          </div>
-                          <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                {cardsByAccount.flatMap(({ account, cards: accCards }) =>
+                  accCards.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setEditingCard(c)}
+                      aria-label={`Editar cartão ${c.name}`}
+                      className="relative flex min-h-[170px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 p-4 text-left text-white transition-transform hover:-translate-y-0.5"
+                      style={{
+                        background: `linear-gradient(135deg, ${c.color}, color-mix(in oklab, ${c.color} 45%, #000))`,
+                      }}
+                    >
+                      <span className="pointer-events-none absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/10" />
+                      <span className="relative flex items-start justify-between gap-2">
+                        <span className="font-display text-[15px] font-semibold">{c.name}</span>
+                        <CreditCard className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      </span>
+                      <span className="relative text-xs opacity-90">
+                        <span className="mb-1 flex items-center justify-between gap-2">
+                          <span>{account.name}</span>
+                          <Pencil className="h-3 w-3" aria-hidden="true" />
+                        </span>
+                        Fecha dia {c.closingDay} · vence dia {c.dueDay}
+                      </span>
+                    </button>
+                  )),
+                )}
               </div>
             )}
+
+            <div className="flex gap-3 rounded-xl border border-invest/30 bg-invest/10 p-3.5">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-invest" aria-hidden="true" />
+              <div>
+                <b className="block text-sm font-semibold">Fechamento e vencimento</b>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
+                  O app usa esses dias para decidir em qual fatura cada compra cai e quando avisar.
+                </p>
+              </div>
+            </div>
           </section>
         </div>
       </div>

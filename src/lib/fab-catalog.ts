@@ -285,43 +285,41 @@ export type FabFolder = { label: string; icon: string; actionIds: ActionId[] };
 export type FabConfigValue = { icon: string; actions: string[]; folders: Record<string, FabFolder> };
 
 /**
- * Início/Meses = a lista atual de `SettingsFabActions` (hoje hard-coded).
- * Lançamento = a lista atual do FAB "+", com "Configurações" virando uma
- * pasta de verdade — reproduz o comportamento de hoje (2 camadas) sem o
- * usuário precisar recriar nada. As outras 7 telas nascem vazias (sem FAB,
- * igual hoje) até alguém customizar de propósito.
+ * Lista padrão do FAB "+" nas telas que não são Lançamento — mesmas 9 ações
+ * de Início/Meses. Cada tela some da própria lista (ex.: Perfil não oferece
+ * "ir pro Perfil") via `screenRef`, pra nunca virar um atalho pra tela em que
+ * o usuário já está.
+ */
+const COMMON_ACTIONS: ActionId[] = [
+  "gerenciar_conta",
+  "importar_planilha",
+  "backup_sync",
+  "locais_produtos",
+  "meios_pagamento",
+  "calculadora",
+  "whitelist",
+  "perfil",
+  "sair",
+];
+
+function commonActionsFor(screenId: ScreenId): string[] {
+  return COMMON_ACTIONS.filter((id) => CATALOG_BY_ID[id].screenRef !== screenId);
+}
+
+function commonDefault(screenId: ScreenId): FabConfigValue {
+  return { icon: "tune", actions: commonActionsFor(screenId), folders: {} };
+}
+
+/**
+ * Início/Meses = a lista `COMMON_ACTIONS`. Lançamento = a lista atual do FAB
+ * "+", com "Configurações" virando uma pasta de verdade — reproduz o
+ * comportamento de hoje (2 camadas) sem o usuário precisar recriar nada. As
+ * outras 9 telas usam a mesma `COMMON_ACTIONS` (igual Início/Meses), cada uma
+ * sem a ação que aponta pra ela mesma.
  */
 export const DEFAULTS: Record<ScreenId, FabConfigValue> = {
-  inicio: {
-    icon: "tune",
-    actions: [
-      "gerenciar_conta",
-      "importar_planilha",
-      "backup_sync",
-      "locais_produtos",
-      "meios_pagamento",
-      "calculadora",
-      "whitelist",
-      "perfil",
-      "sair",
-    ],
-    folders: {},
-  },
-  meses: {
-    icon: "tune",
-    actions: [
-      "gerenciar_conta",
-      "importar_planilha",
-      "backup_sync",
-      "locais_produtos",
-      "meios_pagamento",
-      "calculadora",
-      "whitelist",
-      "perfil",
-      "sair",
-    ],
-    folders: {},
-  },
+  inicio: commonDefault("inicio"),
+  meses: commonDefault("meses"),
   lancamento: {
     icon: "add",
     actions: ["novo_cartao", "nova_compra", "novo_debito", "novo_investimento", "novo_recebimento", "calculadora", "folder:config"],
@@ -333,15 +331,15 @@ export const DEFAULTS: Record<ScreenId, FabConfigValue> = {
       },
     },
   },
-  perfil: { icon: "apps", actions: [], folders: {} },
-  backup: { icon: "apps", actions: [], folders: {} },
-  importar: { icon: "apps", actions: [], folders: {} },
-  locais: { icon: "apps", actions: [], folders: {} },
-  meios: { icon: "apps", actions: [], folders: {} },
-  notificacoes: { icon: "apps", actions: [], folders: {} },
-  whitelist: { icon: "apps", actions: [], folders: {} },
-  sobre: { icon: "apps", actions: [], folders: {} },
-  privacidade: { icon: "apps", actions: [], folders: {} },
+  perfil: commonDefault("perfil"),
+  backup: commonDefault("backup"),
+  importar: commonDefault("importar"),
+  locais: commonDefault("locais"),
+  meios: commonDefault("meios"),
+  notificacoes: commonDefault("notificacoes"),
+  whitelist: commonDefault("whitelist"),
+  sobre: commonDefault("sobre"),
+  privacidade: commonDefault("privacidade"),
 };
 
 /** Mapeia o pathname atual pra uma tela configurável, ou `null` se não houver

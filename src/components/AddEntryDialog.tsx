@@ -51,6 +51,7 @@ export function AddEntryDialog({
   accountId,
   accountName,
   initialTab = "deb",
+  onCreateCard,
 }: {
   open: boolean;
   onClose: () => void;
@@ -59,6 +60,8 @@ export function AddEntryDialog({
   accountId: string;
   accountName: string;
   initialTab?: EntryTab;
+  /** Fecha este modal e abre o de criar cartão (aba Cartão, quando a conta ainda não tem nenhum). */
+  onCreateCard?: () => void;
 }) {
   const [tab, setTab] = useState<EntryTab>(initialTab);
 
@@ -442,21 +445,43 @@ export function AddEntryDialog({
             {tab === "card" && (
               <Field label="Cartão">
                 {selectableCards.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-                    Esta conta não tem cartão cadastrado.
-                  </p>
+                  <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Esta conta não tem cartão cadastrado.
+                    </p>
+                    {onCreateCard && (
+                      <button
+                        type="button"
+                        onClick={onCreateCard}
+                        className="text-xs font-semibold text-primary hover:underline"
+                      >
+                        + Criar cartão nesta conta
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                  <Select
-                    className={inputClass}
-                    value={cardId}
-                    onChange={(e) => setCardId(e.target.value)}
-                  >
-                    {selectableCards.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <>
+                    <Select
+                      className={inputClass}
+                      value={cardId}
+                      onChange={(e) => setCardId(e.target.value)}
+                    >
+                      {selectableCards.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Select>
+                    {onCreateCard && (
+                      <button
+                        type="button"
+                        onClick={onCreateCard}
+                        className="mt-1.5 text-xs font-semibold text-primary hover:underline"
+                      >
+                        + Criar outro cartão nesta conta
+                      </button>
+                    )}
+                  </>
                 )}
               </Field>
             )}

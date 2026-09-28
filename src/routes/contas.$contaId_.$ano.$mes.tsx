@@ -2165,6 +2165,10 @@ export function MonthDetailPane({
         accountId={contaId}
         accountName={account?.name ?? ""}
         initialTab={entryTab}
+        onCreateCard={() => {
+          setOpenEntry(false);
+          setOpenCard(true);
+        }}
       />
       <EditInstallmentDialog
         open={!!editing}

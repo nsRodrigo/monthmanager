@@ -1,10 +1,17 @@
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import type { IconComponent } from "@/lib/fab-catalog";
 import type { Tone } from "./FabAction";
 
 export type ResolvedFabEntry =
-  | { kind: "action"; id: string; label: string; icon: IconComponent; tone: Tone; onClick: () => void }
+  | {
+      kind: "action";
+      id: string;
+      label: string;
+      icon: IconComponent;
+      tone: Tone;
+      onClick: () => void;
+    }
   | { kind: "folder"; id: string; label: string; icon: IconComponent; onOpen: () => void };
 
 /**
@@ -36,8 +43,9 @@ export function FabMenuContent({
   title?: string;
   /**
    * Quando informado, o botão principal executa essa ação direto (ex.: abrir
-   * o modal de novo lançamento) em vez de abrir a gaveta — que passa a ser
-   * alcançada por um botão menor ao lado, com as demais opções.
+   * o modal de novo lançamento) em vez de abrir a gaveta — a gaveta deixa de
+   * ser alcançável neste caso; quem usa precisa oferecer as demais opções
+   * (ex.: Novo cartão, Calculadora) em outro lugar (ver tela "Mais").
    */
   onMainClick?: () => void;
   /** Rótulo acessível do botão principal quando `onMainClick` está definido. */
@@ -51,17 +59,6 @@ export function FabMenuContent({
           "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:left-auto md:right-8 md:bottom-10 md:translate-x-0 md:items-end"
         }
       >
-        {onMainClick && (
-          <button
-            type="button"
-            onClick={() => onOpenChange(true)}
-            aria-label="Mais opções"
-            title="Mais opções"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-elevated hover:text-foreground"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-        )}
         <button
           type="button"
           onClick={() => (onMainClick ? onMainClick() : onOpenChange(true))}
@@ -97,9 +94,15 @@ export function FabMenuContent({
                 onClick={() => (e.kind === "folder" ? e.onOpen() : e.onClick())}
                 className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left text-[15px] font-medium hover:bg-secondary"
               >
-                <e.icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />
+                <e.icon
+                  className="h-[18px] w-[18px] shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
                 <span className="flex-1 truncate">{e.label}</span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
               </button>
             ))}
           </div>

@@ -26,6 +26,7 @@ import {
   getMonthInvestments,
   isCardFullyPaid,
   computeMonthlyAccountBalance,
+  computeAccountBalanceUntilNow,
   isCardVisibleInMonth,
   normalizeZero,
   useEnsureRecurringForMonth,
@@ -1166,6 +1167,13 @@ export function MonthDetailPane({
     return normalizeZero(saldoAnterior + totalIncome);
   })();
 
+  // Saldo atual real da conta (agora), independente do mês sendo visualizado.
+  const saldoAtualConta = account
+    ? normalizeZero(
+        computeAccountBalanceUntilNow(account, cards, purchasesList, installmentsList, allDebits, allIncomes, allInvestments),
+      )
+    : 0;
+
   if (!account || !listsReady) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-12 text-center text-muted-foreground">
@@ -1276,6 +1284,7 @@ export function MonthDetailPane({
       <div className="@4xl:order-2 @4xl:sticky @4xl:top-36">
         <MonthSummaryPanel
           saldoInicial={normalizeZero(saldoAtual)}
+          saldoAtualConta={saldoAtualConta}
           income={totalIncome}
           debits={totalDebits}
           cards={totalCards}
@@ -2292,6 +2301,7 @@ export function MonthDetailPane({
  */
 function MonthSummaryPanel({
   saldoInicial,
+  saldoAtualConta,
   income,
   debits,
   cards,
@@ -2299,6 +2309,7 @@ function MonthSummaryPanel({
   monthName,
 }: {
   saldoInicial: number;
+  saldoAtualConta: number;
   income: number;
   debits: number;
   cards: number;
@@ -2308,6 +2319,7 @@ function MonthSummaryPanel({
   const gastos = debits + cards + invested;
   const saldoFinal = saldoInicial - gastos;
   const saldoAnterior = saldoInicial - income;
+  const atualTone = saldoAtualConta >= 0 ? "text-foreground" : "text-destructive";
   const finalTone = saldoFinal >= 0 ? "text-foreground" : "text-destructive";
   const net = income - gastos;
 
@@ -2356,9 +2368,10 @@ function MonthSummaryPanel({
 
       <div className="grid gap-y-5">
         <div>
-          <p className={`font-display text-[44px] leading-none font-semibold tracking-tight tabular-nums ${finalTone}`}>
-            {formatCurrency(saldoFinal)}
+          <p className={`font-display text-[44px] leading-none font-semibold tracking-tight tabular-nums ${atualTone}`}>
+            {formatCurrency(saldoAtualConta)}
           </p>
+          <p className="mt-1.5 text-xs text-muted-foreground">saldo atual da conta</p>
           <span
             className={`mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${
               net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
@@ -2768,7 +2781,7 @@ function CardRow({
       >
         <div className="overflow-hidden">
           <div className="border-t border-border bg-background/30">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 md:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 md:px-4">
               <span
                 className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${
                   cardState === "paid"

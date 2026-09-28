@@ -93,7 +93,7 @@ import { EditRecurringDialog, type RecurringEditTarget } from "@/components/Edit
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
-import { FabAction, toneText, toneBg, type Tone } from "@/components/FabAction";
+import { toneText, toneBg, type Tone } from "@/components/FabAction";
 import { FabMenuContent, type ResolvedFabEntry } from "@/components/FabMenuContent";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { FloatingCalculator } from "@/components/FloatingCalculator";
@@ -1980,80 +1980,82 @@ export function MonthDetailPane({
         // Modo seleção múltipla: o FAB (+) vira um menu "•••" com Duplicar/Mover/Excluir
         // dos itens selecionados, em vez do menu de "adicionar novo item".
         if (selection) {
+          const bulkEntries: ResolvedFabEntry[] = [
+            ...(selection.key === "debits" || selection.key.startsWith("card:")
+              ? [
+                  {
+                    kind: "action" as const,
+                    id: "gerar_recebivel",
+                    label: "Gerar recebível",
+                    icon: Banknote,
+                    tone: "income" as const,
+                    onClick: () => {
+                      bulkGenerateReceivable(selection.key);
+                      setBulkMenuOpen(false);
+                    },
+                  },
+                ]
+              : []),
+            {
+              kind: "action",
+              id: "gerar_pdf",
+              label: "Gerar PDF",
+              icon: FileText,
+              tone: "primary",
+              onClick: () => {
+                bulkGeneratePdf(selection.key);
+                setBulkMenuOpen(false);
+              },
+            },
+            {
+              kind: "action",
+              id: "duplicar",
+              label: "Duplicar",
+              icon: Copy,
+              tone: "primary",
+              onClick: () => {
+                bulkDuplicate(selection.key);
+                setBulkMenuOpen(false);
+              },
+            },
+            {
+              kind: "action",
+              id: "mover_mes",
+              label: "Mover para outro mês",
+              icon: CalendarClock,
+              tone: "credit",
+              onClick: () => {
+                setMoveMonthOpen(true);
+                setBulkMenuOpen(false);
+              },
+            },
+            {
+              kind: "action",
+              id: "excluir",
+              label: "Excluir",
+              icon: Trash2,
+              tone: "destructive",
+              onClick: () => {
+                bulkDelete(selection.key);
+                setBulkMenuOpen(false);
+              },
+            },
+          ];
           const bulkUi = (
-            <>
-              {bulkMenuOpen && (
-                <div
-                  className={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
-                  onClick={() => setBulkMenuOpen(false)}
-                  aria-hidden="true"
-                />
-              )}
-              <div
-                className={`pointer-events-auto ${embedded ? "absolute bottom-10" : "fixed bottom-[calc(var(--bnav-h)+2.5rem)]"} right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
-              >
-                {bulkMenuOpen && (
-                  <div className="flex flex-col items-end gap-2.5">
-                    {(selection.key === "debits" || selection.key.startsWith("card:")) && (
-                      <FabAction
-                        icon={Banknote}
-                        label="Gerar recebível"
-                        tone="income"
-                        onClick={() => {
-                          bulkGenerateReceivable(selection.key);
-                          setBulkMenuOpen(false);
-                        }}
-                      />
-                    )}
-                    <FabAction
-                      icon={FileText}
-                      label="Gerar PDF"
-                      tone="primary"
-                      onClick={() => {
-                        bulkGeneratePdf(selection.key);
-                        setBulkMenuOpen(false);
-                      }}
-                    />
-                    <FabAction
-                      icon={Copy}
-                      label="Duplicar"
-                      tone="primary"
-                      onClick={() => {
-                        bulkDuplicate(selection.key);
-                        setBulkMenuOpen(false);
-                      }}
-                    />
-                    <FabAction
-                      icon={CalendarClock}
-                      label="Mover para outro mês"
-                      tone="credit"
-                      onClick={() => {
-                        setMoveMonthOpen(true);
-                        setBulkMenuOpen(false);
-                      }}
-                    />
-                    <FabAction
-                      icon={Trash2}
-                      label="Excluir"
-                      tone="destructive"
-                      onClick={() => {
-                        bulkDelete(selection.key);
-                        setBulkMenuOpen(false);
-                      }}
-                    />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setBulkMenuOpen((v) => !v)}
-                  aria-label="Ações da seleção"
-                  aria-expanded={bulkMenuOpen}
-                  className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-card text-destructive shadow-elevated transition-colors hover:border-destructive/50"
-                >
-                  <MoreHorizontal className="h-6 w-6" />
-                </button>
-              </div>
-            </>
+            <FabMenuContent
+              mainIcon={MoreHorizontal}
+              open={bulkMenuOpen}
+              onOpenChange={setBulkMenuOpen}
+              entries={bulkEntries}
+              isSubLevel={false}
+              onBack={() => {}}
+              title="Ações da seleção"
+              positionClassName={
+                embedded
+                  ? "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:absolute md:left-auto md:right-4 md:bottom-10 md:translate-x-0 md:items-end"
+                  : undefined
+              }
+            />
           );
           return embedded && fabPortalTarget ? createPortal(bulkUi, fabPortalTarget) : bulkUi;
         }
@@ -2474,7 +2476,7 @@ function GroupedSection({
         <div className="overflow-hidden">
           <div className="border-t border-border">
             {(paidControl || sortControl) && (
-              <div className="flex items-center justify-end gap-2 px-3 py-2.5 md:px-4">
+              <div className="flex items-center justify-end gap-2 border-b border-border px-3 py-2 md:px-4">
                 {paidControl}
                 {sortControl}
               </div>
@@ -2939,12 +2941,12 @@ function RowShell({
 }) {
   return (
     <div
-      className={`grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:px-4 ${
-        selected ? "bg-primary/10" : ""
-      }`}
+      className={`grid items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:px-4 ${
+        leadingIcon ? "grid-cols-[26px_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]"
+      } ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {leadingIcon ?? <span aria-hidden="true" />}
+      {leadingIcon}
       <button type="button" onClick={guard(onEdit)} className="min-w-0 text-left">
         <p className={`truncate text-sm font-semibold ${done ? "text-muted-foreground" : ""} ${titleClass}`}>
           {title}

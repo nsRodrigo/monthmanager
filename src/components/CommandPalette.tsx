@@ -11,11 +11,13 @@ import {
   LayoutDashboard,
   Lock,
   MapPin,
+  Palette,
   Search,
   ShieldCheck,
   Sliders,
   User,
   Wallet,
+  X,
 } from "lucide-react";
 import { searchPalette, useSearchOpen } from "@/store/search";
 import { useAccounts } from "@/store/finance";
@@ -32,6 +34,7 @@ type Page = {
     | "/locais-produtos"
     | "/meios-pagamento"
     | "/perfil"
+    | "/aparencia"
     | "/personalizar-menu"
     | "/sobre"
     | "/privacidade";
@@ -46,7 +49,8 @@ const PAGES: Page[] = [
   { label: "Backup e sync", to: "/backup", icon: Cloud, keywords: "exportar restaurar drive snapshot" },
   { label: "Locais e produtos", to: "/locais-produtos", icon: MapPin, keywords: "descrição catálogo" },
   { label: "Meios de pagamento", to: "/meios-pagamento", icon: CreditCard, keywords: "pix boleto cartões" },
-  { label: "Meu perfil", to: "/perfil", icon: User, keywords: "tema senha foto conta" },
+  { label: "Meu perfil", to: "/perfil", icon: User, keywords: "senha foto conta segurança" },
+  { label: "Aparência", to: "/aparencia", icon: Palette, keywords: "tema cor escuro claro sistema visual" },
   { label: "Atalhos rápidos", to: "/personalizar-menu", icon: Sliders, keywords: "menu flutuante fab" },
   { label: "Sobre o app", to: "/sobre", icon: Info },
   { label: "Privacidade", to: "/privacidade", icon: Lock },
@@ -101,9 +105,20 @@ export function CommandPalette() {
                 placeholder="Buscar tela ou ação…"
                 className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
               />
-              <kbd className="rounded-[5px] border border-border px-1.5 py-px text-[11px] font-medium text-muted-foreground">
+              <kbd className="max-sm:hidden rounded-[5px] border border-border px-1.5 py-px text-[11px] font-medium text-muted-foreground">
                 Esc
               </kbd>
+              {/* No celular a busca ocupa a tela toda (sem overlay clicável por
+                  trás pra fechar, e sem tecla Esc física) — sem este botão não
+                  havia como sair. */}
+              <button
+                type="button"
+                onClick={() => searchPalette.close()}
+                aria-label="Fechar busca"
+                className="hidden max-sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <X className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
             </div>
             <CommandPrimitive.List className="max-h-[340px] overflow-auto p-2 max-sm:max-h-none max-sm:flex-1">
               <CommandPrimitive.Empty className="p-6 text-center text-sm text-muted-foreground">

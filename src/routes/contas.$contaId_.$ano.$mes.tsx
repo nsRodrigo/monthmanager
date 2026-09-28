@@ -1255,19 +1255,23 @@ export function MonthDetailPane({
             cabeçalho, por cima do conteúdo (não ocupa altura — o resumo tem
             folga acima). Mesma linha vai de ponta a ponta: mês/ano à
             esquerda, "+ Novo" à direita — que vira "N selecionados" + "•••"
-            durante a seleção múltipla, em vez de um FAB flutuando à parte. */}
+            durante a seleção múltipla, em vez de um FAB flutuando à parte.
+            O seletor de mês/ano some enquanto seleciona (não faz sentido
+            trocar de mês com itens selecionados), deixando só a pílula. */}
         <div className="pointer-events-none absolute inset-x-0 top-full z-10 flex items-center justify-between gap-2 px-4 pt-2.5">
-          <div className="pointer-events-auto rounded-full shadow-elevated">
-            <MonthYearPicker
-              contaId={contaId}
-              year={year}
-              month={month}
-              prev={prevMonth}
-              next={nextMonth}
-              onNavigate={onMonthChange}
-            />
-          </div>
-          <div className="pointer-events-auto">
+          {!selection && (
+            <div className="pointer-events-auto rounded-full shadow-elevated">
+              <MonthYearPicker
+                contaId={contaId}
+                year={year}
+                month={month}
+                prev={prevMonth}
+                next={nextMonth}
+                onNavigate={onMonthChange}
+              />
+            </div>
+          )}
+          <div className="pointer-events-auto ml-auto">
             {selection ? (
               <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-1 pr-1 pl-3.5 shadow-elevated">
                 <span className="text-xs font-semibold whitespace-nowrap">

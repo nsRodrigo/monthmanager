@@ -2,13 +2,11 @@ import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Field, inputClass } from "@/components/Modal";
 import { useProfile, useUpdateProfile } from "@/store/profile";
-import { useTheme, type Theme } from "@/store/theme";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
 import { useAccounts } from "@/store/finance";
-import { User, Check, KeyRound, Eye, EyeOff, Palette, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight, Info, Lock } from "lucide-react";
+import { User, Check, KeyRound, Eye, EyeOff, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight, Info, Lock } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
-import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
@@ -23,7 +21,6 @@ function ProfilePage() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const update = useUpdateProfile();
-  const { theme, setTheme, navSystemBg, setNavSystemBg } = useTheme();
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
   const { data: accounts = [] } = useAccounts();
@@ -117,20 +114,6 @@ function ProfilePage() {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-
-  const themes: {
-    value: Theme;
-    label: string;
-    description: string;
-    accent: string;
-    bg: string;
-  }[] = [
-    { value: "dark", label: "Esmeralda Noite", description: "Verde profundo — padrão", accent: "#3ddc97", bg: "#0a0f0e" },
-    { value: "indigo", label: "Índigo Grafite", description: "Azul-noite, mais frio", accent: "#7c9cff", bg: "#0b0d14" },
-    { value: "grafite", label: "Grafite Marfim", description: "Neutro, cor só nos dados", accent: "#e8dfc8", bg: "#0d0d0c" },
-    { value: "light", label: "Claro", description: "Fundo branco", accent: "#1f9d6b", bg: "#fafcfb" },
-    { value: "high-contrast", label: "Alto contraste", description: "WCAG AAA", accent: "#e6ff00", bg: "#000000" },
-  ];
 
   const cardCls = "rounded-2xl border border-border bg-card p-5";
   const SectionTitle = ({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) => (
@@ -305,63 +288,13 @@ function ProfilePage() {
                 )}
               </section>
 
-              <section className={cardCls}>
-                <SectionTitle icon={Users}>Contas</SectionTitle>
-                <AccountSwitcher variant="inline" />
-              </section>
             </div>
 
             <div className="space-y-4">
               <section className={cardCls}>
-                <SectionTitle icon={Palette}>Aparência</SectionTitle>
-                <div role="radiogroup" aria-label="Tema do app" className="grid grid-cols-2 gap-2.5">
-                  {themes.map((t) => {
-                    const active = theme === t.value;
-                    return (
-                      <button
-                        key={t.value}
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => setTheme(t.value)}
-                        className={`flex flex-col gap-2.5 rounded-xl border p-3 text-left transition-colors ${
-                          active
-                            ? "border-primary bg-primary/5"
-                            : "border-border bg-background hover:border-ring/40"
-                        }`}
-                      >
-                        <span className="flex gap-1.5" aria-hidden="true">
-                          <i className="h-6 w-6 rounded-lg" style={{ background: t.accent }} />
-                          <i
-                            className="h-6 flex-1 rounded-lg border border-white/10"
-                            style={{ background: t.bg }}
-                          />
-                        </span>
-                        <span>
-                          <span className="flex items-center gap-1 text-[13px] font-semibold">
-                            {t.label}
-                            {active && <Check className="h-3.5 w-3.5 text-primary" />}
-                          </span>
-                          <span className="block text-[11px] leading-snug text-muted-foreground">
-                            {t.description}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <label className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
-                  <span className="min-w-0">
-                    <span className="block text-[13px] font-medium">Barra inferior no tom do sistema</span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-                      Fundo preto (ou branco, no claro) igual à faixa de gestos do celular, em vez da
-                      cor deste tema.
-                    </span>
-                  </span>
-                  <Switch checked={navSystemBg} onCheckedChange={setNavSystemBg} />
-                </label>
+                <SectionTitle icon={Users}>Contas</SectionTitle>
+                <AccountSwitcher variant="inline" />
               </section>
-
             </div>
           </div>
 

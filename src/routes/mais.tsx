@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
-  FileSpreadsheet,
   Cloud,
   MapPin,
   Wallet,
-  User,
   Sliders,
   ShieldCheck,
   Palette,
   LogOut,
   Settings,
   Calculator as CalculatorIcon,
-  Bell,
   Info,
   Lock,
   ChevronRight,
@@ -64,17 +61,14 @@ function MaisPage() {
       </div>
       <div className="mx-auto max-w-2xl px-4 pt-4 pb-24 sm:px-6">
         <div className="space-y-0.5">
-          {row("/importar-historico", "Importar planilha", FileSpreadsheet)}
           {row("/backup", "Backup e sync", Cloud)}
           {actionRow("Gerenciar conta", Settings, () => setManageOpen(true))}
           {row("/locais-produtos", "Locais e produtos", MapPin)}
           {row("/meios-pagamento", "Meios de pagamento", Wallet)}
           {actionRow("Calculadora", CalculatorIcon, () => openFloatingCalculator())}
-          {row("/notificacoes", "Notificações", Bell)}
-          {row("/perfil", "Meu perfil", User)}
+          {row("/aparencia", "Aparência", Palette)}
           {row("/personalizar-menu", "Atalhos rápidos", Sliders)}
           {isAdmin && row("/admin/whitelist", "Administração", ShieldCheck)}
-          {row("/perfil", "Sistema visual", Palette)}
           {row("/sobre", "Sobre o app", Info)}
           {row("/privacidade", "Privacidade", Lock)}
           <button

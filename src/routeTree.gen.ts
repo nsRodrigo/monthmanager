@@ -21,6 +21,7 @@ import { Route as LocaisProdutosRouteImport } from './routes/locais-produtos'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as BackupRouteImport } from './routes/backup'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AparenciaRouteImport } from './routes/aparencia'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ContasContaIdRouteImport } from './routes/contas.$contaId'
 import { Route as AdminWhitelistRouteImport } from './routes/admin.whitelist'
@@ -87,6 +88,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AparenciaRoute = AparenciaRouteImport.update({
+  id: '/aparencia',
+  path: '/aparencia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -115,6 +121,7 @@ const ContasContaIdAnoMesRoute = ContasContaIdAnoMesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/aparencia': typeof AparenciaRoute
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/aparencia': typeof AparenciaRoute
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
@@ -154,6 +162,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/aparencia': typeof AparenciaRoute
   '/auth': typeof AuthRoute
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/aparencia'
     | '/auth'
     | '/backup'
     | '/importar-historico'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/aparencia'
     | '/auth'
     | '/backup'
     | '/importar-historico'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/aparencia'
     | '/auth'
     | '/backup'
     | '/importar-historico'
@@ -233,6 +245,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AparenciaRoute: typeof AparenciaRoute
   AuthRoute: typeof AuthRoute
   BackupRoute: typeof BackupRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
@@ -337,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/aparencia': {
+      id: '/aparencia'
+      path: '/aparencia'
+      fullPath: '/aparencia'
+      preLoaderRoute: typeof AparenciaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -377,6 +397,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AparenciaRoute: AparenciaRoute,
   AuthRoute: AuthRoute,
   BackupRoute: BackupRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,

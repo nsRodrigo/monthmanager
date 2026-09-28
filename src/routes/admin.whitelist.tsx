@@ -231,7 +231,7 @@ function WhitelistAdmin() {
       <div className="space-y-4">
       {/* Push notifications */}
       <section className="rounded-2xl border border-border bg-card p-5">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />
             <span className="text-sm font-semibold">Notificações push</span>
@@ -239,7 +239,7 @@ function WhitelistAdmin() {
           <button
             onClick={enablePush}
             disabled={pushBusy}
-            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-secondary disabled:opacity-50"
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold whitespace-nowrap hover:bg-secondary disabled:opacity-50"
           >
             {pushBusy ? "Ativando…" : "Ativar neste dispositivo"}
           </button>
@@ -302,18 +302,18 @@ function WhitelistAdmin() {
 
       <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="mb-3 text-sm font-semibold">Whitelist</h2>
-        <form onSubmit={onAdd} className="flex gap-2 rounded-lg border border-border bg-background p-2">
+        <form onSubmit={onAdd} className="flex flex-wrap gap-2 rounded-lg border border-border bg-background p-2">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="email@dominio.com"
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
           />
           <button
             type="submit"
             disabled={addMut.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold whitespace-nowrap text-primary-foreground disabled:opacity-60"
           >
             <Plus className="h-4 w-4" /> Adicionar
           </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -36,6 +36,7 @@ import {
   Cloud,
   CloudDownload,
   Download,
+  FileSpreadsheet,
   HardDriveDownload,
   History,
   Link2,
@@ -255,6 +256,25 @@ function BackupPage() {
             dispositivo aparecem nos demais em segundos. Sem internet, o app continua funcionando
             com cache local e sincroniza assim que reconectar.
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <FileSpreadsheet className="h-4 w-4" />
+            </span>
+            <h2 className="font-display text-[15px] font-semibold">Importar planilha</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Traga seu histórico de outro app ou de uma planilha (XLSX/CSV) — o assistente detecta
+            contas, cartões e parcelas sozinho.
+          </p>
+          <Link
+            to="/importar-historico"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Importar planilha
+          </Link>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5">

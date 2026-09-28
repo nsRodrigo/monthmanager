@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { inputClass } from "./Modal";
 import { useCatalogItems, type CatalogItem } from "@/store/finance";
-import { Tag } from "lucide-react";
+import { Tag, Wallet } from "lucide-react";
 
 /**
  * Campo de Descrição ligado ao catálogo "Locais e Produtos" — um input
@@ -11,15 +11,27 @@ import { Tag } from "lucide-react";
  * ela; digitar algo sem correspondência e salvar o lançamento normalmente
  * cria esse item automaticamente no catálogo (ver `useUpsertCatalogItem`,
  * chamado no submit de cada diálogo) — sem nenhum passo extra aqui.
+ *
+ * Cada conta do app também é um item do catálogo (`accountId`). Nos tipos em
+ * que faz sentido (débito/recebimento, `includeAccounts`), escolher uma conta
+ * cria o lançamento nas duas contas — quem usa o campo é que descobre isso a
+ * partir do texto. A conta em que o usuário já está (`excludeAccountId`) não
+ * é oferecida, e as demais aparecem primeiro.
  */
 export function CatalogDescriptionField({
   value,
   onChange,
   placeholder,
+  includeAccounts = false,
+  excludeAccountId,
 }: {
   value: string;
   onChange: (name: string) => void;
   placeholder?: string;
+  /** Oferece as contas do app como itens (só faz sentido em débito/recebimento). */
+  includeAccounts?: boolean;
+  /** Conta em que o usuário está — nunca é oferecida como destino. */
+  excludeAccountId?: string;
 }) {
   const { data: items = [] } = useCatalogItems();
   const [open, setOpen] = useState(false);
@@ -31,9 +43,13 @@ export function CatalogDescriptionField({
   // no input também serve pra escolher da lista, sem precisar digitar nada.
   // `items` vem ordenado por nome (bom pra tela de gerenciar); aqui, pra
   // sugestão enquanto digita, reordena por mais usado primeiro.
-  const byUsage = [...items].sort((a, b) => b.usageCount - a.usageCount);
+  const byUsage = items
+    .filter((i) => !i.accountId || (includeAccounts && i.accountId !== excludeAccountId))
+    .sort((a, b) => Number(!!b.accountId) - Number(!!a.accountId) || b.usageCount - a.usageCount);
   const matches = (
-    q ? byUsage.filter((i) => i.name.toLowerCase() !== q && i.name.toLowerCase().includes(q)) : byUsage
+    q
+      ? byUsage.filter((i) => i.name.toLowerCase() !== q && i.name.toLowerCase().includes(q))
+      : byUsage
   ).slice(0, 6);
 
   useEffect(() => {
@@ -102,11 +118,23 @@ export function CatalogDescriptionField({
                 idx === highlight ? "bg-secondary text-foreground" : ""
               }`}
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Tag className="h-3 w-3" />
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
+                  item.accountId ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {item.accountId ? <Wallet className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
               </span>
               <span className="min-w-0 flex-1 truncate">{item.name}</span>
-              <span className="shrink-0 text-[10px] text-muted-foreground">{item.usageCount}x</span>
+              {item.accountId ? (
+                <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  Conta
+                </span>
+              ) : (
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {item.usageCount}x
+                </span>
+              )}
             </button>
           ))}
         </div>

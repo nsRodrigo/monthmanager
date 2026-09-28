@@ -260,6 +260,7 @@ export type Database = {
       }
       catalog_items: {
         Row: {
+          account_id: string | null
           created_at: string
           id: string
           kind: string | null
@@ -270,6 +271,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           created_at?: string
           id?: string
           kind?: string | null
@@ -280,6 +282,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           created_at?: string
           id?: string
           kind?: string | null
@@ -293,6 +296,7 @@ export type Database = {
       }
       debits: {
         Row: {
+          mirror_id: string | null
           account_id: string
           amount: number
           auto_debit_day: number | null
@@ -313,6 +317,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          mirror_id?: string | null
           account_id: string
           amount: number
           auto_debit_day?: number | null
@@ -333,6 +338,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          mirror_id?: string | null
           account_id?: string
           amount?: number
           auto_debit_day?: number | null
@@ -412,6 +418,7 @@ export type Database = {
       }
       incomes: {
         Row: {
+          mirror_id: string | null
           account_id: string
           amount: number
           created_at: string
@@ -430,6 +437,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          mirror_id?: string | null
           account_id: string
           amount: number
           created_at?: string
@@ -448,6 +456,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          mirror_id?: string | null
           account_id?: string
           amount?: number
           created_at?: string
@@ -477,6 +486,7 @@ export type Database = {
       }
       installments: {
         Row: {
+          mirror_id: string | null
           amount: number
           created_at: string
           due_date: string
@@ -492,6 +502,7 @@ export type Database = {
           year: number
         }
         Insert: {
+          mirror_id?: string | null
           amount: number
           created_at?: string
           due_date: string
@@ -507,6 +518,7 @@ export type Database = {
           year: number
         }
         Update: {
+          mirror_id?: string | null
           amount?: number
           created_at?: string
           due_date?: string
@@ -1016,6 +1028,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      link_mirror_entries: {
+        Args: { p_debit_id: string; p_income_id: string }
+        Returns: undefined
+      }
       bulk_insert_finance: { Args: { _payload: Json }; Returns: Json }
       convert_finance_entry: {
         Args: {

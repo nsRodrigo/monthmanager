@@ -82,10 +82,7 @@ import {
   FileText,
   Calculator,
 } from "lucide-react";
-import { AddDebitDialog } from "@/components/AddDebitDialog";
-import { AddIncomeDialog } from "@/components/AddIncomeDialog";
-import { AddPurchaseDialog } from "@/components/AddPurchaseDialog";
-import { AddInvestmentDialog } from "@/components/AddInvestmentDialog";
+import { AddEntryDialog, type EntryTab } from "@/components/AddEntryDialog";
 import { EditInstallmentDialog, type SingleEditTarget } from "@/components/EditInstallmentDialog";
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
@@ -223,10 +220,12 @@ export function MonthDetailPane({
   const [reorderMode, setReorderMode] = useState(false);
   const [reorderIds, setReorderIds] = useState<string[] | null>(null);
 
-  const [openDebit, setOpenDebit] = useState(false);
-  const [openIncome, setOpenIncome] = useState(false);
-  const [openInvest, setOpenInvest] = useState(false);
-  const [openPurchase, setOpenPurchase] = useState(false);
+  const [openEntry, setOpenEntry] = useState(false);
+  const [entryTab, setEntryTab] = useState<EntryTab>("deb");
+  const openEntryTab = (t: EntryTab) => {
+    setEntryTab(t);
+    setOpenEntry(true);
+  };
   const [openCard, setOpenCard] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [fabFolder, setFabFolder] = useState<string | null>(null);
@@ -1983,7 +1982,7 @@ export function MonthDetailPane({
       {(() => {
         // Some enquanto qualquer diálogo aberto por ele estiver na tela — senão
         // fica flutuando por cima dos botões do próprio diálogo (ex.: Cancelar/Adicionar).
-        const anyFabDialogOpen = openDebit || openIncome || openInvest || openPurchase || openCard;
+        const anyFabDialogOpen = openEntry || openCard;
         if (anyFabDialogOpen) return null;
 
         // Modo seleção múltipla: o FAB (+) vira um menu "•••" com Duplicar/Mover/Excluir
@@ -2076,10 +2075,10 @@ export function MonthDetailPane({
         // (usado nas outras 9 telas) não sabe executar sozinho.
         const localHandlers: Partial<Record<ActionId, () => void>> = {
           novo_cartao: () => setOpenCard(true),
-          nova_compra: () => setOpenPurchase(true),
-          novo_debito: () => setOpenDebit(true),
-          novo_investimento: () => setOpenInvest(true),
-          novo_recebimento: () => setOpenIncome(true),
+          nova_compra: () => openEntryTab("card"),
+          novo_debito: () => openEntryTab("deb"),
+          novo_investimento: () => openEntryTab("inv"),
+          novo_recebimento: () => openEntryTab("inc"),
         };
 
         const resolveFabAction = (id: string): ResolvedFabEntry | null => {
@@ -2156,33 +2155,14 @@ export function MonthDetailPane({
         return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;
       })()}
 
-      <AddDebitDialog
-        open={openDebit}
-        onClose={() => setOpenDebit(false)}
+      <AddEntryDialog
+        open={openEntry}
+        onClose={() => setOpenEntry(false)}
         defaultYear={year}
         defaultMonth={month}
-        fixedAccountId={contaId}
-      />
-      <AddIncomeDialog
-        open={openIncome}
-        onClose={() => setOpenIncome(false)}
-        defaultYear={year}
-        defaultMonth={month}
-        fixedAccountId={contaId}
-      />
-      <AddPurchaseDialog
-        open={openPurchase}
-        onClose={() => setOpenPurchase(false)}
-        defaultYear={year}
-        defaultMonth={month}
-        fixedAccountId={contaId}
-      />
-      <AddInvestmentDialog
-        open={openInvest}
-        onClose={() => setOpenInvest(false)}
-        defaultYear={year}
-        defaultMonth={month}
-        fixedAccountId={contaId}
+        accountId={contaId}
+        accountName={account?.name ?? ""}
+        initialTab={entryTab}
       />
       <EditInstallmentDialog
         open={!!editing}

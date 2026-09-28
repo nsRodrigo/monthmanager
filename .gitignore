@@ -33,3 +33,6 @@ dist-ssr
 
 # Env vars — nunca versionar (segredos como GOOGLE_CLIENT_SECRET vivem aqui em dev local)
 .env
+
+# Screenshots soltos usados só como referência local (podem conter dados reais)
+supabase/image*.png

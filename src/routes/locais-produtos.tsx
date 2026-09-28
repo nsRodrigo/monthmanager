@@ -12,7 +12,19 @@ import {
   useDeleteCatalogItem,
   type CatalogItem,
 } from "@/store/finance";
-import { Tag, Plus, Pencil, Trash2, Check, X, Search, AlertTriangle, ArrowDownAZ, Flame } from "lucide-react";
+import {
+  Tag,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Search,
+  AlertTriangle,
+  ArrowDownAZ,
+  Flame,
+  Wallet,
+} from "lucide-react";
 
 export const Route = createFileRoute("/locais-produtos")({
   component: LocaisProdutosPage,
@@ -117,7 +129,11 @@ function LocaisProdutosPage() {
               className={`${inputClass} pl-10`}
             />
           </div>
-          <div role="group" aria-label="Ordenar" className="inline-flex gap-0.5 rounded-xl border border-border bg-card p-[3px]">
+          <div
+            role="group"
+            aria-label="Ordenar"
+            className="inline-flex gap-0.5 rounded-xl border border-border bg-card p-[3px]"
+          >
             {(
               [
                 ["name", "Nome", ArrowDownAZ],
@@ -130,7 +146,9 @@ function LocaisProdutosPage() {
                 aria-pressed={sort === k}
                 onClick={() => setSort(k)}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                  sort === k ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+                  sort === k
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" /> {label}
@@ -150,7 +168,9 @@ function LocaisProdutosPage() {
 
         {adding && (
           <div className="mb-4 space-y-3 rounded-2xl border border-border bg-card p-4">
-            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Novo item</p>
+            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              Novo item
+            </p>
             <input
               autoFocus
               value={newName}
@@ -163,9 +183,12 @@ function LocaisProdutosPage() {
               <div className="flex items-start gap-2.5 rounded-xl border border-debit/40 bg-debit/10 p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-debit" />
                 <div className="text-xs">
-                  <p className="font-semibold text-foreground">Já existe: &ldquo;{duplicate.name}&rdquo;</p>
+                  <p className="font-semibold text-foreground">
+                    Já existe: &ldquo;{duplicate.name}&rdquo;
+                  </p>
                   <p className="mt-0.5 text-muted-foreground">
-                    Usado {duplicate.usageCount}x. Escolha outro nome ou cancele pra reaproveitar esse.
+                    Usado {duplicate.usageCount}x. Escolha outro nome ou cancele pra reaproveitar
+                    esse.
                   </p>
                 </div>
               </div>
@@ -235,12 +258,32 @@ function LocaisProdutosPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/30">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
-                        <Tag className="h-[17px] w-[17px]" />
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                          item.accountId
+                            ? "bg-primary/15 text-primary"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {item.accountId ? (
+                          <Wallet className="h-[17px] w-[17px]" />
+                        ) : (
+                          <Tag className="h-[17px] w-[17px]" />
+                        )}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold">{item.name}</p>
-                        <div className="mt-1.5 h-1.5 max-w-64 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
+                        <p className="flex items-center gap-2 truncate font-semibold">
+                          {item.name}
+                          {item.accountId && (
+                            <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                              Conta
+                            </span>
+                          )}
+                        </p>
+                        <div
+                          className="mt-1.5 h-1.5 max-w-64 overflow-hidden rounded-full bg-secondary"
+                          aria-hidden="true"
+                        >
                           <i
                             className="block h-full rounded-full bg-primary"
                             style={{ width: `${(item.usageCount / maxUsage) * 100}%` }}
@@ -253,7 +296,10 @@ function LocaisProdutosPage() {
                       <span className="hidden shrink-0 rounded-full bg-secondary px-2.5 py-0.5 text-[11.5px] font-semibold text-muted-foreground sm:inline">
                         {item.usageCount}× usado
                       </span>
-                      <div className="flex shrink-0 items-center">
+                      {/* Itens de conta acompanham o nome da conta e somem com ela — não se edita nem exclui aqui. */}
+                      <div
+                        className={`flex shrink-0 items-center ${item.accountId ? "hidden" : ""}`}
+                      >
                         <button
                           type="button"
                           onClick={() => startEdit(item)}

@@ -10,6 +10,9 @@ export function Modal({
   onClose,
   title,
   headerRight,
+  subheader,
+  footer,
+  tall,
   children,
 }: {
   open: boolean;
@@ -17,6 +20,12 @@ export function Modal({
   title: string;
   /** Conteúdo extra no cabeçalho, entre o título e o botão de fechar (ex.: PaidToggle). */
   headerRight?: React.ReactNode;
+  /** Faixa fixa logo abaixo do cabeçalho, fora da área que rola (ex.: abas). */
+  subheader?: React.ReactNode;
+  /** Rodapé fixo, fora da área que rola (ex.: botões de salvar). */
+  footer?: React.ReactNode;
+  /** Altura constante (não encolhe/cresce conforme o conteúdo) — pra abas que trocam o corpo sem o modal pular. */
+  tall?: boolean;
   children: React.ReactNode;
 }) {
   const scrollYRef = useRef(0);
@@ -51,7 +60,11 @@ export function Modal({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="animate-modal-pop relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-elevated">
+      <div
+        className={`animate-modal-pop relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-elevated ${
+          tall ? "h-[min(85vh,44rem)]" : "max-h-[85vh]"
+        }`}
+      >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4">
           <h3 className="text-base font-semibold">{title}</h3>
           <div className="flex shrink-0 items-center gap-2">
@@ -64,10 +77,14 @@ export function Modal({
             </button>
           </div>
         </div>
-        <div ref={bodyRef} className="overflow-y-auto p-5">{children}</div>
+        {subheader && <div className="shrink-0 border-b border-border px-5 py-3">{subheader}</div>}
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto p-5">
+          {children}
+        </div>
+        {footer && <div className="shrink-0 border-t border-border px-5 py-3">{footer}</div>}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 
@@ -127,7 +144,9 @@ export function PaidToggle({
       onClick={() => onChange(!checked)}
       disabled={disabled}
       className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
-        checked ? "bg-success/15 text-success hover:bg-success/25" : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+        checked
+          ? "bg-success/15 text-success hover:bg-success/25"
+          : "bg-secondary text-muted-foreground hover:bg-secondary/70"
       } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
       {checked && <Check className="h-3 w-3" />}
@@ -160,7 +179,9 @@ export function Accordion({
         className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm font-medium"
       >
         <span>{label}</span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
       <div
         className="grid transition-[grid-template-rows] duration-300 ease-in-out"

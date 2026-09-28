@@ -930,6 +930,26 @@ export function useRemoveAccount() {
         .select("id")
         .eq("account_id", id);
       const debIds = (debs ?? []).map((d) => d.id);
+      const { data: incsToo } = await supabase
+        .from("incomes")
+        .select("id")
+        .eq("account_id", id);
+      const ownIncIds = (incsToo ?? []).map((i) => i.id);
+
+      // Lançamentos espelhados: solta a ligação ANTES de apagar, senão a
+      // exclusão se propagaria pros lançamentos da outra conta. (Sem a
+      // migração das contas-como-produtos essas chamadas só falham em
+      // silêncio e nada é ligado mesmo.)
+      // Só o lado desta conta precisa ser solto; a ponta que sobra na outra
+      // conta fica apontando pra um lançamento que não existe mais, o que é
+      // inofensivo (nenhum trigger acha o par).
+      const ownParentIds = [...debIds, ...ownIncIds];
+      if (ownParentIds.length > 0) {
+        await supabase.from("installments").update({ mirror_id: null }).in("parent_id", ownParentIds);
+        if (debIds.length > 0) await supabase.from("debits").update({ mirror_id: null }).in("id", debIds);
+        if (ownIncIds.length > 0) await supabase.from("incomes").update({ mirror_id: null }).in("id", ownIncIds);
+      }
+
       if (debIds.length > 0) {
         await supabase
           .from("installments")
@@ -2337,13 +2357,17 @@ export function useAddDebit() {
       markCurrentPaid?: boolean;
       /** Dias de antecedência para notificação push de vencimento (null/undefined = desativado). */
       notifyDaysBefore?: number | null;
+      /** Grupo da série recorrente já definido por quem chama (lançamento espelhado entre contas usa o mesmo grupo nos dois lados). */
+      recurrenceGroupId?: string;
+      /** Não registra no histórico de desfazer (o chamador cuida disso). */
+      noHistory?: boolean;
     }) => {
       const count = Math.max(1, d.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, d.installmentNumber ?? 1));
       // "Recorrente" ou meio "débito automático" (e não parcelado): série
       // real, replicada até o último mês que já existe na conta.
       const isRecurring = (d.required || d.paymentMethod === "auto_debit") && count === 1;
-      const groupId = isRecurring ? crypto.randomUUID() : null;
+      const groupId = isRecurring ? (d.recurrenceGroupId ?? crypto.randomUUID()) : null;
       const debitId = crypto.randomUUID();
       // Fallback to date when caller didn't pass a reference month.
       const [_by, _bm] = d.date.slice(0, 10).split("-").map(Number);
@@ -2422,12 +2446,12 @@ export function useAddDebit() {
         }
       }
 
-      return { debitId, simple: count === 1 && !isRecurring, baseRow };
+      return { debitId, groupId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["debits", "installments"]),
     onSuccess: (result, d) => {
       // Histórico só cobre o caso simples (lançamento único, sem parcelas/recorrência).
-      if (!result.simple) return;
+      if (!result.simple || d.noHistory) return;
       const inv2 = inv;
       const { debitId, baseRow } = result;
       history.push({
@@ -2535,11 +2559,15 @@ export function useAddIncome() {
       markCurrentPaid?: boolean;
       notifyDaysBefore?: number | null;
       paymentMethod?: PaymentMethod;
+      /** Grupo da série recorrente já definido por quem chama (lançamento espelhado entre contas usa o mesmo grupo nos dois lados). */
+      recurrenceGroupId?: string;
+      /** Não registra no histórico de desfazer (o chamador cuida disso). */
+      noHistory?: boolean;
     }) => {
       const count = Math.max(1, i.installmentsCount ?? 1);
       const anchor = Math.max(1, Math.min(count, i.installmentNumber ?? 1));
       const isRecurring = !!i.recurring && count === 1;
-      const groupId = isRecurring ? crypto.randomUUID() : null;
+      const groupId = isRecurring ? (i.recurrenceGroupId ?? crypto.randomUUID()) : null;
       const incomeId = crypto.randomUUID();
       const [_by, _bm] = i.date.slice(0, 10).split("-").map(Number);
       const refYear = i.referenceYear ?? _by;
@@ -2607,11 +2635,11 @@ export function useAddIncome() {
           if (e3) throw e3;
         }
       }
-      return { incomeId, simple: count === 1 && !isRecurring, baseRow };
+      return { incomeId, groupId, simple: count === 1 && !isRecurring, baseRow };
     },
     onSettled: () => inv(["incomes", "installments"]),
     onSuccess: (result, i) => {
-      if (!result.simple) return;
+      if (!result.simple || i.noHistory) return;
       const inv2 = inv;
       const { incomeId, baseRow } = result;
       history.push({
@@ -2626,6 +2654,113 @@ export function useAddIncome() {
         },
       });
     },
+  });
+}
+
+// =======================
+// Lançamentos espelhados entre contas
+// =======================
+/**
+ * Débito/recebimento cuja descrição é o nome de OUTRA conta do app (as contas
+ * viram itens do catálogo "Locais e Produtos"): cria o lançamento na conta da
+ * tela e o espelho na conta escolhida — débito de um lado, recebimento do
+ * outro — e liga os dois no banco (`link_mirror_entries`). Parcelado e
+ * recorrente valem nos dois lados. Depois de ligados, valor, data, mês,
+ * status e exclusão de um lado são refletidos no outro por triggers (ver a
+ * migração account_mirror_entries).
+ */
+export function useAddMirroredEntry() {
+  const addDebit = useAddDebit();
+  const addIncome = useAddIncome();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (a: {
+      /** Lado que o usuário está lançando: "debit" = saiu da conta da tela; "income" = entrou nela. */
+      side: "debit" | "income";
+      accountId: string;
+      accountName: string;
+      targetAccountId: string;
+      description: string;
+      /** Valor total (o parcelado divide igual nos dois lados). */
+      amount: number;
+      date: string;
+      referenceYear: number;
+      referenceMonth: number;
+      installmentsCount: number;
+      installmentNumber: number;
+      /** "Recorrente" (débito automático também conta como série). */
+      recurring: boolean;
+      paymentMethod?: PaymentMethod;
+      autoDebitDay?: number | null;
+      notifyDaysBefore?: number | null;
+      /** Já pago/recebido (no parcelado marca a parcela atual). */
+      settled: boolean;
+    }) => {
+      const count = Math.max(1, a.installmentsCount);
+      const isInstallment = count > 1;
+      const primaryIsDebit = a.side === "debit";
+      const isSeries =
+        !isInstallment && (a.recurring || (primaryIsDebit && a.paymentMethod === "auto_debit"));
+      const groupId = isSeries ? crypto.randomUUID() : undefined;
+      const common = {
+        amount: a.amount,
+        date: a.date,
+        installmentsCount: count,
+        installmentNumber: a.installmentNumber,
+        referenceYear: a.referenceYear,
+        referenceMonth: a.referenceMonth,
+        recurrenceGroupId: groupId,
+        noHistory: true,
+      };
+      const settledNow = a.settled && !isInstallment;
+      const settledCurrent = a.settled && isInstallment;
+
+      // O outro lado leva o nome da conta de origem como descrição, e não
+      // copia meio de pagamento nem aviso de vencimento.
+      const debitRes = await addDebit.mutateAsync({
+        ...common,
+        accountId: primaryIsDebit ? a.accountId : a.targetAccountId,
+        description: primaryIsDebit ? a.description : a.accountName,
+        required: primaryIsDebit ? a.recurring : isSeries,
+        paymentMethod: primaryIsDebit ? a.paymentMethod : undefined,
+        autoDebitDay: primaryIsDebit ? a.autoDebitDay : undefined,
+        notifyDaysBefore: primaryIsDebit ? a.notifyDaysBefore : undefined,
+        paidNow: settledNow,
+        markCurrentPaid: settledCurrent,
+      });
+
+      let incomeRes: { incomeId: string } | null = null;
+      try {
+        incomeRes = await addIncome.mutateAsync({
+          ...common,
+          accountId: primaryIsDebit ? a.targetAccountId : a.accountId,
+          description: primaryIsDebit ? a.accountName : a.description,
+          recurring: primaryIsDebit ? isSeries : a.recurring,
+          paymentMethod: primaryIsDebit ? undefined : a.paymentMethod,
+          notifyDaysBefore: primaryIsDebit ? undefined : a.notifyDaysBefore,
+          receivedNow: settledNow,
+          markCurrentPaid: settledCurrent,
+        });
+        const { error } = await supabase.rpc("link_mirror_entries", {
+          p_debit_id: debitRes.debitId,
+          p_income_id: incomeRes.incomeId,
+        });
+        if (error) throw error;
+      } catch (e) {
+        // Não deixa metade da transferência pra trás (ainda sem ligação, então
+        // apagar um lado não mexe no outro).
+        const cleanup = async (table: "debits" | "incomes", id: string, type: "debit" | "income") => {
+          await supabase.from("installments").delete().eq("parent_id", id).eq("parent_type", type);
+          await supabase.from(table).delete().eq("id", id);
+          if (groupId) await supabase.from(table).delete().eq("recurrence_group_id", groupId);
+        };
+        await cleanup("debits", debitRes.debitId, "debit");
+        if (incomeRes) await cleanup("incomes", incomeRes.incomeId, "income");
+        throw e;
+      }
+      return { debitId: debitRes.debitId, incomeId: incomeRes.incomeId };
+    },
+    onSettled: () => inv(["debits", "incomes", "installments"]),
   });
 }
 
@@ -5875,6 +6010,21 @@ export function useEnsureRecurringForMonth(year: number, month: number) {
               reference_year: year,
               reference_month: month,
             };
+            // Série espelhada entre contas: o mês novo também nasce ligado ao
+            // mês novo do outro lado (id determinístico, então os dois lados
+            // chegam ao mesmo par sem precisar se consultar).
+            if ((table === "debits" || table === "incomes") && t.mirror_id) {
+              const otherTable = table === "debits" ? "incomes" : "debits";
+              const { data: counterpart } = await supabase
+                .from(otherTable)
+                .select("recurrence_group_id")
+                .eq("id", t.mirror_id)
+                .maybeSingle();
+              const otherGid = counterpart?.recurrence_group_id as string | null | undefined;
+              if (otherGid) {
+                row.mirror_id = await deterministicUuid(`recurring:${otherTable}:${otherGid}:${year}:${month}`);
+              }
+            }
             if (table === "debits") {
               row.description = t.description;
               row.required = true;
@@ -6019,10 +6169,12 @@ export type CatalogItem = {
   name: string;
   usageCount: number;
   lastUsedAt: string;
+  /** Preenchido quando o item é uma conta do app (criado/renomeado sozinho pelo banco). */
+  accountId: string | null;
 };
 
 /** trim + minúsculas + espaços colapsados — é o que faz "Mercado Livre" e "mercado  livre" contarem como o mesmo item. */
-function normalizeCatalogName(name: string): string {
+export function normalizeCatalogName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -6034,15 +6186,32 @@ export function useCatalogItems() {
     queryFn: async (): Promise<CatalogItem[]> => {
       const { data, error } = await supabase
         .from("catalog_items")
-        .select("id,name,usage_count,last_used_at")
+        .select("id,name,usage_count,last_used_at,account_id")
         .eq("user_id", activeUserId!)
         .order("name", { ascending: true });
-      if (error) throw error;
+      if (error) {
+        // Banco ainda sem a migração das contas-como-produtos: cai pro
+        // catálogo simples em vez de derrubar a lista de sugestões.
+        const { data: legacy, error: legacyErr } = await supabase
+          .from("catalog_items")
+          .select("id,name,usage_count,last_used_at")
+          .eq("user_id", activeUserId!)
+          .order("name", { ascending: true });
+        if (legacyErr) throw legacyErr;
+        return (legacy ?? []).map((r) => ({
+          id: r.id as string,
+          name: r.name as string,
+          usageCount: r.usage_count as number,
+          lastUsedAt: r.last_used_at as string,
+          accountId: null,
+        }));
+      }
       return (data ?? []).map((r) => ({
         id: r.id as string,
         name: r.name as string,
         usageCount: r.usage_count as number,
         lastUsedAt: r.last_used_at as string,
+        accountId: (r.account_id as string | null) ?? null,
       }));
     },
   });

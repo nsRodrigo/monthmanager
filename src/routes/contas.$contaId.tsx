@@ -140,7 +140,7 @@ function PaneSlot({
           fabPortalTarget={fabPortalTarget}
         />
       </div>
-      <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-40" aria-hidden="true" />
+      <div ref={setFabPortalTarget} className="pointer-events-none absolute inset-0 z-50" aria-hidden="true" />
     </div>
   );
 }

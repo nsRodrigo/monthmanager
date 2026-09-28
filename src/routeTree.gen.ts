@@ -16,6 +16,7 @@ import { Route as PersonalizarMenuRouteImport } from './routes/personalizar-menu
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as NotificacoesRouteImport } from './routes/notificacoes'
 import { Route as MeiosPagamentoRouteImport } from './routes/meios-pagamento'
+import { Route as MaisRouteImport } from './routes/mais'
 import { Route as LocaisProdutosRouteImport } from './routes/locais-produtos'
 import { Route as ImportarHistoricoRouteImport } from './routes/importar-historico'
 import { Route as BackupRouteImport } from './routes/backup'
@@ -59,6 +60,11 @@ const NotificacoesRoute = NotificacoesRouteImport.update({
 const MeiosPagamentoRoute = MeiosPagamentoRouteImport.update({
   id: '/meios-pagamento',
   path: '/meios-pagamento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaisRoute = MaisRouteImport.update({
+  id: '/mais',
+  path: '/mais',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LocaisProdutosRoute = LocaisProdutosRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
+  '/mais': typeof MaisRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
   '/notificacoes': typeof NotificacoesRoute
   '/perfil': typeof PerfilRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
+  '/mais': typeof MaisRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
   '/notificacoes': typeof NotificacoesRoute
   '/perfil': typeof PerfilRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/backup': typeof BackupRoute
   '/importar-historico': typeof ImportarHistoricoRoute
   '/locais-produtos': typeof LocaisProdutosRoute
+  '/mais': typeof MaisRoute
   '/meios-pagamento': typeof MeiosPagamentoRoute
   '/notificacoes': typeof NotificacoesRoute
   '/perfil': typeof PerfilRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/locais-produtos'
+    | '/mais'
     | '/meios-pagamento'
     | '/notificacoes'
     | '/perfil'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/locais-produtos'
+    | '/mais'
     | '/meios-pagamento'
     | '/notificacoes'
     | '/perfil'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/backup'
     | '/importar-historico'
     | '/locais-produtos'
+    | '/mais'
     | '/meios-pagamento'
     | '/notificacoes'
     | '/perfil'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   BackupRoute: typeof BackupRoute
   ImportarHistoricoRoute: typeof ImportarHistoricoRoute
   LocaisProdutosRoute: typeof LocaisProdutosRoute
+  MaisRoute: typeof MaisRoute
   MeiosPagamentoRoute: typeof MeiosPagamentoRoute
   NotificacoesRoute: typeof NotificacoesRoute
   PerfilRoute: typeof PerfilRoute
@@ -287,6 +300,13 @@ declare module '@tanstack/react-router' {
       path: '/meios-pagamento'
       fullPath: '/meios-pagamento'
       preLoaderRoute: typeof MeiosPagamentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mais': {
+      id: '/mais'
+      path: '/mais'
+      fullPath: '/mais'
+      preLoaderRoute: typeof MaisRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/locais-produtos': {
@@ -361,6 +381,7 @@ const rootRouteChildren: RootRouteChildren = {
   BackupRoute: BackupRoute,
   ImportarHistoricoRoute: ImportarHistoricoRoute,
   LocaisProdutosRoute: LocaisProdutosRoute,
+  MaisRoute: MaisRoute,
   MeiosPagamentoRoute: MeiosPagamentoRoute,
   NotificacoesRoute: NotificacoesRoute,
   PerfilRoute: PerfilRoute,

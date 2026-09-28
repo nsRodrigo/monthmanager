@@ -14,7 +14,7 @@ import {
   FileSpreadsheet,
   Plus,
   Menu,
-  LayoutDashboard,
+  Home as HomeIcon,
   User,
   Cloud,
   ShieldCheck,
@@ -22,13 +22,13 @@ import {
   Calculator,
   Wallet,
   Bell,
+  Receipt,
 } from "lucide-react";
 import { RealtimeSync } from "@/components/RealtimeSync";
 import { Logo } from "@/components/Logo";
 import { AppLoader } from "@/components/AppLoader";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { formatCompactCurrency } from "@/lib/format";
 
 import appCss from "../styles.css?url";
@@ -47,6 +47,7 @@ import {
   useInvestments,
   computeAccountBalanceUntilNow,
   normalizeZero,
+  getEffectiveCurrentMonth,
 } from "@/store/finance";
 import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
@@ -279,7 +280,7 @@ function SidebarContent({
         title="Home"
         className={navItemClass(isConsolidated, rail)}
       >
-        <LayoutDashboard className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+        <HomeIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
         <span className={`flex-1 whitespace-nowrap ${labelClass}`}>Home</span>
       </Link>
 
@@ -407,21 +408,25 @@ function SidebarContent({
 
 /**
  * Navegação inferior — só mobile (o desktop tem a sidebar). Home, Contas,
- * Alertas e "Mais" (abre a mesma navegação da sidebar numa gaveta). Os FABs
- * e os painéis descontam a altura dela via `--bnav-h` (styles.css).
+ * Lançamentos (mês vigente) e "Mais" (página própria com a lista de atalhos
+ * — ver `src/routes/mais.tsx`). Notificações agora mora no cabeçalho (ver
+ * `HeaderActions`). Os FABs e os painéis descontam a altura dela via
+ * `--bnav-h` (styles.css).
  */
 function BottomNav() {
   const loc = useLocation();
+  const navigate = useNavigate();
   const panes = usePanes();
   const { data: accounts = [] } = useAccounts();
-  const unreadCount = useUnreadNotificationsCount();
-  const [moreOpen, setMoreOpen] = useState(false);
 
-  // Última conta aberta (ou a primeira) — o atalho "Contas" leva direto a ela.
+  // Última conta aberta (ou a primeira) — os atalhos "Contas"/"Lançamentos"
+  // levam direto a ela.
   const lastId = panes.panes[0]?.contaId ?? accounts[0]?.id;
   const onAccounts = loc.pathname.startsWith("/contas/");
-  const onNotif = loc.pathname === "/notificacoes";
+  const onLancamentos = screenIdForPathname(loc.pathname) === "lancamento";
   const onHome = loc.pathname === "/";
+  const onMais = loc.pathname === "/mais";
+  const { year: curYear, month: curMonth } = getEffectiveCurrentMonth();
 
   const item = (active: boolean) =>
     `relative flex min-w-16 flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[10.5px] font-medium transition-colors ${
@@ -429,54 +434,57 @@ function BottomNav() {
     }`;
 
   return (
-    <>
-      <nav
-        aria-label="Navegação"
-        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-background/90 px-2 pt-2 backdrop-blur md:hidden"
-        style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <Link to="/" className={item(onHome)} aria-current={onHome ? "page" : undefined}>
-          <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
-          Home
+    <nav
+      aria-label="Navegação"
+      className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-background/90 px-2 pt-2 backdrop-blur md:hidden"
+      style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
+    >
+      <Link to="/" className={item(onHome)} aria-current={onHome ? "page" : undefined}>
+        <HomeIcon className="h-5 w-5" aria-hidden="true" />
+        Home
+      </Link>
+      {lastId ? (
+        <Link
+          to="/contas/$contaId"
+          params={{ contaId: lastId }}
+          onClick={() => panes.openSingle(lastId)}
+          className={item(onAccounts)}
+          aria-current={onAccounts ? "page" : undefined}
+        >
+          <Wallet className="h-5 w-5" aria-hidden="true" />
+          Contas
         </Link>
-        {lastId ? (
-          <Link
-            to="/contas/$contaId"
-            params={{ contaId: lastId }}
-            onClick={() => panes.openSingle(lastId)}
-            className={item(onAccounts)}
-            aria-current={onAccounts ? "page" : undefined}
-          >
-            <Wallet className="h-5 w-5" aria-hidden="true" />
-            Contas
-          </Link>
-        ) : (
-          <button type="button" onClick={() => setMoreOpen(true)} className={item(false)}>
-            <Wallet className="h-5 w-5" aria-hidden="true" />
-            Contas
-          </button>
-        )}
-        <Link to="/notificacoes" className={item(onNotif)} aria-current={onNotif ? "page" : undefined}>
-          <Bell className="h-5 w-5" aria-hidden="true" />
-          Alertas
-          {unreadCount > 0 && (
-            <span className="absolute top-0.5 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Link>
-        <button type="button" onClick={() => setMoreOpen(true)} className={item(moreOpen)}>
-          <Menu className="h-5 w-5" aria-hidden="true" />
-          Mais
+      ) : (
+        <button type="button" onClick={() => navigate({ to: "/mais" })} className={item(false)}>
+          <Wallet className="h-5 w-5" aria-hidden="true" />
+          Contas
         </button>
-      </nav>
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="left" className="flex w-[84%] max-w-xs flex-col gap-0 overflow-y-auto p-4">
-          <SheetTitle className="sr-only">Menu</SheetTitle>
-          <SidebarContent onNavigate={() => setMoreOpen(false)} />
-        </SheetContent>
-      </Sheet>
-    </>
+      )}
+      {/* Espaço reservado pro FAB central (botão "+" flutuante, ver
+          ConfigurableFab/FabMenuContent) — ele mesmo é posicionado fixo,
+          só sobrepõe visualmente esse vão. */}
+      <div className="w-14 shrink-0" aria-hidden="true" />
+      {lastId ? (
+        <Link
+          to="/contas/$contaId/$ano/$mes"
+          params={{ contaId: lastId, ano: String(curYear), mes: String(curMonth) }}
+          className={item(onLancamentos)}
+          aria-current={onLancamentos ? "page" : undefined}
+        >
+          <Receipt className="h-5 w-5" aria-hidden="true" />
+          Lançamentos
+        </Link>
+      ) : (
+        <button type="button" onClick={() => navigate({ to: "/mais" })} className={item(false)}>
+          <Receipt className="h-5 w-5" aria-hidden="true" />
+          Lançamentos
+        </button>
+      )}
+      <Link to="/mais" className={item(onMais)} aria-current={onMais ? "page" : undefined}>
+        <Menu className="h-5 w-5" aria-hidden="true" />
+        Mais
+      </Link>
+    </nav>
   );
 }
 

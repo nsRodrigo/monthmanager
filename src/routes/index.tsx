@@ -27,6 +27,7 @@ import { Sparkline } from "@/components/Sparkline";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { HeaderBand } from "@/components/HeaderBand";
+import { Logo } from "@/components/Logo";
 import {
   BalanceTrendChart,
   FlowChart,
@@ -290,7 +291,7 @@ function Consolidated() {
   if (accounts.length === 0) {
     return (
       <div>
-        <HeaderBand title="Home" />
+        <HeaderBand title="Home" avatar={<Logo size="sm" />} />
         <div className="mx-auto max-w-2xl px-5 pt-10 pb-16 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
             <Wallet className="h-8 w-8" />
@@ -342,6 +343,7 @@ function Consolidated() {
       <div className="sticky top-0 z-10">
         <HeaderBand
           title="Home"
+          avatar={<Logo size="sm" />}
           eyebrow={
             <span>
               {MONTHS[month]} de {year}
@@ -519,18 +521,22 @@ function Consolidated() {
             )}
           </section>
 
+          {/* Cabeçalho "Suas contas" em linha própria (col-span-12) — assim a seção de
+              contas e a de Próximos vencimentos começam na mesma linha da grid, com as
+              bordas dos dois frames alinhadas. */}
+          <div className="col-span-12 mb-1 flex items-center justify-between">
+            <h2 className="font-display text-[17px] font-semibold tracking-tight">Suas contas</h2>
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar conta
+            </button>
+          </div>
+
           {/* Contas */}
           <section className="col-span-12 lg:col-span-8">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-display text-[17px] font-semibold tracking-tight">Suas contas</h2>
-              <button
-                type="button"
-                onClick={() => setManageOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar conta
-              </button>
-            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {accounts.map((a) => {
                 const Icon = ICON_BY_TYPE[a.type] ?? Wallet;
@@ -623,7 +629,8 @@ function Consolidated() {
             </div>
           </section>
 
-          {/* Próximos vencimentos */}
+          {/* Próximos vencimentos — mesma linha da grid que a seção Contas, então a borda
+              superior do frame fica alinhada com a dos cards de conta ao lado. */}
           <section className="col-span-12 self-start rounded-2xl border border-border bg-card p-5 lg:col-span-4" aria-label="Próximos vencimentos">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>

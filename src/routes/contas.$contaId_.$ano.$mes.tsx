@@ -1177,6 +1177,64 @@ export function MonthDetailPane({
   const prevMonth = month === 0 ? { y: year - 1, m: 11 } : { y: year, m: month - 1 };
   const nextMonth = month === 11 ? { y: year + 1, m: 0 } : { y: year, m: month + 1 };
 
+  // "Composição das saídas" e "Ainda em aberto" — no mobile ficam no fim da
+  // tela (depois dos cartões), no desktop continuam na coluna lateral fixa
+  // logo abaixo do resumo. Mesmo bloco renderizado nos dois lugares; só a
+  // visibilidade muda por breakpoint (ver `hidden`/`@4xl:hidden` abaixo).
+  const spendCompositionCards = (
+    <>
+      <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-[15px] font-semibold">Composição das saídas</h2>
+        <div className="mt-4 flex items-center gap-5">
+          <SpendDonut data={donutSlices} size={130} />
+          <div className="min-w-0 flex-1">
+            {donutSlices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sem saídas neste mês.</p>
+            ) : (
+              donutSlices.map((d) => (
+                <div key={d.name} className="flex items-center gap-2.5 py-1.5 text-sm">
+                  <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: d.color }} />
+                  <span className="flex-1 truncate text-muted-foreground">{d.name}</span>
+                  <em className="text-xs text-muted-foreground not-italic">
+                    {Math.round((d.value / donutTotal) * 100)}%
+                  </em>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-[15px] font-semibold">Ainda em aberto</h2>
+        <p className="text-xs text-muted-foreground">Próximos itens deste mês</p>
+        {stillOpen.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">Tudo em dia neste mês.</p>
+        ) : (
+          <div className="mt-3 flex flex-col">
+            {stillOpen.map((x) => (
+              <div key={x.key} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
+                <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-background leading-tight">
+                  <b className="font-display text-sm">{String(x.day).padStart(2, "0")}</b>
+                  <small className="text-[8px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {MONTHS_SHORT[month]}
+                  </small>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{x.label}</p>
+                  <p className="text-xs text-muted-foreground">{x.sub}</p>
+                </div>
+                <b className={`text-sm tabular-nums ${x.kind === "income" ? "text-income" : ""}`}>
+                  {formatCurrency(x.amount)}
+                </b>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div>
       {!embedded && maxPanes > 1 && panes.length > 0 && (
@@ -1214,8 +1272,8 @@ export function MonthDetailPane({
       {/* Stacked sections — order: Recebimentos → Investimentos → Débitos → Cartões.
           pb-24 reserva o espaço do FAB no fim da lista, pra ele nunca cobrir
           o último card ao rolar até embaixo. */}
-      <div className="mt-16 grid gap-4 @4xl:grid-cols-[380px_minmax(0,1fr)] @4xl:items-start">
-      <div className="@4xl:sticky @4xl:top-36">
+      <div className="mt-16 grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_380px] @4xl:items-start">
+      <div className="@4xl:order-2 @4xl:sticky @4xl:top-36">
         <MonthSummaryPanel
           saldoInicial={normalizeZero(saldoAtual)}
           income={totalIncome}
@@ -1225,59 +1283,12 @@ export function MonthDetailPane({
           monthName={MONTHS[month]}
         />
 
-        {/* Composição das saídas — mesmo padrão visual da Home, restrito a este mês/conta. */}
-        <div className="mt-4 rounded-2xl border border-border bg-card p-5">
-          <h2 className="font-display text-[15px] font-semibold">Composição das saídas</h2>
-          <div className="mt-4 flex items-center gap-5">
-            <SpendDonut data={donutSlices} size={130} />
-            <div className="min-w-0 flex-1">
-              {donutSlices.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sem saídas neste mês.</p>
-              ) : (
-                donutSlices.map((d) => (
-                  <div key={d.name} className="flex items-center gap-2.5 py-1.5 text-sm">
-                    <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: d.color }} />
-                    <span className="flex-1 truncate text-muted-foreground">{d.name}</span>
-                    <em className="text-xs text-muted-foreground not-italic">
-                      {Math.round((d.value / donutTotal) * 100)}%
-                    </em>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Ainda em aberto: o que falta marcar neste mês, os próximos primeiro. */}
-        <div className="mt-4 rounded-2xl border border-border bg-card p-5">
-          <h2 className="font-display text-[15px] font-semibold">Ainda em aberto</h2>
-          <p className="text-xs text-muted-foreground">Próximos itens deste mês</p>
-          {stillOpen.length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">Tudo em dia neste mês.</p>
-          ) : (
-            <div className="mt-3 flex flex-col">
-              {stillOpen.map((x) => (
-                <div key={x.key} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
-                  <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-background leading-tight">
-                    <b className="font-display text-sm">{String(x.day).padStart(2, "0")}</b>
-                    <small className="text-[8px] font-semibold tracking-wider text-muted-foreground uppercase">
-                      {MONTHS_SHORT[month]}
-                    </small>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{x.label}</p>
-                    <p className="text-xs text-muted-foreground">{x.sub}</p>
-                  </div>
-                  <b className={`text-sm tabular-nums ${x.kind === "income" ? "text-income" : ""}`}>
-                    {formatCurrency(x.amount)}
-                  </b>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Composição das saídas / Ainda em aberto — só desktop aqui (coluna
+            lateral fixa); no mobile o mesmo bloco vai pro fim da tela, depois
+            dos cartões (ver `hidden` mais abaixo). */}
+        <div className="hidden @4xl:block">{spendCompositionCards}</div>
       </div>
-      <div className="min-w-0 space-y-4 pb-24">
+      <div className="min-w-0 space-y-4 pb-24 @4xl:order-1">
         {/* Segmento 1: conta corrente */}
         <div className="flex items-center justify-between gap-3 px-1">
           <div className="min-w-0">
@@ -1857,7 +1868,7 @@ export function MonthDetailPane({
                     : "Nenhum cartão com movimento neste mês."}
                 </p>
               ) : (
-                <div className="grid gap-3">
+                <div className="grid min-w-0 gap-3">
                   {cardsAll.map(({ card: c, items: cardInst }) => {
                     const total = cardInst.reduce((s, i) => s + i.amount, 0);
                     const faturaIsPaid = isCardFullyPaid(
@@ -1880,7 +1891,7 @@ export function MonthDetailPane({
                     return (
                       <div
                         key={c.id}
-                        className="rounded-2xl border border-border bg-card transition-colors"
+                        className="min-w-0 rounded-2xl border border-border bg-card transition-colors"
                       >
                         <CardRowSorted
                           card={c}
@@ -1953,6 +1964,10 @@ export function MonthDetailPane({
             </section>
           );
         })()}
+
+        {/* Composição das saídas / Ainda em aberto — só mobile aqui, no fim
+            da tela; no desktop já aparece na coluna lateral fixa acima. */}
+        <div className="@4xl:hidden">{spendCompositionCards}</div>
       </div>
       </div>
 
@@ -2120,8 +2135,11 @@ export function MonthDetailPane({
             entries={fabEntries}
             isSubLevel={!!fabFolder}
             onBack={() => setFabFolder(null)}
-            positionClassName={`pointer-events-auto ${embedded ? "absolute bottom-10" : "fixed bottom-[calc(var(--bnav-h)+2.5rem)]"} right-4 z-40 flex flex-col items-end gap-3 md:right-8`}
-            backdropClassName={`pointer-events-auto ${embedded ? "absolute" : "fixed"} inset-0 z-30`}
+            positionClassName={
+              embedded
+                ? "pointer-events-auto fixed bottom-[calc(var(--bnav-h)-3rem)] left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-3 md:absolute md:left-auto md:right-4 md:bottom-10 md:translate-x-0 md:items-end"
+                : undefined
+            }
           />
         );
         return embedded && fabPortalTarget ? createPortal(fabUi, fabPortalTarget) : fabUi;
@@ -2687,13 +2705,13 @@ function CardRow({
         className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
       >
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
           style={{
             backgroundColor: `color-mix(in oklab, ${cardColor} 24%, transparent)`,
             color: `color-mix(in oklab, ${cardColor} 55%, white)`,
           }}
         >
-          <CreditCard className="h-5 w-5" aria-hidden="true" />
+          <CreditCard className="h-[18px] w-[18px]" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-[15px] font-semibold tracking-tight">{cardName}</p>
@@ -2705,6 +2723,9 @@ function CardRow({
             {cardState === "paid" ? "fatura paga" : `${countRevisado}/${count} revisados`}
           </p>
         </div>
+        <ChevronDown
+          className={`h-[18px] w-[18px] shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
       </div>
 
       {menuOpen && (
@@ -2918,43 +2939,35 @@ function RowShell({
 }) {
   return (
     <div
-      className={`grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:grid-cols-[26px_minmax(0,1fr)_auto_auto] md:px-4 ${
+      className={`grid grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:px-4 ${
         selected ? "bg-primary/10" : ""
       }`}
       {...lp.handlers}
     >
-      {leadingIcon ?? (
-        <button
-          type="button"
-          onClick={guard(onCheck ?? (() => {}))}
-          aria-label={checkLabel}
-          aria-pressed={!!checked}
-          className={`flex h-[22px] w-[22px] items-center justify-center rounded-[7px] border-[1.5px] transition-colors ${
-            checked
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border hover:border-primary"
-          }`}
-        >
-          {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-        </button>
-      )}
+      {leadingIcon ?? <span aria-hidden="true" />}
       <button type="button" onClick={guard(onEdit)} className="min-w-0 text-left">
         <p className={`truncate text-sm font-semibold ${done ? "text-muted-foreground" : ""} ${titleClass}`}>
           {title}
         </p>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{meta}</div>
       </button>
-      <p className={`text-right text-sm font-semibold whitespace-nowrap tabular-nums ${amountClass}`}>{amount}</p>
-      {status !== undefined && (
-        <span
-          className={`hidden min-w-[78px] items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold md:inline-flex ${
-            checked ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground"
-          }`}
-        >
-          {checked && <Check className="h-3 w-3" strokeWidth={2.6} />}
-          {status}
-        </span>
-      )}
+      <div className="flex flex-col items-end gap-1">
+        <p className={`text-right text-sm font-semibold whitespace-nowrap tabular-nums ${amountClass}`}>{amount}</p>
+        {status !== undefined && (
+          <button
+            type="button"
+            onClick={guard(onCheck ?? (() => {}))}
+            aria-label={checkLabel}
+            aria-pressed={!!checked}
+            className={`inline-flex min-w-[78px] items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold transition-colors ${
+              checked ? "bg-success/15 text-success hover:bg-success/25" : "bg-secondary text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {checked && <Check className="h-3 w-3" strokeWidth={2.6} />}
+            {status}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

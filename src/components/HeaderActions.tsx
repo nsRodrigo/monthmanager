@@ -1,13 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { Search, User } from "lucide-react";
+import { Search, User, Bell } from "lucide-react";
 import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
 import { searchPalette } from "@/store/search";
+import { useUnreadNotificationsCount } from "@/store/notifications";
 
-/** Busca (Ctrl K) e atalho do perfil — canto direito do cabeçalho de cada tela. */
+/** Busca (Ctrl K), notificações e atalho do perfil — canto direito do cabeçalho de cada tela. */
 export function HeaderActions() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
+  const unreadCount = useUnreadNotificationsCount();
   const displayName = profile?.displayName || user?.email?.split("@")[0] || "Você";
   const initials = displayName
     .split(/\s+/)
@@ -28,6 +30,19 @@ export function HeaderActions() {
       >
         <Search className="h-4 w-4" aria-hidden="true" />
       </button>
+      <Link
+        to="/notificacoes"
+        aria-label="Notificações"
+        title="Notificações"
+        className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
+      >
+        <Bell className="h-4 w-4" aria-hidden="true" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </Link>
       <Link
         to="/perfil"
         aria-label="Meu perfil"

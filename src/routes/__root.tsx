@@ -54,7 +54,11 @@ import { useProfile } from "@/store/profile";
 import { useIsAdmin } from "@/store/roles";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import { FloatingCalculator } from "@/components/FloatingCalculator";
-import { openFloatingCalculator, closeFloatingCalculator, useFloatingCalculatorOpen } from "@/store/floating-calculator";
+import {
+  openFloatingCalculator,
+  closeFloatingCalculator,
+  useFloatingCalculatorOpen,
+} from "@/store/floating-calculator";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
@@ -64,7 +68,6 @@ import { history } from "@/store/history";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { CommandPalette } from "@/components/CommandPalette";
 import { AdminViewingBanner } from "@/components/AdminViewingBanner";
-import { ConfigurableFab } from "@/components/ConfigurableFab";
 import { screenIdForPathname } from "@/lib/fab-catalog";
 import { useAccountAccessRealtime, useValidateViewingAs } from "@/store/account-access";
 import { useUnreadNotificationsCount, useNotificationsRealtime } from "@/store/notifications";
@@ -472,10 +475,6 @@ function BottomNav() {
           <FitLabel text="Contas" />
         </button>
       )}
-      {/* Espaço reservado pro FAB central (botão "+" flutuante, ver
-          ConfigurableFab/FabMenuContent) — ele mesmo é posicionado fixo,
-          só sobrepõe visualmente esse vão. */}
-      <div className="w-14 shrink-0" aria-hidden="true" />
       {lastId ? (
         <Link
           to="/contas/$contaId/$ano/$mes"
@@ -518,12 +517,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const conditionallyPublic =
     location.pathname === "/privacidade" || location.pathname === "/sobre";
   const isPublic = alwaysPublic || (conditionallyPublic && !user);
-  const fabScreenId = screenIdForPathname(location.pathname);
-  // Quando um painel de mês está aberto em modo embedded, o FAB local
-  // da LancamentosPage já está ativo (via portal). Suprimir o
-  // ConfigurableFab do root para não sobrepor os dois.
-  const { panes } = usePanes();
-  const anyMonthPaneOpen = panes.some((p) => p.view.type === "month");
 
   useEffect(() => {
     if (loading) return;
@@ -587,15 +580,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           da árvore de rotas) pra continuar aberta ao navegar entre telas.
           Ver src/store/floating-calculator.ts. */}
       <FloatingCalculator open={calcOpen} onClose={closeFloatingCalculator} />
-      {/* Menu flutuante configurável — montado uma única vez aqui (igual
-          AdminViewingBanner), pra não precisar editar rota por rota. A tela
-          de Lançamento fica de fora (screenId null-ish "lancamento"):
-          mantém o próprio FAB local, porque as ações de criar dependem de
-          estado só dela. `key` força reiniciar aberto/fechado ao trocar de
-          tela. */}
-      {fabScreenId && fabScreenId !== "lancamento" && !anyMonthPaneOpen && (
-        <ConfigurableFab key={fabScreenId} screenId={fabScreenId} />
-      )}
     </div>
   );
 }

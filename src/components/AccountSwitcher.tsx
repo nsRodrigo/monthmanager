@@ -132,7 +132,7 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
         onClick={selectOwnAccount}
         className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-secondary"
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-[10px] font-bold text-primary-foreground">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-[10px] font-bold text-primary">
           {initialsOf(ownName) || <User className="h-3.5 w-3.5" />}
         </span>
         <span className="min-w-0 flex-1">
@@ -140,8 +140,8 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
           <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>
         </span>
         <span
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
-            !viewingAs ? "bg-gradient-primary text-primary-foreground" : "border border-border"
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+            !viewingAs ? "border border-primary bg-secondary text-primary" : "border border-border"
           }`}
         >
           {!viewingAs && <Check className="h-3 w-3" />}
@@ -163,7 +163,7 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
             onClick={() => selectGranted(g.ownerId, g.ownerEmail)}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-secondary"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-secondary text-[10px] font-bold">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-primary bg-secondary text-[10px] font-bold">
               {initialsOf(g.ownerEmail.split("@")[0])}
             </span>
             <span className="min-w-0 flex-1">
@@ -171,8 +171,8 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
               <p className="truncate text-[10px] text-muted-foreground">Acesso concedido</p>
             </span>
             <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
-                viewingAs?.userId === g.ownerId ? "bg-gradient-primary text-primary-foreground" : "border border-border"
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                viewingAs?.userId === g.ownerId ? "border border-primary bg-secondary text-primary" : "border border-border"
               }`}
             >
               {viewingAs?.userId === g.ownerId && <Check className="h-3 w-3" />}
@@ -188,7 +188,7 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
           </p>
           {pending.map((g) => (
             <div key={g.id} className="flex items-center gap-2.5 px-3 py-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-muted-foreground">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-[10px] font-bold text-muted-foreground">
                 {initialsOf(g.ownerEmail.split("@")[0])}
               </span>
               <span className="min-w-0 flex-1">
@@ -287,7 +287,7 @@ export function AccountSwitcher({ variant }: { variant: "dropdown" | "inline" })
         aria-label="Trocar de conta"
         className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-secondary"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-xs font-bold text-primary-foreground">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-secondary text-xs font-bold text-primary">
           {viewingAs ? (
             initialsOf(activeName)
           ) : profile?.avatarUrl ? (

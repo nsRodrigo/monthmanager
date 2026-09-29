@@ -293,7 +293,7 @@ function Consolidated() {
       <div>
         <HeaderBand title="Home" avatar={<Logo size="sm" />} />
         <div className="mx-auto max-w-2xl px-5 pt-10 pb-16 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-secondary text-primary shadow-elevated">
             <Wallet className="h-8 w-8" />
           </div>
           <h1 className="mt-6 font-display text-3xl font-semibold tracking-tight">Bem-vindo!</h1>

@@ -140,7 +140,7 @@ function ProfilePage() {
           {/* Identidade */}
           <section className={`${cardCls} flex items-center gap-4 sm:gap-5`}>
             <div className="relative shrink-0">
-              <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full bg-gradient-primary text-2xl font-bold text-primary-foreground">
+              <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-secondary text-2xl font-bold text-primary">
                 {profile?.avatarUrl ? (
                   <img
                     src={profile.avatarUrl}
@@ -154,13 +154,13 @@ function ProfilePage() {
                   initials || <User className="h-7 w-7" />
                 )}
                 {avatarUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                  <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50">
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   </div>
                 )}
               </div>
               <label
-                className="absolute -right-1 -bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground hover:opacity-90"
+                className="absolute -right-1 -bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border-2 border-card bg-secondary text-primary hover:opacity-90"
                 title="Trocar foto"
                 aria-label="Trocar foto de perfil"
               >

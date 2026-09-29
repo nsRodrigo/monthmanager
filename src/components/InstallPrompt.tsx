@@ -112,8 +112,8 @@ export function InstallPrompt() {
       {showIosTip ? (
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary">
-              <Download className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary">
+              <Download className="h-4 w-4 text-primary" />
             </div>
             <h3 className="text-sm font-semibold">Instalar na tela inicial</h3>
           </div>
@@ -139,8 +139,8 @@ export function InstallPrompt() {
       ) : (
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary">
-              <Download className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary">
+              <Download className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-semibold">Instalar Gestão Financeira</h3>

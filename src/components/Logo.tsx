@@ -14,9 +14,9 @@ export function Logo({ size = "sm" }: { size?: keyof typeof SIZES }) {
   const s = SIZES[size];
   return (
     <div
-      className={`flex shrink-0 items-center justify-center bg-gradient-primary shadow-glow ${s.box}`}
+      className={`flex shrink-0 items-center justify-center border border-border bg-secondary shadow-elevated ${s.box}`}
     >
-      <Wallet className={`text-primary-foreground ${s.icon}`} aria-hidden="true" />
+      <Wallet className={`text-primary ${s.icon}`} aria-hidden="true" />
     </div>
   );
 }

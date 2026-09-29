@@ -210,8 +210,8 @@ export function BiometricLock({ children }: { children: ReactNode }) {
           role="status"
           aria-label="Verificando sessão"
         >
-          <div className="animate-splash-icon-in flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
-            <Fingerprint className="h-8 w-8 text-primary-foreground" aria-hidden="true" />
+          <div className="animate-splash-icon-in flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
+            <Fingerprint className="h-8 w-8 text-primary" aria-hidden="true" />
           </div>
         </div>
       )}
@@ -224,11 +224,11 @@ export function BiometricLock({ children }: { children: ReactNode }) {
         >
           <div className="w-full max-w-sm text-center">
             <div
-              className={`animate-splash-icon-in mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow ${
+              className={`animate-splash-icon-in mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/5 ${
                 authing ? "animate-pulse" : ""
               }`}
             >
-              <Fingerprint className="h-8 w-8 text-primary-foreground" aria-hidden="true" />
+              <Fingerprint className="h-8 w-8 text-primary" aria-hidden="true" />
             </div>
             <h2 className="animate-splash-text-in text-2xl font-extrabold tracking-tight text-white">
               App bloqueado

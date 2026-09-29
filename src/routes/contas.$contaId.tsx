@@ -133,7 +133,12 @@ function PaneSlot({
   const [fabPortalTarget, setFabPortalTarget] = useState<HTMLDivElement | null>(null);
   return (
     <div className="relative h-full min-w-0 overflow-hidden">
-      <div className="absolute inset-0 overflow-y-auto [overflow-anchor:none]">
+      {/* overlay-scroll: rolagem interna deste painel (independente do
+          resto da página, necessária pro modo lado a lado no desktop) —
+          sem a classe, o navegador usa a barra "clássica" sempre visível
+          em vez da faixa fina que só aparece rolando, igual nas outras
+          telas (que rolam a janela, não uma div interna). */}
+      <div className="overlay-scroll absolute inset-0 overflow-y-auto [overflow-anchor:none]">
         <AccountPane
           contaId={contaId}
           view={view}

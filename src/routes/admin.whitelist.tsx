@@ -228,7 +228,7 @@ function WhitelistAdmin() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
       {/* Push notifications */}
       <section className="rounded-2xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -345,7 +345,7 @@ function WhitelistAdmin() {
       </section>
 
       </div>
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
       <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Users className="h-4 w-4 text-primary" /> Usuários cadastrados

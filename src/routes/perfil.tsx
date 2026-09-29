@@ -5,7 +5,7 @@ import { useProfile, useUpdateProfile } from "@/store/profile";
 import { useAuth } from "@/store/auth";
 import { useIsAdmin } from "@/store/roles";
 import { useAccounts } from "@/store/finance";
-import { User, Check, KeyRound, Eye, EyeOff, Camera, Users, Clock, X, ShieldCheck, Sliders, ChevronRight, Info, Lock } from "lucide-react";
+import { User, Check, KeyRound, Eye, EyeOff, Camera, Users, Clock, X, ShieldCheck } from "lucide-react";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { supabase } from "@/integrations/supabase/client";
 import { HeaderBand } from "@/components/HeaderBand";
@@ -365,41 +365,6 @@ function ProfilePage() {
               </div>
             </section>
           )}
-
-          {/* Atalhos e páginas informativas */}
-          <section className="overflow-hidden rounded-2xl border border-border bg-card">
-            {[
-              {
-                icon: Sliders,
-                title: "Personalizar menu flutuante",
-                desc: "Ícone e atalhos do botão de cada tela (só no celular)",
-                to: "/personalizar-menu" as const,
-              },
-              { icon: Info, title: "Sobre o app", desc: "Versão e novidades", to: "/sobre" as const },
-              {
-                icon: Lock,
-                title: "Privacidade",
-                desc: "Como seus dados são guardados",
-                to: "/privacidade" as const,
-              },
-            ].map((l) => (
-              <button
-                key={l.to}
-                type="button"
-                onClick={() => navigate({ to: l.to })}
-                className="flex w-full items-center gap-3 border-t border-border px-4 py-3.5 text-left first:border-t-0 hover:bg-secondary/40"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
-                  <l.icon className="h-[18px] w-[18px]" aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{l.title}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{l.desc}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            ))}
-          </section>
 
           <div className="flex gap-2">
             <button

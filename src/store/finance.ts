@@ -5098,13 +5098,13 @@ export function useRenumberInstallment() {
 // =======================
 
 /** year/month (0-indexed) deslocados por `deltaMonths`, com rollover de ano. */
-function shiftYearMonth(year: number, month: number, deltaMonths: number): { year: number; month: number } {
+export function shiftYearMonth(year: number, month: number, deltaMonths: number): { year: number; month: number } {
   const total = year * 12 + month + deltaMonths;
   return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 };
 }
 
 /** Data ISO deslocada por `deltaMonths`, mantendo o dia (clampado ao tamanho do mês de destino). */
-function shiftDateByMonths(dateIso: string, deltaMonths: number): string {
+export function shiftDateByMonths(dateIso: string, deltaMonths: number): string {
   const { y, m, d } = parseLocalDate(dateIso);
   const { year, month } = shiftYearMonth(y, m, deltaMonths);
   const lastDay = new Date(year, month + 1, 0).getDate();
@@ -5124,7 +5124,7 @@ export type InstallmentShiftChange = {
   after: { year: number; month: number; due_date: string };
 };
 
-async function shiftInstallmentsByParentIds(
+export async function shiftInstallmentsByParentIds(
   parentType: "purchase" | "debit" | "income" | "investment",
   parentIds: string[],
   deltaMonths: number,
@@ -5511,6 +5511,231 @@ export function useMoveEntriesToMonth() {
             await supabase.from(c.table).update(c.after).eq("id", c.id);
           }
           inv2(["debits", "incomes", "investments", "installments"]);
+        },
+      });
+    },
+  });
+}
+
+// =======================
+// Mover um cartão (fatura) inteiro para outro mês
+// =======================
+
+/** Deslocamento de uma linha de `card_payments` (`after: null` = linha apagada por colisão — ver `shiftCardPayments`). */
+export type CardPaymentShiftChange = {
+  id: string;
+  cardId: string;
+  before: { year: number; month: number; paid: boolean };
+  after: { year: number; month: number; paid: boolean } | null;
+};
+
+/**
+ * Move as linhas deslocadas (`after != null`) de `card_payments` de
+ * `before` pra `after` (ou vice-versa, ver `direction`) em DUAS etapas: 1)
+ * cada linha vai pra um ano-sentinela único (nunca colide com nada real),
+ * 2) só então cada uma vai pro alvo de verdade — necessário porque o
+ * conjunto de origem e o de destino podem se sobrepor (ex.: linha de Ago
+ * indo pra Jul, linha de Jul indo pra Jun), e a tabela tem
+ * UNIQUE(card_id,year,month), então um UPDATE direto violaria a
+ * constraint no meio do caminho.
+ */
+async function applyCardPaymentShift(
+  changes: CardPaymentShiftChange[],
+  direction: "before" | "after",
+): Promise<void> {
+  const moved = changes.filter((c) => c.after !== null);
+  for (let i = 0; i < moved.length; i++) {
+    const { error } = await supabase
+      .from("card_payments")
+      .update({ year: -900000 - i, month: 0 })
+      .eq("id", moved[i].id);
+    if (error) throw error;
+  }
+  for (const c of moved) {
+    const t = direction === "before" ? c.before : c.after!;
+    const { error } = await supabase
+      .from("card_payments")
+      .update({ year: t.year, month: t.month, paid: t.paid })
+      .eq("id", c.id);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Desloca os registros de "fatura paga" de um cartão.
+ * `fromMonth: null` → escopo "unlimited": TODAS as linhas do cartão (sem
+ * limite de data). `fromMonth` informado → escopo "month": só a linha
+ * daquele mês, se existir; se já houver uma linha no mês de destino, ela é
+ * substituída (a fatura movida assume aquele mês) — a antiga é apagada e
+ * entra no retorno com `after: null` pra dar pra desfazer.
+ */
+async function shiftCardPayments(
+  cardId: string,
+  fromMonth: { year: number; month: number } | null,
+  deltaMonths: number,
+): Promise<CardPaymentShiftChange[]> {
+  if (deltaMonths === 0) return [];
+  let query = supabase.from("card_payments").select("id,year,month,paid").eq("card_id", cardId);
+  if (fromMonth) query = query.eq("year", fromMonth.year).eq("month", fromMonth.month);
+  const { data, error } = await query;
+  if (error) throw error;
+  const rows = (data ?? []) as { id: string; year: number; month: number; paid: boolean }[];
+  if (rows.length === 0) return [];
+
+  const changes: CardPaymentShiftChange[] = rows.map((row) => {
+    const { year, month } = shiftYearMonth(row.year, row.month, deltaMonths);
+    return {
+      id: row.id,
+      cardId,
+      before: { year: row.year, month: row.month, paid: row.paid },
+      after: { year, month, paid: row.paid },
+    };
+  });
+
+  if (fromMonth && changes.length > 0) {
+    const target = changes[0].after!;
+    const { data: clash, error: cErr } = await supabase
+      .from("card_payments")
+      .select("id,paid")
+      .eq("card_id", cardId)
+      .eq("year", target.year)
+      .eq("month", target.month)
+      .maybeSingle();
+    if (cErr) throw cErr;
+    if (clash) {
+      const { error: dErr } = await supabase.from("card_payments").delete().eq("id", clash.id);
+      if (dErr) throw dErr;
+      changes.push({
+        id: clash.id,
+        cardId,
+        before: { year: target.year, month: target.month, paid: clash.paid },
+        after: null,
+      });
+    }
+  }
+
+  await applyCardPaymentShift(changes, "after");
+  return changes;
+}
+
+/**
+ * Move a fatura de um cartão para outro mês. Diferente de
+ * `useMoveEntriesToMonth` (que resolve séries por item selecionado), aqui a
+ * unidade é O CARTÃO inteiro:
+ *  - `scope: "month"` → só os lançamentos deste mês (parcelas, ocorrências
+ *    recorrentes e à vista que caem em `fromYear`/`fromMonth`) vão pro mês
+ *    de destino; o resto do cartão não muda.
+ *  - `scope: "unlimited"` → TODO lançamento já existente no cartão (qualquer
+ *    mês, passado ou futuro, parte de parcelamento/recorrência ou avulso)
+ *    desloca pelo mesmo delta — o cartão inteiro "anda" de mês, sem limite.
+ */
+export function useMoveCardMonth() {
+  const activeUserId = useActiveUserId();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: {
+      cardId: string;
+      fromYear: number;
+      fromMonth: number;
+      toYear: number;
+      toMonth: number;
+      scope: "month" | "unlimited";
+    }) => {
+      const { cardId, fromYear, fromMonth, toYear, toMonth, scope } = args;
+      const deltaMonths = toYear * 12 + toMonth - (fromYear * 12 + fromMonth);
+      if (deltaMonths === 0) {
+        return {
+          installmentChanges: [] as InstallmentShiftChange[],
+          cardPaymentChanges: [] as CardPaymentShiftChange[],
+        };
+      }
+
+      const { data: pursRaw, error: purErr } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("card_id", cardId);
+      if (purErr) throw purErr;
+      const purchaseIds = (pursRaw ?? []).map((p: { id: string }) => p.id);
+
+      let installmentChanges: InstallmentShiftChange[] = [];
+      if (scope === "unlimited") {
+        installmentChanges = await shiftInstallmentsByParentIds("purchase", purchaseIds, deltaMonths);
+      } else if (purchaseIds.length > 0) {
+        const { data, error } = await supabase
+          .from("installments")
+          .select("id,year,month,due_date")
+          .eq("parent_type", "purchase")
+          .in("parent_id", purchaseIds)
+          .eq("year", fromYear)
+          .eq("month", fromMonth);
+        if (error) throw error;
+        const lastDay = new Date(toYear, toMonth + 1, 0).getDate();
+        for (const row of (data ?? []) as { id: string; year: number; month: number; due_date: string }[]) {
+          const day = Math.min(parseLocalDate(row.due_date).d, lastDay);
+          const due_date = fmtLocalDate(toYear, toMonth, day);
+          const { error: uErr } = await supabase
+            .from("installments")
+            .update({ year: toYear, month: toMonth, due_date })
+            .eq("id", row.id);
+          if (uErr) throw uErr;
+          installmentChanges.push({
+            id: row.id,
+            before: { year: row.year, month: row.month, due_date: row.due_date },
+            after: { year: toYear, month: toMonth, due_date },
+          });
+        }
+      }
+
+      const cardPaymentChanges = await shiftCardPayments(
+        cardId,
+        scope === "unlimited" ? null : { year: fromYear, month: fromMonth },
+        deltaMonths,
+      );
+
+      return { installmentChanges, cardPaymentChanges };
+    },
+    onSettled: () => inv(["purchases", "installments", "card_payments"]),
+    onSuccess: ({ installmentChanges, cardPaymentChanges }) => {
+      const count = installmentChanges.length + cardPaymentChanges.length;
+      if (count === 0) return;
+      const inv2 = inv;
+      history.push({
+        label: "Mover fatura de mês",
+        undo: async () => {
+          for (const c of installmentChanges) {
+            await supabase.from("installments").update(c.before).eq("id", c.id);
+          }
+          // Primeiro devolve as linhas deslocadas pro lugar original —
+          // libera o slot de destino antes de recriar a linha que foi
+          // apagada nele (mesmo motivo do two-phase shift).
+          await applyCardPaymentShift(cardPaymentChanges, "before");
+          for (const c of cardPaymentChanges) {
+            if (c.after === null) {
+              await supabase.from("card_payments").insert({
+                id: c.id,
+                user_id: activeUserId!,
+                card_id: c.cardId,
+                year: c.before.year,
+                month: c.before.month,
+                paid: c.before.paid,
+              });
+            }
+          }
+          inv2(["purchases", "installments", "card_payments"]);
+        },
+        redo: async () => {
+          for (const c of installmentChanges) {
+            await supabase.from("installments").update(c.after).eq("id", c.id);
+          }
+          // Mesma ordem do fluxo original: apaga a linha que colidia
+          // primeiro, só depois move a linha principal pro slot livre.
+          for (const c of cardPaymentChanges) {
+            if (c.after === null) {
+              await supabase.from("card_payments").delete().eq("id", c.id);
+            }
+          }
+          await applyCardPaymentShift(cardPaymentChanges, "after");
+          inv2(["purchases", "installments", "card_payments"]);
         },
       });
     },

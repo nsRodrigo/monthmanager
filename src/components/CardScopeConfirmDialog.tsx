@@ -208,7 +208,7 @@ export function CardScopeConfirmDialog({
   );
 }
 
-function ScopeOption({
+export function ScopeOption({
   checked,
   onCheck,
   label,

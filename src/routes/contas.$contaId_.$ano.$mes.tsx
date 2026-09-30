@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   useAccounts,
@@ -37,6 +37,7 @@ import {
   useReorderCards,
   resolveScopeMonths,
   useMoveEntriesToMonth,
+  useMoveCardMonth,
   resolveSeriesFromOps,
   isSeriesShiftEmpty,
   PAYMENT_METHOD_BADGES,
@@ -101,8 +102,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
+import { MoveCardMonthDialog, type CardMoveScope } from "@/components/MoveCardMonthDialog";
 
-type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}`;
+type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}` | `cardAll:${string}`;
 
 export const Route = createFileRoute("/contas/$contaId_/$ano/$mes")({
   head: ({ params }) => ({
@@ -212,6 +214,7 @@ export function MonthDetailPane({
   const removeInvestment = useRemoveInvestment();
   const reorderCards = useReorderCards();
   const moveEntries = useMoveEntriesToMonth();
+  const moveCardMonth = useMoveCardMonth();
   const confirmDialog = useConfirm();
 
   const [reorderMode, setReorderMode] = useState(false);
@@ -231,6 +234,7 @@ export function MonthDetailPane({
     year: number;
     month: number;
   } | null>(null);
+  const [cardMoveOpen, setCardMoveOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   /** Quando um item é aberto via ícone de duplicar (em vez de editar), pula direto pro fluxo de duplicar. */
   const [rowStartAction, setRowStartAction] = useState<"duplicate" | undefined>(undefined);
@@ -840,6 +844,30 @@ export function MonthDetailPane({
     await runMove(ops, targetYear, targetMonth, false);
   };
 
+  /** Entra no modo de reordenar cartões a partir do menu "•••" de uma fatura selecionada. */
+  const enterCardReorder = () => {
+    setReorderIds(cards.filter((c) => c.accountId === contaId).map((c) => c.id));
+    setReorderMode(true);
+  };
+
+  const cardMoveTargetId = selection?.key.startsWith("cardAll:")
+    ? selection.key.slice("cardAll:".length)
+    : null;
+
+  const runCardMove = async (targetYear: number, targetMonth: number, scope: CardMoveScope) => {
+    if (!cardMoveTargetId) return;
+    await moveCardMonth.mutateAsync({
+      cardId: cardMoveTargetId,
+      fromYear: year,
+      fromMonth: month,
+      toYear: targetYear,
+      toMonth: targetMonth,
+      scope,
+    });
+    clearSelection();
+    setCardMoveOpen(false);
+  };
+
   const askDeleteInst = (
     _inst: Installment,
     label: string,
@@ -1296,26 +1324,52 @@ export function MonthDetailPane({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {(selection.key === "debits" || selection.key.startsWith("card:")) && (
-                      <DropdownMenuItem onClick={() => bulkGenerateReceivable(selection.key)}>
-                        <Banknote className="h-4 w-4" /> Gerar recebível
-                      </DropdownMenuItem>
+                    {selection.key.startsWith("cardAll:") ? (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingCardId(cardMoveTargetId);
+                            clearSelection();
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" /> Editar cartão
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            enterCardReorder();
+                            clearSelection();
+                          }}
+                        >
+                          <GripVertical className="h-4 w-4" /> Reordenar cartões
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setCardMoveOpen(true)}>
+                          <CalendarClock className="h-4 w-4" /> Mover para outro mês
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        {(selection.key === "debits" || selection.key.startsWith("card:")) && (
+                          <DropdownMenuItem onClick={() => bulkGenerateReceivable(selection.key)}>
+                            <Banknote className="h-4 w-4" /> Gerar recebível
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => bulkGeneratePdf(selection.key)}>
+                          <FileText className="h-4 w-4" /> Gerar PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => bulkDuplicate(selection.key)}>
+                          <Copy className="h-4 w-4" /> Duplicar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setMoveMonthOpen(true)}>
+                          <CalendarClock className="h-4 w-4" /> Mover para outro mês
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => bulkDelete(selection.key)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" /> Excluir
+                        </DropdownMenuItem>
+                      </>
                     )}
-                    <DropdownMenuItem onClick={() => bulkGeneratePdf(selection.key)}>
-                      <FileText className="h-4 w-4" /> Gerar PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => bulkDuplicate(selection.key)}>
-                      <Copy className="h-4 w-4" /> Duplicar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setMoveMonthOpen(true)}>
-                      <CalendarClock className="h-4 w-4" /> Mover para outro mês
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => bulkDelete(selection.key)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" /> Excluir
-                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -1822,11 +1876,6 @@ export function MonthDetailPane({
             });
           };
 
-          const enterReorder = () => {
-            setReorderIds(allAccountCards.map((c) => c.id));
-            setReorderMode(true);
-          };
-
           const cancelReorder = () => {
             setReorderMode(false);
             setReorderIds(null);
@@ -1979,8 +2028,7 @@ export function MonthDetailPane({
                               }
                             }
                           }}
-                          onEditCard={() => setEditingCardId(c.id)}
-                          onRequestReorder={enterReorder}
+                          cardSelProps={selProps(`cardAll:${c.id}`, c.id)}
                           onToggleInst={(id, p) => toggleInst(id, p)}
                           onEditInst={(inst) => {
                             const pur = purchasesList.find((p) => p.id === inst.parentId);
@@ -2127,6 +2175,15 @@ export function MonthDetailPane({
         currentMonth={month}
         loading={moveEntries.isPending}
         onConfirm={bulkMove}
+      />
+      <MoveCardMonthDialog
+        open={cardMoveOpen}
+        onClose={() => setCardMoveOpen(false)}
+        cardName={accountCards.find((c) => c.id === cardMoveTargetId)?.name}
+        currentYear={year}
+        currentMonth={month}
+        loading={moveCardMonth.isPending}
+        onConfirm={runCardMove}
       />
       <MoveSeriesConfirmDialog
         open={!!askMoveSeries}
@@ -2410,13 +2467,12 @@ function CardRowSorted({
   paymentPending,
   dueLabel,
   onTogglePaid,
-  onEditCard,
+  cardSelProps,
   onToggleInst,
   onEditInst,
   onRemoveInst,
   itemSelProps,
   selectionBar,
-  onRequestReorder,
 }: {
   card: Card;
   cardInst: Installment[];
@@ -2428,13 +2484,13 @@ function CardRowSorted({
   paymentPending?: boolean;
   dueLabel: string;
   onTogglePaid: () => void;
-  onEditCard?: () => void;
+  /** Seleção da FATURA inteira (long-press no cabeçalho) — ver `cardAll:` em SelectionKey. */
+  cardSelProps: SelectionRowProps;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
   onRemoveInst?: (inst: Installment) => void;
   itemSelProps: (inst: Installment, parentId: string) => SelectionRowProps;
   selectionBar?: React.ReactNode;
-  onRequestReorder?: () => void;
 }) {
   const { sort, set } = useSortPreference(`card:${card.id}`);
   const sortedItems =
@@ -2468,7 +2524,7 @@ function CardRowSorted({
       count={cardInst.length}
       dueLabel={dueLabel}
       onTogglePaid={onTogglePaid}
-      onEditCard={onEditCard}
+      cardSelProps={cardSelProps}
       items={cardInst}
       purchases={purchases}
       onToggleInst={onToggleInst}
@@ -2477,7 +2533,6 @@ function CardRowSorted({
       itemSelProps={itemSelProps}
       selectionBar={selectionBar}
       sortedItems={sortedItems}
-      onRequestReorder={onRequestReorder}
       sortControl={<SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />}
     />
   );
@@ -2494,7 +2549,7 @@ function CardRow({
   count,
   dueLabel,
   onTogglePaid,
-  onEditCard,
+  cardSelProps,
   onHideMonth,
   items,
   purchases,
@@ -2505,7 +2560,6 @@ function CardRow({
   selectionBar,
   sortControl,
   sortedItems,
-  onRequestReorder,
 }: {
   cardName: string;
   cardColor: string;
@@ -2517,7 +2571,7 @@ function CardRow({
   count: number;
   dueLabel: string;
   onTogglePaid: () => void;
-  onEditCard?: () => void;
+  cardSelProps: SelectionRowProps;
   onHideMonth?: () => void;
   items: Installment[];
   purchases: ReturnType<typeof usePurchases>["data"] extends infer T
@@ -2533,47 +2587,24 @@ function CardRow({
   sortControl?: React.ReactNode;
   /** When provided, overrides the default sort (parcelled→cash) with this order. */
   sortedItems?: Installment[] | null;
-  onRequestReorder?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const lp = useLongPress(() => {
-    if (onEditCard || onRequestReorder) setMenuOpen(true);
-  });
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: Event) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("touchstart", handler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("touchstart", handler);
-    };
-  }, [menuOpen]);
-
-  const toggle = () => {
-    if (lp.didFire()) {
-      lp.reset();
-      return;
-    }
-    setOpen((o) => !o);
-  };
+  const { selectionMode, selected, onSelectToggle, onLongPress } = cardSelProps;
+  const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
 
   return (
     <div className="relative">
       {/* Cabeçalho: ícone do cartão · nome + fechamento/vencimento · total + revisados.
-          Clicar abre/fecha; segurar abre o menu do cartão. */}
+          Clicar abre/fecha (ou alterna seleção, se a fatura já estiver
+          selecionada); segurar seleciona a fatura inteira — as ações
+          (editar cartão, reordenar, mover pra outro mês) ficam no menu
+          "•••" da seleção, igual às demais listas. */}
       <div
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        onClick={toggle}
+        aria-pressed={selected}
+        onClick={guard(() => setOpen((o) => !o))}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -2581,7 +2612,7 @@ function CardRow({
           }
         }}
         {...lp.handlers}
-        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
+        className={`flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary/30 ${selected ? "bg-primary/10" : ""}`}
       >
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
@@ -2606,38 +2637,6 @@ function CardRow({
           className={`h-[18px] w-[18px] shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </div>
-
-      {menuOpen && (
-        <div
-          ref={menuRef}
-          className="absolute left-4 top-full z-20 mt-1 min-w-[180px] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
-        >
-          {onEditCard && (
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                onEditCard();
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
-            >
-              <Pencil className="h-3.5 w-3.5" /> Editar cartão
-            </button>
-          )}
-          {onRequestReorder && (
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                onRequestReorder();
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
-            >
-              <GripVertical className="h-3.5 w-3.5" /> Reordenar cartões
-            </button>
-          )}
-        </div>
-      )}
 
       <div
         className="grid transition-[grid-template-rows] duration-300 ease-in-out"

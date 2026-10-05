@@ -1386,7 +1386,7 @@ export function MonthDetailPane({
           )}
           <div className="pointer-events-auto ml-auto">
             {selection ? (
-              <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-1 pr-1 pl-3.5 shadow-elevated">
+              <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/20 py-1 pr-1 pl-3.5 shadow-elevated backdrop-blur-xl">
                 <span className="text-xs font-semibold whitespace-nowrap">
                   {selection.ids.size} selecionado{selection.ids.size > 1 ? "s" : ""}
                   {!selection.key.startsWith("cardAll:") && (

@@ -2372,7 +2372,7 @@ function MonthSummaryPanel({
     left: Math.max(saldoAnterior, 0),
     width: income,
     color: "var(--series-income)",
-    value: `+ ${formatCurrency(income)}`,
+    value: `+ ${formatCurrency(Math.abs(income))}`,
     tone: "text-income",
   });
   for (const [label, v, color, tone] of [
@@ -2386,7 +2386,7 @@ function MonthSummaryPanel({
       left: Math.max(run, 0),
       width: Math.max(0, Math.min(v, run + v)),
       color,
-      value: `− ${formatCurrency(v)}`,
+      value: `− ${formatCurrency(Math.abs(v))}`,
       tone,
     });
   }
@@ -3049,7 +3049,7 @@ function DebitRow({
       title={debit.description}
       done={debit.paid}
       onEdit={onEdit}
-      amount={`− ${formatCurrency(debit.amount)}`}
+      amount={`− ${formatCurrency(Math.abs(debit.amount))}`}
       amountClass="text-debit"
       status={debit.paid ? "Pago" : "Pendente"}
       meta={
@@ -3099,7 +3099,7 @@ function IncomeRow({
       title={income.description}
       done={income.received}
       onEdit={onEdit}
-      amount={`+ ${formatCurrency(income.amount)}`}
+      amount={`+ ${formatCurrency(Math.abs(income.amount))}`}
       amountClass="text-income"
       status={income.received ? "Recebido" : "Pendente"}
       meta={
@@ -3174,7 +3174,7 @@ function ParcelledRow({
         }
         title={label}
         onEdit={onEdit}
-        amount={`${sign}${formatCurrency(installment.amount)}`}
+        amount={`${sign}${formatCurrency(Math.abs(installment.amount))}`}
         amountClass={amountClass}
         meta={meta}
       />
@@ -3199,7 +3199,7 @@ function ParcelledRow({
       title={label}
       done={installment.paid}
       onEdit={onEdit}
-      amount={`${sign}${formatCurrency(installment.amount)}`}
+      amount={`${sign}${formatCurrency(Math.abs(installment.amount))}`}
       amountClass={amountClass}
       status={installment.paid ? (kind === "income" ? "Recebido" : "Pago") : "Pendente"}
       meta={meta}
@@ -3234,7 +3234,7 @@ function InvestmentRow({
       title={inv.type}
       titleClass="capitalize"
       onEdit={onEdit}
-      amount={`− ${formatCurrency(inv.amount)}`}
+      amount={`− ${formatCurrency(Math.abs(inv.amount))}`}
       amountClass="text-invest"
       meta={
         <>

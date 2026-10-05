@@ -89,7 +89,7 @@ export function AddEntryDialog({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("none");
   const [autoDebitDay, setAutoDebitDay] = useState("");
   const [paymentType, setPaymentType] = useState<PaymentType>("unico");
-  const [mode, setMode] = useState<"total" | "perInstallment">("total");
+  const [mode, setMode] = useState<"total" | "perInstallment">("perInstallment");
   const [installments, setInstallments] = useState("2");
   const [installmentNumber, setInstallmentNumber] = useState("1");
   const [settled, setSettled] = useState(true);
@@ -610,16 +610,6 @@ export function AddEntryDialog({
                       </button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label="Total de parcelas">
-                        <input
-                          type="number"
-                          min="2"
-                          max="60"
-                          className={inputClass}
-                          value={installments}
-                          onChange={(e) => setInstallments(e.target.value)}
-                        />
-                      </Field>
                       <Field label="Parcela atual">
                         <input
                           type="number"
@@ -628,6 +618,16 @@ export function AddEntryDialog({
                           className={inputClass}
                           value={installmentNumber}
                           onChange={(e) => setInstallmentNumber(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Total de parcelas">
+                        <input
+                          type="number"
+                          min="2"
+                          max="60"
+                          className={inputClass}
+                          value={installments}
+                          onChange={(e) => setInstallments(e.target.value)}
                         />
                       </Field>
                     </div>

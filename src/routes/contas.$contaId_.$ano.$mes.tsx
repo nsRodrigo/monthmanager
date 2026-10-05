@@ -38,6 +38,7 @@ import {
   resolveScopeMonths,
   useMoveEntriesToMonth,
   useMoveCardMonth,
+  useConvertFinanceEntry,
   resolveSeriesFromOps,
   isSeriesShiftEmpty,
   PAYMENT_METHOD_BADGES,
@@ -48,8 +49,10 @@ import {
   type Investment,
   type DuplicateSource,
   type MoveMonthOp,
+  type ParentType,
 } from "@/store/finance";
 import { MoveSeriesConfirmDialog } from "@/components/MoveSeriesConfirmDialog";
+import { EntryDestinationDialog, type EntryDestinationResult } from "@/components/EntryDestinationDialog";
 import { useAccountFilter } from "@/store/account-filter";
 import { usePanes, useMaxPanes } from "@/store/panes";
 import { MonthYearPicker } from "@/components/MonthYearPicker";
@@ -235,6 +238,8 @@ export function MonthDetailPane({
     month: number;
   } | null>(null);
   const [cardMoveOpen, setCardMoveOpen] = useState(false);
+  const [duplicateItemOpen, setDuplicateItemOpen] = useState(false);
+  const [moveTypeOpen, setMoveTypeOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   /** Quando um item é aberto via ícone de duplicar (em vez de editar), pula direto pro fluxo de duplicar. */
   const [rowStartAction, setRowStartAction] = useState<"duplicate" | undefined>(undefined);
@@ -255,6 +260,7 @@ export function MonthDetailPane({
   const compactInstallments = useCompactInstallmentNumbering();
   const deleteOverScope = useDeleteOverScope();
   const duplicateOverScope = useDuplicateOverScope();
+  const convertEntry = useConvertFinanceEntry();
 
   // Diálogo único "Aplicar em" reutilizado por todas as exclusões.
   const [scopeDelete, setScopeDelete] = useState<{
@@ -419,6 +425,34 @@ export function MonthDetailPane({
     setSelection(null);
   };
 
+  /** Valor "deste mês" de 1 item selecionado — parcela/ocorrência do mês
+   * corrente quando for parcelado/recorrente/cartão, senão o valor do
+   * próprio avulso. Usada tanto pela soma do seletor quanto por "Duplicar
+   * item" (valor que vai pra cópia). */
+  const resolveSelectionAmount = (key: SelectionKey, id: string): number => {
+    const instFor = (parentType: "debit" | "income" | "investment" | "purchase") =>
+      installmentsList.find(
+        (i) => i.parentType === parentType && i.parentId === id && i.year === year && i.month === month,
+      );
+    if (key === "incomes") {
+      const i = allIncomes.find((x) => x.id === id);
+      if (!i) return 0;
+      return i.isParent ? instFor("income")?.amount ?? 0 : i.amount;
+    }
+    if (key === "debits") {
+      const d = allDebits.find((x) => x.id === id);
+      if (!d) return 0;
+      return d.isParent ? instFor("debit")?.amount ?? 0 : d.amount;
+    }
+    if (key === "investments") {
+      const v = allInvestments.find((x) => x.id === id);
+      if (!v) return 0;
+      return v.isParent ? instFor("investment")?.amount ?? 0 : v.amount;
+    }
+    if (key.startsWith("card:")) return instFor("purchase")?.amount ?? 0;
+    return 0; // cardAll: sempre 1 selecionado, o total já aparece no cabeçalho do cartão
+  };
+
   const selProps = (key: SelectionKey, id: string) => ({
     selectionMode: isSelMode(key),
     selected: isSelected(key, id),
@@ -519,57 +553,108 @@ export function MonthDetailPane({
     clearSelection();
   };
 
-  /**
-   * Gera um recebimento avulso equivalente a cada débito/compra selecionado
-   * (ex.: emprestou o cartão pra alguém que parcelou uma compra — em vez de
-   * lançar manualmente o recebimento todo mês, seleciona a parcela da fatura
-   * daquele mês e gera o recebível correspondente). Só disponível nas seções
-   * de débitos e cartões (ver botão condicional mais abaixo).
-   * Usa o valor/data da parcela deste mês quando o item é parcelado/recorrente
-   * ou de cartão; senão usa o valor/data do lançamento avulso.
-   */
-  const bulkGenerateReceivable = async (key: SelectionKey) => {
-    if (!selection || selection.key !== key) return;
-    if (key !== "debits" && !key.startsWith("card:")) return;
-    const ids = Array.from(selection.ids);
-    const instFor = (parentType: "debit" | "purchase", parentId: string) =>
+  /** Descrição/valor/data "deste mês" de 1 item selecionado — usado por
+   * "Duplicar item" pra montar a cópia no tipo de destino escolhido. */
+  const resolveSelectionSnapshot = (
+    key: SelectionKey,
+    id: string,
+  ): { description: string; amount: number; date: string } | null => {
+    const amount = resolveSelectionAmount(key, id);
+    const instDate = (parentType: "debit" | "income" | "investment" | "purchase", fallback: string) =>
       installmentsList.find(
-        (i) =>
-          i.parentType === parentType &&
-          i.parentId === parentId &&
-          i.year === year &&
-          i.month === month,
-      );
-    for (const id of ids) {
-      let description: string;
-      let amount: number;
-      let date: string;
-      if (key === "debits") {
-        const d = allDebits.find((x) => x.id === id);
-        if (!d) continue;
-        if (d.isParent) {
-          const inst = instFor("debit", id);
-          if (!inst) continue;
-          amount = inst.amount;
-          date = inst.referenceDate ?? inst.dueDate;
-        } else {
-          amount = d.amount;
-          date = d.date;
-        }
-        description = d.description;
-      } else {
-        const pur = purchasesList.find((x) => x.id === id);
-        if (!pur) continue;
-        const inst = instFor("purchase", id);
-        if (!inst) continue;
-        amount = inst.amount;
-        date = inst.referenceDate ?? inst.dueDate;
-        description = pur.description;
+        (i) => i.parentType === parentType && i.parentId === id && i.year === year && i.month === month,
+      )?.dueDate ?? fallback;
+    if (key === "incomes") {
+      const i = allIncomes.find((x) => x.id === id);
+      if (!i) return null;
+      return { description: i.description, amount, date: i.isParent ? instDate("income", i.date) : i.date };
+    }
+    if (key === "debits") {
+      const d = allDebits.find((x) => x.id === id);
+      if (!d) return null;
+      return { description: d.description, amount, date: d.isParent ? instDate("debit", d.date) : d.date };
+    }
+    if (key === "investments") {
+      const v = allInvestments.find((x) => x.id === id);
+      if (!v) return null;
+      return { description: v.type, amount, date: v.isParent ? instDate("investment", v.date) : v.date };
+    }
+    if (key.startsWith("card:")) {
+      const p = purchasesList.find((x) => x.id === id);
+      if (!p) return null;
+      return { description: p.description, amount, date: instDate("purchase", p.date) };
+    }
+    return null;
+  };
+
+  /** Tipo de origem (pra EntryDestinationDialog/convert_finance_entry) correspondente à seção selecionada. */
+  const fromKindForKey = (key: SelectionKey): ParentType =>
+    key === "incomes" ? "income" : key === "debits" ? "debit" : key === "investments" ? "investment" : "purchase";
+
+  /** "Mover para" não aceita recorrentes — a RPC `convert_finance_entry`
+   * recusa (mesma regra já usada em EditInstallmentDialog). */
+  const isSelectionItemRecurring = (key: SelectionKey, id: string): boolean => {
+    if (key === "incomes") return !!allIncomes.find((x) => x.id === id)?.recurrenceGroupId;
+    if (key === "debits") return !!allDebits.find((x) => x.id === id)?.recurrenceGroupId;
+    if (key === "investments") return !!allInvestments.find((x) => x.id === id)?.recurrenceGroupId;
+    if (key.startsWith("card:")) return !!purchasesList.find((x) => x.id === id)?.recurrenceGroupId;
+    return false;
+  };
+
+  /** "Duplicar item": cria cópias no tipo escolhido (pode ser diferente do
+   * tipo de origem) no mês atual — mesmo motor do "Duplicar" de hoje
+   * (`useDuplicateOverScope`), só que o DuplicateSource é montado no tipo
+   * de destino em vez do tipo de origem. */
+  const bulkDuplicateItem = async (result: EntryDestinationResult) => {
+    if (!selection) return;
+    const key = selection.key;
+    const scope: CardScope = { kind: "month", year, month };
+    const dup = (source: DuplicateSource) =>
+      duplicateOverScope.mutateAsync({ source, scope, anchorYear: year, anchorMonth: month });
+    for (const id of Array.from(selection.ids)) {
+      const snap = resolveSelectionSnapshot(key, id);
+      if (!snap) continue;
+      if (result.toKind === "debit") {
+        await dup({ kind: "debit", accountId: contaId, description: snap.description, amount: snap.amount, date: snap.date, required: false });
+      } else if (result.toKind === "income") {
+        await dup({ kind: "income", accountId: contaId, description: snap.description, amount: snap.amount, date: snap.date });
+      } else if (result.toKind === "investment") {
+        await dup({ kind: "investment", accountId: contaId, type: snap.description, amount: snap.amount, percentage: result.percentage ?? 0, date: snap.date });
+      } else if (result.toKind === "purchase" && result.cardId) {
+        await dup({ kind: "purchase", cardId: result.cardId, description: snap.description, totalAmount: snap.amount, date: snap.date });
       }
-      await addIncome.mutateAsync({ accountId: contaId, description, amount, date });
     }
     clearSelection();
+    setDuplicateItemOpen(false);
   };
+
+  /** "Mover para": troca o TIPO dos selecionados (débito/recebimento/
+   * investimento/compra), mês atual — reusa a RPC `convert_finance_entry`
+   * já usada em EditInstallmentDialog (mesma regra: recorrente não entra,
+   * parcelado move a série inteira de uma vez, sem desfazer). */
+  const bulkMoveType = async (result: EntryDestinationResult) => {
+    if (!selection) return;
+    const key = selection.key;
+    const fromType = fromKindForKey(key);
+    for (const id of Array.from(selection.ids)) {
+      if (isSelectionItemRecurring(key, id)) continue;
+      await convertEntry.mutateAsync({
+        fromType,
+        fromId: id,
+        toType: result.toKind,
+        cardId: result.toKind === "purchase" ? result.cardId : undefined,
+      });
+    }
+    clearSelection();
+    setMoveTypeOpen(false);
+  };
+
+  const selectionSum = selection
+    ? Array.from(selection.ids).reduce((s, id) => s + resolveSelectionAmount(selection.key, id), 0)
+    : 0;
+  const selectionRecurringCount = selection
+    ? Array.from(selection.ids).filter((id) => isSelectionItemRecurring(selection.key, id)).length
+    : 0;
 
   const selectionSectionLabel = (key: SelectionKey) => {
     if (key === "incomes") return "Recebimentos";
@@ -1304,6 +1389,9 @@ export function MonthDetailPane({
               <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-1 pr-1 pl-3.5 shadow-elevated">
                 <span className="text-xs font-semibold whitespace-nowrap">
                   {selection.ids.size} selecionado{selection.ids.size > 1 ? "s" : ""}
+                  {!selection.key.startsWith("cardAll:") && (
+                    <span className="text-primary"> · {formatCurrency(selectionSum)}</span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -1348,19 +1436,20 @@ export function MonthDetailPane({
                       </>
                     ) : (
                       <>
-                        {(selection.key === "debits" || selection.key.startsWith("card:")) && (
-                          <DropdownMenuItem onClick={() => bulkGenerateReceivable(selection.key)}>
-                            <Banknote className="h-4 w-4" /> Gerar recebível
-                          </DropdownMenuItem>
-                        )}
                         <DropdownMenuItem onClick={() => bulkGeneratePdf(selection.key)}>
                           <FileText className="h-4 w-4" /> Gerar PDF
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => bulkDuplicate(selection.key)}>
                           <Copy className="h-4 w-4" /> Duplicar
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDuplicateItemOpen(true)}>
+                          <Copy className="h-4 w-4" /> Duplicar item
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setMoveMonthOpen(true)}>
                           <CalendarClock className="h-4 w-4" /> Mover para outro mês
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setMoveTypeOpen(true)}>
+                          <Banknote className="h-4 w-4" /> Mover para
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => bulkDelete(selection.key)}
@@ -2203,6 +2292,27 @@ export function MonthDetailPane({
           if (!askMoveSeries) return;
           await runMove(askMoveSeries.ops, askMoveSeries.year, askMoveSeries.month, expandSeries);
         }}
+      />
+      <EntryDestinationDialog
+        open={duplicateItemOpen}
+        onClose={() => setDuplicateItemOpen(false)}
+        mode="duplicate"
+        fromKind={selection ? fromKindForKey(selection.key) : "debit"}
+        selectedCount={selection?.ids.size ?? 0}
+        cards={accountCards}
+        loading={duplicateOverScope.isPending}
+        onConfirm={bulkDuplicateItem}
+      />
+      <EntryDestinationDialog
+        open={moveTypeOpen}
+        onClose={() => setMoveTypeOpen(false)}
+        mode="move"
+        fromKind={selection ? fromKindForKey(selection.key) : "debit"}
+        selectedCount={selection?.ids.size ?? 0}
+        excludedCount={selectionRecurringCount}
+        cards={accountCards}
+        loading={convertEntry.isPending}
+        onConfirm={bulkMoveType}
       />
       <ManageAccountsDialog open={manageOpen} onClose={() => setManageOpen(false)} />
       </div>

@@ -2353,6 +2353,12 @@ function MonthSummaryPanel({
   const atualTone = saldoAtualConta >= 0 ? "text-foreground" : "text-destructive";
   const finalTone = saldoFinal >= 0 ? "text-foreground" : "text-destructive";
   const net = income - gastos;
+  // O número grande é sempre o saldo real de hoje, não importa o mês sendo
+  // visto (ver comentário em `saldoAtualConta` na rota) — então o rótulo não
+  // pode prometer "Saldo final · {mês}" quando o mês visto é outro. Quando os
+  // dois batem (normalmente só no mês atual, sem nada lançado mais à frente),
+  // mostra um rótulo só; quando divergem, mostra os dois valores.
+  const sameAsMonthFinal = Math.abs(saldoAtualConta - saldoFinal) < 0.005;
 
   // Ponte: cada linha é uma barra posicionada no eixo do saldo (0 → topo).
   const scaleMax = Math.max(saldoInicial, saldoAnterior, 1);
@@ -2394,7 +2400,7 @@ function MonthSummaryPanel({
   return (
     <section className="animate-fade-slide-in overflow-hidden rounded-3xl border border-border bg-gradient-hero p-6">
       <div className="mb-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-        Saldo final · {monthName}
+        Saldo atual da conta
       </div>
 
       <div className="grid gap-y-5">
@@ -2402,7 +2408,16 @@ function MonthSummaryPanel({
           <p className={`font-display text-[44px] leading-none font-semibold tracking-tight tabular-nums ${atualTone}`}>
             {formatCurrency(saldoAtualConta)}
           </p>
-          <p className="mt-1.5 text-xs text-muted-foreground">saldo atual da conta</p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {sameAsMonthFinal ? (
+              `saldo final de ${monthName}`
+            ) : (
+              <>
+                hoje · final previsto de {monthName}:{" "}
+                <span className={`font-semibold ${finalTone}`}>{formatCurrency(saldoFinal)}</span>
+              </>
+            )}
+          </p>
           <span
             className={`mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${
               net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"

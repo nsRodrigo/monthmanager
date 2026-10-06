@@ -82,7 +82,6 @@ import {
   MoreHorizontal,
   Settings,
   CalendarClock,
-  Banknote,
   FileText,
   X,
 } from "lucide-react";
@@ -105,6 +104,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PaneTabsBar } from "@/components/PaneTabsBar";
 import { MoveToMonthDialog } from "@/components/MoveToMonthDialog";
+import { Modal } from "@/components/Modal";
 import { MoveCardMonthDialog, type CardMoveScope } from "@/components/MoveCardMonthDialog";
 
 type SelectionKey = "incomes" | "debits" | "investments" | `card:${string}` | `cardAll:${string}`;
@@ -239,6 +239,7 @@ export function MonthDetailPane({
   } | null>(null);
   const [cardMoveOpen, setCardMoveOpen] = useState(false);
   const [duplicateItemOpen, setDuplicateItemOpen] = useState(false);
+  const [moveChoiceOpen, setMoveChoiceOpen] = useState(false);
   const [moveTypeOpen, setMoveTypeOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   /** Quando um item é aberto via ícone de duplicar (em vez de editar), pula direto pro fluxo de duplicar. */
@@ -1445,11 +1446,8 @@ export function MonthDetailPane({
                         <DropdownMenuItem onClick={() => setDuplicateItemOpen(true)}>
                           <Copy className="h-4 w-4" /> Duplicar item
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setMoveMonthOpen(true)}>
-                          <CalendarClock className="h-4 w-4" /> Mover para outro mês
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setMoveTypeOpen(true)}>
-                          <Banknote className="h-4 w-4" /> Mover para
+                        <DropdownMenuItem onClick={() => setMoveChoiceOpen(true)}>
+                          <CalendarClock className="h-4 w-4" /> Mover para
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => bulkDelete(selection.key)}
@@ -2256,6 +2254,34 @@ export function MonthDetailPane({
           setScopeDelete(null);
         }}
       />
+      <Modal open={moveChoiceOpen} onClose={() => setMoveChoiceOpen(false)} title="Mover para">
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMoveChoiceOpen(false);
+              setMoveMonthOpen(true);
+            }}
+            className="w-full rounded-xl border border-border p-4 text-left transition-colors hover:border-primary"
+          >
+            <span className="block font-semibold text-foreground">Outro mês</span>
+            <span className="block text-xs text-muted-foreground">Mesmo tipo — muda só o mês em que aparece.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMoveChoiceOpen(false);
+              setMoveTypeOpen(true);
+            }}
+            className="w-full rounded-xl border border-border p-4 text-left transition-colors hover:border-primary"
+          >
+            <span className="block font-semibold text-foreground">Outro tipo</span>
+            <span className="block text-xs text-muted-foreground">
+              Débito, recebimento, investimento ou cartão — mesmo mês.
+            </span>
+          </button>
+        </div>
+      </Modal>
       <MoveToMonthDialog
         open={moveMonthOpen}
         onClose={() => setMoveMonthOpen(false)}

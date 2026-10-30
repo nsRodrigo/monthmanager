@@ -75,8 +75,8 @@ export function FloatingModal({
   /** Chave no localStorage pra lembrar posição/tamanho — separada por diálogo. */
   storageKey?: string;
 }) {
-  const defaultWidth = 512;
-  const defaultHeight = tall ? 704 : 560;
+  const defaultWidth = 500;
+  const defaultHeight = tall ? 650 : 560;
   const [rect, setRect] = useState<Rect>(() => loadRect(storageKey, defaultWidth, defaultHeight));
   const rectRef = useRef(rect);
   rectRef.current = rect;

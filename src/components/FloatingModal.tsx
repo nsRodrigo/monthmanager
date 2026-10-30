@@ -162,7 +162,10 @@ export function FloatingModal({
       head.removeEventListener("pointercancel", onUp);
       handle.removeEventListener("pointercancel", onUp);
     };
-  }, [storageKey]);
+    // Depende de `open`: no primeiro render o modal está fechado (refs ainda
+    // null, o efeito só sai sem anexar nada) — precisa rodar de novo quando
+    // abre de verdade e o cabeçalho/alça já existem no DOM.
+  }, [open, storageKey]);
 
   // Mantém o painel dentro da viewport se a janela encolher (ex.: girar o
   // aparelho, redimensionar a janela do navegador).

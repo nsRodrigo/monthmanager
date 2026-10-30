@@ -97,9 +97,9 @@ export function AddEntryDialog({
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const resetFields = (preserveDescLike = false) => {
+  const resetFields = (preserveDescLike = false, preserveCard = false) => {
     setDate("");
-    setCardId(selectableCards[0]?.id ?? "");
+    if (!preserveCard) setCardId(selectableCards[0]?.id ?? "");
     setPaymentType("unico");
     setMode("total");
     setInstallments("2");
@@ -266,7 +266,7 @@ export function AddEntryDialog({
         });
         upsertCatalogItem.mutate({ name: description.trim() });
       }
-      if (after === "another") resetFields();
+      if (after === "another") resetFields(false, tab === "card");
       else if (after === "close") onClose();
     } finally {
       setBusy(false);

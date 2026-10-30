@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Copy, ArrowDownRight, ArrowUpRight, CreditCard, TrendingUp } from "lucide-react";
 import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal";
+import { FloatingModal } from "./FloatingModal";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
 import { FitLabel } from "./FitLabel";
@@ -65,6 +67,10 @@ export function AddEntryDialog({
   onCreateCard?: () => void;
 }) {
   const [tab, setTab] = useState<EntryTab>(initialTab);
+  // Flutuante (arrastável, sem escurecer o resto da tela) em telas largas;
+  // no celular continua o Modal de sempre — não sobra espaço pra arrastar.
+  const isMobile = useIsMobile();
+  const ModalComp = isMobile ? Modal : FloatingModal;
 
   const addDebit = useAddDebit();
   const addIncome = useAddIncome();
@@ -284,10 +290,11 @@ export function AddEntryDialog({
           : "Investimento";
 
   return (
-    <Modal
+    <ModalComp
       open={open}
       onClose={onClose}
       title="Novo lançamento"
+      storageKey="floating-modal:new-entry"
       tall
       headerRight={
         tab !== "inv" ? (
@@ -689,6 +696,6 @@ export function AddEntryDialog({
           </>
         )}
       </div>
-    </Modal>
+    </ModalComp>
   );
 }

@@ -100,6 +100,8 @@ export type Purchase = {
   recurrenceGroupId: string | null;
   /** Dias de antecedência para notificação push de vencimento. Só usado em compras recorrentes. */
   notifyDaysBefore: number | null;
+  /** Posição manual na lista de compras do cartão (arrastar). null = nunca reordenado. */
+  position: number | null;
 };
 
 export type ParentType = "purchase" | "debit" | "income" | "investment";
@@ -253,6 +255,8 @@ export type Debit = {
   referenceMonth: number | null;
   /** Dias de antecedência para notificação push de vencimento. null = desativado. */
   notifyDaysBefore: number | null;
+  /** Posição manual na lista de débitos do mês (arrastar). null = nunca reordenado. */
+  position: number | null;
 };
 
 export type Income = {
@@ -272,6 +276,8 @@ export type Income = {
   /** Dias de antecedência para notificação push de vencimento. null = desativado. */
   notifyDaysBefore: number | null;
   paymentMethod: PaymentMethod;
+  /** Posição manual na lista de recebimentos do mês (arrastar). null = nunca reordenado. */
+  position: number | null;
 };
 
 export type Investment = {
@@ -288,6 +294,8 @@ export type Investment = {
   /** Month the entry belongs to (set on creation, never touched by date edits). */
   referenceYear: number | null;
   referenceMonth: number | null;
+  /** Posição manual na lista de investimentos do mês (arrastar). null = nunca reordenado. */
+  position: number | null;
 };
 
 // =======================
@@ -617,10 +625,11 @@ export function usePurchases() {
         installments_count: number;
         recurrence_group_id: string | null;
         notify_days_before: number | null;
+        position: number | null;
       }>(() =>
         supabase
           .from("purchases")
-          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id,notify_days_before")
+          .select("id,card_id,description,total_amount,purchase_date,installments_count,recurrence_group_id,notify_days_before,position")
           .eq("user_id", activeUserId!),
       );
       return data.map((p) => ({
@@ -632,6 +641,7 @@ export function usePurchases() {
         installmentsCount: p.installments_count,
         recurrenceGroupId: p.recurrence_group_id ?? null,
         notifyDaysBefore: p.notify_days_before ?? null,
+        position: p.position ?? null,
       }));
     },
   });
@@ -715,12 +725,13 @@ export function useDebits() {
         reference_year: number | null;
         reference_month: number | null;
         notify_days_before: number | null;
+        position: number | null;
       }>(
         (abortSignal) => {
           const query = supabase
             .from("debits")
             .select(
-              "id,account_id,description,amount,date,required,paid,payment_method,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before",
+              "id,account_id,description,amount,date,required,paid,payment_method,auto_debit_day,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before,position",
             )
             .eq("user_id", activeUserId!)
             .order("date", { ascending: true })
@@ -747,6 +758,7 @@ export function useDebits() {
           referenceYear: d.reference_year ?? null,
           referenceMonth: d.reference_month ?? null,
           notifyDaysBefore: d.notify_days_before ?? null,
+          position: d.position ?? null,
         })),
       );
     },
@@ -773,11 +785,12 @@ export function useIncomes() {
         reference_month: number | null;
         notify_days_before: number | null;
         payment_method: string | null;
+        position: number | null;
       }>(() =>
         supabase
           .from("incomes")
           .select(
-            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before,payment_method",
+            "id,account_id,description,amount,date,received,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,notify_days_before,payment_method,position",
           )
           .eq("user_id", activeUserId!)
           .order("date", { ascending: true }),
@@ -796,6 +809,7 @@ export function useIncomes() {
         referenceMonth: d.reference_month ?? null,
         notifyDaysBefore: d.notify_days_before ?? null,
         paymentMethod: (d.payment_method as PaymentMethod) ?? null,
+        position: d.position ?? null,
       }));
     },
   });
@@ -819,11 +833,12 @@ export function useInvestments() {
         recurrence_group_id: string | null;
         reference_year: number | null;
         reference_month: number | null;
+        position: number | null;
       }>(() =>
         supabase
           .from("investments")
           .select(
-            "id,account_id,type,amount,percentage,date,installments_count,is_parent,recurrence_group_id,reference_year,reference_month",
+            "id,account_id,type,amount,percentage,date,installments_count,is_parent,recurrence_group_id,reference_year,reference_month,position",
           )
           .eq("user_id", activeUserId!),
       );
@@ -839,6 +854,7 @@ export function useInvestments() {
         recurrenceGroupId: i.recurrence_group_id ?? null,
         referenceYear: i.reference_year ?? null,
         referenceMonth: i.reference_month ?? null,
+        position: i.position ?? null,
       }));
     },
   });
@@ -1215,6 +1231,27 @@ export function useReorderCards() {
       );
     },
     onSuccess: () => inv(["cards"]),
+  });
+}
+
+/**
+ * Reordena manualmente débito/recebimento/investimento/compra (segurar e
+ * arrastar na lista — igual ao `useReorderCards`, mas por tipo). Posição
+ * salva no item-pai (não na parcela), então vale em todo mês onde esse item
+ * aparece. `orderedIds` deve vir já mesclado com os itens que ficaram fora
+ * do filtro ativo (ver `mergeManualOrder` nas rotas) — aqui só grava
+ * `position` sequencial (1, 2, 3, ...) pra cada id, na ordem recebida.
+ */
+export function useReorderEntries() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: async (args: { parentType: ParentType; orderedIds: string[] }) => {
+      const table = parentTypeTable(args.parentType);
+      await Promise.all(
+        args.orderedIds.map((id, idx) => supabase.from(table).update({ position: idx + 1 }).eq("id", id)),
+      );
+    },
+    onSuccess: (_data, args) => inv([parentTypeTable(args.parentType)]),
   });
 }
 
@@ -4810,7 +4847,7 @@ export function useConvertFinanceEntry() {
         _from_type: args.fromType,
         _from_id: args.fromId,
         _to_type: args.toType,
-        _card_id: args.cardId ?? null,
+        _card_id: args.cardId,
       });
       if (error) throw error;
       return data as string;

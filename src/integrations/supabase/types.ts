@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       access_requests: {
@@ -103,6 +128,36 @@ export type Database = {
           initial_balance?: number
           name?: string
           type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      amount_adjustments: {
+        Row: {
+          created_at: string
+          id: string
+          new_total: number
+          parent_id: string
+          parent_type: string
+          previous_total: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_total: number
+          parent_id: string
+          parent_type: string
+          previous_total: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_total?: number
+          parent_id?: string
+          parent_type?: string
+          previous_total?: number
           user_id?: string
         }
         Relationships: []
@@ -292,11 +347,18 @@ export type Database = {
           usage_count?: number
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "catalog_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       debits: {
         Row: {
-          mirror_id: string | null
           account_id: string
           amount: number
           auto_debit_day: number | null
@@ -307,9 +369,11 @@ export type Database = {
           id: string
           installments_count: number
           is_parent: boolean
+          mirror_id: string | null
           notify_days_before: number | null
           paid: boolean
           payment_method: string | null
+          position: number | null
           recurrence_group_id: string | null
           reference_month: number | null
           reference_year: number | null
@@ -317,7 +381,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          mirror_id?: string | null
           account_id: string
           amount: number
           auto_debit_day?: number | null
@@ -328,9 +391,11 @@ export type Database = {
           id?: string
           installments_count?: number
           is_parent?: boolean
+          mirror_id?: string | null
           notify_days_before?: number | null
           paid?: boolean
           payment_method?: string | null
+          position?: number | null
           recurrence_group_id?: string | null
           reference_month?: number | null
           reference_year?: number | null
@@ -338,7 +403,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          mirror_id?: string | null
           account_id?: string
           amount?: number
           auto_debit_day?: number | null
@@ -349,9 +413,11 @@ export type Database = {
           id?: string
           installments_count?: number
           is_parent?: boolean
+          mirror_id?: string | null
           notify_days_before?: number | null
           paid?: boolean
           payment_method?: string | null
+          position?: number | null
           recurrence_group_id?: string | null
           reference_month?: number | null
           reference_year?: number | null
@@ -418,7 +484,6 @@ export type Database = {
       }
       incomes: {
         Row: {
-          mirror_id: string | null
           account_id: string
           amount: number
           created_at: string
@@ -428,8 +493,10 @@ export type Database = {
           id: string
           installments_count: number
           is_parent: boolean
+          mirror_id: string | null
           notify_days_before: number | null
           payment_method: string | null
+          position: number | null
           received: boolean
           recurrence_group_id: string | null
           reference_month: number | null
@@ -437,7 +504,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          mirror_id?: string | null
           account_id: string
           amount: number
           created_at?: string
@@ -447,8 +513,10 @@ export type Database = {
           id?: string
           installments_count?: number
           is_parent?: boolean
+          mirror_id?: string | null
           notify_days_before?: number | null
           payment_method?: string | null
+          position?: number | null
           received?: boolean
           recurrence_group_id?: string | null
           reference_month?: number | null
@@ -456,7 +524,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          mirror_id?: string | null
           account_id?: string
           amount?: number
           created_at?: string
@@ -466,8 +533,10 @@ export type Database = {
           id?: string
           installments_count?: number
           is_parent?: boolean
+          mirror_id?: string | null
           notify_days_before?: number | null
           payment_method?: string | null
+          position?: number | null
           received?: boolean
           recurrence_group_id?: string | null
           reference_month?: number | null
@@ -486,49 +555,52 @@ export type Database = {
       }
       installments: {
         Row: {
-          mirror_id: string | null
           amount: number
           created_at: string
           due_date: string
           id: string
+          mirror_id: string | null
           month: number
           number: number
           paid: boolean
           parent_id: string | null
           parent_type: string
           purchase_id: string | null
+          reference_date: string | null
           total: number
           user_id: string
           year: number
         }
         Insert: {
-          mirror_id?: string | null
           amount: number
           created_at?: string
           due_date: string
           id?: string
+          mirror_id?: string | null
           month: number
           number: number
           paid?: boolean
           parent_id?: string | null
           parent_type?: string
           purchase_id?: string | null
+          reference_date?: string | null
           total: number
           user_id: string
           year: number
         }
         Update: {
-          mirror_id?: string | null
           amount?: number
           created_at?: string
           due_date?: string
           id?: string
+          mirror_id?: string | null
           month?: number
           number?: number
           paid?: boolean
           parent_id?: string | null
           parent_type?: string
           purchase_id?: string | null
+          reference_date?: string | null
           total?: number
           user_id?: string
           year?: number
@@ -553,6 +625,7 @@ export type Database = {
           installments_count: number
           is_parent: boolean
           percentage: number
+          position: number | null
           recurrence_group_id: string | null
           reference_month: number | null
           reference_year: number | null
@@ -568,6 +641,7 @@ export type Database = {
           installments_count?: number
           is_parent?: boolean
           percentage?: number
+          position?: number | null
           recurrence_group_id?: string | null
           reference_month?: number | null
           reference_year?: number | null
@@ -583,6 +657,7 @@ export type Database = {
           installments_count?: number
           is_parent?: boolean
           percentage?: number
+          position?: number | null
           recurrence_group_id?: string | null
           reference_month?: number | null
           reference_year?: number | null
@@ -817,6 +892,7 @@ export type Database = {
           id: string
           installments_count: number
           notify_days_before: number | null
+          position: number | null
           purchase_date: string
           recurrence_group_id: string | null
           total_amount: number
@@ -830,6 +906,7 @@ export type Database = {
           id?: string
           installments_count?: number
           notify_days_before?: number | null
+          position?: number | null
           purchase_date: string
           recurrence_group_id?: string | null
           total_amount: number
@@ -843,6 +920,7 @@ export type Database = {
           id?: string
           installments_count?: number
           notify_days_before?: number | null
+          position?: number | null
           purchase_date?: string
           recurrence_group_id?: string | null
           total_amount?: number
@@ -1028,17 +1106,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      link_mirror_entries: {
-        Args: { p_debit_id: string; p_income_id: string }
-        Returns: undefined
-      }
       bulk_insert_finance: { Args: { _payload: Json }; Returns: Json }
+      catalog_normalize: { Args: { p: string }; Returns: string }
       convert_finance_entry: {
         Args: {
-          _from_type: string
+          _card_id?: string
           _from_id: string
+          _from_type: string
           _to_type: string
-          _card_id?: string | null
         }
         Returns: string
       }
@@ -1050,6 +1125,10 @@ export type Database = {
         Returns: boolean
       }
       is_email_whitelisted: { Args: { _email: string }; Returns: boolean }
+      link_mirror_entries: {
+        Args: { p_debit_id: string; p_income_id: string }
+        Returns: undefined
+      }
       restore_finance_backup: {
         Args: {
           _payload: Json
@@ -1076,12 +1155,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1105,11 +1184,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1130,11 +1209,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1155,11 +1234,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1172,11 +1251,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1186,6 +1265,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user"],

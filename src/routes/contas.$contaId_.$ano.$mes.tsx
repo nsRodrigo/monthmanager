@@ -35,6 +35,7 @@ import {
   useDeleteOverScope,
   useDuplicateOverScope,
   useReorderCards,
+  useReorderEntries,
   resolveScopeMonths,
   useMoveEntriesToMonth,
   useMoveCardMonth,
@@ -146,6 +147,87 @@ function AccountMonthRoute() {
   );
 }
 
+/**
+ * Ordena por posição manual (menor primeiro, "arrastar" na lista); itens
+ * sem posição (nunca arrastados) vão pro fim, mantendo a ordem relativa que
+ * já tinham entre si (ordem padrão por data). Só usada quando "Ordenar"
+ * está em "Padrão" — com Nome/Valor/Data ativo, a posição manual é ignorada
+ * (mas continua salva, e volta a valer ao voltar pra "Padrão").
+ */
+function applyManualOrder<T>(items: T[], getPos: (item: T) => number | null): T[] {
+  return items
+    .map((item, i) => ({ item, i, pos: getPos(item) }))
+    .sort((a, b) => {
+      if (a.pos !== null && b.pos !== null) return a.pos - b.pos;
+      if (a.pos !== null) return -1;
+      if (b.pos !== null) return 1;
+      return a.i - b.i;
+    })
+    .map((x) => x.item);
+}
+
+/**
+ * Ao arrastar dentro de uma lista FILTRADA, a nova ordem só é conhecida para
+ * os itens visíveis — os escondidos pelo filtro precisam manter sua posição
+ * relativa de antes. Reinsere `visibleNewOrder` nos mesmos "slots" que os
+ * itens visíveis ocupavam em `full` (a lista completa, sem filtro) e devolve
+ * os ids na ordem final, prontos para gravar sequencialmente (1, 2, 3, ...).
+ */
+function mergeManualOrder<T>(full: T[], visibleNewOrder: T[], getId: (item: T) => string): string[] {
+  const visibleIds = new Set(visibleNewOrder.map(getId));
+  const queue = visibleNewOrder.slice();
+  return full.map((item) => (visibleIds.has(getId(item)) ? queue.shift()! : item)).map(getId);
+}
+
+/**
+ * Pointer-drag genérico pelo ícone de "grip" — mesma técnica validada no
+ * protótipo (reordena o DOM com insertBefore enquanto arrasta, sem
+ * re-renderizar a cada pixel; ao soltar, lê a ordem final do container e
+ * chama `onCommit` com os ids visíveis, na nova ordem).
+ */
+function startRowDrag(onCommit: (orderedIds: string[]) => void) {
+  return (e: React.PointerEvent<HTMLButtonElement>) => {
+    const grip = e.currentTarget;
+    const row = grip.closest<HTMLElement>("[data-drag-row]");
+    const container = row?.parentElement;
+    if (!row || !container) return;
+    e.preventDefault();
+    // Impede que o pointerdown "borbulhe" até o long-press da própria linha
+    // (useRowGuard) — sem isso, segurar o grip parado por 450ms reabria o
+    // long-press e podia resetar a seleção pro item sozinho.
+    e.stopPropagation();
+    grip.setPointerCapture(e.pointerId);
+    let startY = e.clientY;
+    const rowH = row.getBoundingClientRect().height;
+    row.classList.add("relative", "z-10", "bg-card", "shadow-lg");
+    const onMove = (ev: PointerEvent) => {
+      const dy = ev.clientY - startY;
+      const siblings = Array.from(container.children) as HTMLElement[];
+      const curIdx = siblings.indexOf(row);
+      if (dy > rowH / 2 && curIdx < siblings.length - 1) {
+        container.insertBefore(siblings[curIdx + 1], row);
+        startY = ev.clientY;
+      } else if (dy < -rowH / 2 && curIdx > 0) {
+        container.insertBefore(row, siblings[curIdx - 1]);
+        startY = ev.clientY;
+      }
+    };
+    const onUp = () => {
+      grip.removeEventListener("pointermove", onMove);
+      grip.removeEventListener("pointerup", onUp);
+      grip.removeEventListener("pointercancel", onUp);
+      row.classList.remove("relative", "z-10", "bg-card", "shadow-lg");
+      const orderedIds = Array.from(container.children)
+        .map((el) => (el as HTMLElement).dataset.dragRow)
+        .filter((id): id is string => !!id);
+      onCommit(orderedIds);
+    };
+    grip.addEventListener("pointermove", onMove);
+    grip.addEventListener("pointerup", onUp);
+    grip.addEventListener("pointercancel", onUp);
+  };
+}
+
 export function MonthDetailPane({
   contaId,
   year,
@@ -217,6 +299,7 @@ export function MonthDetailPane({
   const addIncome = useAddIncome();
   const removeInvestment = useRemoveInvestment();
   const reorderCards = useReorderCards();
+  const reorderEntries = useReorderEntries();
   const moveEntries = useMoveEntriesToMonth();
   const moveCardMonth = useMoveCardMonth();
   const confirmDialog = useConfirm();
@@ -1107,19 +1190,22 @@ export function MonthDetailPane({
     const ib = b.kind === "single" ? b.debit.id : b.entry.installment.id;
     return da.localeCompare(db) || ia.localeCompare(ib);
   });
-  const debitsDefaultOrder: DebitEntry[] = [
-    ...debitsFixedMerged,
-    ...debitsCash.map<DebitEntry>((d) => ({ kind: "single", debit: d })),
-  ];
-  const debitsOrdered =
-    debitsSort.sort.option === "default"
-      ? debitsDefaultOrder
-      : applySort(debitsDefaultOrder, debitsSort.sort, {
-          name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
-          amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
-          date: (e) => (e.kind === "single" ? e.debit.date : e.entry.debit.date),
-          id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
-        });
+  // id/posição do item-pai (não da parcela) — usado pela ordenação/arrasto manual.
+  const debitEntryId = (e: DebitEntry) => (e.kind === "single" ? e.debit.id : e.entry.debit!.id);
+  const debitEntryPos = (e: DebitEntry) => (e.kind === "single" ? e.debit.position : e.entry.debit!.position);
+  const debitsDefaultOrder: DebitEntry[] = applyManualOrder(
+    [...debitsFixedMerged, ...debitsCash.map<DebitEntry>((d) => ({ kind: "single", debit: d }))],
+    debitEntryPos,
+  );
+  const debitsReorderEnabled = debitsSort.sort.option === "default";
+  const debitsOrdered = debitsReorderEnabled
+    ? debitsDefaultOrder
+    : applySort(debitsDefaultOrder, debitsSort.sort, {
+        name: (e) => (e.kind === "single" ? e.debit.description : e.entry.debit!.description),
+        amount: (e) => (e.kind === "single" ? e.debit.amount : e.entry.installment.amount),
+        date: (e) => (e.kind === "single" ? e.debit.date : e.entry.debit.date),
+        id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
+      });
   const debitsVisible = debitsOrdered.filter((e) =>
     matchesEntryFilter(
       debitsFilter.filter,
@@ -1127,6 +1213,16 @@ export function MonthDetailPane({
       e.kind === "single" ? "vista" : "parc",
     ),
   );
+  /** Commit do arrasto (ver `startRowDrag`): mescla a nova ordem dos itens
+   * visíveis de volta na lista completa (preserva os escondidos pelo filtro
+   * no lugar) e grava posição sequencial pra todos. */
+  const commitDebitsOrder = (visibleIds: string[]) => {
+    const byId = new Map(debitsVisible.map((e) => [debitEntryId(e), e] as const));
+    const newVisibleOrder = visibleIds.map((id) => byId.get(id)).filter((e): e is DebitEntry => !!e);
+    const mergedIds = mergeManualOrder(debitsOrdered, newVisibleOrder, debitEntryId);
+    reorderEntries.mutate({ parentType: "debit", orderedIds: mergedIds });
+  };
+  const startDebitDrag = startRowDrag(commitDebitsOrder);
 
   const incomesFixedMerged: IncomeEntry[] = [
     ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
@@ -1138,19 +1234,21 @@ export function MonthDetailPane({
     const ib = b.kind === "single" ? b.income.id : b.entry.installment.id;
     return da.localeCompare(db) || ia.localeCompare(ib);
   });
-  const incomesDefaultOrder: IncomeEntry[] = [
-    ...incomesFixedMerged,
-    ...incomesCash.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
-  ];
-  const incomesOrdered =
-    incomesSort.sort.option === "default"
-      ? incomesDefaultOrder
-      : applySort(incomesDefaultOrder, incomesSort.sort, {
-          name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
-          amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
-          date: (e) => (e.kind === "single" ? e.income.date : e.entry.income.date),
-          id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
-        });
+  const incomeEntryId = (e: IncomeEntry) => (e.kind === "single" ? e.income.id : e.entry.income!.id);
+  const incomeEntryPos = (e: IncomeEntry) => (e.kind === "single" ? e.income.position : e.entry.income!.position);
+  const incomesDefaultOrder: IncomeEntry[] = applyManualOrder(
+    [...incomesFixedMerged, ...incomesCash.map<IncomeEntry>((i) => ({ kind: "single", income: i }))],
+    incomeEntryPos,
+  );
+  const incomesReorderEnabled = incomesSort.sort.option === "default";
+  const incomesOrdered = incomesReorderEnabled
+    ? incomesDefaultOrder
+    : applySort(incomesDefaultOrder, incomesSort.sort, {
+        name: (e) => (e.kind === "single" ? e.income.description : e.entry.income!.description),
+        amount: (e) => (e.kind === "single" ? e.income.amount : e.entry.installment.amount),
+        date: (e) => (e.kind === "single" ? e.income.date : e.entry.income.date),
+        id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
+      });
   const incomesVisible = incomesOrdered.filter((e) =>
     matchesEntryFilter(
       incomesFilter.filter,
@@ -1158,6 +1256,13 @@ export function MonthDetailPane({
       e.kind === "single" ? "vista" : "parc",
     ),
   );
+  const commitIncomesOrder = (visibleIds: string[]) => {
+    const byId = new Map(incomesVisible.map((e) => [incomeEntryId(e), e] as const));
+    const newVisibleOrder = visibleIds.map((id) => byId.get(id)).filter((e): e is IncomeEntry => !!e);
+    const mergedIds = mergeManualOrder(incomesOrdered, newVisibleOrder, incomeEntryId);
+    reorderEntries.mutate({ parentType: "income", orderedIds: mergedIds });
+  };
+  const startIncomeDrag = startRowDrag(commitIncomesOrder);
 
   const investmentsFixedMerged: InvestmentEntry[] = [
     ...investmentsFixedSingle.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
@@ -1169,19 +1274,29 @@ export function MonthDetailPane({
     const ib = b.kind === "single" ? b.investment.id : b.entry.installment.id;
     return da.localeCompare(db) || ia.localeCompare(ib);
   });
-  const investmentsDefaultOrder: InvestmentEntry[] = [
-    ...investmentsFixedMerged,
-    ...investmentsCash.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
-  ];
-  const investmentsOrdered =
-    investmentsSort.sort.option === "default"
-      ? investmentsDefaultOrder
-      : applySort(investmentsDefaultOrder, investmentsSort.sort, {
-          name: (e) => (e.kind === "single" ? e.investment.type : e.entry.investment!.type),
-          amount: (e) => (e.kind === "single" ? e.investment.amount : e.entry.installment.amount),
-          date: (e) => (e.kind === "single" ? e.investment.date : e.entry.investment.date),
-          id: (e) => (e.kind === "single" ? e.investment.id : e.entry.installment.id),
-        });
+  const investmentEntryId = (e: InvestmentEntry) => (e.kind === "single" ? e.investment.id : e.entry.investment!.id);
+  const investmentEntryPos = (e: InvestmentEntry) =>
+    e.kind === "single" ? e.investment.position : e.entry.investment!.position;
+  const investmentsDefaultOrder: InvestmentEntry[] = applyManualOrder(
+    [...investmentsFixedMerged, ...investmentsCash.map<InvestmentEntry>((i) => ({ kind: "single", investment: i }))],
+    investmentEntryPos,
+  );
+  const investmentsReorderEnabled = investmentsSort.sort.option === "default";
+  const investmentsOrdered = investmentsReorderEnabled
+    ? investmentsDefaultOrder
+    : applySort(investmentsDefaultOrder, investmentsSort.sort, {
+        name: (e) => (e.kind === "single" ? e.investment.type : e.entry.investment!.type),
+        amount: (e) => (e.kind === "single" ? e.investment.amount : e.entry.installment.amount),
+        date: (e) => (e.kind === "single" ? e.investment.date : e.entry.investment.date),
+        id: (e) => (e.kind === "single" ? e.investment.id : e.entry.installment.id),
+      });
+  const commitInvestmentsOrder = (visibleIds: string[]) => {
+    const byId = new Map(investmentsOrdered.map((e) => [investmentEntryId(e), e] as const));
+    const newVisibleOrder = visibleIds.map((id) => byId.get(id)).filter((e): e is InvestmentEntry => !!e);
+    const mergedIds = mergeManualOrder(investmentsOrdered, newVisibleOrder, investmentEntryId);
+    reorderEntries.mutate({ parentType: "investment", orderedIds: mergedIds });
+  };
+  const startInvestmentDrag = startRowDrag(commitInvestmentsOrder);
 
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
@@ -1624,6 +1739,8 @@ export function MonthDetailPane({
                     askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)
                   }
                   {...selProps("incomes", p.income!.id)}
+                  dragId={p.income!.id}
+                  onDragStart={incomesReorderEnabled ? startIncomeDrag : undefined}
                 />
               );
             }
@@ -1688,6 +1805,8 @@ export function MonthDetailPane({
                       }
                 }
                 {...selProps("incomes", i.id)}
+                dragId={i.id}
+                onDragStart={incomesReorderEnabled ? startIncomeDrag : undefined}
               />
             );
           })}
@@ -1754,6 +1873,8 @@ export function MonthDetailPane({
                     askDeleteInst(p.installment, p.investment!.type, "investment", p.investment!.id)
                   }
                   {...selProps("investments", p.investment!.id)}
+                  dragId={p.investment!.id}
+                  onDragStart={investmentsReorderEnabled ? startInvestmentDrag : undefined}
                 />
               );
             }
@@ -1812,6 +1933,8 @@ export function MonthDetailPane({
                       }
                 }
                 {...selProps("investments", inv.id)}
+                dragId={inv.id}
+                onDragStart={investmentsReorderEnabled ? startInvestmentDrag : undefined}
               />
             );
           })}
@@ -1914,6 +2037,8 @@ export function MonthDetailPane({
                     askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)
                   }
                   {...selProps("debits", p.debit!.id)}
+                  dragId={p.debit!.id}
+                  onDragStart={debitsReorderEnabled ? startDebitDrag : undefined}
                 />
               );
             }
@@ -1981,6 +2106,8 @@ export function MonthDetailPane({
                         }
                 }
                 {...selProps("debits", d.id)}
+                dragId={d.id}
+                onDragStart={debitsReorderEnabled ? startDebitDrag : undefined}
               />
             );
           })}
@@ -2722,28 +2849,55 @@ function CardRowSorted({
 }) {
   const { sort, set } = useSortPreference(`card:${card.id}`);
   const cardFilter = useFilterPreference(`card:${card.id}`);
+  const reorderEntries = useReorderEntries();
   const cardInstVisible = cardInst.filter((i) =>
     matchesEntryFilter(cardFilter.filter, null, i.total > 1 ? "parc" : "vista"),
   );
-  const sortedItems =
-    sort.option === "default"
-      ? null
-      : applySort(cardInstVisible, sort, {
-          name: (i) => {
-            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
-            return pur?.description ?? "";
-          },
-          amount: (i) => i.amount,
-          // Mesma data mostrada na linha (`inst.referenceDate || purchase.date`,
-          // ver a renderização abaixo) — não `i.dueDate` (a "vaga"/mês, que
-          // nunca muda ao editar a data visual), senão editar a data não
-          // reordenava a lista mesmo mudando o texto exibido.
-          date: (i) => {
-            const pur = purchases.find((p: Purchase) => p.id === i.parentId);
-            return i.referenceDate || pur?.date || i.dueDate;
-          },
-          id: (i) => i.id,
-        });
+  // Mesma regra de tier (parcelado+recorrente antes de à-vista) + data que o
+  // CardRow aplicava sozinho quando sortedItems vinha null — reproduzida
+  // aqui pra poder aplicar a posição manual por cima (ver applyManualOrder).
+  const cardTierDate = (a: Installment, b: Installment) => {
+    const pa = purchases.find((p: Purchase) => p.id === a.parentId);
+    const pb = purchases.find((p: Purchase) => p.id === b.parentId);
+    const aParc = (pa?.installmentsCount ?? 1) > 1 || !!pa?.recurrenceGroupId ? 0 : 1;
+    const bParc = (pb?.installmentsCount ?? 1) > 1 || !!pb?.recurrenceGroupId ? 0 : 1;
+    return (
+      aParc - bParc ||
+      (pa?.date ?? "").localeCompare(pb?.date ?? "") ||
+      (a.purchaseId ?? "").localeCompare(b.purchaseId ?? "") ||
+      a.number - b.number ||
+      a.id.localeCompare(b.id)
+    );
+  };
+  const purchasePosOf = (i: Installment) => purchases.find((p: Purchase) => p.id === i.parentId)?.position ?? null;
+  const cardReorderEnabled = sort.option === "default";
+  const cardDefaultOrderVisible = applyManualOrder(cardInstVisible.slice().sort(cardTierDate), purchasePosOf);
+  const sortedItems = cardReorderEnabled
+    ? cardDefaultOrderVisible
+    : applySort(cardInstVisible, sort, {
+        name: (i) => {
+          const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+          return pur?.description ?? "";
+        },
+        amount: (i) => i.amount,
+        // Mesma data mostrada na linha (`inst.referenceDate || purchase.date`,
+        // ver a renderização abaixo) — não `i.dueDate` (a "vaga"/mês, que
+        // nunca muda ao editar a data visual), senão editar a data não
+        // reordenava a lista mesmo mudando o texto exibido.
+        date: (i) => {
+          const pur = purchases.find((p: Purchase) => p.id === i.parentId);
+          return i.referenceDate || pur?.date || i.dueDate;
+        },
+        id: (i) => i.id,
+      });
+  const commitCardOrder = (visibleIds: string[]) => {
+    const cardFullDefaultOrder = applyManualOrder(cardInst.slice().sort(cardTierDate), purchasePosOf);
+    const byId = new Map(cardInstVisible.map((i) => [i.parentId, i] as const));
+    const newVisibleOrder = visibleIds.map((id) => byId.get(id)).filter((i): i is Installment => !!i);
+    const mergedIds = mergeManualOrder(cardFullDefaultOrder, newVisibleOrder, (i) => i.parentId);
+    reorderEntries.mutate({ parentType: "purchase", orderedIds: mergedIds });
+  };
+  const startCardDrag = startRowDrag(commitCardOrder);
   return (
     <CardRow
       cardName={card.name}
@@ -2766,6 +2920,8 @@ function CardRowSorted({
       itemSelProps={itemSelProps}
       selectionBar={selectionBar}
       sortedItems={sortedItems}
+      dragEnabled={cardReorderEnabled}
+      onDragStart={startCardDrag}
       sortControl={
         <>
           <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
@@ -2816,6 +2972,8 @@ function CardRow({
   selectionBar,
   sortControl,
   sortedItems,
+  dragEnabled,
+  onDragStart,
 }: {
   cardName: string;
   cardColor: string;
@@ -2845,6 +3003,9 @@ function CardRow({
   sortControl?: React.ReactNode;
   /** When provided, overrides the default sort (parcelled→cash) with this order. */
   sortedItems?: Installment[] | null;
+  /** Arrastar pra reordenar só faz sentido com "Ordenar" em "Padrão". */
+  dragEnabled?: boolean;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { selectionMode, selected, onSelectToggle, onLongPress } = cardSelProps;
@@ -2993,6 +3154,8 @@ function CardRow({
                       onEdit={() => onEditInst(inst)}
                       onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                       {...itemSelProps(inst, inst.parentId)}
+                      dragId={inst.parentId}
+                      onDragStart={dragEnabled ? onDragStart : undefined}
                     />
                   ))}
               </div>
@@ -3058,10 +3221,15 @@ function RowShell({
   amountClass,
   status,
   onEdit,
+  selectionMode,
+  dragId,
+  onDragStart,
 }: {
   lp: ReturnType<typeof useLongPress>;
   guard: (fn: () => void) => (e: React.MouseEvent) => void;
   selected?: boolean;
+  /** Mostra o grip de arrastar só durante a seleção múltipla (long-press). */
+  selectionMode?: boolean;
   /** Estado da caixa. `undefined` + `leadingIcon` = linha sem caixa (ex.: investimento). */
   checked?: boolean;
   onCheck?: () => void;
@@ -3076,14 +3244,39 @@ function RowShell({
   /** Texto do status à direita (some no celular). */
   status?: string;
   onEdit: () => void;
+  /** Id do item-pai (não da parcela) — a linha carrega esse id no
+   * `data-drag-row` pra `startRowDrag` reconhecer a ordem no DOM. O
+   * chamador só passa `onDragStart` quando "Ordenar" está em "Padrão" —
+   * combinado com `selectionMode`, é isso que decide se o grip aparece. */
+  dragId?: string;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
+  const showGrip = !!selectionMode && !!dragId && !!onDragStart;
   return (
     <div
+      data-drag-row={dragId}
       className={`grid items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:px-4 ${
-        leadingIcon ? "grid-cols-[26px_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]"
+        showGrip
+          ? leadingIcon
+            ? "grid-cols-[18px_26px_minmax(0,1fr)_auto]"
+            : "grid-cols-[18px_minmax(0,1fr)_auto]"
+          : leadingIcon
+            ? "grid-cols-[26px_minmax(0,1fr)_auto]"
+            : "grid-cols-[minmax(0,1fr)_auto]"
       } ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
+      {showGrip && (
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={onDragStart}
+          aria-label="Mover na lista"
+          className="flex h-6 w-[18px] shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground active:cursor-grabbing"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
       {leadingIcon}
       <button type="button" onClick={guard(onEdit)} className="min-w-0 text-left">
         <p className={`truncate text-sm font-semibold ${done ? "text-muted-foreground" : ""} ${titleClass}`}>
@@ -3126,6 +3319,8 @@ function PurchaseInstRow({
   selected,
   onSelectToggle,
   onLongPress,
+  dragId,
+  onDragStart,
 }: {
   inst: Installment;
   purchase: {
@@ -3140,6 +3335,8 @@ function PurchaseInstRow({
   onEdit: () => void;
   onRemove?: () => void;
   onDuplicate?: () => void;
+  dragId?: string;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const isInstallment = inst.total > 1;
@@ -3149,6 +3346,9 @@ function PurchaseInstRow({
       lp={lp}
       guard={guard}
       selected={selected}
+      selectionMode={selectionMode}
+      dragId={dragId}
+      onDragStart={onDragStart}
       checked={inst.paid}
       onCheck={onToggle}
       checkLabel={inst.paid ? "Desmarcar validação" : "Marcar como revisado"}
@@ -3182,12 +3382,16 @@ function DebitRow({
   selected,
   onSelectToggle,
   onLongPress,
+  dragId,
+  onDragStart,
 }: {
   debit: Debit;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
   onDuplicate?: () => void;
+  dragId?: string;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
@@ -3195,6 +3399,9 @@ function DebitRow({
       lp={lp}
       guard={guard}
       selected={selected}
+      selectionMode={selectionMode}
+      dragId={dragId}
+      onDragStart={onDragStart}
       checked={debit.paid}
       onCheck={onToggle}
       checkLabel={debit.paid ? "Desmarcar pagamento" : "Marcar como pago"}
@@ -3232,12 +3439,16 @@ function IncomeRow({
   selected,
   onSelectToggle,
   onLongPress,
+  dragId,
+  onDragStart,
 }: {
   income: Income;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
   onDuplicate?: () => void;
+  dragId?: string;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
@@ -3245,6 +3456,9 @@ function IncomeRow({
       lp={lp}
       guard={guard}
       selected={selected}
+      selectionMode={selectionMode}
+      dragId={dragId}
+      onDragStart={onDragStart}
       checked={income.received}
       onCheck={onToggle}
       checkLabel={income.received ? "Desmarcar recebimento" : "Marcar como recebido"}
@@ -3277,6 +3491,8 @@ function ParcelledRow({
   selected,
   onSelectToggle,
   onLongPress,
+  dragId,
+  onDragStart,
 }: {
   kind: "debit" | "income" | "investment";
   installment: Installment;
@@ -3284,6 +3500,8 @@ function ParcelledRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
+  dragId?: string;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
@@ -3319,6 +3537,9 @@ function ParcelledRow({
         lp={lp}
         guard={guard}
         selected={selected}
+        selectionMode={selectionMode}
+        dragId={dragId}
+        onDragStart={onDragStart}
         leadingIcon={
           <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
             <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3337,6 +3558,9 @@ function ParcelledRow({
       lp={lp}
       guard={guard}
       selected={selected}
+      selectionMode={selectionMode}
+      dragId={dragId}
+      onDragStart={onDragStart}
       checked={installment.paid}
       onCheck={onToggle}
       checkLabel={
@@ -3366,11 +3590,15 @@ function InvestmentRow({
   selected,
   onSelectToggle,
   onLongPress,
+  dragId,
+  onDragStart,
 }: {
   inv: Investment;
   onEdit: () => void;
   onRemove: () => void;
   onDuplicate?: () => void;
+  dragId?: string;
+  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
@@ -3378,6 +3606,9 @@ function InvestmentRow({
       lp={lp}
       guard={guard}
       selected={selected}
+      selectionMode={selectionMode}
+      dragId={dragId}
+      onDragStart={onDragStart}
       leadingIcon={
         <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
           <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />

@@ -1889,12 +1889,13 @@ export type AmountAdjustment = {
 };
 
 /**
- * Último ajuste de valor registrado para um lançamento parcelado (histórico
- * visível ao usuário — "valor original → ajustado para" —, distinto do
- * undo/redo de sessão em `history.ts`). Retorna `null` quando o total nunca
- * foi ajustado via edição de parcela com escopo.
+ * Todos os ajustes de valor registrados para um lançamento parcelado
+ * (histórico visível ao usuário — "valor original → ajustado para", com
+ * data — distinto do undo/redo de sessão em `history.ts`), mais recente
+ * primeiro. Lista vazia quando o total nunca foi ajustado via edição de
+ * parcela com escopo.
  */
-export function useLatestAmountAdjustment(
+export function useAmountAdjustments(
   parentId: string | null | undefined,
   parentType: ParentType | null | undefined,
 ) {
@@ -1902,24 +1903,21 @@ export function useLatestAmountAdjustment(
   return useQuery({
     queryKey: ["amount_adjustments", parentType, parentId],
     enabled: !!activeUserId && !!parentId && !!parentType,
-    queryFn: async (): Promise<AmountAdjustment | null> => {
+    queryFn: async (): Promise<AmountAdjustment[]> => {
       const { data, error } = await (supabase.from("amount_adjustments" as any) as any)
         .select("id,parent_type,parent_id,previous_total,new_total,created_at")
         .eq("parent_type", parentType)
         .eq("parent_id", parentId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      const row = ((data ?? []) as Array<Record<string, unknown>>)[0];
-      if (!row) return null;
-      return {
+      return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
         id: String(row.id),
         parentType: row.parent_type as ParentType,
         parentId: String(row.parent_id),
         previousTotal: num(row.previous_total as number),
         newTotal: num(row.new_total as number),
         createdAt: String(row.created_at),
-      };
+      }));
     },
   });
 }

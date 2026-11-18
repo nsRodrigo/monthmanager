@@ -34,7 +34,7 @@ import {
   useDebits,
   useIncomes,
   useInvestments,
-  useLatestAmountAdjustment,
+  useAmountAdjustments,
   useConvertFinanceEntry,
   PAYMENT_METHOD_OPTIONS,
   type Installment,
@@ -47,7 +47,7 @@ import {
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
 import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
-import { Trash2, Copy, FastForward, Rewind, Settings2, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
+import { Trash2, Copy, ChevronRight } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
 import { toast } from "sonner";
@@ -121,7 +121,7 @@ export function EditInstallmentDialog({
   const { data: investments = [] } = useInvestments();
   const { data: cards = [] } = useCards();
   const { data: accounts = [] } = useAccounts();
-  const latestAdjustment = useLatestAmountAdjustment(
+  const amountAdjustments = useAmountAdjustments(
     installment?.parentId,
     installment?.parentType,
   );
@@ -175,7 +175,8 @@ export function EditInstallmentDialog({
   const [newTotalAmount, setNewTotalAmount] = useState<number>(0);
   const [newCurrentNumber, setNewCurrentNumber] = useState("");
   const [recreateMode, setRecreateMode] = useState<"recalculate" | "keepPerInstallment">("recalculate");
-  const [manageView, setManageView] = useState<"none" | "menu" | "advance" | "change">("none");
+  // "Alterar parcelamento" — accordion inline (recriar + renumerar juntos), sem modal separado.
+  const [accOpen, setAccOpen] = useState(false);
   // Single-mode type conversion state
   const [singleType, setSingleType] = useState<"cash" | "parcelled" | "recurring">("cash");
   const [convInstallments, setConvInstallments] = useState("2");
@@ -190,9 +191,13 @@ export function EditInstallmentDialog({
   const [purchInstallments, setPurchInstallments] = useState("2");
   const [purchInstNumber, setPurchInstNumber] = useState("1");
   const [purchMode, setPurchMode] = useState<"total" | "perInstallment">("total");
-  // Mover lançamento para outro tipo (débito/compra/recebimento/investimento).
+  // Mover lançamento para outro tipo (débito/compra/recebimento/investimento),
+  // ou mover a parcela em si (postergar/antecipar) — "Mover para" unificado
+  // na edição de parcela (ver `renderMoveSection`).
   const [moveToType, setMoveToType] = useState<ParentType | "">("");
   const [moveCardId, setMoveCardId] = useState("");
+  const [moveComboOpen, setMoveComboOpen] = useState(false);
+  const [moveParcelaAction, setMoveParcelaAction] = useState<"" | "postergar" | "antecipar">("");
 
   useEffect(() => {
     if (!open) return;
@@ -233,9 +238,11 @@ export function EditInstallmentDialog({
     }
     setAskDateScope(false);
     setAdvanceCount("");
-    setManageView("none");
+    setAccOpen(false);
     setMoveToType("");
     setMoveCardId("");
+    setMoveComboOpen(false);
+    setMoveParcelaAction("");
     // parentPaymentMethod/parentAutoDebitDay ficam de fora de propósito — igual
     // parentDate, são derivados de listas que podem re-fetchar com o modal
     // aberto, e re-rodar isso apagaria o que o usuário já digitou.
@@ -300,23 +307,24 @@ export function EditInstallmentDialog({
     }
 
     return (
-      <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3">
-        <span className="block text-xs font-medium text-muted-foreground">Mover para outro tipo</span>
-        <Select
-          className={inputClass}
-          value={moveToType}
-          onChange={(e) => {
-            setMoveToType(e.target.value as ParentType | "");
-            setMoveCardId("");
-          }}
-        >
-          <option value="">Manter como está</option>
-          {otherTypes.map((t) => (
-            <option key={t} value={t}>
-              {MOVE_TYPE_LABEL[t]}
-            </option>
-          ))}
-        </Select>
+      <div className="space-y-2">
+        <Field label="Mover para outro tipo">
+          <Select
+            className={inputClass}
+            value={moveToType}
+            onChange={(e) => {
+              setMoveToType(e.target.value as ParentType | "");
+              setMoveCardId("");
+            }}
+          >
+            <option value="">Manter como está</option>
+            {otherTypes.map((t) => (
+              <option key={t} value={t}>
+                {MOVE_TYPE_LABEL[t]}
+              </option>
+            ))}
+          </Select>
+        </Field>
         {moveToType === "purchase" && (
           <Select className={inputClass} value={moveCardId} onChange={(e) => setMoveCardId(e.target.value)}>
             <option value="">Selecione um cartão</option>
@@ -339,6 +347,397 @@ export function EditInstallmentDialog({
               {convertEntry.isPending ? "Movendo…" : `Mover para ${MOVE_TYPE_LABEL[moveToType].toLowerCase()}`}
             </button>
           </>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * "Mover para" unificado (modo installment): no mesmo combo, "Outro tipo"
+   * (conversão débito/compra/recebimento/investimento, mesma regra de
+   * negócio de `renderMoveTypeSection`) e, quando a parcela faz parte de uma
+   * série (total > 1), "Mover parcela" (Postergar/Antecipar — mesmas
+   * mutations e textos de confirmação da antiga "Gerenciar parcelamento").
+   */
+  function renderMoveSection(inst: Installment) {
+    const otherTypes = (["purchase", "debit", "income", "investment"] as ParentType[]).filter((t) => t !== inst.parentType);
+    const accountId =
+      inst.parentType === "purchase"
+        ? cards.find((c) => c.id === purchaseForInst?.cardId)?.accountId
+        : inst.parentType === "debit"
+        ? debits.find((d) => d.id === inst.parentId)?.accountId
+        : inst.parentType === "income"
+        ? incomes.find((i) => i.id === inst.parentId)?.accountId
+        : investments.find((i) => i.id === inst.parentId)?.accountId;
+    const accountCards = cards.filter((c) => c.accountId === accountId);
+    const canMoveParcela = inst.total > 1;
+
+    async function doMove() {
+      if (!moveToType) return;
+      const ok = await confirm({
+        title: "Mover lançamento",
+        description: `Mover este lançamento para "${MOVE_TYPE_LABEL[moveToType]}"? Esta ação não pode ser desfeita.`,
+        variant: "destructive",
+        confirmLabel: "Mover",
+      });
+      if (!ok) return;
+      try {
+        await convertEntry.mutateAsync({
+          fromType: inst.parentType,
+          fromId: inst.parentId,
+          toType: moveToType,
+          cardId: moveToType === "purchase" ? moveCardId : undefined,
+        });
+        toast.success(`Lançamento movido para ${MOVE_TYPE_LABEL[moveToType].toLowerCase()}.`);
+        onClose();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível mover o lançamento.");
+      }
+    }
+
+    async function doPostpone() {
+      const ok = await confirm({
+        title: "Postergar parcela",
+        description: `A parcela ${inst.number}/${inst.total} vai se juntar à parcela seguinte no mesmo mês. As demais parcelas não mudam.`,
+        confirmLabel: "Postergar",
+      });
+      if (!ok) return;
+      await postpone.mutateAsync({ installment: inst });
+      onClose();
+    }
+
+    async function doAdvance() {
+      const n = Math.min(remaining, Math.max(1, parseInt(advanceCount) || 0));
+      if (!n) return;
+      const ok = await confirm({
+        title: "Antecipar parcelas",
+        description: `Antecipar ${n} parcela(s)?`,
+        confirmLabel: "Antecipar",
+      });
+      if (!ok) return;
+      await advance.mutateAsync({ installment: inst, count: n });
+      onClose();
+    }
+
+    const comboLabel = moveToType
+      ? MOVE_TYPE_LABEL[moveToType]
+      : moveParcelaAction === "postergar"
+      ? "Postergar parcela"
+      : moveParcelaAction === "antecipar"
+      ? "Antecipar parcelas"
+      : "Manter como está";
+
+    return (
+      <div className="space-y-2">
+        <Field label="Mover para">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMoveComboOpen((v) => !v)}
+              className={`${inputClass} flex items-center justify-between text-left`}
+            >
+              <span className={moveToType || moveParcelaAction ? "" : "text-muted-foreground"}>{comboLabel}</span>
+              <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${moveComboOpen ? "rotate-90" : ""}`} />
+            </button>
+            {moveComboOpen && (
+              <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-background py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoveToType("");
+                    setMoveCardId("");
+                    setMoveParcelaAction("");
+                    setMoveComboOpen(false);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-xs hover:bg-secondary"
+                >
+                  Manter como está
+                </button>
+                <div className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Outro tipo</div>
+                {otherTypes.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setMoveToType(t);
+                      setMoveCardId("");
+                      setMoveParcelaAction("");
+                      setMoveComboOpen(false);
+                    }}
+                    className="block w-full px-3 py-2 text-left text-xs hover:bg-secondary"
+                  >
+                    {MOVE_TYPE_LABEL[t]}
+                  </button>
+                ))}
+                {canMoveParcela && (
+                  <>
+                    <div className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Mover parcela</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMoveParcelaAction("postergar");
+                        setMoveToType("");
+                        setMoveComboOpen(false);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-secondary"
+                    >
+                      Postergar
+                      <span className="block text-[10px] text-muted-foreground">Junta esta parcela com a próxima, no mesmo mês.</span>
+                    </button>
+                    {remaining > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMoveParcelaAction("antecipar");
+                          setMoveToType("");
+                          setMoveComboOpen(false);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-xs hover:bg-secondary"
+                      >
+                        Antecipar
+                        <span className="block text-[10px] text-muted-foreground">Marca parcelas futuras como pagas.</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </Field>
+
+        {moveToType === "purchase" && (
+          <Select className={inputClass} value={moveCardId} onChange={(e) => setMoveCardId(e.target.value)}>
+            <option value="">Selecione um cartão</option>
+            {accountCards.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        {moveToType && (
+          <>
+            <p className="text-[11px] text-amber-500/90">⚠ Esta ação não pode ser desfeita.</p>
+            <button
+              type="button"
+              onClick={doMove}
+              disabled={convertEntry.isPending || (moveToType === "purchase" && !moveCardId)}
+              className="w-full rounded-lg border border-destructive/40 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            >
+              {convertEntry.isPending ? "Movendo…" : `Mover para ${MOVE_TYPE_LABEL[moveToType].toLowerCase()}`}
+            </button>
+          </>
+        )}
+
+        {moveParcelaAction === "postergar" && (
+          <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3">
+            <p className="text-[11px] text-muted-foreground">
+              A parcela {inst.number}/{inst.total} vai se juntar à parcela seguinte no mesmo mês. As demais parcelas não mudam.
+            </p>
+            <button
+              type="button"
+              onClick={doPostpone}
+              disabled={postpone.isPending}
+              className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {postpone.isPending ? "Postergando…" : "Confirmar"}
+            </button>
+          </div>
+        )}
+
+        {moveParcelaAction === "antecipar" && (
+          <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3">
+            <p className="text-[11px] text-muted-foreground">
+              Quantas parcelas futuras você antecipou? Restam {remaining}.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={remaining}
+                placeholder={`1 a ${remaining}`}
+                className={inputClass}
+                value={advanceCount}
+                onChange={(e) => setAdvanceCount(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={doAdvance}
+                disabled={advance.isPending || !advanceCount}
+                className="whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {advance.isPending ? "Antecipando…" : "Antecipar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * Accordion "Alterar parcelamento" — título + chevron somente, sem frame
+   * ao redor (nem no cabeçalho nem no conteúdo expandido). Reúne Recriar
+   * parcelamento + Renumerar parcela (antiga "Gerenciar parcelamento",
+   * mesmas mutations/textos), separados por um divisor "ou".
+   */
+  function renderChangeInstallmentAccordion(inst: Installment) {
+    const nParsed = Math.max(1, parseInt(newInstCount) || 1);
+    const perInstallmentFixed = inst.amount;
+    const computedTotal =
+      recreateMode === "keepPerInstallment" ? perInstallmentFixed * nParsed : newTotalAmount;
+    const computedPer = nParsed > 0 ? computedTotal / nParsed : 0;
+    const newNumParsed = Math.max(1, Math.min(inst.total, parseInt(newCurrentNumber) || inst.number));
+
+    async function doRecreate() {
+      if (!nParsed || computedTotal <= 0) return;
+      const ok = await confirm({
+        title: "Alterar parcelamento",
+        description: `Recriar como ${nParsed}x de ${formatCurrency(computedPer)}?`,
+        confirmLabel: "Alterar",
+      });
+      if (!ok) return;
+      await changeInstSeries.mutateAsync({
+        parentId: inst.parentId,
+        parentType: inst.parentType,
+        newCount: nParsed,
+        totalAmount: computedTotal,
+      });
+      onClose();
+    }
+
+    async function doRenumber() {
+      if (newNumParsed === inst.number) return;
+      const ok = await confirm({
+        title: "Renumerar parcela",
+        description: `Mover a parcela ${inst.number}/${inst.total} para a posição ${newNumParsed}? As parcelas anteriores à ${inst.number}/${inst.total} e as que ficarem fora do intervalo 1-${inst.total} serão excluídas.`,
+        confirmLabel: "Renumerar",
+      });
+      if (!ok) return;
+      const createMissing = await confirm({
+        title: "Criar parcelas faltantes?",
+        description: "Algumas posições da série ficarão sem parcela. Deseja criá-las agora, em meses consecutivos a partir desta parcela?",
+        confirmLabel: "Criar faltantes",
+        cancelLabel: "Não criar",
+      });
+      await renumberInstallment.mutateAsync({
+        parentId: inst.parentId,
+        parentType: inst.parentType,
+        installmentId: inst.id,
+        oldNumber: inst.number,
+        newNumber: newNumParsed,
+        total: inst.total,
+        amount: inst.amount,
+        createMissing,
+      });
+      onClose();
+    }
+
+    return (
+      <div className="border-b border-border pb-3">
+        <button
+          type="button"
+          onClick={() => setAccOpen((v) => !v)}
+          className="flex w-full items-center justify-between py-1 text-left"
+        >
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alterar parcelamento</span>
+          <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${accOpen ? "rotate-90" : ""}`} />
+        </button>
+        {accOpen && (
+          <div className="space-y-4 pt-3">
+            <div className="space-y-3">
+              <p className="text-[12px] font-semibold text-foreground">Recriar parcelamento</p>
+              <p className="text-[11px] text-muted-foreground">
+                Recria todas as parcelas a partir da data da primeira. Status de pagamento será resetado.
+              </p>
+              <div className="flex gap-1 rounded-full bg-secondary p-1">
+                <button
+                  type="button"
+                  onClick={() => setRecreateMode("recalculate")}
+                  className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                    recreateMode === "recalculate" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  Recalcular valor por parcela
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecreateMode("keepPerInstallment")}
+                  className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                    recreateMode === "keepPerInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  Manter valor por parcela
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Nº parcelas">
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    className={inputClass}
+                    value={newInstCount}
+                    onChange={(e) => setNewInstCount(e.target.value)}
+                  />
+                </Field>
+                <Field label="Valor total">
+                  {recreateMode === "keepPerInstallment" ? (
+                    <input type="text" disabled className={inputClass} value={formatCurrency(computedTotal)} />
+                  ) : (
+                    <CurrencyInputWithCalculator value={newTotalAmount} onValueChange={setNewTotalAmount} />
+                  )}
+                </Field>
+              </div>
+              {nParsed > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  {nParsed}x de <span className="font-semibold text-foreground">{formatCurrency(computedPer)}</span> · total{" "}
+                  <span className="font-semibold text-foreground">{formatCurrency(computedTotal)}</span>
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={doRecreate}
+                disabled={changeInstSeries.isPending}
+                className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {changeInstSeries.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ou</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[12px] font-semibold text-foreground">Renumerar parcela</p>
+              <p className="text-[11px] text-muted-foreground">
+                Move esta parcela para outra posição na série, mantendo o mês de cada parcela
+                restante. As parcelas anteriores a esta e as que não couberem no novo intervalo
+                serão removidas.
+              </p>
+              <Field label="Posição desta parcela">
+                <input
+                  type="number"
+                  min={1}
+                  max={inst.total}
+                  className={inputClass}
+                  value={newCurrentNumber}
+                  onChange={(e) => setNewCurrentNumber(e.target.value)}
+                />
+              </Field>
+              <button
+                type="button"
+                onClick={doRenumber}
+                disabled={renumberInstallment.isPending || newCurrentNumber === String(inst.number)}
+                className="w-full rounded-lg border border-primary bg-primary/10 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+              >
+                {renumberInstallment.isPending ? "Renumerando…" : "Aplicar só a renumeração"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -948,8 +1347,6 @@ export function EditInstallmentDialog({
     );
   }
 
-  const canManage = true;
-
   return (
     <>
       <Modal
@@ -971,7 +1368,7 @@ export function EditInstallmentDialog({
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Valor">
+            <Field label={inst.total > 1 ? "Valor da parcela" : "Valor"}>
               <CurrencyInputWithCalculator value={amount} onValueChange={setAmount} allowNegative />
             </Field>
             <Field label="Data da compra">
@@ -983,6 +1380,15 @@ export function EditInstallmentDialog({
               />
             </Field>
           </div>
+
+          {inst.total > 1 ? (
+            <p className="-mt-2 text-[11px] text-muted-foreground">
+              Você está na parcela <span className="font-semibold text-foreground">{inst.number} de {inst.total}</span> · total{" "}
+              <span className="font-semibold text-foreground">{formatCurrency(inst.amount * inst.total)}</span>.
+            </p>
+          ) : parentSubtitle ? (
+            <p className="-mt-2 text-[11px] text-muted-foreground truncate">{parentSubtitle}</p>
+          ) : null}
 
           {inst.parentType === "purchase" && (
             <Field label="Cartão">
@@ -1008,27 +1414,7 @@ export function EditInstallmentDialog({
             </Field>
           )}
 
-          {(inst.parentType !== "purchase" || purchType === "cash") &&
-            renderMoveTypeSection(
-              inst.parentType,
-              inst.parentId,
-              inst.parentType === "purchase"
-                ? cards.find((c) => c.id === purchaseForInst?.cardId)?.accountId
-                : inst.parentType === "debit"
-                ? debits.find((d) => d.id === inst.parentId)?.accountId
-                : inst.parentType === "income"
-                ? incomes.find((i) => i.id === inst.parentId)?.accountId
-                : investments.find((i) => i.id === inst.parentId)?.accountId,
-            )}
-
-          <p className="-mt-2 text-[11px] text-muted-foreground">
-            Valor atual da parcela: {formatCurrency(inst.amount)}.
-          </p>
-          {latestAdjustment.data && (
-            <p className="-mt-2 text-[11px] text-amber-500/90">
-              Histórico: valor original {formatCurrency(latestAdjustment.data.previousTotal)} → ajustado para {formatCurrency(latestAdjustment.data.newTotal)}.
-            </p>
-          )}
+          {(inst.parentType !== "purchase" || purchType === "cash") && renderMoveSection(inst)}
 
           {(inst.parentType === "debit" || inst.parentType === "income") && (
             <div className="space-y-2">
@@ -1157,73 +1543,22 @@ export function EditInstallmentDialog({
             </div>
           )}
 
-          {(inst.total > 1 || parentSubtitle) && (
-            canManage ? (
-              <button
-                type="button"
-                onClick={() => setManageView("menu")}
-                className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5 text-left transition hover:border-primary/50 hover:bg-background"
-              >
-                <Settings2 className="h-4 w-4 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  {inst.total > 1 && (
-                    <p className="text-[12px] font-semibold text-foreground">
-                      Parcela {inst.number} de {inst.total}
-                    </p>
-                  )}
-                  {parentSubtitle && (
-                    <p className="text-[11px] text-muted-foreground truncate">{parentSubtitle}</p>
-                  )}
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </button>
-            ) : (
-              <div className="rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
-                {inst.total > 1 && (
-                  <p>
-                    <span className="font-semibold text-foreground">Parcela {inst.number} de {inst.total}</span>
-                  </p>
-                )}
-                {parentSubtitle && <p className={inst.total > 1 ? "mt-0.5" : ""}>{parentSubtitle}</p>}
-              </div>
-            )
-          )}
+          {inst.total > 1 && renderChangeInstallmentAccordion(inst)}
 
-          {(parentSource || inst.total > 1 || onDeleteParent) && (
-            <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-              {(parentSource || inst.total > 1) && (
-                <button
-                  onClick={() => {
-                    // Parcelled → open checklist picker (pré-seleciona a parcela atual).
-                    // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
-                    if (inst.total > 1) {
-                      setSelectedDupIds(new Set([inst.id]));
-                      setAskDuplicateParcelled(true);
-                    } else {
-                      setAskDuplicate(true);
-                    }
-                  }}
-                  disabled={duplicate.isPending || duplicateSeries.isPending || duplicateSelection.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                  title="Duplicar lançamento"
-                >
-                  <Copy className="h-3.5 w-3.5" /> Duplicar
-                </button>
-              )}
-              {onDeleteParent && (
-                <button
-                  onClick={() => {
-                    onDeleteParent();
-                    onClose();
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10"
-                  title="Excluir lançamento parcelado"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Excluir
-                </button>
-              )}
+          {amountAdjustments.data && amountAdjustments.data.length > 0 && (
+            <div className="space-y-1.5 border-t border-border pt-3">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Histórico</span>
+              <ul className="space-y-1">
+                {amountAdjustments.data.map((adj) => (
+                  <li key={adj.id} className="text-[11px] text-muted-foreground">
+                    {formatCurrency(adj.previousTotal)} → {formatCurrency(adj.newTotal)}{" "}
+                    <span className="text-muted-foreground/70">· {formatDate(adj.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
+
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 rounded-lg border border-border bg-background py-2.5 text-sm font-semibold hover:bg-secondary">
               Cancelar
@@ -1243,297 +1578,41 @@ export function EditInstallmentDialog({
                 ? "Salvando…"
                 : "Salvar"}
             </button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={manageView !== "none"}
-        onClose={() => setManageView("none")}
-        title={
-          manageView === "advance"
-            ? "Antecipar parcelas"
-            : manageView === "change"
-            ? "Alterar parcelamento"
-            : "Gerenciar parcelamento"
-        }
-      >
-        {manageView === "menu" && (
-          <div className="space-y-3">
-            <p className="text-[11px] text-muted-foreground">
-              Parcela {inst.number} de {inst.total}
-              {parentSubtitle ? ` · ${parentSubtitle}` : ""}
-            </p>
-            {remaining > 0 && (
+            {onDeleteParent && (
               <button
-                onClick={() => setManageView("advance")}
-                className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
-              >
-                <FastForward className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="font-semibold">Antecipar parcelas</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Marcar N parcelas futuras como pagas. Restam {remaining}.
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-              </button>
-            )}
-            <button
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Postergar parcela",
-                  description: `A parcela ${inst.number}/${inst.total} vai se juntar à parcela seguinte no mesmo mês. As demais parcelas não mudam.`,
-                  confirmLabel: "Postergar",
-                });
-                if (!ok) return;
-                await postpone.mutateAsync({ installment: inst });
-                setManageView("none");
-                onClose();
-              }}
-              disabled={postpone.isPending}
-              className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary disabled:opacity-50"
-            >
-              <Rewind className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <p className="font-semibold">Postergar parcela</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Empurra esta parcela para o mês seguinte, juntando com a próxima.
-                </p>
-              </div>
-            </button>
-            <button
-              onClick={() => setManageView("change")}
-              className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary"
-            >
-              <RefreshCw className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <p className="font-semibold">Alterar parcelamento</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Recriar todas as parcelas com novo nº ou valor total, ou renumerar esta parcela.
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-            </button>
-            <button
-              onClick={() => setManageView("none")}
-              className="w-full rounded-lg border border-border bg-background py-2 text-sm font-semibold hover:bg-secondary"
-            >
-              Fechar
-            </button>
-          </div>
-        )}
-
-        {manageView === "advance" && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setManageView("menu")}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Voltar
-            </button>
-            <p className="text-[11px] text-muted-foreground">
-              Quantas parcelas futuras você antecipou? Restam {remaining}.
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min={1}
-                max={remaining}
-                placeholder={`1 a ${remaining}`}
-                className={inputClass}
-                value={advanceCount}
-                onChange={(e) => setAdvanceCount(e.target.value)}
-                autoFocus
-              />
-              <button
-                onClick={async () => {
-                  const n = Math.min(remaining, Math.max(1, parseInt(advanceCount) || 0));
-                  if (!n) return;
-                  const ok = await confirm({
-                    title: "Antecipar parcelas",
-                    description: `Antecipar ${n} parcela(s)?`,
-                    confirmLabel: "Antecipar",
-                  });
-                  if (!ok) return;
-                  await advance.mutateAsync({ installment: inst, count: n });
-                  setManageView("none");
+                type="button"
+                onClick={() => {
+                  onDeleteParent();
                   onClose();
                 }}
-                disabled={advance.isPending || !advanceCount}
-                className="whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                title="Excluir lançamento parcelado"
+                className="inline-flex items-center justify-center rounded-lg bg-destructive/15 px-3 py-2.5 text-destructive hover:bg-destructive/25"
               >
-                {advance.isPending ? "Antecipando…" : "Antecipar"}
+                <Trash2 className="h-4 w-4" />
               </button>
-            </div>
-          </div>
-        )}
-
-        {manageView === "change" && (() => {
-          const nParsed = Math.max(1, parseInt(newInstCount) || 1);
-          const perInstallmentFixed = inst.amount;
-          const computedTotal =
-            recreateMode === "keepPerInstallment"
-              ? perInstallmentFixed * nParsed
-              : newTotalAmount;
-          const computedPer = nParsed > 0 ? computedTotal / nParsed : 0;
-          const newNumParsed = Math.max(
-            1,
-            Math.min(inst.total, parseInt(newCurrentNumber) || inst.number),
-          );
-          return (
-            <div className="space-y-4">
+            )}
+            {(parentSource || inst.total > 1) && (
               <button
-                onClick={() => setManageView("menu")}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                type="button"
+                onClick={() => {
+                  // Parcelled → open checklist picker (pré-seleciona a parcela atual).
+                  // Single (recorrente/avulso) → keep original CardScopeConfirmDialog flow.
+                  if (inst.total > 1) {
+                    setSelectedDupIds(new Set([inst.id]));
+                    setAskDuplicateParcelled(true);
+                  } else {
+                    setAskDuplicate(true);
+                  }
+                }}
+                disabled={duplicate.isPending || duplicateSeries.isPending || duplicateSelection.isPending}
+                title="Duplicar lançamento"
+                className="inline-flex items-center justify-center rounded-lg bg-secondary px-3 py-2.5 text-foreground hover:bg-secondary/70 disabled:opacity-50"
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Voltar
+                <Copy className="h-4 w-4" />
               </button>
-
-              {/* SECAO 1 — Recriar parcelamento */}
-              <div className="space-y-3">
-                <p className="text-[12px] font-semibold text-foreground">Recriar parcelamento</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Recria todas as parcelas a partir da data da primeira. Status de pagamento será resetado.
-                </p>
-                <div className="flex gap-1 rounded-full bg-secondary p-1">
-                  <button
-                    type="button"
-                    onClick={() => setRecreateMode("recalculate")}
-                    className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-                      recreateMode === "recalculate" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    Recalcular valor por parcela
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecreateMode("keepPerInstallment")}
-                    className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-                      recreateMode === "keepPerInstallment" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    Manter valor por parcela
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Nº parcelas">
-                    <input
-                      type="number"
-                      min={1}
-                      max={120}
-                      className={inputClass}
-                      value={newInstCount}
-                      onChange={(e) => setNewInstCount(e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Valor total">
-                    {recreateMode === "keepPerInstallment" ? (
-                      <input
-                        type="text"
-                        disabled
-                        className={inputClass}
-                        value={formatCurrency(computedTotal)}
-                      />
-                    ) : (
-                      <CurrencyInputWithCalculator value={newTotalAmount} onValueChange={setNewTotalAmount} />
-                    )}
-                  </Field>
-                </div>
-                {nParsed > 0 && (
-                  <p className="text-[11px] text-muted-foreground">
-                    {nParsed}x de <span className="font-semibold text-foreground">{formatCurrency(computedPer)}</span> · total{" "}
-                    <span className="font-semibold text-foreground">{formatCurrency(computedTotal)}</span>
-                  </p>
-                )}
-                <button
-                  onClick={async () => {
-                    if (!nParsed || computedTotal <= 0) return;
-                    const ok = await confirm({
-                      title: "Alterar parcelamento",
-                      description: `Recriar como ${nParsed}x de ${formatCurrency(computedPer)}?`,
-                      confirmLabel: "Alterar",
-                    });
-                    if (!ok) return;
-                    await changeInstSeries.mutateAsync({
-                      parentId: inst.parentId,
-                      parentType: inst.parentType,
-                      newCount: nParsed,
-                      totalAmount: computedTotal,
-                    });
-                    setManageView("none");
-                    onClose();
-                  }}
-                  disabled={changeInstSeries.isPending}
-                  className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                >
-                  {changeInstSeries.isPending ? "Alterando…" : "Aplicar novo parcelamento"}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Renumerar
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
-              {/* SECAO 2 — Renumerar parcela */}
-              <div className="space-y-3">
-                <p className="text-[12px] font-semibold text-foreground">Renumerar parcela</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Move esta parcela para outra posição na série, mantendo o mês de cada parcela
-                  restante. As parcelas anteriores a esta e as que não couberem no novo intervalo
-                  serão removidas.
-                </p>
-                <Field label="Parcela atual">
-                  <input
-                    type="number"
-                    min={1}
-                    max={inst.total}
-                    className={inputClass}
-                    value={newCurrentNumber}
-                    onChange={(e) => setNewCurrentNumber(e.target.value)}
-                  />
-                </Field>
-                <button
-                  onClick={async () => {
-                    if (newNumParsed === inst.number) return;
-                    const ok = await confirm({
-                      title: "Renumerar parcela",
-                      description: `Mover a parcela ${inst.number}/${inst.total} para a posição ${newNumParsed}? As parcelas anteriores à ${inst.number}/${inst.total} e as que ficarem fora do intervalo 1-${inst.total} serão excluídas.`,
-                      confirmLabel: "Renumerar",
-                    });
-                    if (!ok) return;
-                    const createMissing = await confirm({
-                      title: "Criar parcelas faltantes?",
-                      description: "Algumas posições da série ficarão sem parcela. Deseja criá-las agora, em meses consecutivos a partir desta parcela?",
-                      confirmLabel: "Criar faltantes",
-                      cancelLabel: "Não criar",
-                    });
-                    await renumberInstallment.mutateAsync({
-                      parentId: inst.parentId,
-                      parentType: inst.parentType,
-                      installmentId: inst.id,
-                      oldNumber: inst.number,
-                      newNumber: newNumParsed,
-                      total: inst.total,
-                      amount: inst.amount,
-                      createMissing,
-                    });
-                    setManageView("none");
-                    onClose();
-                  }}
-                  disabled={renumberInstallment.isPending || newCurrentNumber === String(inst.number)}
-                  className="w-full rounded-lg border border-primary bg-primary/10 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
-                >
-                  {renumberInstallment.isPending ? "Renumerando…" : "Aplicar só a renumeração"}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+            )}
+          </div>
+        </div>
       </Modal>
 
       {parentSource && (

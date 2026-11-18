@@ -28,8 +28,8 @@ const incomePaymentMethods = PAYMENT_METHOD_OPTIONS.filter((o) => o.value !== "a
 const INV_TYPES = ["CDB", "Tesouro Direto", "Poupança", "Fundo", "Ações", "Cripto", "Outros"];
 
 const TABS: { id: EntryTab; label: string; icon: typeof ArrowDownRight }[] = [
-  { id: "inc", label: "Recebimento", icon: ArrowUpRight },
   { id: "deb", label: "Débito", icon: ArrowDownRight },
+  { id: "inc", label: "Recebimento", icon: ArrowUpRight },
   { id: "card", label: "Cartão", icon: CreditCard },
   { id: "inv", label: "Investimento", icon: TrendingUp },
 ];

@@ -47,10 +47,43 @@ import {
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
 import { formatCurrency, formatDate, MONTHS } from "@/lib/format";
-import { Trash2, Copy, ChevronRight } from "lucide-react";
+import { Trash2, Copy, ChevronRight, Info } from "lucide-react";
 import { useConfirm } from "@/store/confirm";
 import { CardScopeConfirmDialog } from "./CardScopeConfirmDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
+
+/**
+ * ⓘ ao lado de um título — abre um balão com texto explicativo que antes
+ * ficava sempre visível como parágrafo (ex.: aviso de reset de status ao
+ * recriar parcelamento). Cor do tema (`bg-primary`), igual ao Tooltip padrão
+ * do design system; usa Popover (clique) em vez de hover, pra funcionar no
+ * toque — e herda o posicionamento anti-colisão do Radix, então o balão
+ * sempre se reposiciona pra caber na tela.
+ */
+function InfoTip({ children }: { children: React.ReactNode }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Mais informações"
+          className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-primary"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        collisionPadding={12}
+        className="w-64 rounded-lg border-primary/40 bg-primary p-2.5 text-[11px] leading-relaxed text-primary-foreground shadow-lg"
+      >
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 
 export type SingleEditTarget =
@@ -634,7 +667,7 @@ export function EditInstallmentDialog({
     }
 
     return (
-      <div className="border-b border-border pb-3">
+      <div>
         <button
           type="button"
           onClick={() => setAccOpen((v) => !v)}
@@ -646,10 +679,10 @@ export function EditInstallmentDialog({
         {accOpen && (
           <div className="space-y-4 pt-3">
             <div className="space-y-3">
-              <p className="text-[12px] font-semibold text-foreground">Recriar parcelamento</p>
-              <p className="text-[11px] text-muted-foreground">
-                Recria todas as parcelas a partir da data da primeira. Status de pagamento será resetado.
-              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recriar parcelamento</span>
+                <InfoTip>Recria todas as parcelas a partir da data da primeira. Status de pagamento será resetado.</InfoTip>
+              </div>
               <div className="flex gap-1 rounded-full bg-secondary p-1">
                 <button
                   type="button"
@@ -705,19 +738,16 @@ export function EditInstallmentDialog({
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">ou</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
+            <p className="text-center text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">ou</p>
 
             <div className="space-y-3">
-              <p className="text-[12px] font-semibold text-foreground">Renumerar parcela</p>
-              <p className="text-[11px] text-muted-foreground">
-                Move esta parcela para outra posição na série, mantendo o mês de cada parcela
-                restante. As parcelas anteriores a esta e as que não couberem no novo intervalo
-                serão removidas.
-              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Renumerar parcela</span>
+                <InfoTip>
+                  Move esta parcela para outra posição na série, mantendo o mês de cada parcela restante. As parcelas
+                  anteriores a esta e as que não couberem no novo intervalo serão removidas.
+                </InfoTip>
+              </div>
               <Field label="Posição desta parcela">
                 <input
                   type="number"
@@ -1546,7 +1576,7 @@ export function EditInstallmentDialog({
           {inst.total > 1 && renderChangeInstallmentAccordion(inst)}
 
           {amountAdjustments.data && amountAdjustments.data.length > 0 && (
-            <div className="space-y-1.5 border-t border-border pt-3">
+            <div className="space-y-1.5">
               <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Histórico</span>
               <ul className="space-y-1">
                 {amountAdjustments.data.map((adj) => (

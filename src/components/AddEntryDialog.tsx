@@ -130,16 +130,23 @@ export function AddEntryDialog({
     if (open) {
       setTab(initialTab);
       resetFields();
+      if (
+        initialTab === "card" &&
+        initialCardId &&
+        selectableCards.some((c) => c.id === initialCardId)
+      ) {
+        setCardId(initialCardId);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialTab, defaultYear, defaultMonth, accountId]);
+  }, [open, initialTab, initialCardId, defaultYear, defaultMonth, accountId]);
 
   useEffect(() => {
     if (!open) return;
     setCardId(
       tab === "card" && initialCardId && selectableCards.some((c) => c.id === initialCardId)
         ? initialCardId
-        : selectableCards[0]?.id ?? "",
+        : (selectableCards[0]?.id ?? ""),
     );
     setSettled(tab !== "inc");
     if (tab !== "deb" && paymentMethod === "auto_debit") setPaymentMethod("none");

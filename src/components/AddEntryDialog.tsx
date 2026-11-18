@@ -54,6 +54,7 @@ export function AddEntryDialog({
   accountId,
   accountName,
   initialTab = "deb",
+  initialCardId,
   onCreateCard,
 }: {
   open: boolean;
@@ -63,6 +64,8 @@ export function AddEntryDialog({
   accountId: string;
   accountName: string;
   initialTab?: EntryTab;
+  /** Cartão já escolhido ao abrir (ex.: "+" de uma fatura específica) — só tem efeito quando a aba é "card". */
+  initialCardId?: string;
   /** Fecha este modal e abre o de criar cartão (aba Cartão, quando a conta ainda não tem nenhum). */
   onCreateCard?: () => void;
 }) {
@@ -133,7 +136,11 @@ export function AddEntryDialog({
 
   useEffect(() => {
     if (!open) return;
-    setCardId(selectableCards[0]?.id ?? "");
+    setCardId(
+      tab === "card" && initialCardId && selectableCards.some((c) => c.id === initialCardId)
+        ? initialCardId
+        : selectableCards[0]?.id ?? "",
+    );
     setSettled(tab !== "inc");
     if (tab !== "deb" && paymentMethod === "auto_debit") setPaymentMethod("none");
     if (tab !== "deb" && tab !== "inc" && paymentMethod !== "none") setPaymentMethod("none");

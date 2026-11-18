@@ -226,8 +226,10 @@ export function MonthDetailPane({
 
   const [openEntry, setOpenEntry] = useState(false);
   const [entryTab, setEntryTab] = useState<EntryTab>("deb");
-  const openEntryTab = (t: EntryTab) => {
+  const [entryCardId, setEntryCardId] = useState<string | undefined>(undefined);
+  const openEntryTab = (t: EntryTab, cardId?: string) => {
     setEntryTab(t);
+    setEntryCardId(cardId);
     setOpenEntry(true);
   };
   const [openCard, setOpenCard] = useState(false);
@@ -1552,6 +1554,15 @@ export function MonthDetailPane({
                 onToggleTerm={incomesFilter.toggleTerm}
                 onClear={incomesFilter.clear}
               />
+              <button
+                type="button"
+                onClick={() => openEntryTab("inc")}
+                aria-label="Novo recebimento"
+                title="Novo recebimento"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
             </>
           }
           paidControl={
@@ -1694,11 +1705,22 @@ export function MonthDetailPane({
           empty={monthInvestments.single.length === 0 && monthInvestments.parcelled.length === 0}
           emptyText="Nenhum investimento nesta conta."
           sortControl={
-            <SortMenu
-              scope="investments"
-              state={investmentsSort.sort}
-              onChange={investmentsSort.set}
-            />
+            <>
+              <SortMenu
+                scope="investments"
+                state={investmentsSort.sort}
+                onChange={investmentsSort.set}
+              />
+              <button
+                type="button"
+                onClick={() => openEntryTab("inv")}
+                aria-label="Novo investimento"
+                title="Novo investimento"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </>
           }
         >
           {investmentsOrdered.map((e) => {
@@ -1824,6 +1846,15 @@ export function MonthDetailPane({
                 onToggleTerm={debitsFilter.toggleTerm}
                 onClear={debitsFilter.clear}
               />
+              <button
+                type="button"
+                onClick={() => openEntryTab("deb")}
+                aria-label="Novo débito"
+                title="Novo débito"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
             </>
           }
           paidControl={
@@ -2157,6 +2188,7 @@ export function MonthDetailPane({
                             }
                           }}
                           cardSelProps={selProps(`cardAll:${c.id}`, c.id)}
+                          onAddPurchase={() => openEntryTab("card", c.id)}
                           onToggleInst={(id, p) => toggleInst(id, p)}
                           onEditInst={(inst) => {
                             const pur = purchasesList.find((p) => p.id === inst.parentId);
@@ -2220,6 +2252,7 @@ export function MonthDetailPane({
         accountId={contaId}
         accountName={account?.name ?? ""}
         initialTab={entryTab}
+        initialCardId={entryCardId}
         onCreateCard={() => {
           setOpenEntry(false);
           setOpenCard(true);
@@ -2660,6 +2693,7 @@ function CardRowSorted({
   dueLabel,
   onTogglePaid,
   cardSelProps,
+  onAddPurchase,
   onToggleInst,
   onEditInst,
   onRemoveInst,
@@ -2678,6 +2712,8 @@ function CardRowSorted({
   onTogglePaid: () => void;
   /** Seleção da FATURA inteira (long-press no cabeçalho) — ver `cardAll:` em SelectionKey. */
   cardSelProps: SelectionRowProps;
+  /** Atalho "+" ao lado de Ordenar/Filtrar — abre "Novo lançamento" já na aba Cartão, com este cartão pré-selecionado. */
+  onAddPurchase?: () => void;
   onToggleInst: (id: string, paid: boolean) => void;
   onEditInst: (inst: Installment) => void;
   onRemoveInst?: (inst: Installment) => void;
@@ -2740,6 +2776,17 @@ function CardRowSorted({
             onClear={cardFilter.clear}
             showMethods={false}
           />
+          {onAddPurchase && (
+            <button
+              type="button"
+              onClick={onAddPurchase}
+              aria-label={`Nova compra em ${card.name}`}
+              title={`Nova compra em ${card.name}`}
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-primary hover:bg-secondary"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
         </>
       }
     />
@@ -2840,7 +2887,7 @@ function CardRow({
         </div>
         <div className="shrink-0 text-right">
           <p className="font-display text-[17px] font-bold text-credit tabular-nums">{formatCurrency(total)}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className={`text-xs ${cardState === "paid" ? "font-semibold text-success" : "text-muted-foreground"}`}>
             {cardState === "paid" ? "fatura paga" : `${countRevisado}/${count} revisados`}
           </p>
         </div>

@@ -94,6 +94,7 @@ import { EditRecurringDialog, type RecurringEditTarget } from "@/components/Edit
 import { useConfirm } from "@/store/confirm";
 import { useLongPress } from "@/hooks/use-long-press";
 import { SortMenu, useSortPreference, applySort, type SortState } from "@/components/SortMenu";
+import { FilterMenu, useFilterPreference, matchesEntryFilter } from "@/components/FilterMenu";
 import { toneText, toneBg, type Tone } from "@/components/FabAction";
 import { ManageAccountsDialog } from "@/components/ManageAccountsDialog";
 import {
@@ -1077,6 +1078,10 @@ export function MonthDetailPane({
   const incomesSort = useSortPreference("incomes");
   const investmentsSort = useSortPreference("investments");
 
+  // ───── Filter prefs (per-section, persisted in localStorage) ─────
+  const debitsFilter = useFilterPreference("debits");
+  const incomesFilter = useFilterPreference("incomes");
+
   // Tagged unions for sort-aware flat rendering of debits/incomes.
   type DebitEntry =
     | { kind: "single"; debit: Debit }
@@ -1113,6 +1118,13 @@ export function MonthDetailPane({
           date: (e) => (e.kind === "single" ? e.debit.date : e.entry.debit.date),
           id: (e) => (e.kind === "single" ? e.debit.id : e.entry.installment.id),
         });
+  const debitsVisible = debitsOrdered.filter((e) =>
+    matchesEntryFilter(
+      debitsFilter.filter,
+      e.kind === "single" ? e.debit.paymentMethod : e.entry.debit.paymentMethod,
+      e.kind === "single" ? "vista" : "parc",
+    ),
+  );
 
   const incomesFixedMerged: IncomeEntry[] = [
     ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
@@ -1137,6 +1149,13 @@ export function MonthDetailPane({
           date: (e) => (e.kind === "single" ? e.income.date : e.entry.income.date),
           id: (e) => (e.kind === "single" ? e.income.id : e.entry.installment.id),
         });
+  const incomesVisible = incomesOrdered.filter((e) =>
+    matchesEntryFilter(
+      incomesFilter.filter,
+      e.kind === "single" ? e.income.paymentMethod : e.entry.income.paymentMethod,
+      e.kind === "single" ? "vista" : "parc",
+    ),
+  );
 
   const investmentsFixedMerged: InvestmentEntry[] = [
     ...investmentsFixedSingle.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
@@ -1518,10 +1537,22 @@ export function MonthDetailPane({
           total={totalIncomeNet}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
           paidState={incomesAllReceived ? "paid" : null}
-          empty={monthIncomes.single.length === 0 && monthIncomes.parcelled.length === 0}
-          emptyText="Nenhum recebimento neste mês."
+          empty={incomesVisible.length === 0}
+          emptyText={
+            incomesOrdered.length === 0
+              ? "Nenhum recebimento neste mês."
+              : "Nenhum recebimento com esses filtros."
+          }
           sortControl={
-            <SortMenu scope="incomes" state={incomesSort.sort} onChange={incomesSort.set} />
+            <>
+              <SortMenu scope="incomes" state={incomesSort.sort} onChange={incomesSort.set} />
+              <FilterMenu
+                filter={incomesFilter.filter}
+                onToggleMethod={incomesFilter.toggleMethod}
+                onToggleTerm={incomesFilter.toggleTerm}
+                onClear={incomesFilter.clear}
+              />
+            </>
           }
           paidControl={
             !isSelMode("incomes") &&
@@ -1551,7 +1582,7 @@ export function MonthDetailPane({
             ) : null
           }
         >
-          {incomesOrdered.map((e) => {
+          {incomesVisible.map((e) => {
             if (e.kind === "parcelled") {
               const p = e.entry;
               return (
@@ -1780,10 +1811,20 @@ export function MonthDetailPane({
                 : "open"
               : null
           }
-          empty={monthDebits.single.length === 0 && monthDebits.parcelled.length === 0}
-          emptyText="Nenhum débito neste mês."
+          empty={debitsVisible.length === 0}
+          emptyText={
+            debitsOrdered.length === 0 ? "Nenhum débito neste mês." : "Nenhum débito com esses filtros."
+          }
           sortControl={
-            <SortMenu scope="debits" state={debitsSort.sort} onChange={debitsSort.set} />
+            <>
+              <SortMenu scope="debits" state={debitsSort.sort} onChange={debitsSort.set} />
+              <FilterMenu
+                filter={debitsFilter.filter}
+                onToggleMethod={debitsFilter.toggleMethod}
+                onToggleTerm={debitsFilter.toggleTerm}
+                onClear={debitsFilter.clear}
+              />
+            </>
           }
           paidControl={
             !isSelMode("debits") && monthDebits.single.length + monthDebits.parcelled.length > 0 ? (
@@ -1809,7 +1850,7 @@ export function MonthDetailPane({
             ) : null
           }
         >
-          {debitsOrdered.map((e) => {
+          {debitsVisible.map((e) => {
             if (e.kind === "parcelled") {
               const p = e.entry;
               return (
@@ -2644,10 +2685,14 @@ function CardRowSorted({
   selectionBar?: React.ReactNode;
 }) {
   const { sort, set } = useSortPreference(`card:${card.id}`);
+  const cardFilter = useFilterPreference(`card:${card.id}`);
+  const cardInstVisible = cardInst.filter((i) =>
+    matchesEntryFilter(cardFilter.filter, null, i.total > 1 ? "parc" : "vista"),
+  );
   const sortedItems =
     sort.option === "default"
       ? null
-      : applySort(cardInst, sort, {
+      : applySort(cardInstVisible, sort, {
           name: (i) => {
             const pur = purchases.find((p: Purchase) => p.id === i.parentId);
             return pur?.description ?? "";
@@ -2673,10 +2718,11 @@ function CardRowSorted({
       countRevisado={countRevisado}
       paymentPending={paymentPending}
       count={cardInst.length}
+      totalCount={cardInst.length}
       dueLabel={dueLabel}
       onTogglePaid={onTogglePaid}
       cardSelProps={cardSelProps}
-      items={cardInst}
+      items={cardInstVisible}
       purchases={purchases}
       onToggleInst={onToggleInst}
       onEditInst={onEditInst}
@@ -2684,7 +2730,18 @@ function CardRowSorted({
       itemSelProps={itemSelProps}
       selectionBar={selectionBar}
       sortedItems={sortedItems}
-      sortControl={<SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />}
+      sortControl={
+        <>
+          <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
+          <FilterMenu
+            filter={cardFilter.filter}
+            onToggleMethod={cardFilter.toggleMethod}
+            onToggleTerm={cardFilter.toggleTerm}
+            onClear={cardFilter.clear}
+            showMethods={false}
+          />
+        </>
+      }
     />
   );
 }
@@ -2698,6 +2755,7 @@ function CardRow({
   countRevisado,
   paymentPending,
   count,
+  totalCount,
   dueLabel,
   onTogglePaid,
   cardSelProps,
@@ -2720,6 +2778,8 @@ function CardRow({
   countRevisado: number;
   paymentPending?: boolean;
   count: number;
+  /** Total de itens da fatura sem filtro — pra distinguir "mês vazio" de "filtro zerou a lista". */
+  totalCount?: number;
   dueLabel: string;
   onTogglePaid: () => void;
   cardSelProps: SelectionRowProps;
@@ -2830,7 +2890,11 @@ function CardRow({
 
             {items.length === 0 ? (
               <div className="space-y-3 px-4 py-6 text-center">
-                <p className="text-xs text-muted-foreground">Nenhum lançamento neste mês.</p>
+                <p className="text-xs text-muted-foreground">
+                  {typeof totalCount === "number" && totalCount > 0
+                    ? "Nenhum lançamento com esses filtros."
+                    : "Nenhum lançamento neste mês."}
+                </p>
                 {onHideMonth && (
                   <button
                     type="button"

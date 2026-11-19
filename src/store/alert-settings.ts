@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 export type AlertPosition = "top-center" | "bottom-center";
-export type AlertDuration = 2000 | 3200 | 5000 | 0; // 0 = fica até fechar manualmente
+/** Milissegundos; 0 = fica até fechar manualmente. Além dos atalhos
+ * (2000/3200/5000), aceita qualquer valor digitado pelo usuário. */
+export type AlertDuration = number;
 
 type AlertSettings = { position: AlertPosition; duration: AlertDuration };
 
@@ -17,9 +19,10 @@ function read(): AlertSettings {
     const parsed = JSON.parse(raw);
     return {
       position: parsed.position === "bottom-center" ? "bottom-center" : "top-center",
-      duration: [0, 2000, 3200, 5000].includes(parsed.duration)
-        ? parsed.duration
-        : DEFAULT.duration,
+      duration:
+        typeof parsed.duration === "number" && parsed.duration >= 0
+          ? parsed.duration
+          : DEFAULT.duration,
     };
   } catch {
     return DEFAULT;

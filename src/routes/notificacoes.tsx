@@ -13,6 +13,7 @@ import {
   BellOff,
 } from "lucide-react";
 import { HeaderBand } from "@/components/HeaderBand";
+import { inputClass } from "@/components/Modal";
 import { useIsAdmin } from "@/store/roles";
 import { useAlertSettings, type AlertDuration, type AlertPosition } from "@/store/alert-settings";
 import {
@@ -65,6 +66,17 @@ const POSITION_OPTIONS: { value: AlertPosition; label: string }[] = [
  * salvar, editar, mover ou excluir um lançamento — ver `useAlertSettings`. */
 function AlertSettingsCard() {
   const { position, duration, setPosition, setDuration } = useAlertSettings();
+  const isPresetDuration = DURATION_OPTIONS.some((o) => o.value === duration);
+  const [customSeconds, setCustomSeconds] = useState(
+    isPresetDuration ? "" : String(duration / 1000),
+  );
+
+  const applyCustomDuration = () => {
+    const n = Number(customSeconds.replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDuration(Math.round(n * 1000));
+  };
+
   return (
     <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-card">
       <div className="flex items-center gap-2 p-4 pb-1">
@@ -82,7 +94,10 @@ function AlertSettingsCard() {
                 key={o.value}
                 type="button"
                 aria-pressed={duration === o.value}
-                onClick={() => setDuration(o.value)}
+                onClick={() => {
+                  setDuration(o.value);
+                  setCustomSeconds("");
+                }}
                 className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors ${
                   duration === o.value
                     ? "bg-primary text-primary-foreground"
@@ -92,6 +107,28 @@ function AlertSettingsCard() {
                 {o.label}
               </button>
             ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min="0.5"
+              step="0.1"
+              inputMode="decimal"
+              value={customSeconds}
+              onChange={(e) => setCustomSeconds(e.target.value)}
+              onBlur={applyCustomDuration}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  applyCustomDuration();
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="outro valor"
+              className={`${inputClass} w-24 py-1.5 text-[12.5px]`}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              segundos{!isPresetDuration && ` — atual: ${(duration / 1000).toFixed(1)}s`}
+            </span>
           </div>
         </div>
         <div>

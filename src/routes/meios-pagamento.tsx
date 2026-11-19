@@ -6,6 +6,7 @@ import { inputClass } from "@/components/Modal";
 import { useConfirm } from "@/store/confirm";
 import { AddCardDialog } from "@/components/AddCardDialog";
 import { EditCardDialog } from "@/components/EditCardDialog";
+import { usePaymentDefaults, type DefaultPaymentType } from "@/store/payment-defaults";
 import {
   useAccounts,
   useCards,
@@ -29,6 +30,38 @@ function normalize(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+const PAYMENT_TYPE_OPTIONS: { value: DefaultPaymentType; label: string; badge: string }[] = [
+  { value: "unico", label: "À Vista", badge: "AV" },
+  { value: "parcelado", label: "Parcelado", badge: "PAR" },
+  { value: "recorrente", label: "Recorrente", badge: "REC" },
+];
+
+/** Botão "padrão" — marca qual meio/tipo vem pré-selecionado em "Novo
+ * lançamento" (ver `usePaymentDefaults`). `onClick` decide se dá pra
+ * desmarcar (meio de pagamento pode ficar sem padrão; tipo, não). */
+function DefaultToggle({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={active ? "Padrão (clique para remover)" : "Definir como padrão"}
+      className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[10.5px] font-bold tracking-wide transition-colors ${
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <span
+        className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border transition-colors ${
+          active ? "border-primary bg-primary text-primary-foreground" : "border-border"
+        }`}
+      >
+        {active && <Check className="h-3 w-3" />}
+      </span>
+      padrão
+    </button>
+  );
+}
+
 function MeiosPagamentoPage() {
   const navigate = useNavigate();
   const goBack = () => navigate({ to: "/" });
@@ -38,6 +71,7 @@ function MeiosPagamentoPage() {
   const { data: accounts = [] } = useAccounts();
   const { data: cards = [] } = useCards();
   const { data: methods = [] } = useCustomPaymentMethods();
+  const paymentDefaults = usePaymentDefaults();
   const addMethod = useAddPaymentMethod();
   const updateMethod = useUpdatePaymentMethod();
   const deleteMethod = useDeletePaymentMethod();
@@ -108,6 +142,7 @@ function MeiosPagamentoPage() {
       </div>
       <div className="mx-auto max-w-5xl px-4 pt-5 pb-24 sm:px-6">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+          <div className="space-y-4">
           {/* ───── Meios de pagamento ───── */}
           <section className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="flex items-start justify-between gap-3 p-4 pb-3">
@@ -170,7 +205,12 @@ function MeiosPagamentoPage() {
                   {PAYMENT_METHOD_BADGES[o.value]}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-semibold">{o.label}</span>
-                <span className="text-xs text-muted-foreground">padrão</span>
+                <DefaultToggle
+                  active={paymentDefaults.methodKey === o.value}
+                  onClick={() =>
+                    paymentDefaults.setMethodKey(paymentDefaults.methodKey === o.value ? null : o.value)
+                  }
+                />
               </div>
             ))}
 
@@ -208,6 +248,12 @@ function MeiosPagamentoPage() {
                       <Wallet className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1 truncate font-semibold">{m.name}</span>
+                    <DefaultToggle
+                      active={paymentDefaults.methodKey === m.id}
+                      onClick={() =>
+                        paymentDefaults.setMethodKey(paymentDefaults.methodKey === m.id ? null : m.id)
+                      }
+                    />
                     <button
                       type="button"
                       onClick={() => startEditMethod(m)}
@@ -229,6 +275,26 @@ function MeiosPagamentoPage() {
               </div>
             ))}
           </section>
+
+          {/* ───── Tipo de pagamento ───── */}
+          <section className="overflow-hidden rounded-2xl border border-border bg-card">
+            <div className="p-4 pb-3">
+              <h2 className="font-display text-[15px] font-semibold">Tipo de pagamento</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Qual vem pré-selecionado ao abrir &ldquo;Novo lançamento&rdquo;.
+              </p>
+            </div>
+            {PAYMENT_TYPE_OPTIONS.map((o) => (
+              <div key={o.value} className="flex items-center gap-3 border-t border-border px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-[10.5px] font-bold tracking-wide text-muted-foreground">
+                  {o.badge}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-semibold">{o.label}</span>
+                <DefaultToggle active={paymentDefaults.type === o.value} onClick={() => paymentDefaults.setType(o.value)} />
+              </div>
+            ))}
+          </section>
+          </div>
 
           {/* ───── Cartões ───── */}
           <section className="space-y-4">

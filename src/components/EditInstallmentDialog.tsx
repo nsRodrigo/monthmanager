@@ -630,13 +630,18 @@ export function EditInstallmentDialog({
         confirmLabel: "Alterar",
       });
       if (!ok) return;
-      await changeInstSeries.mutateAsync({
-        parentId: inst.parentId,
-        parentType: inst.parentType,
-        newCount: nParsed,
-        totalAmount: computedTotal,
-      });
-      onClose();
+      try {
+        await changeInstSeries.mutateAsync({
+          parentId: inst.parentId,
+          parentType: inst.parentType,
+          newCount: nParsed,
+          totalAmount: computedTotal,
+        });
+        onClose();
+        toast.success("Parcelamento alterado.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível alterar o parcelamento.");
+      }
     }
 
     async function doRenumber() {
@@ -653,17 +658,22 @@ export function EditInstallmentDialog({
         confirmLabel: "Criar faltantes",
         cancelLabel: "Não criar",
       });
-      await renumberInstallment.mutateAsync({
-        parentId: inst.parentId,
-        parentType: inst.parentType,
-        installmentId: inst.id,
-        oldNumber: inst.number,
-        newNumber: newNumParsed,
-        total: inst.total,
-        amount: inst.amount,
-        createMissing,
-      });
-      onClose();
+      try {
+        await renumberInstallment.mutateAsync({
+          parentId: inst.parentId,
+          parentType: inst.parentType,
+          installmentId: inst.id,
+          oldNumber: inst.number,
+          newNumber: newNumParsed,
+          total: inst.total,
+          amount: inst.amount,
+          createMissing,
+        });
+        onClose();
+        toast.success("Parcela renumerada.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível renumerar.");
+      }
     }
 
     return (
@@ -786,6 +796,7 @@ export function EditInstallmentDialog({
     const convPer = convN > 0 ? convTotal / convN : 0;
 
     const handleSave = async () => {
+     try {
       // ── Conversion: cash → parcelled or cash → recurring
       if (canConvert && singleType !== "cash") {
         // Remove the original single, then create the new shape using the
@@ -857,6 +868,7 @@ export function EditInstallmentDialog({
         }
         upsertCatalogItem.mutate({ name: description.trim() });
         onClose();
+        toast.success("Lançamento salvo.");
         return;
       }
       // ── Plain edit (no type change)
@@ -891,6 +903,10 @@ export function EditInstallmentDialog({
       }
       upsertCatalogItem.mutate({ name: description.trim() });
       onClose();
+      toast.success("Lançamento salvo.");
+     } catch (err) {
+       toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
+     }
     };
     const pending =
       updateDebit.isPending ||
@@ -1209,6 +1225,7 @@ export function EditInstallmentDialog({
   const purchPer = purchN > 0 ? purchTotal / purchN : 0;
 
   async function commit(scope: InstallmentScope) {
+   try {
     // Date edit: the typed date is ONLY a visual reference — it never
     // touches the installment's own month/dueDate (that's a separate,
     // explicit action — renumber/recreate — never a side effect of editing
@@ -1281,10 +1298,15 @@ export function EditInstallmentDialog({
       }
     }
     onClose();
+    toast.success("Lançamento salvo.");
+   } catch (err) {
+     toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
+   }
   }
 
   const handleSave = async () => {
-    // Conversion: cash purchase → parcelado or recorrente. Remove the
+   try {
+    // Conversion: cash purchase → parcelado ou recorrente. Remove the
     // original single purchase and recreate it in the new shape (same
     // pattern used for debit/income conversion in the "single" branch above).
     if (canConvertPurchase && purchType !== "cash" && purchaseForInst) {
@@ -1313,6 +1335,7 @@ export function EditInstallmentDialog({
       }
       upsertCatalogItem.mutate({ name: description.trim() });
       onClose();
+      toast.success("Lançamento salvo.");
       return;
     }
     // Scope prompt is needed for both amount AND date edits on a genuine
@@ -1322,6 +1345,9 @@ export function EditInstallmentDialog({
       return;
     }
     await commit("current");
+   } catch (err) {
+     toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
+   }
   };
 
   if (askDateScope) {

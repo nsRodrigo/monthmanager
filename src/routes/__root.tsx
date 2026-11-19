@@ -64,6 +64,8 @@ import { NavigationLoader } from "@/components/NavigationLoader";
 import { BiometricLock } from "@/components/BiometricLock";
 import { ConfirmProvider } from "@/store/confirm";
 import { UndoRedoBar } from "@/components/UndoRedoBar";
+import { Toaster } from "@/components/ui/sonner";
+import { useAlertSettings } from "@/store/alert-settings";
 import { history } from "@/store/history";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -584,10 +586,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AlertToaster() {
+  const { position, duration } = useAlertSettings();
+  return <Toaster position={position} duration={duration === 0 ? Infinity : duration} />;
+}
+
 function RootComponent() {
   return (
     <>
       <AppLoader />
+      <AlertToaster />
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>

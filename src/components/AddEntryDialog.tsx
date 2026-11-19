@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Plus, Copy, ArrowDownRight, ArrowUpRight, CreditCard, TrendingUp } from "lucide-react";
 import { Modal, Field, inputClass, Select, PaidToggle, Accordion } from "./Modal";
 import { FloatingModal } from "./FloatingModal";
@@ -6,6 +7,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { CurrencyInputWithCalculator } from "./CurrencyInput";
 import { CatalogDescriptionField } from "./CatalogDescriptionField";
 import { FitLabel } from "./FitLabel";
+import { usePaymentDefaults } from "@/store/payment-defaults";
 import {
   useAddDebit,
   useAddIncome,
@@ -26,6 +28,13 @@ type PaymentMethod = "none" | (typeof PAYMENT_METHOD_OPTIONS)[number]["value"];
 const incomePaymentMethods = PAYMENT_METHOD_OPTIONS.filter((o) => o.value !== "auto_debit");
 
 const INV_TYPES = ["CDB", "Tesouro Direto", "Poupança", "Fundo", "Ações", "Cripto", "Outros"];
+
+const SAVED_LABEL: Record<EntryTab, string> = {
+  deb: "Débito salvo.",
+  inc: "Recebimento salvo.",
+  card: "Compra salva.",
+  inv: "Investimento salvo.",
+};
 
 const TABS: { id: EntryTab; label: string; icon: typeof ArrowDownRight }[] = [
   { id: "deb", label: "Débito", icon: ArrowDownRight },
@@ -84,10 +93,25 @@ export function AddEntryDialog({
   const { data: cards = [] } = useCards();
   const { data: catalogItems = [] } = useCatalogItems();
   const { data: customPaymentMethods = [] } = useCustomPaymentMethods();
+  const paymentDefaults = usePaymentDefaults();
   const selectableCards = useMemo(
     () => cards.filter((c) => c.accountId === accountId),
     [cards, accountId],
   );
+
+  /** Meio de pagamento "padrão" (configurado em Meios de pagamento),
+   * validado pra aba atual — só deb/inc têm esse campo, e "inc" não aceita
+   * débito automático. */
+  const defaultMethodForTab = (t: EntryTab): PaymentMethod => {
+    if (t !== "deb" && t !== "inc") return "none";
+    const key = paymentDefaults.methodKey;
+    if (!key) return "none";
+    if (t === "inc" && key === "auto_debit") return "none";
+    const valid =
+      PAYMENT_METHOD_OPTIONS.some((o) => o.value === key) ||
+      customPaymentMethods.some((m) => m.id === key);
+    return valid ? (key as PaymentMethod) : "none";
+  };
 
   const [description, setDescription] = useState("");
   const [invType, setInvType] = useState(INV_TYPES[0]);
@@ -106,17 +130,17 @@ export function AddEntryDialog({
   const [notifyDaysBefore, setNotifyDaysBefore] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const resetFields = (preserveDescLike = false, preserveCard = false) => {
+  const resetFields = (targetTab: EntryTab, preserveDescLike = false, preserveCard = false) => {
     setDate("");
     if (!preserveCard) setCardId(selectableCards[0]?.id ?? "");
-    setPaymentType("unico");
+    setPaymentType(paymentDefaults.type);
     setMode("total");
     setInstallments("2");
     setInstallmentNumber("1");
-    setSettled(tab !== "inc");
+    setSettled(targetTab !== "inc");
     setNotifyEnabled(false);
     setNotifyDaysBefore("");
-    setPaymentMethod("none");
+    setPaymentMethod(defaultMethodForTab(targetTab));
     setAutoDebitDay("");
     if (!preserveDescLike) {
       setDescription("");
@@ -129,7 +153,7 @@ export function AddEntryDialog({
   useEffect(() => {
     if (open) {
       setTab(initialTab);
-      resetFields();
+      resetFields(initialTab);
       if (
         initialTab === "card" &&
         initialCardId &&
@@ -149,8 +173,7 @@ export function AddEntryDialog({
         : (selectableCards[0]?.id ?? ""),
     );
     setSettled(tab !== "inc");
-    if (tab !== "deb" && paymentMethod === "auto_debit") setPaymentMethod("none");
-    if (tab !== "deb" && tab !== "inc" && paymentMethod !== "none") setPaymentMethod("none");
+    setPaymentMethod(defaultMethodForTab(tab));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -286,8 +309,11 @@ export function AddEntryDialog({
         });
         upsertCatalogItem.mutate({ name: description.trim() });
       }
-      if (after === "another") resetFields(false, tab === "card");
+      toast.success(SAVED_LABEL[tab]);
+      if (after === "another") resetFields(tab, false, tab === "card");
       else if (after === "close") onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar.");
     } finally {
       setBusy(false);
     }

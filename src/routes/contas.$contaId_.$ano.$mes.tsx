@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import {
   useAccounts,
   useCards,
@@ -571,6 +572,8 @@ export function MonthDetailPane({
     else if (key === "debits") ids.forEach((id) => removeDebit.mutate(id));
     else if (key === "investments") ids.forEach((id) => removeInvestment.mutate(id));
     else if (key.startsWith("card:")) ids.forEach((id) => removePurchase.mutate(id));
+    const participle = key.startsWith("card:") ? "excluída" : "excluído";
+    toast.success(`${ids.length} ${label} ${participle}${ids.length === 1 ? "" : "s"}.`);
     clearSelection();
   };
 
@@ -1075,7 +1078,10 @@ export function MonthDetailPane({
       variant: "destructive",
       confirmLabel: "Excluir",
     });
-    if (ok) removePurchase.mutate(pur.id);
+    if (ok) {
+      removePurchase.mutate(pur.id);
+      toast.success("Compra excluída.");
+    }
   };
 
   const accountCards = useMemo(
@@ -1311,17 +1317,11 @@ export function MonthDetailPane({
     monthInvestments.single.reduce((s, i) => s + i.amount, 0) +
     monthInvestments.parcelled.reduce((s, p) => s + p.installment.amount, 0);
 
-  // Totais pagos/recebidos: só contabiliza itens marcados (paid/received = true).
-  // Itens não marcados valem 0 -- não entram negativos.
+  // Total líquido recebido: só contabiliza recebimentos já marcados como
+  // recebidos -- usado no saldo "Conta corrente" (dinheiro que já entrou).
   const totalIncomeNet =
     monthIncomes.single.reduce((s, i) => s + (i.received ? i.amount : 0), 0) +
     monthIncomes.parcelled.reduce((s, p) => s + (p.installment.paid ? p.installment.amount : 0), 0);
-  const totalDebitsNet =
-    monthDebits.single.reduce((s, d) => s + (d.paid ? d.amount : 0), 0) +
-    monthDebits.parcelled.reduce((s, p) => s + (p.installment.paid ? p.installment.amount : 0), 0);
-  const totalCardsNet = monthInst
-    .filter((i) => i.parentType === "purchase")
-    .reduce((s, i) => s + (i.paid ? i.amount : 0), 0);
 
   // Composição das saídas do mês — mesmo componente e cores da Home.
   const donutSlices: DonutSlice[] = [
@@ -1651,7 +1651,7 @@ export function MonthDetailPane({
           title="Recebimentos"
           description="Entradas de dinheiro na conta"
           tone="income"
-          total={totalIncomeNet}
+          total={totalIncome}
           count={monthIncomes.single.length + monthIncomes.parcelled.length}
           paidState={incomesAllReceived ? "paid" : null}
           empty={incomesVisible.length === 0}
@@ -1801,7 +1801,10 @@ export function MonthDetailPane({
                           variant: "destructive",
                           confirmLabel: "Excluir",
                         });
-                        if (ok) removeIncome.mutate(i.id);
+                        if (ok) {
+                          removeIncome.mutate(i.id);
+                          toast.success("Recebimento excluído.");
+                        }
                       }
                 }
                 {...selProps("incomes", i.id)}
@@ -1929,7 +1932,10 @@ export function MonthDetailPane({
                           variant: "destructive",
                           confirmLabel: "Excluir",
                         });
-                        if (ok) removeInvestment.mutate(inv.id);
+                        if (ok) {
+                          removeInvestment.mutate(inv.id);
+                          toast.success("Investimento excluído.");
+                        }
                       }
                 }
                 {...selProps("investments", inv.id)}
@@ -1947,7 +1953,7 @@ export function MonthDetailPane({
           title="Débitos"
           description="Gastos diretos da conta corrente"
           tone="debit"
-          total={totalDebitsNet}
+          total={totalDebits}
           count={monthDebits.single.length + monthDebits.parcelled.length}
           paidState={
             monthDebits.single.length + monthDebits.parcelled.length > 0
@@ -2102,7 +2108,10 @@ export function MonthDetailPane({
                             variant: "destructive",
                             confirmLabel: "Excluir",
                           });
-                          if (ok) removeDebit.mutate(d.id);
+                          if (ok) {
+                            removeDebit.mutate(d.id);
+                            toast.success("Débito excluído.");
+                          }
                         }
                 }
                 {...selProps("debits", d.id)}
@@ -2211,7 +2220,7 @@ export function MonthDetailPane({
                   </div>
                 ) : (
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCardsNet)}</p>
+                    <p className="text-sm font-bold text-debit">{formatCurrency(totalCards)}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {accountCards.length} {accountCards.length === 1 ? "cartão" : "cartões"}
                     </p>
@@ -2451,7 +2460,12 @@ export function MonthDetailPane({
         availableMonths={scopeDelete?.availableMonths}
         onConfirm={async (scope) => {
           if (!scopeDelete) return;
-          await scopeDelete.execute(scope);
+          try {
+            await scopeDelete.execute(scope);
+            toast.success("Excluído.");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Não foi possível excluir.");
+          }
           setScopeDelete(null);
         }}
       />

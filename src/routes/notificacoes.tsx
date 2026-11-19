@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { HeaderBand } from "@/components/HeaderBand";
 import { useIsAdmin } from "@/store/roles";
+import { useAlertSettings, type AlertDuration, type AlertPosition } from "@/store/alert-settings";
 import {
   useNotifications,
   useMarkNotificationRead,
@@ -48,6 +49,75 @@ const KIND_ICON: Record<string, typeof Bell> = {
 };
 
 type NotifFilter = "all" | "unread" | "due" | "acc";
+
+const DURATION_OPTIONS: { value: AlertDuration; label: string }[] = [
+  { value: 2000, label: "2s" },
+  { value: 3200, label: "3,2s" },
+  { value: 5000, label: "5s" },
+  { value: 0, label: "Até eu fechar" },
+];
+const POSITION_OPTIONS: { value: AlertPosition; label: string }[] = [
+  { value: "top-center", label: "Topo" },
+  { value: "bottom-center", label: "Rodapé" },
+];
+
+/** Configuração de duração/posição dos alertas (toasts) que aparecem ao
+ * salvar, editar, mover ou excluir um lançamento — ver `useAlertSettings`. */
+function AlertSettingsCard() {
+  const { position, duration, setPosition, setDuration } = useAlertSettings();
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="flex items-center gap-2 p-4 pb-1">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          <Bell className="h-3.5 w-3.5" />
+        </span>
+        <h2 className="font-display text-[14px] font-semibold">Alertas</h2>
+      </div>
+      <div className="space-y-3 p-4 pt-2">
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Duração na tela</p>
+          <div className="inline-flex max-w-full flex-wrap gap-0.5 rounded-xl border border-border bg-background p-[3px]">
+            {DURATION_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                aria-pressed={duration === o.value}
+                onClick={() => setDuration(o.value)}
+                className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors ${
+                  duration === o.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Posição na tela</p>
+          <div className="inline-flex max-w-full gap-0.5 rounded-xl border border-border bg-background p-[3px]">
+            {POSITION_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                aria-pressed={position === o.value}
+                onClick={() => setPosition(o.value)}
+                className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors ${
+                  position === o.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NotificationsPage() {
   const navigate = useNavigate();
@@ -125,6 +195,7 @@ function NotificationsPage() {
       </div>
 
       <div className="mx-auto max-w-3xl px-4 pt-5 pb-24 sm:px-6">
+        <AlertSettingsCard />
         <div className="mb-4 flex flex-wrap items-center gap-2.5">
           <div
             role="group"

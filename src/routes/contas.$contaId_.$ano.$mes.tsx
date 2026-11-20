@@ -182,52 +182,18 @@ function mergeManualOrder<T>(full: T[], visibleNewOrder: T[], getId: (item: T) =
 }
 
 /**
- * Pointer-drag genérico pelo ícone de "grip" — mesma técnica validada no
- * protótipo (reordena o DOM com insertBefore enquanto arrasta, sem
- * re-renderizar a cada pixel; ao soltar, lê a ordem final do container e
- * chama `onCommit` com os ids visíveis, na nova ordem).
+ * A partir de uma lista de ids na ordem atual, move o id `id` uma posição
+ * na direção `dir` (-1 = sobe, 1 = desce) e chama `onCommit` com a nova
+ * ordem completa. Usado pelos botões de seta (substitui o antigo
+ * pointer-drag, que ficava "pulando" linha ao arrastar).
  */
-function startRowDrag(onCommit: (orderedIds: string[]) => void) {
-  return (e: React.PointerEvent<HTMLButtonElement>) => {
-    const grip = e.currentTarget;
-    const row = grip.closest<HTMLElement>("[data-drag-row]");
-    const container = row?.parentElement;
-    if (!row || !container) return;
-    e.preventDefault();
-    // Impede que o pointerdown "borbulhe" até o long-press da própria linha
-    // (useRowGuard) — sem isso, segurar o grip parado por 450ms reabria o
-    // long-press e podia resetar a seleção pro item sozinho.
-    e.stopPropagation();
-    grip.setPointerCapture(e.pointerId);
-    let startY = e.clientY;
-    const rowH = row.getBoundingClientRect().height;
-    row.classList.add("relative", "z-10", "bg-card", "shadow-lg");
-    const onMove = (ev: PointerEvent) => {
-      const dy = ev.clientY - startY;
-      const siblings = Array.from(container.children) as HTMLElement[];
-      const curIdx = siblings.indexOf(row);
-      if (dy > rowH / 2 && curIdx < siblings.length - 1) {
-        container.insertBefore(siblings[curIdx + 1], row);
-        startY = ev.clientY;
-      } else if (dy < -rowH / 2 && curIdx > 0) {
-        container.insertBefore(row, siblings[curIdx - 1]);
-        startY = ev.clientY;
-      }
-    };
-    const onUp = () => {
-      grip.removeEventListener("pointermove", onMove);
-      grip.removeEventListener("pointerup", onUp);
-      grip.removeEventListener("pointercancel", onUp);
-      row.classList.remove("relative", "z-10", "bg-card", "shadow-lg");
-      const orderedIds = Array.from(container.children)
-        .map((el) => (el as HTMLElement).dataset.dragRow)
-        .filter((id): id is string => !!id);
-      onCommit(orderedIds);
-    };
-    grip.addEventListener("pointermove", onMove);
-    grip.addEventListener("pointerup", onUp);
-    grip.addEventListener("pointercancel", onUp);
-  };
+function moveInList(ids: string[], id: string, dir: -1 | 1, onCommit: (orderedIds: string[]) => void) {
+  const idx = ids.indexOf(id);
+  const swapIdx = idx + dir;
+  if (idx < 0 || swapIdx < 0 || swapIdx >= ids.length) return;
+  const next = ids.slice();
+  [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+  onCommit(next);
 }
 
 export function MonthDetailPane({
@@ -1220,16 +1186,17 @@ export function MonthDetailPane({
       e.kind === "single" ? "vista" : "parc",
     ),
   );
-  /** Commit do arrasto (ver `startRowDrag`): mescla a nova ordem dos itens
-   * visíveis de volta na lista completa (preserva os escondidos pelo filtro
-   * no lugar) e grava posição sequencial pra todos. */
+  /** Commit do botão de mover (ver `moveInList`): mescla a nova ordem dos
+   * itens visíveis de volta na lista completa (preserva os escondidos pelo
+   * filtro no lugar) e grava posição sequencial pra todos. */
   const commitDebitsOrder = (visibleIds: string[]) => {
     const byId = new Map(debitsVisible.map((e) => [debitEntryId(e), e] as const));
     const newVisibleOrder = visibleIds.map((id) => byId.get(id)).filter((e): e is DebitEntry => !!e);
     const mergedIds = mergeManualOrder(debitsOrdered, newVisibleOrder, debitEntryId);
     reorderEntries.mutate({ parentType: "debit", orderedIds: mergedIds });
   };
-  const startDebitDrag = startRowDrag(commitDebitsOrder);
+  const moveDebitEntry = (id: string, dir: -1 | 1) =>
+    moveInList(debitsVisible.map(debitEntryId), id, dir, commitDebitsOrder);
 
   const incomesFixedMerged: IncomeEntry[] = [
     ...incomesFixedSingle.map<IncomeEntry>((i) => ({ kind: "single", income: i })),
@@ -1269,7 +1236,8 @@ export function MonthDetailPane({
     const mergedIds = mergeManualOrder(incomesOrdered, newVisibleOrder, incomeEntryId);
     reorderEntries.mutate({ parentType: "income", orderedIds: mergedIds });
   };
-  const startIncomeDrag = startRowDrag(commitIncomesOrder);
+  const moveIncomeEntry = (id: string, dir: -1 | 1) =>
+    moveInList(incomesVisible.map(incomeEntryId), id, dir, commitIncomesOrder);
 
   const investmentsFixedMerged: InvestmentEntry[] = [
     ...investmentsFixedSingle.map<InvestmentEntry>((i) => ({ kind: "single", investment: i })),
@@ -1303,7 +1271,8 @@ export function MonthDetailPane({
     const mergedIds = mergeManualOrder(investmentsOrdered, newVisibleOrder, investmentEntryId);
     reorderEntries.mutate({ parentType: "investment", orderedIds: mergedIds });
   };
-  const startInvestmentDrag = startRowDrag(commitInvestmentsOrder);
+  const moveInvestmentEntry = (id: string, dir: -1 | 1) =>
+    moveInList(investmentsOrdered.map(investmentEntryId), id, dir, commitInvestmentsOrder);
 
   const totalDebits =
     monthDebits.single.reduce((s, d) => s + d.amount, 0) +
@@ -1709,7 +1678,7 @@ export function MonthDetailPane({
             ) : null
           }
         >
-          {incomesVisible.map((e) => {
+          {incomesVisible.map((e, idx) => {
             if (e.kind === "parcelled") {
               const p = e.entry;
               return (
@@ -1740,8 +1709,12 @@ export function MonthDetailPane({
                     askDeleteInst(p.installment, p.income!.description, "income", p.income!.id)
                   }
                   {...selProps("incomes", p.income!.id)}
-                  dragId={p.income!.id}
-                  onDragStart={incomesReorderEnabled ? startIncomeDrag : undefined}
+                  onMoveUp={incomesReorderEnabled && idx > 0 ? () => moveIncomeEntry(p.income!.id, -1) : undefined}
+                  onMoveDown={
+                    incomesReorderEnabled && idx < incomesVisible.length - 1
+                      ? () => moveIncomeEntry(p.income!.id, 1)
+                      : undefined
+                  }
                 />
               );
             }
@@ -1809,8 +1782,12 @@ export function MonthDetailPane({
                       }
                 }
                 {...selProps("incomes", i.id)}
-                dragId={i.id}
-                onDragStart={incomesReorderEnabled ? startIncomeDrag : undefined}
+                onMoveUp={incomesReorderEnabled && idx > 0 ? () => moveIncomeEntry(i.id, -1) : undefined}
+                onMoveDown={
+                  incomesReorderEnabled && idx < incomesVisible.length - 1
+                    ? () => moveIncomeEntry(i.id, 1)
+                    : undefined
+                }
               />
             );
           })}
@@ -1846,7 +1823,7 @@ export function MonthDetailPane({
             </>
           }
         >
-          {investmentsOrdered.map((e) => {
+          {investmentsOrdered.map((e, idx) => {
             if (e.kind === "parcelled") {
               const p = e.entry;
               return (
@@ -1877,8 +1854,14 @@ export function MonthDetailPane({
                     askDeleteInst(p.installment, p.investment!.type, "investment", p.investment!.id)
                   }
                   {...selProps("investments", p.investment!.id)}
-                  dragId={p.investment!.id}
-                  onDragStart={investmentsReorderEnabled ? startInvestmentDrag : undefined}
+                  onMoveUp={
+                    investmentsReorderEnabled && idx > 0 ? () => moveInvestmentEntry(p.investment!.id, -1) : undefined
+                  }
+                  onMoveDown={
+                    investmentsReorderEnabled && idx < investmentsOrdered.length - 1
+                      ? () => moveInvestmentEntry(p.investment!.id, 1)
+                      : undefined
+                  }
                 />
               );
             }
@@ -1940,8 +1923,12 @@ export function MonthDetailPane({
                       }
                 }
                 {...selProps("investments", inv.id)}
-                dragId={inv.id}
-                onDragStart={investmentsReorderEnabled ? startInvestmentDrag : undefined}
+                onMoveUp={investmentsReorderEnabled && idx > 0 ? () => moveInvestmentEntry(inv.id, -1) : undefined}
+                onMoveDown={
+                  investmentsReorderEnabled && idx < investmentsOrdered.length - 1
+                    ? () => moveInvestmentEntry(inv.id, 1)
+                    : undefined
+                }
               />
             );
           })}
@@ -2011,7 +1998,7 @@ export function MonthDetailPane({
             ) : null
           }
         >
-          {debitsVisible.map((e) => {
+          {debitsVisible.map((e, idx) => {
             if (e.kind === "parcelled") {
               const p = e.entry;
               return (
@@ -2044,8 +2031,12 @@ export function MonthDetailPane({
                     askDeleteInst(p.installment, p.debit!.description, "debit", p.debit!.id)
                   }
                   {...selProps("debits", p.debit!.id)}
-                  dragId={p.debit!.id}
-                  onDragStart={debitsReorderEnabled ? startDebitDrag : undefined}
+                  onMoveUp={debitsReorderEnabled && idx > 0 ? () => moveDebitEntry(p.debit!.id, -1) : undefined}
+                  onMoveDown={
+                    debitsReorderEnabled && idx < debitsVisible.length - 1
+                      ? () => moveDebitEntry(p.debit!.id, 1)
+                      : undefined
+                  }
                 />
               );
             }
@@ -2116,8 +2107,12 @@ export function MonthDetailPane({
                         }
                 }
                 {...selProps("debits", d.id)}
-                dragId={d.id}
-                onDragStart={debitsReorderEnabled ? startDebitDrag : undefined}
+                onMoveUp={debitsReorderEnabled && idx > 0 ? () => moveDebitEntry(d.id, -1) : undefined}
+                onMoveDown={
+                  debitsReorderEnabled && idx < debitsVisible.length - 1
+                    ? () => moveDebitEntry(d.id, 1)
+                    : undefined
+                }
               />
             );
           })}
@@ -2912,7 +2907,8 @@ function CardRowSorted({
     const mergedIds = mergeManualOrder(cardFullDefaultOrder, newVisibleOrder, (i) => i.parentId);
     reorderEntries.mutate({ parentType: "purchase", orderedIds: mergedIds });
   };
-  const startCardDrag = startRowDrag(commitCardOrder);
+  const moveCardEntry = (parentId: string, dir: -1 | 1) =>
+    moveInList(cardDefaultOrderVisible.map((i) => i.parentId), parentId, dir, commitCardOrder);
   return (
     <CardRow
       cardName={card.name}
@@ -2935,8 +2931,8 @@ function CardRowSorted({
       itemSelProps={itemSelProps}
       selectionBar={selectionBar}
       sortedItems={sortedItems}
-      dragEnabled={cardReorderEnabled}
-      onDragStart={startCardDrag}
+      reorderEnabled={cardReorderEnabled}
+      onMoveItem={moveCardEntry}
       sortControl={
         <>
           <SortMenu scope={`card:${card.id}`} state={sort} onChange={set} />
@@ -2987,8 +2983,8 @@ function CardRow({
   selectionBar,
   sortControl,
   sortedItems,
-  dragEnabled,
-  onDragStart,
+  reorderEnabled,
+  onMoveItem,
 }: {
   cardName: string;
   cardColor: string;
@@ -3018,9 +3014,9 @@ function CardRow({
   sortControl?: React.ReactNode;
   /** When provided, overrides the default sort (parcelled→cash) with this order. */
   sortedItems?: Installment[] | null;
-  /** Arrastar pra reordenar só faz sentido com "Ordenar" em "Padrão". */
-  dragEnabled?: boolean;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  /** Setas de mover só fazem sentido com "Ordenar" em "Padrão". */
+  reorderEnabled?: boolean;
+  onMoveItem?: (parentId: string, dir: -1 | 1) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { selectionMode, selected, onSelectToggle, onLongPress } = cardSelProps;
@@ -3133,33 +3129,34 @@ function CardRow({
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {(sortedItems ?? items)
-                  .slice()
-                  .map((inst) => {
-                    const pur = purchases.find((p) => p.id === inst.parentId);
-                    return { inst, pur };
-                  })
-                  .filter(
-                    (x): x is { inst: (typeof items)[number]; pur: NonNullable<typeof x.pur> } =>
-                      !!x.pur,
-                  )
-                  .sort((a, b) => {
-                    if (sortedItems) return 0; // respect provided order
-                    // Prioriza parcelados + recorrentes (tier 0) sobre à-vista (tier 1),
-                    // igual à regra já aplicada em débitos/recebimentos.
-                    const aParc = a.pur.installmentsCount > 1 || !!a.pur.recurrenceGroupId ? 0 : 1;
-                    const bParc = b.pur.installmentsCount > 1 || !!b.pur.recurrenceGroupId ? 0 : 1;
-                    return (
-                      aParc - bParc ||
-                      // Ordena pela data da COMPRA original (pur.date), não pela
-                      // fatura (dueDate) — mesma regra aplicada a débitos/recebimentos.
-                      a.pur.date.localeCompare(b.pur.date) ||
-                      (a.inst.purchaseId ?? "").localeCompare(b.inst.purchaseId ?? "") ||
-                      a.inst.number - b.inst.number ||
-                      a.inst.id.localeCompare(b.inst.id)
-                    );
-                  })
-                  .map(({ inst, pur }) => (
+                {(() => {
+                  const rows = (sortedItems ?? items)
+                    .slice()
+                    .map((inst) => {
+                      const pur = purchases.find((p) => p.id === inst.parentId);
+                      return { inst, pur };
+                    })
+                    .filter(
+                      (x): x is { inst: (typeof items)[number]; pur: NonNullable<typeof x.pur> } =>
+                        !!x.pur,
+                    )
+                    .sort((a, b) => {
+                      if (sortedItems) return 0; // respect provided order
+                      // Prioriza parcelados + recorrentes (tier 0) sobre à-vista (tier 1),
+                      // igual à regra já aplicada em débitos/recebimentos.
+                      const aParc = a.pur.installmentsCount > 1 || !!a.pur.recurrenceGroupId ? 0 : 1;
+                      const bParc = b.pur.installmentsCount > 1 || !!b.pur.recurrenceGroupId ? 0 : 1;
+                      return (
+                        aParc - bParc ||
+                        // Ordena pela data da COMPRA original (pur.date), não pela
+                        // fatura (dueDate) — mesma regra aplicada a débitos/recebimentos.
+                        a.pur.date.localeCompare(b.pur.date) ||
+                        (a.inst.purchaseId ?? "").localeCompare(b.inst.purchaseId ?? "") ||
+                        a.inst.number - b.inst.number ||
+                        a.inst.id.localeCompare(b.inst.id)
+                      );
+                    });
+                  return rows.map(({ inst, pur }, idx) => (
                     <PurchaseInstRow
                       key={inst.id}
                       inst={inst}
@@ -3169,10 +3166,13 @@ function CardRow({
                       onEdit={() => onEditInst(inst)}
                       onRemove={onRemoveInst ? () => onRemoveInst(inst) : undefined}
                       {...itemSelProps(inst, inst.parentId)}
-                      dragId={inst.parentId}
-                      onDragStart={dragEnabled ? onDragStart : undefined}
+                      onMoveUp={reorderEnabled && idx > 0 ? () => onMoveItem?.(inst.parentId, -1) : undefined}
+                      onMoveDown={
+                        reorderEnabled && idx < rows.length - 1 ? () => onMoveItem?.(inst.parentId, 1) : undefined
+                      }
                     />
-                  ))}
+                  ));
+                })()}
               </div>
             )}
           </div>
@@ -3237,13 +3237,13 @@ function RowShell({
   status,
   onEdit,
   selectionMode,
-  dragId,
-  onDragStart,
+  onMoveUp,
+  onMoveDown,
 }: {
   lp: ReturnType<typeof useLongPress>;
   guard: (fn: () => void) => (e: React.MouseEvent) => void;
   selected?: boolean;
-  /** Mostra o grip de arrastar só durante a seleção múltipla (long-press). */
+  /** Mostra as setas de mover só durante a seleção múltipla (long-press). */
   selectionMode?: boolean;
   /** Estado da caixa. `undefined` + `leadingIcon` = linha sem caixa (ex.: investimento). */
   checked?: boolean;
@@ -3259,38 +3259,54 @@ function RowShell({
   /** Texto do status à direita (some no celular). */
   status?: string;
   onEdit: () => void;
-  /** Id do item-pai (não da parcela) — a linha carrega esse id no
-   * `data-drag-row` pra `startRowDrag` reconhecer a ordem no DOM. O
-   * chamador só passa `onDragStart` quando "Ordenar" está em "Padrão" —
-   * combinado com `selectionMode`, é isso que decide se o grip aparece. */
-  dragId?: string;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  /** O chamador só passa essas funções quando "Ordenar" está em "Padrão" —
+   * combinado com `selectionMode`, é isso que decide se as setas aparecem.
+   * `undefined` em uma delas (sem desabilitar a outra) desabilita só aquele
+   * botão, para os itens nas pontas da lista. */
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
-  const showGrip = !!selectionMode && !!dragId && !!onDragStart;
+  const showMove = !!selectionMode && (!!onMoveUp || !!onMoveDown);
   return (
     <div
-      data-drag-row={dragId}
       className={`grid items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/30 md:px-4 ${
-        showGrip
+        showMove
           ? leadingIcon
-            ? "grid-cols-[18px_26px_minmax(0,1fr)_auto]"
-            : "grid-cols-[18px_minmax(0,1fr)_auto]"
+            ? "grid-cols-[40px_26px_minmax(0,1fr)_auto]"
+            : "grid-cols-[40px_minmax(0,1fr)_auto]"
           : leadingIcon
             ? "grid-cols-[26px_minmax(0,1fr)_auto]"
             : "grid-cols-[minmax(0,1fr)_auto]"
       } ${selected ? "bg-primary/10" : ""}`}
       {...lp.handlers}
     >
-      {showGrip && (
-        <button
-          type="button"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={onDragStart}
-          aria-label="Mover na lista"
-          className="flex h-6 w-[18px] shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground active:cursor-grabbing"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+      {showMove && (
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveUp?.();
+            }}
+            disabled={!onMoveUp}
+            aria-label="Mover para cima"
+            className="flex h-6 w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-secondary disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            <ArrowUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveDown?.();
+            }}
+            disabled={!onMoveDown}
+            aria-label="Mover para baixo"
+            className="flex h-6 w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-secondary disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
       {leadingIcon}
       <button type="button" onClick={guard(onEdit)} className="min-w-0 text-left">
@@ -3347,8 +3363,8 @@ function PurchaseInstRow({
   selected,
   onSelectToggle,
   onLongPress,
-  dragId,
-  onDragStart,
+  onMoveUp,
+  onMoveDown,
 }: {
   inst: Installment;
   purchase: {
@@ -3363,8 +3379,8 @@ function PurchaseInstRow({
   onEdit: () => void;
   onRemove?: () => void;
   onDuplicate?: () => void;
-  dragId?: string;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const isInstallment = inst.total > 1;
@@ -3375,8 +3391,8 @@ function PurchaseInstRow({
       guard={guard}
       selected={selected}
       selectionMode={selectionMode}
-      dragId={dragId}
-      onDragStart={onDragStart}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
       checked={inst.paid}
       onCheck={onToggle}
       checkLabel={inst.paid ? "Desmarcar validação" : "Marcar como revisado"}
@@ -3410,16 +3426,16 @@ function DebitRow({
   selected,
   onSelectToggle,
   onLongPress,
-  dragId,
-  onDragStart,
+  onMoveUp,
+  onMoveDown,
 }: {
   debit: Debit;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
   onDuplicate?: () => void;
-  dragId?: string;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
@@ -3428,8 +3444,8 @@ function DebitRow({
       guard={guard}
       selected={selected}
       selectionMode={selectionMode}
-      dragId={dragId}
-      onDragStart={onDragStart}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
       checked={debit.paid}
       onCheck={onToggle}
       checkLabel={debit.paid ? "Desmarcar pagamento" : "Marcar como pago"}
@@ -3467,16 +3483,16 @@ function IncomeRow({
   selected,
   onSelectToggle,
   onLongPress,
-  dragId,
-  onDragStart,
+  onMoveUp,
+  onMoveDown,
 }: {
   income: Income;
   onToggle: () => void;
   onEdit: () => void;
   onRemove: () => void;
   onDuplicate?: () => void;
-  dragId?: string;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
@@ -3485,8 +3501,8 @@ function IncomeRow({
       guard={guard}
       selected={selected}
       selectionMode={selectionMode}
-      dragId={dragId}
-      onDragStart={onDragStart}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
       checked={income.received}
       onCheck={onToggle}
       checkLabel={income.received ? "Desmarcar recebimento" : "Marcar como recebido"}
@@ -3519,8 +3535,8 @@ function ParcelledRow({
   selected,
   onSelectToggle,
   onLongPress,
-  dragId,
-  onDragStart,
+  onMoveUp,
+  onMoveDown,
 }: {
   kind: "debit" | "income" | "investment";
   installment: Installment;
@@ -3528,8 +3544,8 @@ function ParcelledRow({
   onToggle: () => void;
   onEdit: () => void;
   onRemove?: () => void;
-  dragId?: string;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
@@ -3566,8 +3582,8 @@ function ParcelledRow({
         guard={guard}
         selected={selected}
         selectionMode={selectionMode}
-        dragId={dragId}
-        onDragStart={onDragStart}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
         leadingIcon={
           <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
             <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3587,8 +3603,8 @@ function ParcelledRow({
       guard={guard}
       selected={selected}
       selectionMode={selectionMode}
-      dragId={dragId}
-      onDragStart={onDragStart}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
       checked={installment.paid}
       onCheck={onToggle}
       checkLabel={
@@ -3618,15 +3634,15 @@ function InvestmentRow({
   selected,
   onSelectToggle,
   onLongPress,
-  dragId,
-  onDragStart,
+  onMoveUp,
+  onMoveDown,
 }: {
   inv: Investment;
   onEdit: () => void;
   onRemove: () => void;
   onDuplicate?: () => void;
-  dragId?: string;
-  onDragStart?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
   return (
@@ -3635,8 +3651,8 @@ function InvestmentRow({
       guard={guard}
       selected={selected}
       selectionMode={selectionMode}
-      dragId={dragId}
-      onDragStart={onDragStart}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
       leadingIcon={
         <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-invest/15 text-invest">
           <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />

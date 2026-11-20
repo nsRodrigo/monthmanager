@@ -386,7 +386,7 @@ export function AddEntryDialog({
             disabled={busy || !isValid}
             className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {busy ? "Salvando…" : "Adicionar"}
+            {busy ? "Salvando…" : "Salvar"}
           </button>
           <button
             type="button"

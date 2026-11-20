@@ -45,6 +45,7 @@ import {
   isSeriesShiftEmpty,
   PAYMENT_METHOD_BADGES,
   useCustomPaymentMethods,
+  normalizeCatalogName,
   type CardScope,
   type Installment,
   type Debit,
@@ -53,6 +54,7 @@ import {
   type DuplicateSource,
   type MoveMonthOp,
   type ParentType,
+  type CustomPaymentMethod,
 } from "@/store/finance";
 import { MoveSeriesConfirmDialog } from "@/components/MoveSeriesConfirmDialog";
 import { EntryDestinationDialog, type EntryDestinationResult } from "@/components/EntryDestinationDialog";
@@ -3343,6 +3345,18 @@ function customMethodBadge(name?: string): string | null {
   return letters.slice(0, 3) || null;
 }
 
+/** Débito/recebimento pago com o meio personalizado "Reembolso" mostra o
+ * valor em azul (cor de investimento) em vez do laranja/verde padrão — é
+ * dinheiro que voltou, não um gasto/entrada comum. */
+function isReembolsoMethod(
+  method: string | null | undefined,
+  customMethods: CustomPaymentMethod[],
+): boolean {
+  if (!method) return false;
+  const found = customMethods.find((m) => m.id === method);
+  return !!found && normalizeCatalogName(found.name) === "reembolso";
+}
+
 /** Etiqueta de meio de pagamento (PIX, BOL… ou as 3 iniciais de um
  * personalizado) usada nas linhas. */
 function MethodChip({ method }: { method: Exclude<Debit["paymentMethod"], null | "auto_debit"> }) {
@@ -3438,6 +3452,8 @@ function DebitRow({
   onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
+  const { data: customMethods = [] } = useCustomPaymentMethods();
+  const isReembolso = isReembolsoMethod(debit.paymentMethod, customMethods);
   return (
     <RowShell
       lp={lp}
@@ -3453,7 +3469,7 @@ function DebitRow({
       done={debit.paid}
       onEdit={onEdit}
       amount={`− ${formatCurrency(Math.abs(debit.amount))}`}
-      amountClass="text-debit"
+      amountClass={isReembolso ? "text-invest" : "text-debit"}
       status={debit.paid ? "Pago" : "Pendente"}
       meta={
         <>
@@ -3495,6 +3511,8 @@ function IncomeRow({
   onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
+  const { data: customMethods = [] } = useCustomPaymentMethods();
+  const isReembolso = isReembolsoMethod(income.paymentMethod, customMethods);
   return (
     <RowShell
       lp={lp}
@@ -3510,7 +3528,7 @@ function IncomeRow({
       done={income.received}
       onEdit={onEdit}
       amount={`+ ${formatCurrency(Math.abs(income.amount))}`}
-      amountClass="text-income"
+      amountClass={isReembolso ? "text-invest" : "text-income"}
       status={income.received ? "Recebido" : "Pendente"}
       meta={
         <>
@@ -3548,8 +3566,10 @@ function ParcelledRow({
   onMoveDown?: () => void;
 } & SelectionRowProps) {
   const { lp, guard } = useRowGuard(onLongPress, selectionMode, onSelectToggle);
+  const { data: customMethods = [] } = useCustomPaymentMethods();
   const auto = kind === "debit" && (parent as Debit).paymentMethod === "auto_debit";
   const otherMethod = kind !== "investment" && !auto ? (parent as Debit | Income).paymentMethod : null;
+  const isReembolso = kind !== "investment" && isReembolsoMethod((parent as Debit | Income).paymentMethod, customMethods);
   const label = kind === "investment" ? (parent as Investment).type : (parent as Debit | Income).description;
   const badge =
     kind === "debit"
@@ -3557,7 +3577,13 @@ function ParcelledRow({
       : kind === "income"
         ? "bg-success/15 text-success"
         : "bg-invest/15 text-invest";
-  const amountClass = kind === "debit" ? "text-debit" : kind === "income" ? "text-income" : "text-invest";
+  const amountClass = isReembolso
+    ? "text-invest"
+    : kind === "debit"
+      ? "text-debit"
+      : kind === "income"
+        ? "text-income"
+        : "text-invest";
   const sign = kind === "income" ? "+ " : "− ";
   const meta = (
     <>

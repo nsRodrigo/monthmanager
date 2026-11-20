@@ -44,6 +44,7 @@ import {
   resolveSeriesFromOps,
   isSeriesShiftEmpty,
   PAYMENT_METHOD_BADGES,
+  useCustomPaymentMethods,
   type CardScope,
   type Installment,
   type Debit,
@@ -3319,9 +3320,22 @@ function RowShell({
   );
 }
 
-/** Etiqueta de meio de pagamento (PIX, BOL…) usada nas linhas. */
+/** 3 primeiras letras do nome — mesmo estilo dos fixos (PIX, BOL…). */
+function customMethodBadge(name?: string): string | null {
+  if (!name) return null;
+  const letters = name.replace(/[^\p{L}]/gu, "").toUpperCase();
+  return letters.slice(0, 3) || null;
+}
+
+/** Etiqueta de meio de pagamento (PIX, BOL… ou as 3 iniciais de um
+ * personalizado) usada nas linhas. */
 function MethodChip({ method }: { method: Exclude<Debit["paymentMethod"], null | "auto_debit"> }) {
-  return <span className={`${rowChip} bg-invest/15 text-invest`}>{PAYMENT_METHOD_BADGES[method]}</span>;
+  const { data: customMethods = [] } = useCustomPaymentMethods();
+  const label =
+    PAYMENT_METHOD_BADGES[method] ??
+    customMethodBadge(customMethods.find((m) => m.id === method)?.name);
+  if (!label) return null;
+  return <span className={`${rowChip} bg-invest/15 text-invest`}>{label}</span>;
 }
 
 function PurchaseInstRow({

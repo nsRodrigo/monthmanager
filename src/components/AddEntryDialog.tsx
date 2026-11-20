@@ -583,15 +583,11 @@ export function AddEntryDialog({
                       {o.label}
                     </option>
                   ))}
-                  {customPaymentMethods.length > 0 && (
-                    <optgroup label="Personalizados">
-                      {customPaymentMethods.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                  {customPaymentMethods.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
                 </Select>
 
                 {autoDebit && (

@@ -971,15 +971,11 @@ export function EditInstallmentDialog({
                     {o.label}
                   </option>
                 ))}
-                {customPaymentMethods.length > 0 && (
-                  <optgroup label="Personalizados">
-                    {customPaymentMethods.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+                {customPaymentMethods.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
               </Select>
               {single.kind === "debit" && paymentMethod === "auto_debit" && (
                 <Field label="Dia do débito (1-31)">
@@ -1491,15 +1487,11 @@ export function EditInstallmentDialog({
                     {o.label}
                   </option>
                 ))}
-                {customPaymentMethods.length > 0 && (
-                  <optgroup label="Personalizados">
-                    {customPaymentMethods.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+                {customPaymentMethods.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
               </Select>
               {inst.parentType === "debit" && paymentMethod === "auto_debit" && (
                 <Field label="Dia do débito (1-31)">
